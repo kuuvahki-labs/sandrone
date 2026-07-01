@@ -1,0 +1,45 @@
+# 自动检测文本文件并规范化行尾
+* text=auto
+
+# 确保特定的文件类型使用 LF 行尾
+*.go text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.toml text eol=lf
+*.xml text eol=lf
+*.sh text eol=lf
+manifest/sql/*.sql text eol=lf
+Makefile text eol=lf
+.gitignore text eol=lf
+.gitattributes text eol=lf
+
+# Go 相关文件
+go.mod text eol=lf
+go.sum text eol=lf
+
+# 依赖文件
+*.proto text eol=lf
+
+# Docker 文件
+Dockerfile text eol=lf
+*.dockerfile text eol=lf
+.dockerignore text eol=lf
+
+# 配置文件
+.env text eol=lf
+.env.* text eol=lf
+config.* text eol=lf
+
+# 确保脚本文件可执行
+*.sh linguist-detectable=true
+
+# 排除某些文件类型和目录的差异检查
+vendor/* -diff
+node_modules/* -diff
+*.pb.go -diff linguist-generated=true
+*.pb.gw.go -diff linguist-generated=true
+*.swp -diff
+*.swo -diff
