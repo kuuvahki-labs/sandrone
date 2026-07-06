@@ -1,0 +1,122 @@
+package singbox_test
+
+import "github.com/kuuvahki-labs/sandrone/internal/domain"
+
+func allProtocolNodes() []domain.NodeIR {
+	return []domain.NodeIR{
+		{
+			Name:     "ss",
+			Type:     domain.NodeTypeShadowsocks,
+			Server:   "ss.example.com",
+			Port:     8388,
+			Cipher:   "aes-128-gcm",
+			Password: "secret",
+		},
+		{
+			Name:    "vmess",
+			Type:    domain.NodeTypeVMess,
+			Server:  "vmess.example.com",
+			Port:    443,
+			UUID:    "11111111-1111-1111-1111-111111111111",
+			Cipher:  "auto",
+			AlterID: 0,
+			TLS:     &domain.TLSOptions{Enabled: true, ServerName: "vmess.example.com"},
+			Transport: &domain.TransportOptions{
+				Type: "websocket",
+				Path: "/ws",
+				Host: "cdn.example.com",
+			},
+		},
+		{
+			Name:       "vless",
+			Type:       domain.NodeTypeVLESS,
+			Server:     "vless.example.com",
+			Port:       443,
+			UUID:       "11111111-1111-1111-1111-111111111112",
+			Flow:       "xtls-rprx-vision",
+			Encryption: "none",
+			TLS:        &domain.TLSOptions{Enabled: true, Reality: &domain.RealityOptions{Enabled: true, PublicKey: "public", ShortID: "abcd"}},
+		},
+		{
+			Name:     "trojan",
+			Type:     domain.NodeTypeTrojan,
+			Server:   "trojan.example.com",
+			Port:     443,
+			Password: "secret",
+			TLS:      &domain.TLSOptions{Enabled: true, ServerName: "trojan.example.com"},
+		},
+		{
+			Name:   "hysteria",
+			Type:   domain.NodeTypeHysteria,
+			Server: "hy.example.com",
+			Port:   8443,
+			TLS:    &domain.TLSOptions{Enabled: true, ServerName: "hy.example.com"},
+			Hysteria: &domain.HysteriaOptions{
+				Up:           "20 Mbps",
+				Down:         "100 Mbps",
+				AuthString:   "secret",
+				Obfs:         "xplus",
+				ObfsPassword: "obfs",
+			},
+		},
+		{
+			Name:     "hysteria2",
+			Type:     domain.NodeTypeHysteria2,
+			Server:   "hy2.example.com",
+			Port:     8443,
+			Password: "secret",
+			Hysteria: &domain.HysteriaOptions{
+				Obfs:         "salamander",
+				ObfsPassword: "obfs",
+				BBRProfile:   "desktop",
+				UpMbps:       20,
+				DownMbps:     100,
+			},
+		},
+		{
+			Name:     "tuic",
+			Type:     domain.NodeTypeTUIC,
+			Server:   "tuic.example.com",
+			Port:     443,
+			UUID:     "11111111-1111-1111-1111-111111111113",
+			Password: "secret",
+			TUIC:     &domain.TUICOptions{CongestionControl: "bbr", UDPRelayMode: "native"},
+			TLS:      &domain.TLSOptions{Enabled: true, ServerName: "tuic.example.com"},
+		},
+		{
+			Name:     "socks",
+			Type:     domain.NodeTypeSOCKS,
+			Server:   "socks.example.com",
+			Port:     1080,
+			Username: "user",
+			Password: "pass",
+		},
+		{
+			Name:     "http",
+			Type:     domain.NodeTypeHTTP,
+			Server:   "http.example.com",
+			Port:     8080,
+			Username: "user",
+			Password: "pass",
+			Headers:  map[string]string{"X-Test": "yes"},
+		},
+		{
+			Name:   "wireguard",
+			Type:   domain.NodeTypeWireGuard,
+			Server: "wg.example.com",
+			Port:   51820,
+			WireGuard: &domain.WireGuardOptions{
+				PrivateKey: "private",
+				Address:    []string{"10.0.0.2/32"},
+				Peers: []domain.WireGuardPeer{{
+					Server:       "wg.example.com",
+					Port:         51820,
+					PublicKey:    "public",
+					PreSharedKey: "psk",
+					AllowedIPs:   []string{"0.0.0.0/0"},
+				}},
+				MTU: 1408,
+			},
+		},
+	}
+}

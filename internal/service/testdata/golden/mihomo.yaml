@@ -1,0 +1,32 @@
+mixed-port: 7890
+allow-lan: true
+mode: rule
+proxies:
+    - name: node-a
+      type: ss
+      server: example.com
+      port: 8388
+      cipher: aes-128-gcm
+      password: secret
+    - name: vmess-ws-tls
+      type: vmess
+      server: example.com
+      port: 443
+      uuid: 11111111-1111-1111-1111-111111111111
+      cipher: auto
+      alterId: 0
+      network: ws
+      ws-opts:
+        path: /ws
+        headers:
+            Host: cdn.example.com
+      tls: true
+      servername: example.com
+proxy-groups:
+    - name: AUTO
+      type: url-test
+      proxies: []
+      url: https://www.gstatic.com/generate_204
+      interval: 300
+rules:
+    - MATCH,AUTO
