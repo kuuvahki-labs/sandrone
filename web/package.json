@@ -1,0 +1,63 @@
+{
+  "name": "web",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0 <25"
+  },
+  "scripts": {
+    "build": "react-router build && node -e \"require('node:fs').rmSync('build/server', { recursive: true, force: true })\"",
+    "dev": "react-router dev --host 0.0.0.0",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "preview": "vite preview --host 127.0.0.1 --outDir build/client",
+    "start": "vite preview --host 127.0.0.1 --outDir build/client",
+    "test": "vitest",
+    "test:run": "vitest --run",
+    "pretest:e2e": "playwright install chromium-headless-shell",
+    "test:e2e": "playwright test",
+    "test:e2e:install": "playwright install chromium-headless-shell",
+    "typecheck": "react-router typegen && tsc"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^9.1.1",
+    "@mui/material": "^9.1.1",
+    "@react-router/node": "8.0.0",
+    "isbot": "^5.1.36",
+    "js-yaml": "^5.2.1",
+    "prism-react-renderer": "^2.4.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-router": "8.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@playwright/test": "^1.61.0",
+    "@react-router/dev": "8.0.0",
+    "@tailwindcss/vite": "^4.2.2",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^24",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^9.39.4",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-simple-import-sort": "^13.0.0",
+    "eslint-plugin-unused-imports": "^4.4.1",
+    "globals": "^17.6.0",
+    "jsdom": "^29.1.1",
+    "tailwindcss": "^4.2.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.61.1",
+    "vite": "^8.0.3",
+    "vitest": "^4.1.9"
+  }
+}

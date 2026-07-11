@@ -1,0 +1,30 @@
+@layer theme, base, mui, components, utilities;
+@import "tailwindcss";
+@import "./styles/base.css" layer(base);
+
+@theme inline {
+  --font-sans: Roboto, "Noto Sans SC", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  --breakpoint-sm: 37.5rem;
+  --breakpoint-md: 56.25rem;
+  --breakpoint-lg: 75rem;
+  --breakpoint-xl: 96rem;
+
+  --color-primary: var(--mui-palette-primary-main);
+  --color-primary-contrast: var(--mui-palette-primary-contrastText);
+  --color-info: var(--mui-palette-info-main);
+  --color-success: var(--mui-palette-success-main);
+  --color-warning: var(--mui-palette-warning-main);
+  --color-error: var(--mui-palette-error-main);
+  --color-text-primary: var(--mui-palette-text-primary);
+  --color-text-secondary: var(--mui-palette-text-secondary);
+  --color-background-default: var(--mui-palette-background-default);
+  --color-background-paper: var(--mui-palette-background-paper);
+  --color-divider: var(--mui-palette-divider);
+  --color-action-hover: var(--mui-palette-action-hover);
+  --color-action-selected: var(--mui-palette-action-selected);
+
+  --shadow-1: var(--mui-shadows-1);
+  --shadow-2: var(--mui-shadows-2);
+  --shadow-3: var(--mui-shadows-3);
+}

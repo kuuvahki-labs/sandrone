@@ -1,0 +1,6 @@
+minimumReleaseAgeExclude:
+  - '@react-router/dev@8.0.0'
+  - '@react-router/express@8.0.0'
+  - '@react-router/node@8.0.0'
+  - '@react-router/serve@8.0.0'
+  - react-router@8.0.0

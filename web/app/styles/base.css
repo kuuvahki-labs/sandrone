@@ -1,0 +1,28 @@
+html,
+body {
+  min-width: 320px;
+  min-height: 100%;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+code,
+pre {
+  max-width: 100%;
+  overflow-x: auto;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+.highlighted-textarea-input {
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none;
+}
+
+.highlighted-textarea-input::selection {
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  background-color: color-mix(in srgb, var(--mui-palette-primary-main) 42%, transparent);
+}
