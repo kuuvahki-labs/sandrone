@@ -1,0 +1,70 @@
+name: 缺陷报告
+description: 报告可复现的缺陷或异常行为
+title: "[缺陷]: "
+labels: ["缺陷"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈问题。提交前请确认信息已脱敏：不要提交真实订阅、token、cookie、私有节点 URI 或未脱敏日志。
+  - type: input
+    id: version
+    attributes:
+      label: 版本或 commit
+      description: 请填写受影响的发布版本、commit SHA 或构建来源。
+      placeholder: "例如：v0.1.0 或 62cf374"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: OS 与架构
+      description: 请填写操作系统、版本和 CPU 架构。
+      placeholder: "例如：Ubuntu 24.04 x86_64 / macOS 15 arm64"
+    validations:
+      required: true
+  - type: textarea
+    id: entrypoint
+    attributes:
+      label: 使用命令或 API route
+      description: 请填写触发问题的命令、参数或 API route。
+      placeholder: "例如：make check；或 GET /api/example"
+    validations:
+      required: true
+  - type: textarea
+    id: sanitized-config
+    attributes:
+      label: 已脱敏配置或输入
+      description: 请提供最小可复现配置或输入，并移除真实订阅、token、cookie、私有节点 URI、密钥和个人信息。
+      render: yaml
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为
+      description: 请描述你认为应该发生什么。
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为
+      description: 请描述实际发生了什么，以及是否稳定复现。
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 已脱敏日志
+      description: 请粘贴相关日志，并确认已移除真实订阅、token、cookie、私有节点 URI、密钥和个人信息。
+      render: text
+    validations:
+      required: false
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: 补充信息
+      description: 可提供截图、相关链接、可能的回归范围或其他上下文。请继续保持脱敏。
+    validations:
+      required: false

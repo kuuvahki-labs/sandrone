@@ -1,0 +1,46 @@
+name: 功能请求
+description: 提议新能力、改进或行为调整
+title: "[功能]: "
+labels: ["功能"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢提出建议。请避免提交真实订阅、token、cookie、私有节点 URI 或其他敏感信息。
+  - type: textarea
+    id: problem
+    attributes:
+      label: 背景问题
+      description: 请说明当前遇到的问题、使用场景或限制。
+      placeholder: "我在……场景下需要……，但目前……"
+    validations:
+      required: true
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: 期望行为
+      description: 请描述你希望项目如何表现，或希望新增什么能力。
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 已考虑替代方案
+      description: 请列出你尝试过或考虑过的替代方案，以及它们为什么不够合适。
+    validations:
+      required: false
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: 兼容性影响
+      description: 请说明该请求是否可能影响现有配置、API、Web UI、部署方式或集成行为。
+      placeholder: "例如：需要新增配置字段；不应影响现有 API。"
+    validations:
+      required: true
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: 补充信息
+      description: 可提供相关链接、示例、草图或其他上下文。请勿包含敏感信息。
+    validations:
+      required: false

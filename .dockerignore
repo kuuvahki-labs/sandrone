@@ -1,0 +1,15 @@
+.git
+.local
+private
+data
+.claude
+.codex
+.agents
+.mcp
+.idea
+web/node_modules
+web/build
+web/test-results
+coverage
+dist
+internal/service/catalog_builtin/catalog.json.gz

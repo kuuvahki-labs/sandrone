@@ -1,0 +1,31 @@
+services:
+  sandrone:
+    build:
+      context: .
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-}
+        PNPM_REGISTRY: ${PNPM_REGISTRY:-}
+        GOPROXY: ${GOPROXY:-}
+    image: ${SANDRONE_IMAGE:-ghcr.io/kuuvahki-labs/sandrone:local}
+    command:
+      - serve
+      - http
+    environment:
+      SANDRONE_DATA_DIR: ${SANDRONE_DATA_DIR:-/app/data}
+      SANDRONE_LISTEN: ${SANDRONE_LISTEN:-0.0.0.0:1137}
+      SANDRONE_TOKEN: ${SANDRONE_TOKEN:-sandrone}
+      SANDRONE_WEBUI_STATIC_DIR: ${SANDRONE_WEBUI_STATIC_DIR:-}
+    ports:
+      - "0.0.0.0:1137:1137"
+    volumes:
+      - sandrone-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:1137/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  sandrone-data:

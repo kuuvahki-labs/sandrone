@@ -1,0 +1,96 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+  modules-download-mode: readonly
+
+linters:
+  default: none
+  enable:
+    - bodyclose
+    - copyloopvar
+    - durationcheck
+    - errcheck
+    - errorlint
+    - gocritic
+    - gosec
+    - ineffassign
+    - misspell
+    - nilerr
+    - nilnil
+    - noctx
+    - nolintlint
+    - prealloc
+    - staticcheck
+    - testifylint
+    - unconvert
+    - unparam
+    - unused
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - bodyclose
+          - copyloopvar
+          - errcheck
+          - gosec
+          - nilnil
+          - noctx
+          - prealloc
+          - staticcheck
+          - testifylint
+          - unparam
+      - path: internal/entry/cli/io\.go
+        linters:
+          - gosec
+        text: "G30[16]:"
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: false
+    gosec:
+      excludes:
+        - G304 # File paths are validated at service/store boundaries where required.
+    govet:
+      enable-all: true
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+    revive:
+      severity: warning
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: error-naming
+        - name: error-return
+        - name: error-strings
+        - name: exported
+        - name: if-return
+        - name: increment-decrement
+        - name: indent-error-flow
+        - name: receiver-naming
+        - name: superfluous-else
+        - name: unexported-return
+        - name: var-declaration
+        - name: var-naming
+    staticcheck:
+      checks:
+        - all
+    testifylint:
+      enable-all: true
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/kuuvahki-labs/sandrone
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
