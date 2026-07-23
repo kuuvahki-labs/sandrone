@@ -7,6 +7,7 @@ import { requireFileDriver } from "~/features/files/drivers/registry";
 import { requireFileDriverUI } from "~/features/files/editor/file-driver-ui-registry";
 
 import { FileFormFields } from "./file-form";
+import { RawFileConfigEditor } from "./raw-config-editor";
 
 afterEach(() => {
   localStorage.removeItem("sandrone.locale");
@@ -55,10 +56,10 @@ describe("file form drivers", () => {
   it.each([
     ["mihomo", {}],
     ["mihomo", { type: "url-test" }],
-    ["mihomo", { minimum_node_count: 2, regions: ["us", "hk"] }],
+    ["mihomo", { regions: ["us", "hk"] }],
     ["shadowrocket", {}],
     ["shadowrocket", { type: "url-test" }],
-    ["shadowrocket", { minimum_node_count: 2, regions: ["us", "hk"] }],
+    ["shadowrocket", { regions: ["us", "hk"] }],
   ] as const)("keeps untouched partial %s adaptive settings byte-structurally equivalent", (kind, adaptiveGroups) => {
     const adapter = structuredAdapter(kind);
     const settings = { adaptive_groups: adaptiveGroups };
@@ -98,7 +99,6 @@ describe("file form drivers", () => {
       settings: {
         adaptive_groups: {
           type: "load-balance",
-          minimum_node_count: 2,
           regions: ["hk", "us"],
         },
       },
@@ -124,6 +124,15 @@ describe("file form drivers", () => {
     expect(window.confirm).toHaveBeenCalledOnce();
     expect(screen.getByRole("textbox", { name: /settings JSON/i })).toBeInTheDocument();
     expect(currentConfig()).toEqual({ subscriptions: ["provider"], settings: { future_nested: { keep: true } } });
+  });
+
+  it("labels raw configuration as editable configuration content", () => {
+    localStorage.setItem("sandrone.locale", "en-US");
+
+    render(<RawFileConfigEditor baseEditor={<div />} subscriptions={[]} />);
+
+    expect(screen.getByRole("heading", { name: "Configuration content" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Base configuration content" })).toBeInTheDocument();
   });
 
   it("keeps omitted Shadowrocket sections absent until that section is edited", async () => {
@@ -197,7 +206,7 @@ describe("file form drivers", () => {
   it("uses INI highlighting and a section-complete base for Shadowrocket", () => {
     render(<FileFormFields defaultName="default.conf" driver={requireFileDriver("shadowrocket")} mode="create" />);
 
-		const base = within(screen.getByRole("group", { name: "基础配置" }))
+		const base = within(screen.getByRole("group", { name: "基础配置内容" }))
 			.getByRole("textbox", { name: "内容" });
 		const value = (base as HTMLTextAreaElement).value;
 		expect(value).toContain("[General]");

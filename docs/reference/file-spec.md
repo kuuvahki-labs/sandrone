@@ -97,7 +97,7 @@ Shadowrocket 的 settings 还执行字段级严格校验：
   `policy-regex-filter`；`proxies` 中的 `$nodes` 在编译时展开为全部节点；
 - `rule_sets[]` 使用 `name`、`type`、`url`；
 - `rules[]` 是 Shadowrocket 规则字符串；
-- `adaptive_groups` 只接受已声明的 type、最小节点数和 region 值。
+- `adaptive_groups` 只接受已声明的 type 和 region 值。
 
 所有 settings 的未知字段都会失败。Shadowrocket 的嵌套对象也拒绝未知字段；
 Mihomo 和 sing-box 的客户端 object 内容保持开放，以容纳各自客户端字段。

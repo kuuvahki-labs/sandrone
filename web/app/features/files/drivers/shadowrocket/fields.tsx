@@ -54,34 +54,6 @@ function ShadowrocketGroupFields({ draft, healthCheck, index, onUpdate }: GroupF
           ) : null}
         </div>
       ) : null}
-      <div className="grid gap-3 sm:grid-cols-3 sm:items-center">
-        <TextField
-          fullWidth
-          label={t("files.config.groupPolicySelectName")}
-          size="small"
-          value={draft.policySelectName ?? ""}
-          onChange={(event) => onUpdate({
-            ...draft,
-            policySelectName: event.target.value || undefined,
-          })}
-        />
-        <TextField
-          fullWidth
-          label={t("files.config.groupSelect")}
-          size="small"
-          slotProps={{ htmlInput: { min: 0, step: 1 } }}
-          type="number"
-          value={optionalValue(draft.selectedIndex)}
-          onChange={(event) => onUpdate({
-            ...draft,
-            selectedIndex: optionalNumber(event.target.value),
-          })}
-        />
-        <FormControlLabel
-          control={<Checkbox checked={draft.hidden === true} size="small" onChange={(event) => onUpdate({ ...draft, hidden: event.target.checked })} />}
-          label={t("files.config.groupHidden")}
-        />
-      </div>
     </>
   );
 }

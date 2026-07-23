@@ -40,7 +40,7 @@ const REGION_IDS = new Set([
 ]);
 const GROUP_KEYS = [
   "name", "type", "proxies", "policy-regex-filter", "interval", "timeout", "tolerance",
-  "policy-select-name", "select", "hidden",
+  "hidden",
 ] as const;
 const GROUP_TYPE_OPTIONS = [
   { value: "select", label: "select" },
@@ -123,8 +123,6 @@ function shadowrocketGroups(): StructuredFileConfigurationAdapter["groups"] {
     healthCheckInterval: scalarString(value.interval),
     healthCheckTimeout: optionalNumber(value.timeout),
     healthCheckTolerance: optionalNumber(value.tolerance),
-    policySelectName: stringField(value["policy-select-name"]) || undefined,
-    selectedIndex: optionalNumber(value.select),
     hidden: typeof value.hidden === "boolean" ? value.hidden : undefined,
   }));
   const serialize = (values: GroupDraft[]): ConfigMap[] => values.map((draft) => {
@@ -136,8 +134,6 @@ function shadowrocketGroups(): StructuredFileConfigurationAdapter["groups"] {
       if (draft.healthCheckTimeout !== undefined) value.timeout = draft.healthCheckTimeout;
       if (draft.healthCheckTolerance !== undefined) value.tolerance = draft.healthCheckTolerance;
     }
-    if (draft.policySelectName) value["policy-select-name"] = draft.policySelectName;
-    if (draft.selectedIndex !== undefined) value.select = draft.selectedIndex;
     if (draft.hidden !== undefined) value.hidden = draft.hidden;
     return value;
   });
@@ -156,6 +152,7 @@ function shadowrocketGroups(): StructuredFileConfigurationAdapter["groups"] {
     project,
     serialize,
     supportsExcludeFilter: false,
+    supportsHidden: true,
     supportsRuntimeFilter: true,
     transitionMemberMode: (group, mode, restoredMembers) => ({
       ...group,
@@ -345,10 +342,9 @@ function runtimeRules(): string[] {
 }
 
 function validAdaptiveGroups(value: unknown): boolean {
-  const item = strictSettingsObject(value, ["type", "minimum_node_count", "regions"]);
+  const item = strictSettingsObject(value, ["type", "regions"]);
   if (!item) return false;
   if ("type" in item && (typeof item.type !== "string" || !ADAPTIVE_GROUP_TYPES.has(item.type.trim()))) return false;
-  if ("minimum_node_count" in item && (!Number.isInteger(item.minimum_node_count) || Number(item.minimum_node_count) < 1)) return false;
   if ("regions" in item) {
     if (!Array.isArray(item.regions) || item.regions.some((region) => typeof region !== "string" || !REGION_IDS.has(region))) return false;
     if (new Set(item.regions).size !== item.regions.length) return false;
@@ -373,8 +369,6 @@ function validGroups(value: unknown): value is ConfigMap[] {
     if (!optionalIntegerInRange(group.interval, 1, 86400)) return false;
     if (!optionalIntegerInRange(group.timeout, 1, 300)) return false;
     if (!optionalIntegerInRange(group.tolerance, 0, 65535)) return false;
-    if (group["policy-select-name"] !== undefined && (typeof group["policy-select-name"] !== "string" || !group["policy-select-name"].trim())) return false;
-    if (group.select !== undefined && (!Number.isInteger(group.select) || Number(group.select) < 0)) return false;
     return group.hidden === undefined || typeof group.hidden === "boolean";
   });
 }

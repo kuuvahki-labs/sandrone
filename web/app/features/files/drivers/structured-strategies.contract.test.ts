@@ -33,18 +33,18 @@ interface Task3AdapterStrategies {
     canonicalNames: (groups: readonly Record<string, unknown>[]) => string[];
     generate: (nodeNames: readonly string[], options: Readonly<AdaptiveGroupOptions>, namingLocale?: "en-US" | "zh-CN") => AdaptiveGroupGeneration;
     merge: (config: Readonly<FileConfigDraft>, generation: Readonly<AdaptiveGroupGeneration>) => AdaptiveGroupMergeResult;
-  };
+ };
   preview: {
     projectNodes: (preview: ReturnType<typeof configNodePreviewFromSubscription>) => Array<{ name: string }>;
-  };
+ };
   relations: {
     project: (groups: Record<string, unknown>[], ruleSets: Record<string, unknown>[], rules: unknown[], nodeNames?: string[]) => ConfigRelationProjection;
-  };
+ };
   templates: {
     create: (id: ConfigTemplateID, namingLocale?: "en-US" | "zh-CN") => FileConfigDraft;
     list: () => Array<{ id: ConfigTemplateID; modules: string[] }>;
     recognize: (config: FileConfigDraft) => ConfigTemplateRecognition;
-  };
+ };
 }
 
 describe("structured file driver orchestration strategies", () => {
@@ -55,19 +55,19 @@ describe("structured file driver orchestration strategies", () => {
       create: expect.any(Function),
       list: expect.any(Function),
       recognize: expect.any(Function),
-    }));
+   }));
     expect(adapter.relations).toEqual(expect.objectContaining({ project: expect.any(Function) }));
     expect(adapter.preview).toEqual(expect.objectContaining({ projectNodes: expect.any(Function) }));
     expect(adapter.adaptive).toEqual(expect.objectContaining({
       canonicalNames: expect.any(Function),
       generate: expect.any(Function),
       merge: expect.any(Function),
-    }));
+   }));
     expect(Object.isFrozen(adapter.templates)).toBe(true);
     expect(Object.isFrozen(adapter.relations)).toBe(true);
     expect(Object.isFrozen(adapter.preview)).toBe(true);
     expect(Object.isFrozen(adapter.adaptive)).toBe(true);
-  });
+ });
 
   it.each(CONFIG_KINDS)("keeps every %s template tier recognizable in both naming locales", (kind) => {
     const adapter = task3Adapter(kind);
@@ -80,15 +80,15 @@ describe("structured file driver orchestration strategies", () => {
           adaptive: false,
           match: templateID,
           namingLocale,
-        });
+       });
         expect(buildConfigRelationModel(adapter.relations.project(
           config.groups ?? [],
           config.rule_sets ?? [],
           config.rules ?? [],
         )).issues).toEqual([]);
-      }
-    }
-  });
+     }
+   }
+ });
 
   it.each(CONFIG_KINDS)("owns %s native adaptive metadata cleanup during template recognition", (kind) => {
     const adapter = task3Adapter(kind);
@@ -97,12 +97,12 @@ describe("structured file driver orchestration strategies", () => {
     expect(adapter.templates.recognize({
       ...config,
       adaptive_groups: { type: "driver-native" },
-    })).toEqual({
+   })).toEqual({
       adaptive: false,
       match: "minimal",
       namingLocale: "en-US",
-    });
-  });
+   });
+ });
 
   it("projects Shadowrocket node options exclusively from service-realized target names", () => {
     const adapter = task3Adapter("shadowrocket");
@@ -114,13 +114,13 @@ describe("structured file driver orchestration strategies", () => {
         { identity: "second", after: { name: "DIRECT", type: "http", endpoint: "two.example:3" }, targetNames: { shadowrocket: "DIRECT (Node) (2)" } },
       ],
       warnings: [],
-    };
+   };
 
     const projected = adapter.preview.projectNodes(configNodePreviewFromSubscription(preview));
 
     expect(projected.map((node) => node.name)).toEqual(["DIRECT (Node)", "DIRECT (Node) (2)"]);
     expect(projected.map((node) => node.name)).not.toContain("secret raw name");
-  });
+ });
 
   it.each([
     {
@@ -128,31 +128,31 @@ describe("structured file driver orchestration strategies", () => {
       targetNames: [undefined, undefined],
       expectedNames: ["raw one", "raw two"],
       expectedValid: true,
-    },
+   },
     {
       name: "partial",
       targetNames: [{ shadowrocket: "Service One" }, undefined],
       expectedNames: ["Service One"],
       expectedValid: true,
-    },
+   },
     {
       name: "complete",
       targetNames: [{ shadowrocket: "Service One" }, { shadowrocket: "Service Two" }],
       expectedNames: ["Service One", "Service Two"],
       expectedValid: true,
-    },
+   },
     {
       name: "all-skipped",
       targetNames: [{ shadowrocket: "" }, { shadowrocket: "" }],
       expectedNames: [],
       expectedValid: false,
-    },
+   },
     {
       name: "partial-without-safe-options",
       targetNames: [{ shadowrocket: "" }, undefined],
       expectedNames: [],
       expectedValid: false,
-    },
+   },
   ])("uses conservative Shadowrocket readiness for $name target-name coverage", ({ targetNames, expectedNames, expectedValid }) => {
     const adapter = task3Adapter("shadowrocket");
     const preview = configNodePreviewFromSubscription(shadowrocketPreview(targetNames));
@@ -161,7 +161,7 @@ describe("structured file driver orchestration strategies", () => {
     expect(projectedNodes.map((node) => node.name)).toEqual(expectedNames);
     expect(adapter.preview.validate({ formMode: "edit", preview, projectedNodes, selected: true }).valid)
       .toBe(expectedValid);
-  });
+ });
 
   it("keeps registered client selection and native keys out of shared Task 3 orchestration", () => {
     const sharedFiles = [
@@ -177,15 +177,14 @@ describe("structured file driver orchestration strategies", () => {
       const source = readFileSync(new URL(filename, import.meta.url), "utf8");
       expect(source, filename).not.toMatch(/["'](?:mihomo|sing-box|shadowrocket)["']/);
       expect(source, filename).not.toMatch(/["'](?:tag|outbounds|proxies|policy-regex-filter)["']/);
-      expect(source, filename).not.toMatch(/adaptive_groups|minimum_node_count|policy-select-name/);
+      expect(source, filename).not.toMatch(/adaptive_groups/);
       expect(source, filename).not.toMatch(/persistOptions|staleMode|createConfigAdaptiveStrategy/);
-      expect(source, filename).not.toContain("unknown_group_policy_select");
-    }
+   }
 
     const previewSource = readFileSync(new URL("../config/model/node-source.ts", import.meta.url), "utf8");
     expect(previewSource).not.toContain("normalizeShadowrocketNodeName");
     expect(previewSource).not.toContain("SHADOWROCKET_SUPPORTED_NODE_TYPES");
-  });
+ });
 
   it("lets a fourth driver compose custom adaptive persistence and stale behavior from pure helpers", () => {
     const dialect = fakeAdaptiveDialect();
@@ -197,26 +196,26 @@ describe("structured file driver orchestration strategies", () => {
       optionsFromConfig: (config: FileConfigDraft["adaptive_groups"]) => ({
         ...defaultAdaptiveGroupOptions(dialect),
         type: config?.type?.replace(/^fourth:/, "") ?? "race",
-      }),
+     }),
       recognizesCanonicalLayer: () => false,
-    } satisfies Task3AdapterStrategies["adaptive"] & {
+   } satisfies Task3AdapterStrategies["adaptive"] & {
       configFromOptions: (options: Readonly<AdaptiveGroupOptions>) => FileConfigDraft["adaptive_groups"];
       initiallyEnabled: (mode: "create" | "edit", config: FileConfigDraft["adaptive_groups"]) => boolean;
       isStale: (input: { options: Readonly<AdaptiveGroupOptions> }) => boolean;
       optionsFromConfig: (config: FileConfigDraft["adaptive_groups"]) => AdaptiveGroupOptions;
       recognizesCanonicalLayer: (config: Readonly<FileConfigDraft>) => boolean;
-    };
+   };
 
-    const persisted = custom.configFromOptions({ type: "race", minimumNodeCount: 3 });
+    const persisted = custom.configFromOptions({ type: "race" });
     expect(persisted).toEqual({ type: "fourth:race" });
     expect(custom.initiallyEnabled("edit", persisted)).toBe(true);
     expect(custom.optionsFromConfig(persisted).type).toBe("race");
-    expect(custom.isStale({ options: { type: "stale-by-driver", minimumNodeCount: 1 } })).toBe(true);
-    expect(custom.generate(["HK-01"], { type: "race", minimumNodeCount: 1 }).groups[0]).toMatchObject({
+    expect(custom.isStale({ options: { type: "stale-by-driver" } })).toBe(true);
+    expect(custom.generate(["HK-01"], { type: "race" }).groups[0]).toMatchObject({
       label: "Hong Kong",
       members: ["HK-01"],
-    });
-  });
+   });
+ });
 });
 
 function fakeAdaptiveDialect(): ConfigAdaptiveDialect {
@@ -229,8 +228,9 @@ function fakeAdaptiveDialect(): ConfigAdaptiveDialect {
     inboundReferences: () => ({}),
     materialize: (definition, _type, nodeNames) => ({ label: definition.name, members: [...nodeNames] }),
     replaceGroupMembers: (group, members) => ({ ...group, members: [...members] }),
+    requiresNodePreview: true,
     typeOptions: [{ label: "race", value: "race" }, { label: "stale", value: "stale-by-driver" }],
-  };
+ };
 }
 
 function task3Adapter(kind: typeof CONFIG_KINDS[number]): StructuredFileConfigurationAdapter & Task3AdapterStrategies {
@@ -250,9 +250,9 @@ function shadowrocketPreview(
         name: index === 0 ? "raw one" : "raw two",
         type: "http",
         endpoint: `${index}.example:80`,
-      },
+     },
       ...(names ? { targetNames: names } : {}),
-    })),
+   })),
     warnings: [],
-  };
+ };
 }

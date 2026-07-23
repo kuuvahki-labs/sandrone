@@ -49,7 +49,7 @@ export function OrderedReferenceList({ label, onChange, options, values }: {
           ))}
         </SortableContext>
       </DndContext>
-      <div>
+      <div className="flex justify-end">
         <Button startIcon={<AddIcon aria-hidden />} type="button" variant="outlined" onClick={() => onChange([...values, ""])}>
           {t("files.config.referenceAdd", { label })}
         </Button>

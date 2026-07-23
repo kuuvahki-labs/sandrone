@@ -183,13 +183,13 @@ block-quic = all-proxy
 # url:指定要测试的URL。
 
 # 不含正则筛选的代理分组，示例：
-# 名称 = 类型(如select,url-test,fallback,load-balance,random),策略(如direct,proxy,订阅名称,代理分组,节点),interval=测试周期,timeout=超时时间,tolerance=公差,policy-select-name=指定选择的节点备注名称,select=默认策略(0表示第一个策略,1表示第二个策略,2表示第三个策略……),url=测试地址
+# 名称 = 类型(如select,url-test,fallback,load-balance,random),策略(如direct,proxy,订阅名称,代理分组,节点),interval=测试周期,timeout=超时时间,tolerance=公差,url=测试地址
 
 # 含正则筛选的代理分组，示例：
-# 名称 = 类型(如select,url-test,fallback,load-balance,random),policy-regex-filter=正则式或关键词筛选,interval=测试周期,timeout=超时时间,tolerance=公差,policy-select-name=指定选择的节点备注名称,select=默认策略(0表示第一个策略,1表示第二个策略,2表示第三个策略……),url=测试地址
+# 名称 = 类型(如select,url-test,fallback,load-balance,random),policy-regex-filter=正则式或关键词筛选,interval=测试周期,timeout=超时时间,tolerance=公差,url=测试地址
 
 # 开启订阅筛选的代理分组，示例：
-# 名称 = 类型(如select,url-test,fallback,load-balance,random),订阅名称(多个订阅时,用逗号分隔),use=true,policy-regex-filter=正则式或关键词筛选(省略该参数时,表示匹配对应订阅的全部节点),interval=测试周期,timeout=超时时间,tolerance=公差,policy-select-name=指定选择的节点备注名称,select=默认策略(0表示第一个策略,1表示第二个策略,2表示第三个策略……),url=测试地址
+# 名称 = 类型(如select,url-test,fallback,load-balance,random),订阅名称(多个订阅时,用逗号分隔),use=true,policy-regex-filter=正则式或关键词筛选(省略该参数时,表示匹配对应订阅的全部节点),interval=测试周期,timeout=超时时间,tolerance=公差,url=测试地址
 
 
 [Rule]

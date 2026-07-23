@@ -77,8 +77,6 @@ export const fileEnUS = {
   "processor.merge.iniOverrideDescription": "Overrides INI by section; use [Section+] to append to an existing section.",
   "files.config.groupTimeout": "Timeout",
   "files.config.groupTolerance": "Tolerance",
-  "files.config.groupPolicySelectName": "Default policy name",
-  "files.config.groupSelect": "Default policy index",
-  "files.config.groupHidden": "Hide policy group",
+  "files.config.groupHidden": "Hide group",
   "processor.merge.jsonInvalid": "Merge content must be a valid JSON object; array operators require array values.",
 } as const;

@@ -112,14 +112,14 @@ func TestServiceShadowrocketFileUsesExplicitGroupsRuleSetsAndRules(t *testing.T)
 			Subscriptions: []string{"default"},
 			Settings: shadowrocketSettings(t, map[string]any{
 				"adaptive_groups": map[string]any{
-					"type": "url-test", "minimum_node_count": 2, "regions": []string{"hk", "jp"},
+					"type": "url-test", "regions": []string{"hk", "jp"},
 				},
 				"groups": []map[string]any{
 					{"name": "Manual", "type": "select", "proxies": []string{"$nodes", "DIRECT"}},
 					{
 						"name": "Auto", "type": "url-test", "policy-regex-filter": "(?i)hk",
 						"interval": 600, "timeout": 5, "tolerance": 20,
-						"policy-select-name": "Manual", "select": 1, "hidden": false,
+						"hidden": false,
 					},
 				},
 				"rule_sets": []map[string]any{
@@ -140,7 +140,7 @@ func TestServiceShadowrocketFileUsesExplicitGroupsRuleSetsAndRules(t *testing.T)
 	require.NoError(t, err)
 	body := string(result.Content)
 	require.Contains(t, body, "Manual = select,hk-node,DIRECT")
-	require.Contains(t, body, "Auto = url-test,policy-regex-filter=(?i)hk,interval=600,timeout=5,tolerance=20,policy-select-name=Manual,select=1,hidden=0")
+	require.Contains(t, body, "Auto = url-test,policy-regex-filter=(?i)hk,interval=600,timeout=5,tolerance=20,hidden=0")
 	require.Contains(t, body, "RULE-SET,https://rules.example/private.list,DIRECT")
 	require.Contains(t, body, "DOMAIN-SET,https://direct.example/ads.list,REJECT")
 	require.Contains(t, body, "FINAL,Manual")
@@ -197,7 +197,6 @@ func TestServiceShadowrocketAcceptsDocumentedGroupPolicies(t *testing.T) {
 		Config: &domain.FileConfig{Settings: shadowrocketSettings(t, map[string]any{
 			"groups": []map[string]any{{
 				"name": "AI", "type": "select", "proxies": []string{"PROXY", "DIRECT", "REJECT"},
-				"policy-select-name": "PROXY",
 			}},
 			"rules": []string{"FINAL,PROXY"},
 		})},
@@ -206,7 +205,7 @@ func TestServiceShadowrocketAcceptsDocumentedGroupPolicies(t *testing.T) {
 	result, err := service.New().GetFile(context.Background(), domain.FileRequest{Spec: &spec})
 
 	require.NoError(t, err)
-	require.Contains(t, string(result.Content), "AI = select,PROXY,DIRECT,REJECT,policy-select-name=PROXY")
+	require.Contains(t, string(result.Content), "AI = select,PROXY,DIRECT,REJECT")
 	require.Contains(t, string(result.Content), "FINAL,PROXY")
 }
 
@@ -293,8 +292,8 @@ func TestServiceShadowrocketSettingsValidation(t *testing.T) {
 		{name: "duplicate group", settings: `{"groups":[{"name":"Proxy","type":"select","proxies":["DIRECT"]},{"name":"Proxy","type":"select","proxies":["DIRECT"]}]}`, path: "config.settings.groups[1].name"},
 		{name: "group cycle", settings: `{"groups":[{"name":"A","type":"select","proxies":["B"]},{"name":"B","type":"select","proxies":["A"]}]}`, path: "config.settings.groups"},
 		{name: "bad interval", settings: `{"groups":[{"name":"Auto","type":"url-test","proxies":["$nodes"],"interval":0}]}`, path: "config.settings.groups[0].interval"},
-		{name: "boolean select index", settings: `{"groups":[{"name":"Proxy","type":"select","proxies":["DIRECT"],"select":true}],"rules":[]}`, path: "config.settings.groups[0]"},
-		{name: "negative select index", settings: `{"groups":[{"name":"Proxy","type":"select","proxies":["DIRECT"],"select":-1}],"rules":[]}`, path: "config.settings.groups[0].select"},
+		{name: "removed policy select name", settings: `{"groups":[{"name":"Proxy","type":"select","proxies":["DIRECT"],"policy-select-name":"DIRECT"}],"rules":[]}`, path: "config.settings.groups[0].policy-select-name"},
+		{name: "removed select", settings: `{"groups":[{"name":"Proxy","type":"select","proxies":["DIRECT"],"select":0}],"rules":[]}`, path: "config.settings.groups[0].select"},
 		{name: "missing final policy", settings: `{"rules":["FINAL"]}`, path: "config.settings.rules[0]"},
 		{name: "missing match policy", settings: `{"rules":["MATCH"]}`, path: "config.settings.rules[0]"},
 		{name: "missing domain policy", settings: `{"rules":["DOMAIN,example.com"]}`, path: "config.settings.rules[0]"},
@@ -306,7 +305,7 @@ func TestServiceShadowrocketSettingsValidation(t *testing.T) {
 		{name: "group filter newline injection", settings: `{"groups":[{"name":"Proxy","type":"select","policy-regex-filter":".*\n[Rule]\nFINAL,REJECT"}],"rules":[]}`, path: "config.settings.groups[0].policy-regex-filter"},
 		{name: "group filter comma injection", settings: `{"groups":[{"name":"Proxy","type":"select","policy-regex-filter":".*,hidden=1"}],"rules":[]}`, path: "config.settings.groups[0].policy-regex-filter"},
 		{name: "bad adaptive type", settings: `{"adaptive_groups":{"type":"fallback"}}`, path: "config.settings.adaptive_groups.type"},
-		{name: "bad adaptive count", settings: `{"adaptive_groups":{"minimum_node_count":0}}`, path: "config.settings.adaptive_groups.minimum_node_count"},
+		{name: "removed adaptive count", settings: `{"adaptive_groups":{"minimum_node_count":2}}`, path: "config.settings.adaptive_groups.minimum_node_count"},
 		{name: "bad adaptive region", settings: `{"adaptive_groups":{"regions":["moon"]}}`, path: "config.settings.adaptive_groups.regions[0]"},
 		{name: "duplicate rule set", settings: `{"rule_sets":[{"name":"a","type":"rule-set","url":"https://example.com/a"},{"name":"a","type":"rule-set","url":"https://example.com/b"}]}`, path: "config.settings.rule_sets[1].name"},
 		{name: "bad rule set type", settings: `{"rule_sets":[{"name":"a","type":"classical","url":"https://example.com/a"}]}`, path: "config.settings.rule_sets[0].type"},
@@ -339,10 +338,8 @@ func TestServiceShadowrocketRejectsUnresolvedPoliciesAfterRenderingNodes(t *test
 	}{
 		{name: "group member", settings: `{"groups":[{"name":"Proxy","type":"select","proxies":["missing"]}],"rules":[]}`, path: "config.settings.groups[0].proxies"},
 		{name: "rule-only policy used as group member", settings: `{"groups":[{"name":"Proxy","type":"select","proxies":["TAILSCALE"]}],"rules":[]}`, path: "config.settings.groups[0].proxies"},
-		{name: "policy select name", settings: `{"groups":[{"name":"Proxy","type":"url-test","policy-regex-filter":".*","policy-select-name":"missing"}],"rules":[]}`, path: "config.settings.groups[0].policy-select-name"},
 		{name: "rule policy", settings: `{"groups":[],"rules":["FINAL,missing"]}`, path: "config.settings.rules[0]"},
 		{name: "implicit final without Proxy", settings: `{"groups":[]}`, path: "config.settings.rules[4]"},
-		{name: "select index exceeds expanded members", settings: `{"groups":[{"name":"Proxy","type":"select","proxies":["DIRECT"],"select":1}],"rules":[]}`, path: "config.settings.groups[0].select"},
 		{name: "nodes expansion leaves empty group", settings: `{"groups":[{"name":"Proxy","type":"select","proxies":["$nodes"]}],"rules":[]}`, path: "config.settings.groups[0].proxies"},
 	}
 	for _, test := range tests {
@@ -358,30 +355,6 @@ func TestServiceShadowrocketRejectsUnresolvedPoliciesAfterRenderingNodes(t *test
 			require.ErrorContains(t, err, test.path)
 		})
 	}
-}
-
-func TestServiceShadowrocketChecksSelectIndexAfterNodesExpansion(t *testing.T) {
-	ctx := context.Background()
-	svc := service.New(service.WithFS(afero.NewMemMapFs()))
-	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
-		Name: "default", Type: domain.SubscriptionTypeLocal, Format: "uri-list",
-		Content: "ss://aes-128-gcm:secret@example.com:8388#only-node",
-	}))
-	spec := domain.FileSpec{
-		Name: "bad-select.conf", Kind: domain.FileKindShadowrocket,
-		Config: &domain.FileConfig{
-			Subscriptions: []string{"default"},
-			Settings: json.RawMessage(`{
-				"groups":[{"name":"Proxy","type":"select","proxies":["$nodes"],"select":1}],
-				"rules":[]
-			}`),
-		},
-	}
-
-	_, err := svc.GetFile(ctx, domain.FileRequest{Spec: &spec})
-
-	require.True(t, domain.IsCode(err, domain.CodeInvalidArgument), "got %v", err)
-	require.ErrorContains(t, err, "config.settings.groups[0].select")
 }
 
 func TestServiceShadowrocketRejectsAmbiguousRenderedPolicyNames(t *testing.T) {

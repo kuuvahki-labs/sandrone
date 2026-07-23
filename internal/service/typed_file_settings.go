@@ -26,11 +26,39 @@ type singBoxFileSettings struct {
 }
 
 func decodeMihomoFileSettings(raw json.RawMessage) (mihomoFileSettings, error) {
+	if err := validateMihomoAdaptiveGroupFields(raw); err != nil {
+		return mihomoFileSettings{}, domain.NewError(
+			domain.CodeInvalidArgument,
+			fmt.Sprintf("file kind %q %v", domain.FileKindMihomo, err),
+		)
+	}
 	var settings mihomoFileSettings
 	if err := decodeTypedFileSettings(domain.FileKindMihomo, raw, &settings); err != nil {
 		return mihomoFileSettings{}, err
 	}
 	return settings, nil
+}
+
+func validateMihomoAdaptiveGroupFields(raw json.RawMessage) error {
+	if len(bytes.TrimSpace(raw)) == 0 {
+		return nil
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil || fields == nil {
+		return nil
+	}
+	adaptive, ok := fields["adaptive_groups"]
+	if !ok || isJSONNull(adaptive) {
+		return nil
+	}
+	adaptiveFields, err := strictJSONObject(adaptive, "config.settings.adaptive_groups")
+	if err != nil {
+		return err
+	}
+	return rejectUnknownJSONFields(adaptiveFields, map[string]bool{
+		"type":    true,
+		"regions": true,
+	}, "config.settings.adaptive_groups")
 }
 
 func decodeSingBoxFileSettings(raw json.RawMessage) (singBoxFileSettings, error) {

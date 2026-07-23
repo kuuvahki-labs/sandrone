@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import Alert from "@mui/material/Alert";
@@ -6,7 +6,6 @@ import Button from "@mui/material/Button";
 import Checkbox from "@mui/material/Checkbox";
 import Collapse from "@mui/material/Collapse";
 import FormControlLabel from "@mui/material/FormControlLabel";
-import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 
 import type {
@@ -15,7 +14,11 @@ import type {
   AdaptiveGroupType,
   AdaptiveGroupWarning,
 } from "~/features/files/config/model/adaptive-groups";
-import { ADAPTIVE_REGION_IDS, DEFAULT_ADAPTIVE_REGION_IDS } from "~/features/files/config/model/adaptive-groups";
+import {
+  ADAPTIVE_REGION_IDS,
+  DEFAULT_ADAPTIVE_REGION_IDS,
+  sortAdaptiveCandidates,
+} from "~/features/files/config/model/adaptive-groups";
 import { type Translator, useI18n } from "~/shared/i18n/context";
 import { SelectField } from "~/shared/ui/form-fields";
 
@@ -43,19 +46,15 @@ export function ConfigAdaptiveGroupControls({
   warnings,
 }: ConfigAdaptiveGroupControlsProps) {
   const { t } = useI18n();
-  const [minimumText, setMinimumText] = useState(String(options.minimumNodeCount));
   const [scopeExpanded, setScopeExpanded] = useState(false);
-  const minimumNodeCount = Number(minimumText);
-  const minimumValid = Number.isInteger(minimumNodeCount) && minimumNodeCount >= 1;
-  const reason = disabledReason ?? (!minimumValid ? t("files.config.adaptiveMinimumInvalid") : undefined);
+  const reason = disabledReason;
   const enabledRegionIds = options.enabledRegionIds ?? DEFAULT_ADAPTIVE_REGION_IDS;
   const enabledRegionSet = new Set(enabledRegionIds);
+  const sortedCandidates = sortAdaptiveCandidates(candidates, enabledRegionIds);
   const warningMessages = warnings.flatMap((warning) => {
     const message = adaptiveWarningMessage(warning, t);
     return message ? [message] : [];
   });
-
-  useEffect(() => setMinimumText(String(options.minimumNodeCount)), [options.minimumNodeCount]);
 
   function changeOptions(update: Partial<AdaptiveGroupOptions>) {
     onOptionsChange({
@@ -76,7 +75,6 @@ export function ConfigAdaptiveGroupControls({
         onGenerate({
           ...options,
           enabledRegionIds: [...enabledRegionIds],
-          minimumNodeCount,
         });
       }}
     >
@@ -95,30 +93,13 @@ export function ConfigAdaptiveGroupControls({
         <Typography color="text.secondary" variant="body2">
           {t("files.config.adaptiveDescription")}
         </Typography>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3">
           <SelectField
             label={t("files.config.adaptiveGroupType")}
             options={[...typeOptions]}
             size="small"
             value={options.type}
             onChange={(value) => changeOptions({ type: value as AdaptiveGroupType })}
-          />
-          <TextField
-            error={!minimumValid}
-            fullWidth
-            label={t("files.config.adaptiveMinimumNodeCount")}
-            size="small"
-            slotProps={{ htmlInput: { min: 1, step: 1 } }}
-            type="number"
-            value={minimumText}
-            onChange={(event) => {
-              const value = event.target.value;
-              setMinimumText(value);
-              const nextMinimum = Number(value);
-              if (Number.isInteger(nextMinimum) && nextMinimum >= 1) {
-                changeOptions({ minimumNodeCount: nextMinimum });
-              }
-            }}
           />
         </div>
         <div className="grid rounded-md border border-divider">
@@ -154,7 +135,7 @@ export function ConfigAdaptiveGroupControls({
               </Button>
               </div>
               <div className="grid max-h-[min(40vh,20rem)] grid-cols-1 gap-x-3 overflow-y-auto rounded-md border border-divider px-2 py-1 sm:grid-cols-2 lg:grid-cols-3">
-                {candidates.map((candidate) => (
+                {sortedCandidates.map((candidate) => (
                   <FormControlLabel
                     control={(
                       <Checkbox
@@ -211,6 +192,8 @@ function adaptiveWarningMessage(warning: AdaptiveGroupWarning, t: Translator): s
       return t("files.config.adaptiveNodeNameConflict", { name: warning.groupName });
     case "referenced_stale_group":
       return t("files.config.adaptiveReferencedPreserved", { name: warning.groupName });
+    case "empty_regions_skipped":
+      return t("files.config.adaptiveEmptyRegionsSkipped", { names: warning.groupNames.join(", ") });
     default:
       return null;
   }

@@ -23,7 +23,7 @@ func ConflictsWithBuiltinRulePolicy(name string) bool {
 }
 
 // IsBuiltinGroupPolicy reports whether name is an intrinsic policy accepted by
-// fixed proxy-group members and policy-select-name.
+// fixed proxy-group members.
 func IsBuiltinGroupPolicy(name string) bool {
 	return name == "PROXY" || name == "DIRECT" || name == "REJECT"
 }

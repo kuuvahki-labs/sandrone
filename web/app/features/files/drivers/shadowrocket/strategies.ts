@@ -113,24 +113,6 @@ function shadowrocketRelations(): ConfigRelationStrategy {
           sourceGroup,
           target,
         }));
-        const policy = trimmedString(group["policy-select-name"]);
-        if (policy) {
-          projected.push(relationReferenceEvent({
-            allowed: allowedGroupTargets.has(policy) || knownGroups.has(policy),
-            danglingIssue: relationIssue(
-              severity,
-              "unknown_group_policy_select",
-              "groups",
-              `group-${index}`,
-              `Group policy-select-name references unknown policy "${policy}".`,
-              policy,
-            ),
-            itemId: `group-${index}`,
-            role: "group-policy",
-            section: "groups",
-            target: policy,
-          }));
-        }
         return projected;
       });
       const ruleSetTypes = new Map(ruleSets.map((ruleSet, index) => [
@@ -268,17 +250,9 @@ function shadowrocketFieldIssues(
     addIntegerIssue(issues, group.interval, 1, 86400, "shadowrocket_group_interval_invalid", itemId, "interval");
     addIntegerIssue(issues, group.timeout, 1, 300, "shadowrocket_group_timeout_invalid", itemId, "timeout");
     addIntegerIssue(issues, group.tolerance, 0, 65535, "shadowrocket_group_tolerance_invalid", itemId, "tolerance");
-    const select = group.select;
-    const selectValid = typeof select === "number" && Number.isInteger(select) && select >= 0;
-    if (select !== undefined && !selectValid) {
-      issues.push(relationIssue("error", "shadowrocket_group_select_invalid", "groups", itemId, "Group select must be a non-negative integer."));
-    }
     const expandedMembers = expandedMembersForValidation(group, nodeNames);
     if (expandedMembers?.length === 0 && Array.isArray(group.proxies) && group.proxies.length > 0) {
       issues.push(relationIssue("error", "shadowrocket_group_members_empty", "groups", itemId, "Group must contain at least one member after expanding subscription nodes."));
-    }
-    if (selectValid && expandedMembers && select >= expandedMembers.length) {
-      issues.push(relationIssue("error", "shadowrocket_group_select_out_of_range", "groups", itemId, "Group select must reference an expanded member."));
     }
   }
   for (const [index, ruleSet] of ruleSets.entries()) {
@@ -336,6 +310,7 @@ function shadowrocketAdaptiveDialect(
     )).groupInboundReferences,
     materialize,
     replaceGroupMembers: (group, members) => ({ ...group, proxies: [...members] }),
+    requiresNodePreview: false,
     typeOptions: ADAPTIVE_TYPE_OPTIONS,
   };
 }
@@ -348,7 +323,6 @@ function shadowrocketAdaptive(dialect: ConfigAdaptiveDialect): ConfigAdaptiveStr
       const enabled = new Set(options.enabledRegionIds ?? DEFAULT_ADAPTIVE_REGION_IDS);
       return {
         type: options.type,
-        minimum_node_count: options.minimumNodeCount,
         regions: ADAPTIVE_REGION_IDS.filter((id) => enabled.has(id)),
       };
     },
@@ -356,7 +330,6 @@ function shadowrocketAdaptive(dialect: ConfigAdaptiveDialect): ConfigAdaptiveStr
     isStale: () => false,
     optionsFromConfig: (config) => adaptiveGroupOptionsFromValues(dialect, config ? {
       enabledRegionIds: config.regions,
-      minimumNodeCount: config.minimum_node_count,
       type: config.type,
     } : undefined),
     recognizesCanonicalLayer: (config) => helpers.canonicalNames(config.groups ?? []).length > 0,

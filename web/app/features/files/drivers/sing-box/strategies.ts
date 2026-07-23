@@ -272,6 +272,7 @@ function singBoxAdaptiveDialect(
     )).groupInboundReferences,
     materialize,
     replaceGroupMembers: (group, members) => ({ ...group, outbounds: [...members] }),
+    requiresNodePreview: true,
     typeOptions: ADAPTIVE_TYPE_OPTIONS,
   };
 }
@@ -285,7 +286,6 @@ function singBoxAdaptive(dialect: ConfigAdaptiveDialect): ConfigAdaptiveStrategy
     isStale: (input) => adaptiveGroupsAreStale(dialect, input),
     optionsFromConfig: (config) => adaptiveGroupOptionsFromValues(dialect, config ? {
       enabledRegionIds: config.regions,
-      minimumNodeCount: config.minimum_node_count,
       type: config.type,
     } : undefined),
     recognizesCanonicalLayer: () => false,

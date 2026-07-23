@@ -97,8 +97,7 @@ describe("structured driver UI slots", () => {
       expect(Object.isFrozen(ui.ruleSetPresentation.summaryFields)).toBe(true);
     });
 
-  it("lets a driver slot update only a normalized group draft", async () => {
-    const user = userEvent.setup();
+  it("keeps shared policy controls out of the Shadowrocket slot while retaining health-check controls", () => {
     const adapter = structuredAdapter("shadowrocket");
     const onUpdate = vi.fn();
     const draft = groupDraft({
@@ -106,7 +105,6 @@ describe("structured driver UI slots", () => {
       healthCheckTimeout: 5,
       healthCheckTolerance: 50,
       name: "Auto",
-      selectedIndex: 1,
       type: "url-test",
     });
     const GroupFields = requireFileDriverUI("shadowrocket").GroupFields;
@@ -120,11 +118,10 @@ describe("structured driver UI slots", () => {
       />,
     );
 
-    const select = screen.getByRole("spinbutton", { name: /默认策略索引|Default policy index/i });
-    await user.clear(select);
-
-    expect(onUpdate).toHaveBeenLastCalledWith({ ...draft, selectedIndex: undefined });
-    expect(onUpdate.mock.lastCall?.[0]).not.toHaveProperty("select");
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(screen.getByRole("spinbutton", { name: /检查间隔|Check interval/i })).toBeInTheDocument();
+    expect(screen.getByRole("spinbutton", { name: /超时|Timeout/i })).toBeInTheDocument();
+    expect(screen.getByRole("spinbutton", { name: /容差|Tolerance/i })).toBeInTheDocument();
   });
 
   it.each([

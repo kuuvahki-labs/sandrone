@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useMemo, useState } from "react";
 import Alert from "@mui/material/Alert";
 import MenuItem from "@mui/material/MenuItem";
 import TextField from "@mui/material/TextField";
+import Typography from "@mui/material/Typography";
 
 import { WorkbenchGroupSection } from "~/features/files/config/components/editor-shared";
 import type { FileConfigDetail } from "~/features/files/model/types";
@@ -45,7 +46,10 @@ export function RawFileConfigEditor({
   return (
     <div className="grid gap-3">
       <input name="config" type="hidden" value={serialized} />
-      <WorkbenchGroupSection collapsible={false} id="file-config-base" label={t("files.config.base")}>
+      <Typography className="font-semibold" component="h2" variant="h6">
+        {t("files.config.content")}
+      </Typography>
+      <WorkbenchGroupSection collapsible={false} id="file-config-base" label={t("files.config.baseContent")}>
         {baseEditor}
       </WorkbenchGroupSection>
       <WorkbenchGroupSection collapsible={false} id="file-config-raw-settings" label={t("files.form.config")}>

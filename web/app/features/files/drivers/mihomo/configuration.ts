@@ -98,10 +98,9 @@ function decodeMihomoSettings(value: unknown): Partial<FileConfigDraft> | null {
 }
 
 function validMihomoAdaptiveGroups(value: unknown): boolean {
-  const item = strictSettingsObject(value, ["type", "minimum_node_count", "regions"]);
+  const item = strictSettingsObject(value, ["type", "regions"]);
   if (!item) return false;
   if ("type" in item && typeof item.type !== "string") return false;
-  if ("minimum_node_count" in item && !Number.isInteger(item.minimum_node_count)) return false;
   return !("regions" in item)
     || (Array.isArray(item.regions) && item.regions.every((region) => typeof region === "string"));
 }
@@ -117,6 +116,7 @@ function mihomoGroups(): StructuredFileConfigurationAdapter["groups"] {
     excludeFilter: stringField(value["exclude-filter"]),
     healthCheckURL: stringField(value.url),
     healthCheckInterval: scalarString(value.interval),
+    hidden: typeof value.hidden === "boolean" ? value.hidden : undefined,
     adapterState: opaqueGroupState(value),
   }));
   const serialize = (values: GroupDraft[]): ConfigMap[] => values.map((draft) => {
@@ -132,6 +132,7 @@ function mihomoGroups(): StructuredFileConfigurationAdapter["groups"] {
       value.url = draft.healthCheckURL;
       value.interval = positiveInteger(draft.healthCheckInterval) ?? 300;
     }
+    if (draft.hidden !== undefined) value.hidden = draft.hidden;
     return value;
   });
   const project = (values: ConfigMap[]) => {
@@ -145,6 +146,7 @@ function mihomoGroups(): StructuredFileConfigurationAdapter["groups"] {
     project,
     serialize,
     supportsExcludeFilter: true,
+    supportsHidden: true,
     supportsRuntimeFilter: true,
     transitionMemberMode: (group, mode, restoredMembers) => ({
       ...group,
@@ -181,7 +183,7 @@ function mihomoGroups(): StructuredFileConfigurationAdapter["groups"] {
 }
 
 function opaqueGroupState(value: ConfigMap): ConfigMap {
-  const state = omitKeys(value, ["name", "type", "proxies", "include-all-proxies", "filter", "exclude-filter", "url", "interval"]);
+  const state = omitKeys(value, ["name", "type", "proxies", "include-all-proxies", "filter", "exclude-filter", "url", "interval", "hidden"]);
   if (Object.hasOwn(value, "exclude-filter") && typeof value["exclude-filter"] !== "string") {
     state["exclude-filter"] = value["exclude-filter"];
   }

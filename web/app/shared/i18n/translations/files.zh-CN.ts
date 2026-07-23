@@ -77,8 +77,6 @@ export const fileZhCN = {
   "processor.merge.iniOverrideDescription": "按节覆写 INI；使用 [节名+] 将内容追加到同名节。",
   "files.config.groupTimeout": "超时",
   "files.config.groupTolerance": "容差",
-  "files.config.groupPolicySelectName": "默认策略名称",
-  "files.config.groupSelect": "默认策略索引",
-  "files.config.groupHidden": "隐藏策略组",
+  "files.config.groupHidden": "隐藏分组",
   "processor.merge.jsonInvalid": "合并内容必须是有效的 JSON 对象，数组操作符的值必须是数组。",
 } as const;

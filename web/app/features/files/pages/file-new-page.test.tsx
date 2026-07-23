@@ -77,7 +77,7 @@ describe("FileNewPage", () => {
     );
 
     expect(screen.getByRole("textbox", { name: "名称" })).toHaveValue("sing-box.json");
-    const baseContent = within(screen.getByRole("group", { name: "基础配置" }))
+    const baseContent = within(screen.getByRole("group", { name: "基础配置内容" }))
       .getByRole("textbox", { name: "内容" });
     expect(JSON.parse((baseContent as HTMLTextAreaElement).value)).toMatchObject({
       dns: {

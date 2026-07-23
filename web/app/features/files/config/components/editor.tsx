@@ -220,6 +220,7 @@ export function FileConfigEditor({ adapter, baseEditor, createNamingLocale = "en
     hasCurrentPreview: Boolean(currentNodePreview),
     nodeCount: nodeOptions?.length ?? 0,
 		previewStatus: nodeSourceState.status,
+    requiresNodePreview: adapter.adaptive.requiresNodePreview,
 		selected: Boolean(selected),
 	});
   const adaptiveDisabledReason = adaptiveDisabledReasonKey
@@ -274,9 +275,8 @@ export function FileConfigEditor({ adapter, baseEditor, createNamingLocale = "en
   }
 
   function generateAdaptive(options: AdaptiveGroupOptions) {
-    if (!nodeOptions) return;
 		const generation = adapter.adaptive.generate(
-			nodeOptions.map((node) => node.name),
+			nodeOptions?.map((node) => node.name) ?? [],
 			options,
 			namingLocale,
 		);
@@ -318,7 +318,24 @@ export function FileConfigEditor({ adapter, baseEditor, createNamingLocale = "en
   return (
     <div className="grid min-w-0 gap-3">
       <input name="config" type="hidden" value={serialized} />
+      <Typography className="font-semibold" component="h2" variant="h6">
+        {t("files.config.content")}
+      </Typography>
 			{multipleSubscriptions ? <Alert severity="error">{t("files.config.multipleSubscriptions", { names: originalSubscriptions.join(", ") })}</Alert> : null}
+      {!rawMode ? (
+        <WorkbenchGroupSection collapsible={false} id="config-templates" label={copy.templateSection} summary={templateSummary}>
+          <ConfigTemplatePicker
+            choices={templates}
+            confirmBeforeApply={formMode === "edit" || recognition.adaptive}
+            copy={templatePickerCopy}
+            currentTemplateId={recognizedTemplate ?? undefined}
+            customized={recognition.match === "custom"}
+            labelledBy="config-templates-header"
+            onRequestApply={applyTemplate}
+          />
+          {appliedTemplateName ? <ConfigTemplateAppliedNotice message={copy.applied} undoLabel={copy.undo} onUndo={undoTemplate} /> : null}
+        </WorkbenchGroupSection>
+      ) : null}
       <ConfigNodeSourceSection
         disabled={multipleSubscriptions}
         loadPreview={loadSubscriptionPreview}
@@ -334,7 +351,7 @@ export function FileConfigEditor({ adapter, baseEditor, createNamingLocale = "en
 			{rawMode ? (
 				<>
 					<Alert severity="warning">{t("files.config.rawSettingsPreserved")}</Alert>
-					<WorkbenchGroupSection collapsible={false} id="file-config-base" label={t("files.config.base")}>
+					<WorkbenchGroupSection collapsible={false} id="file-config-base" label={t("files.config.baseContent")}>
 						{baseEditor}
 					</WorkbenchGroupSection>
 					<HighlightedTextarea label={t("files.config.rawSettings")} language="json" minRows={12} showLineNumbers value={rawSettingsText} onChange={(event) => {
@@ -352,18 +369,6 @@ export function FileConfigEditor({ adapter, baseEditor, createNamingLocale = "en
 				</>
 			) : (
 				<>
-      <WorkbenchGroupSection collapsible={false} id="config-templates" label={copy.templateSection} summary={templateSummary}>
-        <ConfigTemplatePicker
-          choices={templates}
-          confirmBeforeApply={formMode === "edit" || recognition.adaptive}
-          copy={templatePickerCopy}
-          currentTemplateId={recognizedTemplate ?? undefined}
-          customized={recognition.match === "custom"}
-          labelledBy="config-templates-header"
-          onRequestApply={applyTemplate}
-        />
-        {appliedTemplateName ? <ConfigTemplateAppliedNotice message={copy.applied} undoLabel={copy.undo} onUndo={undoTemplate} /> : null}
-      </WorkbenchGroupSection>
       <ConfigAdaptiveGroupControls
         candidates={adaptiveCandidates}
         disabledReason={adaptiveDisabledReason}
@@ -381,10 +386,7 @@ export function FileConfigEditor({ adapter, baseEditor, createNamingLocale = "en
         onGenerate={generateAdaptive}
       />
       {adaptiveStale ? <Alert severity="error">{t("files.config.adaptiveStale")}</Alert> : null}
-      <Typography className="font-semibold" component="h3" id="file-config-details-heading" variant="subtitle1">
-        {t("files.config.details")}
-      </Typography>
-      <WorkbenchGroupSection collapsible={false} id="file-config-base" label={t("files.config.base")}>
+      <WorkbenchGroupSection collapsible={false} id="file-config-base" label={t("files.config.baseContent")}>
         {baseEditor}
       </WorkbenchGroupSection>
       {editorMode === "advanced" ? <Alert severity="warning"><Typography className="font-semibold" component="p" variant="body2">{t("files.config.rawConfig")}</Typography>{t("files.config.advancedUnsupported")}</Alert> : null}

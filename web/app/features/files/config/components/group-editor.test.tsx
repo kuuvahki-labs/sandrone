@@ -14,6 +14,21 @@ afterEach(() => {
 });
 
 describe("ProxyGroupEditor runtime-filtered Mihomo groups", () => {
+  it("places hidden beside the member source", async () => {
+    const user = userEvent.setup();
+    render(<ControlledEditor
+      initialGroups={[{ name: "Proxy", type: "select", proxies: ["$nodes"], hidden: true }]}
+      onChange={vi.fn()}
+    />);
+
+    await user.click(screen.getByRole("button", { name: "展开代理组 Proxy" }));
+    const memberSource = screen.getByRole("combobox", { name: /成员来源|Member source/i });
+    const hidden = screen.getByRole("checkbox", { name: /隐藏分组|Hide group/i });
+
+    expect(memberSource.closest("[data-group-membership-controls]"))
+      .toBe(hidden.closest("[data-group-membership-controls]"));
+  });
+
   it("switches a runtime filter to fixed members without retaining dynamic fields", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
@@ -99,6 +114,22 @@ describe("ProxyGroupEditor runtime-filtered Mihomo groups", () => {
 });
 
 describe("ProxyGroupEditor Shadowrocket schema", () => {
+  it("places hidden beside the member source", async () => {
+    const user = userEvent.setup();
+    render(<ControlledEditor
+      initialGroups={[{ name: "Proxy", type: "select", proxies: ["$nodes"], hidden: true }]}
+      kind="shadowrocket"
+      onChange={vi.fn()}
+    />);
+
+    await user.click(screen.getByRole("button", { name: "展开代理组 Proxy" }));
+    const memberSource = screen.getByRole("combobox", { name: /成员来源|Member source/i });
+    const hidden = screen.getByRole("checkbox", { name: /隐藏分组|Hide group/i });
+
+    expect(memberSource.closest("[data-group-membership-controls]"))
+      .toBe(hidden.closest("[data-group-membership-controls]"));
+  });
+
   it("switches between policy regex and fixed proxies without retaining stale fields", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
@@ -160,34 +191,6 @@ describe("ProxyGroupEditor Shadowrocket schema", () => {
     expect(screen.getByRole("spinbutton", { name: /容差|Tolerance/i })).toHaveValue(50);
   });
 
-  it("edits select as an optional non-negative default policy index", async () => {
-    const user = userEvent.setup();
-    const onChange = vi.fn();
-    render(<ControlledEditor
-      initialGroups={[{ name: "Proxy", type: "select", proxies: ["Node 1", "Node 2", "DIRECT"] }]}
-      kind="shadowrocket"
-      onChange={onChange}
-    />);
-
-    await user.click(screen.getByRole("button", { name: "展开代理组 Proxy" }));
-    const select = screen.getByRole("spinbutton", { name: /默认策略索引|Default policy index/i });
-    expect(select).toHaveAttribute("min", "0");
-    await user.type(select, "2");
-    expect(onChange).toHaveBeenLastCalledWith([{
-      name: "Proxy",
-      type: "select",
-      proxies: ["Node 1", "Node 2", "DIRECT"],
-      select: 2,
-    }]);
-
-    await user.clear(select);
-    expect(onChange).toHaveBeenLastCalledWith([{
-      name: "Proxy",
-      type: "select",
-      proxies: ["Node 1", "Node 2", "DIRECT"],
-    }]);
-  });
-
   it("treats Shadowrocket health interval and timeout as optional and removes cleared values", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
@@ -220,6 +223,19 @@ describe("ProxyGroupEditor Shadowrocket schema", () => {
 });
 
 describe("ProxyGroupEditor sing-box summaries", () => {
+  it("does not offer a hidden group control", async () => {
+    const user = userEvent.setup();
+    render(<ControlledEditor
+      initialGroups={[{ type: "selector", tag: "Proxy", outbounds: ["direct"] }]}
+      kind="sing-box"
+      onChange={vi.fn()}
+    />);
+
+    await user.click(screen.getByRole("button", { name: "展开代理组 Proxy" }));
+
+    expect(screen.queryByRole("checkbox", { name: /隐藏分组|Hide group/i })).not.toBeInTheDocument();
+  });
+
   it("uses native type labels for collapsed selector and urltest groups", () => {
     render(<ControlledEditor
       initialGroups={[

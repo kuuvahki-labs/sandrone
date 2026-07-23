@@ -81,8 +81,8 @@ describe("config templates", () => {
       expect(template.groupCount).toBe(config.groups?.length);
       expect(template.ruleSetCount).toBe(config.rule_sets?.length);
       expect(template.ruleCount).toBe(config.rules?.length);
-    }
-  });
+   }
+ });
 
   it.each(CONFIG_KINDS)("creates explicit, isolated %s configs for every template", (kind) => {
     for (const templateID of TEMPLATE_IDS) {
@@ -95,14 +95,14 @@ describe("config templates", () => {
         groups: expect.any(Array),
         rule_sets: expect.any(Array),
         rules: expect.any(Array),
-      });
+     });
       expect(first).not.toHaveProperty("subscriptions");
       expect(first).not.toBe(second);
       expect(first.groups).not.toBe(second.groups);
       expect(first.rule_sets).not.toBe(second.rule_sets);
       expect(first.rules).not.toBe(second.rules);
-    }
-  });
+   }
+ });
 
   it("uses MetaCubeX MRS rule providers for Mihomo", () => {
     const config = createConfigFromTemplate("mihomo", "full");
@@ -118,9 +118,9 @@ describe("config templates", () => {
         url: expect.stringMatching(
           /^https:\/\/raw\.githubusercontent\.com\/MetaCubeX\/meta-rules-dat\/meta\/geo\/(?:geosite|geoip)\/.+\.mrs$/,
         ),
-      });
-    }
-  });
+     });
+   }
+ });
 
   it("uses equivalent MetaCubeX binary SRS rule sets for sing-box", () => {
     const config = createConfigFromTemplate("sing-box", "full");
@@ -135,9 +135,9 @@ describe("config templates", () => {
         url: expect.stringMatching(
           /^https:\/\/raw\.githubusercontent\.com\/MetaCubeX\/meta-rules-dat\/sing\/geo\/(?:geosite|geoip)\/.+\.srs$/,
         ),
-      });
-    }
-  });
+     });
+   }
+ });
 
   it.each(TEMPLATE_IDS)("uses live Blackmatrix rule lists for the %s Shadowrocket template", (templateID) => {
     const config = createConfigFromTemplate("shadowrocket", templateID);
@@ -149,11 +149,11 @@ describe("config templates", () => {
       name: "Proxy",
       type: "select",
       proxies: ["PROXY", "$nodes", "DIRECT", "REJECT"],
-    });
+   });
     expect(groupsByName.has("Auto")).toBe(false);
     for (const group of config.groups ?? []) {
       if (Array.isArray(group.proxies)) expect(group.proxies).not.toContain("Auto");
-    }
+   }
     expect(config.rules?.at(-1)).toBe("FINAL,Final");
     for (const ruleSet of config.rule_sets ?? []) {
       expect(ruleSet).toEqual({
@@ -162,16 +162,16 @@ describe("config templates", () => {
         url: expect.stringMatching(
           /^https:\/\/raw\.githubusercontent\.com\/blackmatrix7\/ios_rule_script\/master\/rule\/Shadowrocket\//,
         ),
-      });
+     });
       expect(String(ruleSet.url)).not.toContain("MetaCubeX");
-    }
+   }
     for (const rule of config.rules ?? []) {
       if (typeof rule !== "string") continue;
       const [type, name] = rule.split(",");
       if (type !== "RULE-SET" && type !== "DOMAIN-SET") continue;
       expect(type).toBe(ruleTypesByName.get(name) === "domain-set" ? "DOMAIN-SET" : "RULE-SET");
-    }
-  });
+   }
+ });
 
   it.each(TEMPLATE_IDS)("uses each fixed Blackmatrix catalog URL once in the %s Shadowrocket template", (templateID) => {
     const config = createConfigFromTemplate("shadowrocket", templateID);
@@ -184,9 +184,9 @@ describe("config templates", () => {
       expect(match?.[1]).toEqual(expect.any(String));
       expect(SHADOWROCKET_TEMPLATE_ARTIFACTS.has(match?.[1] ?? "")).toBe(true);
       if (match?.[1]) artifacts.push(match[1]);
-    }
+   }
     if (templateID === "full") expect(new Set(artifacts)).toEqual(SHADOWROCKET_TEMPLATE_ARTIFACTS);
-  });
+ });
 
   it.each(TEMPLATE_IDS)("never assigns one Blackmatrix URL to different policies in the %s Shadowrocket template", (templateID) => {
     const config = createConfigFromTemplate("shadowrocket", templateID);
@@ -202,20 +202,20 @@ describe("config templates", () => {
       const policies = policiesByURL.get(url) ?? new Set<string>();
       policies.add(policy);
       policiesByURL.set(url, policies);
-    }
+   }
 
     expect([...policiesByURL.entries()].filter(([, policies]) => policies.size > 1)).toEqual([]);
     if (templateID === "full") {
       expect(policiesByURL.get(`${SHADOWROCKET_RULE_BASE}/Amazon/Amazon.list`)).toEqual(new Set(["Shopping"]));
       expect(policiesByURL.get(`${SHADOWROCKET_RULE_BASE}/Microsoft/Microsoft.list`)).toEqual(new Set(["Microsoft"]));
-    }
-  });
+   }
+ });
 
   it.each(CONFIG_KINDS)("keeps every generated %s group, rule-set, and policy reference closed", (kind) => {
     for (const templateID of TEMPLATE_IDS) {
       expect(referenceProblems(kind, createConfigFromTemplate(kind, templateID))).toEqual([]);
-    }
-  });
+   }
+ });
 
   it.each(CONFIG_KINDS)("materializes approved Chinese names throughout %s templates", (kind) => {
     const config = createConfigFromTemplate(kind, "full", "zh-CN");
@@ -236,8 +236,8 @@ describe("config templates", () => {
       adaptive: false,
       match: "full",
       namingLocale: "zh-CN",
-    });
-  });
+   });
+ });
 
   it.each(CONFIG_KINDS)("matches exact %s templates while ignoring subscriptions", (kind) => {
     for (const templateID of TEMPLATE_IDS) {
@@ -246,8 +246,8 @@ describe("config templates", () => {
 
       expect(recognizeConfigTemplate(kind, config).match).toBe(templateID);
       expect(recognizeConfigTemplate(kind, withSubscriptions).match).toBe(templateID);
-    }
-  });
+   }
+ });
 
   it.each(CONFIG_KINDS)("recognizes structural changes to a %s template as custom", (kind) => {
     const config = createConfigFromTemplate(kind, "standard");
@@ -255,7 +255,7 @@ describe("config templates", () => {
     groups[0] = { ...groups[0], unexpected: true };
 
     expect(recognizeConfigTemplate(kind, { ...config, groups }).match).toBe("custom");
-  });
+ });
 
   it("does not migrate a legacy Shadowrocket Auto template during recognition", () => {
     const config = createConfigFromTemplate("shadowrocket", "minimal");
@@ -270,10 +270,10 @@ describe("config templates", () => {
       interval: 300,
       timeout: 5,
       tolerance: 50,
-    });
+   });
 
     expect(recognizeConfigTemplate("shadowrocket", { ...config, groups }).match).toBe("custom");
-  });
+ });
 
   it.each(CONFIG_KINDS)("keeps the detected Chinese naming language for customized %s configs", (kind) => {
     const config = createConfigFromTemplate(kind, "minimal", "zh-CN");
@@ -283,23 +283,23 @@ describe("config templates", () => {
     expect(recognizeConfigTemplate(kind, { ...config, groups })).toMatchObject({
       match: "custom",
       namingLocale: "zh-CN",
-    });
-  });
+   });
+ });
 
   it.each(TEMPLATE_IDS)("recognizes the %s Mihomo template beneath a canonical adaptive layer", (templateID) => {
     const config = createConfigFromTemplate("mihomo", templateID);
     const merged = mergeAdaptiveGroups(
       config,
-      generateAdaptiveGroups(["HK-01"], { type: "url-test", minimumNodeCount: 1 }),
+      generateAdaptiveGroups(["HK-01"], { type: "url-test" }),
     );
 
     expect(recognizeConfigTemplate("mihomo", merged.config)).toEqual({
       adaptive: true,
       match: templateID,
       namingLocale: "en-US",
-    });
+   });
     expect(recognizeConfigTemplate("mihomo", merged.config).match).toBe(templateID);
-  });
+ });
 
   it.each(TEMPLATE_IDS)("recognizes the %s Shadowrocket template beneath a canonical adaptive layer", (templateID) => {
     const config = createConfigFromTemplate("shadowrocket", templateID);
@@ -307,7 +307,7 @@ describe("config templates", () => {
       config,
       generateAdaptiveGroups(
         ["HK-01"],
-        { type: "url-test", minimumNodeCount: 1 },
+        { type: "url-test" },
         "shadowrocket",
       ),
       "shadowrocket",
@@ -317,45 +317,45 @@ describe("config templates", () => {
       adaptive: true,
       match: templateID,
       namingLocale: "en-US",
-    });
-  });
+   });
+ });
 
   it("keeps a custom adaptive-like group classified as custom", () => {
     const config = createConfigFromTemplate("mihomo", "minimal");
     const merged = mergeAdaptiveGroups(
       config,
-      generateAdaptiveGroups(["HK-01"], { type: "select", minimumNodeCount: 1 }),
+      generateAdaptiveGroups(["HK-01"], { type: "select" }),
     );
     const customized = {
       ...merged.config,
       groups: merged.config.groups?.map((group) => group.name === "Hong Kong"
         ? { ...group, icon: "custom" }
         : group),
-    };
+   };
 
     expect(stripCanonicalAdaptiveGroups(customized).changed).toBe(false);
     expect(recognizeConfigTemplate("mihomo", customized)).toEqual({ adaptive: false, match: "custom", namingLocale: "en-US" });
-  });
+ });
 
   it("detects adaptive groups but keeps invalid anchor structures custom", () => {
     const config = createConfigFromTemplate("mihomo", "minimal");
     const merged = mergeAdaptiveGroups(
       config,
-      generateAdaptiveGroups(["HK-01"], { type: "select", minimumNodeCount: 1 }),
+      generateAdaptiveGroups(["HK-01"], { type: "select" }),
     );
     const duplicateProxy = {
       ...merged.config,
       groups: [...(merged.config.groups ?? []), { name: "Proxy", type: "select", proxies: ["$nodes"] }],
-    };
+   };
 
     expect(recognizeConfigTemplate("mihomo", duplicateProxy)).toEqual({ adaptive: true, match: "custom", namingLocale: "en-US" });
-  });
+ });
 
   it("detects adaptive groups but keeps externally referenced layers custom", () => {
     const config = createConfigFromTemplate("mihomo", "minimal");
     const merged = mergeAdaptiveGroups(
       config,
-      generateAdaptiveGroups(["HK-01"], { type: "select", minimumNodeCount: 1 }),
+      generateAdaptiveGroups(["HK-01"], { type: "select" }),
     );
     const referenced = {
       ...merged.config,
@@ -363,31 +363,31 @@ describe("config templates", () => {
         name: "Dependent",
         type: "select",
         proxies: ["Hong Kong"],
-      }],
-    };
+     }],
+   };
 
     expect(recognizeConfigTemplate("mihomo", referenced)).toEqual({ adaptive: true, match: "custom", namingLocale: "en-US" });
-  });
+ });
 
   it("detects duplicate canonical groups but keeps the conflict custom", () => {
     const config = createConfigFromTemplate("mihomo", "minimal");
     const merged = mergeAdaptiveGroups(
       config,
-      generateAdaptiveGroups(["HK-01"], { type: "select", minimumNodeCount: 1 }),
+      generateAdaptiveGroups(["HK-01"], { type: "select" }),
     );
     const canonical = merged.config.groups?.find((group) => group.name === "Hong Kong");
     if (!canonical) throw new Error("expected generated canonical group");
     const duplicated = {
       ...merged.config,
       groups: [...(merged.config.groups ?? []), structuredClone(canonical)],
-    };
+   };
 
     expect(recognizeConfigTemplate("mihomo", duplicated)).toEqual({ adaptive: true, match: "custom", namingLocale: "en-US" });
-  });
+ });
 
   it("does not offer config templates for static files", () => {
     expect(requireFileDriver("static").configuration.mode).toBe("none");
-  });
+ });
 });
 
 function referenceProblems(kind: ConfigKind, config: FileConfigDraft): string[] {
@@ -409,34 +409,34 @@ function referenceProblems(kind: ConfigKind, config: FileConfigDraft): string[] 
   for (const group of groups) {
     for (const target of stringList(group[groupTargetKey])) {
       if (!groupNames.has(target) && !literals.has(target)) problems.push(`unknown group target: ${target}`);
-    }
-  }
+   }
+ }
 
   for (const rule of rules) {
     if (kind === "sing-box") {
       if (!isRecord(rule)) {
         problems.push("non-object sing-box rule");
         continue;
-      }
+     }
       for (const ruleSet of stringList(rule.rule_set)) {
         if (!ruleSetNames.has(ruleSet)) problems.push(`unknown rule-set: ${ruleSet}`);
-      }
+     }
       const policy = stringValue(rule.outbound);
       if (!groupNames.has(policy) && !literals.has(policy)) problems.push(`unknown policy: ${policy}`);
       continue;
-    }
+   }
 
     if (typeof rule !== "string") {
       problems.push("non-string INI/YAML rule");
       continue;
-    }
+   }
     const parts = rule.split(",").map((part) => part.trim());
     if ((parts[0] === "RULE-SET" || parts[0] === "DOMAIN-SET") && !ruleSetNames.has(parts[1])) {
       problems.push(`unknown rule-set: ${parts[1]}`);
-    }
+   }
     const policy = parts[0] === "MATCH" || parts[0] === "FINAL" ? parts[1] : parts[2];
     if (!groupNames.has(policy) && !literals.has(policy)) problems.push(`unknown policy: ${policy}`);
-  }
+ }
 
   return problems;
 }

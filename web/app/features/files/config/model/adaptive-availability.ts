@@ -8,6 +8,7 @@ export interface AdaptiveGenerationAvailability {
   hasCurrentPreview: boolean;
   nodeCount: number;
 	previewStatus: "idle" | "loading" | "ready" | "error";
+  requiresNodePreview: boolean;
 	selected: boolean;
 }
 
@@ -15,6 +16,7 @@ export function adaptiveGenerationDisabledReasonKey(
   input: AdaptiveGenerationAvailability,
 ): TranslationKey | undefined {
   if (input.editorMode === "advanced") return "files.config.adaptiveAdvancedUnsupported";
+  if (!input.requiresNodePreview) return anchorProblemReason(input.anchorProblem);
   if (!input.selected) return "files.config.adaptiveSelectSubscription";
   if (input.previewStatus === "loading") return "files.config.adaptivePreviewLoading";
   if (input.previewStatus === "error" || !input.hasCurrentPreview) {
@@ -22,7 +24,13 @@ export function adaptiveGenerationDisabledReasonKey(
   }
   if (input.nodeCount === 0) return "files.config.adaptiveNoNodes";
 
-	switch (input.anchorProblem?.code) {
+  return anchorProblemReason(input.anchorProblem);
+}
+
+function anchorProblemReason(
+  problem: AdaptiveGroupAnchorProblem | null,
+): TranslationKey | undefined {
+	switch (problem?.code) {
     case "anchor_missing":
       return "files.config.adaptiveProxyMissing";
     case "anchor_duplicate":

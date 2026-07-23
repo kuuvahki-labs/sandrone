@@ -143,15 +143,9 @@ func compileShadowrocketGroups(groups []shadowrocketGroupSettings, nodeNames []s
 			if len(members) == 0 {
 				return nil, shadowrocketSettingsError(fmt.Errorf("config.settings.groups[%d].proxies must resolve to at least one policy", index))
 			}
-			if group.Select != nil && *group.Select >= len(members) {
-				return nil, shadowrocketSettingsError(fmt.Errorf("config.settings.groups[%d].select must reference an expanded policy", index))
-			}
 			values = append(values, members...)
 		} else {
 			values = append(values, "policy-regex-filter="+strings.TrimSpace(*group.PolicyRegexFilter))
-		}
-		if group.PolicySelectName != nil && !shadowrocketadapter.IsBuiltinGroupPolicy(strings.TrimSpace(*group.PolicySelectName)) && !validMembers[strings.TrimSpace(*group.PolicySelectName)] {
-			return nil, shadowrocketSettingsError(fmt.Errorf("config.settings.groups[%d].policy-select-name references unknown policy %q", index, strings.TrimSpace(*group.PolicySelectName)))
 		}
 		values = appendShadowrocketGroupOptions(values, group)
 		lines = append(lines, group.Name+" = "+strings.Join(values, ","))
@@ -168,12 +162,6 @@ func appendShadowrocketGroupOptions(values []string, group shadowrocketGroupSett
 	}
 	if group.Tolerance != nil {
 		values = append(values, "tolerance="+strconv.Itoa(*group.Tolerance))
-	}
-	if group.PolicySelectName != nil {
-		values = append(values, "policy-select-name="+strings.TrimSpace(*group.PolicySelectName))
-	}
-	if group.Select != nil {
-		values = append(values, "select="+strconv.Itoa(*group.Select))
 	}
 	if group.Hidden != nil {
 		values = append(values, "hidden="+shadowrocketBool(*group.Hidden))

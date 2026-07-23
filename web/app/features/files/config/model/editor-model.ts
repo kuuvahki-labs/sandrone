@@ -26,8 +26,6 @@ export interface GroupDraft {
   memberMode: ProxyGroupMemberMode;
   members: string[];
   name: string;
-  policySelectName?: string;
-  selectedIndex?: number;
   type: string;
 }
 

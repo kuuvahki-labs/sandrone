@@ -229,7 +229,7 @@ describe("config relation model", () => {
   it("keeps Shadowrocket group policies separate from rule-only actions", () => {
     const model = buildConfigRelationModel(
       "shadowrocket",
-      [{ name: "Proxy", type: "select", proxies: ["PROXY", "DIRECT", "REJECT", "TAILSCALE"], "policy-select-name": "PROXY" }],
+      [{ name: "Proxy", type: "select", proxies: ["PROXY", "DIRECT", "REJECT", "TAILSCALE"] }],
       [],
       [],
       [],
@@ -343,28 +343,6 @@ describe("config relation model", () => {
     },
   );
 
-  it("validates the Shadowrocket default policy index against deduplicated expanded members", () => {
-    const model = buildConfigRelationModel(
-      "shadowrocket",
-      [
-        { name: "Valid", type: "select", proxies: ["$nodes", "Node 1", "DIRECT"], select: 2 },
-        { name: "Out of range", type: "select", proxies: ["$nodes", "Node 1", "DIRECT"], select: 3 },
-        { name: "Boolean", type: "select", proxies: ["DIRECT"], select: true },
-        { name: "Negative", type: "select", proxies: ["DIRECT"], select: -1 },
-      ],
-      [],
-      [],
-      ["Node 1", "Node 2"],
-    );
-
-    expect(model.issues).not.toContainEqual(expect.objectContaining({ itemId: "group-0", code: "shadowrocket_group_select_invalid" }));
-    expect(model.issues).toEqual(expect.arrayContaining([
-      expect.objectContaining({ itemId: "group-1", code: "shadowrocket_group_select_out_of_range" }),
-      expect.objectContaining({ itemId: "group-2", code: "shadowrocket_group_select_invalid" }),
-      expect.objectContaining({ itemId: "group-3", code: "shadowrocket_group_select_invalid" }),
-    ]));
-  });
-
   it("rejects a fixed Shadowrocket group that is empty after expanding subscription nodes", () => {
     const model = buildConfigRelationModel(
       "shadowrocket",
@@ -390,31 +368,6 @@ describe("config relation model", () => {
     );
 
     expect(model.issues).toEqual([]);
-  });
-
-  it("validates Shadowrocket policy-select-name as a policy reference", () => {
-    const model = buildConfigRelationModel(
-      "shadowrocket",
-      [
-        { name: "Proxy", type: "select", proxies: ["DIRECT"] },
-        { name: "Manual", type: "select", proxies: ["DIRECT"], "policy-select-name": "Proxy" },
-        { name: "Node picker", type: "select", proxies: ["DIRECT"], "policy-select-name": "Node 1" },
-        { name: "Missing picker", type: "select", proxies: ["DIRECT"], "policy-select-name": "Missing" },
-      ],
-      [],
-      [],
-      ["Node 1"],
-    );
-
-    expect(model.groupInboundReferences.Proxy).toBe(1);
-    expect(model.issues).toContainEqual(expect.objectContaining({
-      severity: "error",
-      code: "unknown_group_policy_select",
-      itemId: "group-3",
-      reference: "Missing",
-    }));
-    expect(model.issues).not.toContainEqual(expect.objectContaining({ itemId: "group-1" }));
-    expect(model.issues).not.toContainEqual(expect.objectContaining({ itemId: "group-2" }));
   });
 
   it("requires Shadowrocket symbolic rules to match the declared rule-set type", () => {

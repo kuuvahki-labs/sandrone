@@ -1,16 +1,16 @@
 # Generated rule-set catalog
 
-`make ruleset-catalog` derives URL metadata from the `meta` and `sing` Git tree
-paths of `MetaCubeX/meta-rules-dat`, plus the `rule/Shadowrocket` subtree of
-`blackmatrix7/ios_rule_script` at fixed commit
-`e69663d642551aa3e0164a656179335a896127ad`. The Blackmatrix generator includes
-only `.list` files named in each category README's `使用说明` section. It reads
-the artifacts only to validate their declared `RULE-SET` or `DOMAIN-SET` shape
-and to distinguish IP-only rule sets; no rule content is stored in the catalog.
+`make ruleset-catalog` derives URL metadata from the active `meta` and `sing`
+Git branches of `MetaCubeX/meta-rules-dat`, plus the active `master` branch's
+`rule/Shadowrocket` subtree of `blackmatrix7/ios_rule_script`. The Blackmatrix
+generator includes only `.list` files named in each category README's
+`使用说明` section. It reads the artifacts only to validate their declared
+`RULE-SET` or `DOMAIN-SET` shape and to distinguish IP-only rule sets; no rule
+content is stored in the catalog.
 
-Generated Blackmatrix URLs intentionally use the live `master` raw-content
-paths, while the fixed commit makes the discovered metadata reproducible. The
-generator sorts and deduplicates all targets before installing a deterministic
+Generated Blackmatrix URLs use live `master` raw-content paths. Catalog
+metadata therefore follows the active upstream branches and can change between
+builds. The generator sorts and deduplicates all targets before installing
 `catalog.json.gz` here.
 
 The source projects and their contributors retain attribution for the upstream

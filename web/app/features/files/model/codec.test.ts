@@ -182,7 +182,6 @@ describe("file model codec", () => {
       config: {
         settings: { adaptive_groups: {
           type: "load-balance",
-          minimum_node_count: 3,
         } },
       },
     });
@@ -191,7 +190,6 @@ describe("file model codec", () => {
       settingsPresent: true,
       settings: { adaptive_groups: {
         type: "load-balance",
-        minimum_node_count: 3,
       } },
     });
   });

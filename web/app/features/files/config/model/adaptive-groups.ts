@@ -8,7 +8,6 @@ import {
 import type { ConfigMap } from "./editor-model";
 import {
   configAnchorName,
-  configAutoName,
   type ConfigNamingLocale,
 } from "./naming";
 
@@ -17,7 +16,6 @@ export type AdaptiveGroupType = string;
 export interface AdaptiveGroupOptions {
   enabledRegionIds?: readonly string[];
   type: AdaptiveGroupType;
-  minimumNodeCount: number;
 }
 
 export interface AdaptiveGroupCandidate {
@@ -27,7 +25,6 @@ export interface AdaptiveGroupCandidate {
   id: string;
   matchedNodeCount: number;
   name: string;
-  requiredNodeCount: number;
 }
 
 export type AdaptiveGroupWarning =
@@ -37,7 +34,8 @@ export type AdaptiveGroupWarning =
   | { code: "anchor_type_invalid" }
   | { code: "anchor_members_invalid" }
   | { code: "group_name_conflict"; groupName: string }
-  | { code: "referenced_stale_group"; groupName: string };
+  | { code: "referenced_stale_group"; groupName: string }
+  | { code: "empty_regions_skipped"; groupNames: string[] };
 
 export interface AdaptiveGroupGeneration {
   candidates: AdaptiveGroupCandidate[];
@@ -89,6 +87,7 @@ export interface ConfigAdaptiveDialect {
     nodeNames: readonly string[],
   ) => ConfigMap;
   replaceGroupMembers: (group: ConfigMap, members: readonly string[]) => ConfigMap;
+  requiresNodePreview: boolean;
   typeOptions: readonly { label: string; value: string }[];
 }
 
@@ -105,6 +104,7 @@ export interface ConfigAdaptiveHelpers {
     config: Readonly<FileConfigDraft>,
     generation: Readonly<AdaptiveGroupGeneration>,
   ) => AdaptiveGroupMergeResult;
+  requiresNodePreview: boolean;
   strip: (config: Readonly<FileConfigDraft>) => AdaptiveGroupStripResult;
   typeOptions: readonly { label: string; value: string }[];
 }
@@ -131,6 +131,7 @@ export function adaptiveGroupHelpers(
       namingLocale,
     ),
     merge: (config, generation) => mergeAdaptiveGroups(dialect, config, generation),
+    requiresNodePreview: dialect.requiresNodePreview,
     strip: (config) => stripCanonicalAdaptiveGroups(dialect, config),
     typeOptions: Object.freeze([...dialect.typeOptions]),
   };
@@ -142,7 +143,6 @@ export function defaultAdaptiveGroupOptions(
 ): AdaptiveGroupOptions {
   return {
     type: dialect.defaultType,
-    minimumNodeCount: 2,
     enabledRegionIds: [...DEFAULT_ADAPTIVE_REGION_IDS],
   };
 }
@@ -151,19 +151,14 @@ export function adaptiveGroupOptionsFromValues(
   dialect: Pick<ConfigAdaptiveDialect, "defaultType" | "typeOptions">,
   values: Readonly<{
     enabledRegionIds?: readonly string[];
-    minimumNodeCount?: unknown;
     type?: unknown;
   }> | undefined,
 ): AdaptiveGroupOptions {
   const defaults = defaultAdaptiveGroupOptions(dialect);
   if (!values) return defaults;
   const enabled = new Set(values.enabledRegionIds ?? []);
-  const minimumNodeCount = values.minimumNodeCount;
   return {
     type: isAdaptiveGroupType(dialect, values.type) ? values.type : defaults.type,
-    minimumNodeCount: Number.isInteger(minimumNodeCount) && Number(minimumNodeCount) >= 1
-      ? Number(minimumNodeCount)
-      : defaults.minimumNodeCount,
     enabledRegionIds: ADAPTIVE_REGION_IDS.filter((id) => enabled.has(id)),
   };
 }
@@ -174,9 +169,6 @@ export function generateAdaptiveGroups(
   options: Readonly<AdaptiveGroupOptions>,
   namingLocale: ConfigNamingLocale = "en-US",
 ): AdaptiveGroupGeneration {
-  if (!Number.isInteger(options.minimumNodeCount) || options.minimumNodeCount < 1) {
-    throw new RangeError("minimumNodeCount must be a positive integer");
-  }
   if (!isAdaptiveGroupType(dialect, options.type)) {
     throw new RangeError("adaptive group type is invalid");
   }
@@ -187,12 +179,14 @@ export function generateAdaptiveGroups(
     adaptiveRegionName(region.id, namingLocale),
     region.filter,
     region.excludeFilter,
-    options.minimumNodeCount,
     uniqueNodeNames,
   ));
   const warnings: AdaptiveGroupWarning[] = [];
   const groups: ConfigMap[] = [];
-  const enabledRegionIds = new Set(options.enabledRegionIds ?? DEFAULT_ADAPTIVE_REGION_IDS);
+  const emptyRegionNames: string[] = [];
+  const enabledRegionIds = new Set(
+    options.enabledRegionIds ?? candidates.filter((item) => item.active).map((item) => item.id),
+  );
 
   for (const item of candidates) {
     if (!enabledRegionIds.has(item.id)) continue;
@@ -200,14 +194,36 @@ export function generateAdaptiveGroups(
       warnings.push({ code: "node_name_conflict", groupName: item.name });
       continue;
     }
-    if (!item.active) continue;
+    if (dialect.requiresNodePreview && !item.active) {
+      emptyRegionNames.push(item.name);
+      continue;
+    }
     groups.push(dialect.materialize(
       item,
       options.type,
       adaptiveMatchingNodeNames(item, uniqueNodeNames),
     ));
   }
+  if (emptyRegionNames.length > 0) {
+    warnings.push({ code: "empty_regions_skipped", groupNames: emptyRegionNames });
+  }
   return { candidates, groups, namingLocale, uniqueNodeCount: uniqueNodeNames.length, warnings };
+}
+
+export function sortAdaptiveCandidates(
+  candidates: readonly AdaptiveGroupCandidate[],
+  enabledRegionIds: readonly string[],
+): AdaptiveGroupCandidate[] {
+  const enabled = new Set(enabledRegionIds);
+  const order = new Map(candidates.map((item, index) => [item.id, index]));
+  return [...candidates].sort((left, right) => {
+    const selectionDifference = Number(enabled.has(right.id)) - Number(enabled.has(left.id));
+    if (selectionDifference !== 0) return selectionDifference;
+    const countDifference = right.matchedNodeCount - left.matchedNodeCount;
+    return countDifference !== 0
+      ? countDifference
+      : (order.get(left.id) ?? 0) - (order.get(right.id) ?? 0);
+  });
 }
 
 export function canonicalAdaptiveGroupNames(
@@ -305,16 +321,9 @@ export function mergeAdaptiveGroups(
     if (index === anchorIndex) return [dialect.replaceGroupMembers(group, rewrittenProxyTargets)];
     return [group];
   });
-  const autoName = configAutoName(generation.namingLocale);
-  const anchorName = configAnchorName(generation.namingLocale);
-  const insertAfterName = retainedGroups.some((group) => dialect.groupName(group) === autoName)
-    ? autoName
-    : anchorName;
-  const insertAfterIndex = retainedGroups.findIndex((group) => dialect.groupName(group) === insertAfterName);
   const nextGroups = [
-    ...retainedGroups.slice(0, insertAfterIndex + 1),
+    ...retainedGroups,
     ...desiredGroups,
-    ...retainedGroups.slice(insertAfterIndex + 1),
   ];
   const changed = !exactValueEqual(currentGroups, nextGroups);
   const nextConfig = changed ? { ...config, groups: nextGroups } : config;
@@ -520,18 +529,16 @@ function candidate(
   name: string,
   filter: string,
   excludeFilter: string | undefined,
-  requiredNodeCount: number,
   nodeNames: readonly string[],
 ): AdaptiveGroupCandidate {
   const matchedNodeCount = adaptiveMatchingNodeNames({ filter, excludeFilter }, nodeNames).length;
   return {
-    active: matchedNodeCount >= requiredNodeCount,
+    active: matchedNodeCount > 0,
     ...(excludeFilter ? { excludeFilter } : {}),
     filter,
     id,
     matchedNodeCount,
     name,
-    requiredNodeCount,
   };
 }
 

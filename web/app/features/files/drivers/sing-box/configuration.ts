@@ -122,6 +122,7 @@ function singBoxGroups(): StructuredFileConfigurationAdapter["groups"] {
     project,
     serialize,
     supportsExcludeFilter: false,
+    supportsHidden: false,
     supportsRuntimeFilter: false,
     transitionMemberMode: (group) => group,
     transitionType: (group, type) => {

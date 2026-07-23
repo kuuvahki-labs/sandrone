@@ -71,6 +71,7 @@ export interface ConfigAdaptiveStrategy {
   ) => AdaptiveGroupMergeResult;
   optionsFromConfig: (config: FileAdaptiveGroupConfigDetail | undefined) => AdaptiveGroupOptions;
   recognizesCanonicalLayer: (config: Readonly<FileConfigDraft>) => boolean;
+  requiresNodePreview: boolean;
   strip: (config: Readonly<FileConfigDraft>) => AdaptiveGroupStripResult;
   typeOptions: readonly { label: string; value: string }[];
 }
@@ -82,6 +83,7 @@ export interface StructuredGroupDraftAdapter {
   project: (groups: ConfigMap[]) => GroupDraft[] | null;
   serialize: (groups: GroupDraft[]) => ConfigMap[];
   supportsExcludeFilter: boolean;
+  supportsHidden: boolean;
   supportsRuntimeFilter: boolean;
   transitionMemberMode: (group: GroupDraft, mode: ProxyGroupMemberMode, restoredMembers?: string[]) => GroupDraft;
   transitionType: (group: GroupDraft, type: string) => GroupDraft;

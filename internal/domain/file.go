@@ -103,9 +103,8 @@ func (c FileConfig) MarshalYAML() (any, error) {
 }
 
 type FileAdaptiveGroupConfig struct {
-	Type             string   `json:"type,omitempty" yaml:"type,omitempty"`
-	MinimumNodeCount int      `json:"minimum_node_count,omitempty" yaml:"minimum_node_count,omitempty"`
-	Regions          []string `json:"regions,omitempty" yaml:"regions,omitempty"`
+	Type    string   `json:"type,omitempty" yaml:"type,omitempty"`
+	Regions []string `json:"regions,omitempty" yaml:"regions,omitempty"`
 }
 
 type FileSource struct {

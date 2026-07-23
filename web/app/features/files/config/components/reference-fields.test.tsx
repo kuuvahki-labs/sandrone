@@ -20,6 +20,8 @@ describe("config reference fields", () => {
     render(<OrderedReferencesHarness />);
 
     expect(referenceValues()).toEqual(["$nodes", "DIRECT", "DIRECT"]);
+    expect(screen.getByRole("button", { name: "添加成员" }).parentElement)
+      .toHaveClass("flex", "justify-end");
     expect(screen.getByRole("button", { name: "拖动成员 1" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "下移成员 1" }));
     expect(referenceValues()).toEqual(["DIRECT", "$nodes", "DIRECT"]);

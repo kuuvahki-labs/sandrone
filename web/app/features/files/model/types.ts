@@ -34,7 +34,6 @@ export interface FileSourceContent {
 
 export interface FileAdaptiveGroupConfigDetail {
   type?: string;
-  minimum_node_count?: number;
   regions?: string[];
 }
 

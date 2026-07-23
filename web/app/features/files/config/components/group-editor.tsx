@@ -7,7 +7,9 @@ import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
 import Button from "@mui/material/Button";
+import Checkbox from "@mui/material/Checkbox";
 import Collapse from "@mui/material/Collapse";
+import FormControlLabel from "@mui/material/FormControlLabel";
 import IconButton from "@mui/material/IconButton";
 import TextField from "@mui/material/TextField";
 import Tooltip from "@mui/material/Tooltip";
@@ -175,18 +177,32 @@ function SortableProxyGroupRow({ adapter, group, id, inboundCount, index, nodes,
             <TextField fullWidth required label={t("files.config.groupNameWithIndex", { index: index + 1 })} size="small" value={group.name} onChange={(event) => patchGroup({ name: event.target.value })} />
             <SelectField label={t("files.config.groupTypeWithIndex", { index: index + 1 })} options={[...adapter.groups.typeOptions]} size="small" value={type} onChange={updateType} />
           </div>
-          {adapter.groups.supportsRuntimeFilter ? (
-            <SelectField
-              label={t("files.config.groupMemberSource")}
-              options={[
-                { value: "fixed", label: t("files.config.groupMemberSourceFixed") },
-                { value: "runtime-filter", label: t("files.config.groupMemberSourceRuntime") },
-              ]}
-              size="small"
-              value={memberMode}
-              onChange={updateMemberMode}
-            />
-          ) : null}
+          <div
+            className={adapter.groups.supportsHidden
+              ? "grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+              : "grid gap-3"}
+            data-group-membership-controls=""
+          >
+            {adapter.groups.supportsRuntimeFilter ? (
+              <SelectField
+                label={t("files.config.groupMemberSource")}
+                options={[
+                  { value: "fixed", label: t("files.config.groupMemberSourceFixed") },
+                  { value: "runtime-filter", label: t("files.config.groupMemberSourceRuntime") },
+                ]}
+                size="small"
+                value={memberMode}
+                onChange={updateMemberMode}
+              />
+            ) : <span />}
+            {adapter.groups.supportsHidden ? (
+              <FormControlLabel
+                className="m-0 w-fit"
+                control={<Checkbox checked={group.hidden === true} size="small" onChange={(event) => patchGroup({ hidden: event.target.checked })} />}
+                label={t("files.config.groupHidden")}
+              />
+            ) : null}
+          </div>
           {memberMode === "runtime-filter" ? (
             <div className={adapter.groups.supportsExcludeFilter ? "grid gap-3 sm:grid-cols-2" : "grid gap-3"}>
               <TextField

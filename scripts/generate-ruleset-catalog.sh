@@ -8,8 +8,6 @@ trap 'rm -rf "$work_dir"' EXIT
 
 export GIT_TERMINAL_PROMPT=0
 
-blackmatrix_commit="e69663d642551aa3e0164a656179335a896127ad"
-
 clone_tree_paths() {
   local repository="$1"
   local branch="$2"
@@ -28,27 +26,24 @@ clone_tree_paths() {
   git -C "$clone_dir" ls-tree -r --name-only HEAD >"$work_dir/$name.paths"
 }
 
-checkout_repository_at_commit() {
+checkout_repository_branch() {
   local repository="$1"
-  local commit="$2"
+  local branch="$2"
   local name="$3"
   local checkout_dir="$work_dir/$name"
 
-  git init --quiet "$checkout_dir"
-  git -C "$checkout_dir" remote add origin "$repository"
+  git clone \
+    --filter=blob:none \
+    --no-checkout \
+    --no-tags \
+    --depth=1 \
+    --single-branch \
+    --branch "$branch" \
+    "$repository" \
+    "$checkout_dir"
   git -C "$checkout_dir" sparse-checkout init --cone
   git -C "$checkout_dir" sparse-checkout set rule/Shadowrocket
-  git -C "$checkout_dir" \
-    -c protocol.version=2 \
-    fetch --quiet --filter=blob:none --no-tags --depth=1 origin "$commit"
-  git -C "$checkout_dir" checkout --quiet --detach FETCH_HEAD
-
-  local checked_out_commit
-  checked_out_commit="$(git -C "$checkout_dir" rev-parse HEAD)"
-  if [[ "$checked_out_commit" != "$commit" ]]; then
-    echo "expected blackmatrix7/ios_rule_script $commit, got $checked_out_commit" >&2
-    return 1
-  fi
+  git -C "$checkout_dir" checkout --quiet
 }
 
 clone_tree_paths \
@@ -59,9 +54,9 @@ clone_tree_paths \
   https://github.com/MetaCubeX/meta-rules-dat.git \
   sing \
   meta-rules-dat-sing
-checkout_repository_at_commit \
+checkout_repository_branch \
   https://github.com/blackmatrix7/ios_rule_script.git \
-  "$blackmatrix_commit" \
+  master \
   ios-rule-script
 
 "${GO:-go}" run "$repo_root/internal/tools/ruleset-catalog-gen" \

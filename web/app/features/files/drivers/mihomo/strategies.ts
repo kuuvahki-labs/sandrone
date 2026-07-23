@@ -221,6 +221,7 @@ function mihomoAdaptiveDialect(
     )).groupInboundReferences,
     materialize,
     replaceGroupMembers: (group, members) => ({ ...group, proxies: [...members] }),
+    requiresNodePreview: false,
     typeOptions: ADAPTIVE_TYPE_OPTIONS,
   };
 }
@@ -233,7 +234,6 @@ function mihomoAdaptive(dialect: ConfigAdaptiveDialect): ConfigAdaptiveStrategy 
       const enabled = new Set(options.enabledRegionIds ?? DEFAULT_ADAPTIVE_REGION_IDS);
       return {
         type: options.type,
-        minimum_node_count: options.minimumNodeCount,
         regions: ADAPTIVE_REGION_IDS.filter((id) => enabled.has(id)),
       };
     },
@@ -241,7 +241,6 @@ function mihomoAdaptive(dialect: ConfigAdaptiveDialect): ConfigAdaptiveStrategy 
     isStale: () => false,
     optionsFromConfig: (config) => adaptiveGroupOptionsFromValues(dialect, config ? {
       enabledRegionIds: config.regions,
-      minimumNodeCount: config.minimum_node_count,
       type: config.type,
     } : undefined),
     recognizesCanonicalLayer: (config) => helpers.canonicalNames(config.groups ?? []).length > 0,

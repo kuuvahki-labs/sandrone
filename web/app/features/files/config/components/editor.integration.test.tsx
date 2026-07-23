@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -374,7 +374,7 @@ describe("config file workbench integration", { timeout: 20_000 }, () => {
     await waitFor(() => expect(onValidityChange).toHaveBeenLastCalledWith(false));
   });
 
-  it("updates adaptive groups only after explicit regeneration", async () => {
+  it("keeps runtime-filter groups stable when the subscription preview changes", async () => {
     const user = userEvent.setup();
     const loadPreview = vi.fn()
       .mockResolvedValueOnce(subscriptionPreview("provider", ["HK-01", "香港-02"]))
@@ -384,16 +384,49 @@ describe("config file workbench integration", { timeout: 20_000 }, () => {
     expect(await screen.findByText("已加载 2 个节点")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "生成自适应分组" }));
     expect(screen.getByRole("button", { name: "展开代理组 Hong Kong" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "展开代理组 Japan" })).toBeInTheDocument();
+    const generated = structuredClone(currentConfig().groups);
 
     await user.click(screen.getByRole("button", { name: "刷新节点" }));
     await waitFor(() => expect(loadPreview).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.getByRole("button", { name: "重新生成自适应分组" })).toBeEnabled());
-    expect(screen.getByRole("button", { name: "展开代理组 Hong Kong" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "展开代理组 Japan" })).not.toBeInTheDocument();
+    expect(currentConfig().groups).toEqual(generated);
+  });
 
-    await user.click(screen.getByRole("button", { name: "重新生成自适应分组" }));
-    expect(screen.queryByRole("button", { name: "展开代理组 Hong Kong" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "展开代理组 Japan" })).toBeInTheDocument();
+  it.each(["mihomo", "shadowrocket"] as const)(
+    "generates the five default runtime-filter groups for %s without selecting a subscription",
+    async (kind) => {
+      const user = userEvent.setup();
+      const adapter = structuredAdapter(kind);
+      renderEditor({
+        adapter,
+        defaultValue: adapter.templates.create("minimal"),
+      });
+
+      const generate = screen.getByRole("button", { name: "生成自适应分组" });
+      expect(generate).toBeEnabled();
+      await user.click(generate);
+
+      const nameKey = kind === "shadowrocket" ? "policy-regex-filter" : "include-all-proxies";
+      expect(currentConfig().groups.filter((group) => group[nameKey] !== undefined).map((group) => group.name)).toEqual([
+        "Hong Kong",
+        "Taiwan",
+        "Singapore",
+        "Japan",
+        "United States",
+      ]);
+    },
+  );
+
+  it("keeps sing-box adaptive generation disabled without a subscription preview", () => {
+    const adapter = structuredAdapter("sing-box");
+    renderEditor({
+      adapter,
+      defaultValue: adapter.templates.create("minimal"),
+    });
+
+    expect(screen.getByRole("button", { name: "生成自适应分组" })).toBeDisabled();
+    expect(screen.getByText("请先选择订阅。")).toBeInTheDocument();
   });
 
   it("uses displayed Shadowrocket runtime defaults as the adaptive anchor and materializes them on generation", async () => {
@@ -497,7 +530,6 @@ describe("config file workbench integration", { timeout: 20_000 }, () => {
     expect(await screen.findByText("已加载 2 个节点")).toBeInTheDocument();
     await user.click(screen.getByRole("combobox", { name: "代理组类型" }));
     await user.click(await screen.findByRole("option", { name: "load-balance" }));
-    fireEvent.change(screen.getByRole("spinbutton", { name: "地区最少节点数" }), { target: { value: "3" } });
     await user.click(screen.getByRole("button", { name: "返回" }));
 
     expect(onBack).not.toHaveBeenCalled();
@@ -530,7 +562,13 @@ describe("config file workbench integration", { timeout: 20_000 }, () => {
     localStorage.setItem("sandrone.locale", "en-US");
     renderEditor();
 
-    expect(screen.getByRole("group", { name: "Configuration template" })).toBeInTheDocument();
+    const template = screen.getByRole("group", { name: "Configuration template" });
+    const nodeSource = screen.getByRole("group", { name: "Node source" });
+
+    expect(screen.getByRole("heading", { name: "Configuration content" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Base configuration content" })).toBeInTheDocument();
+    expect(template.compareDocumentPosition(nodeSource)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(screen.queryByRole("heading", { name: "Configuration details" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Rules/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Expand rule set 1 private" })).toBeInTheDocument();
   });

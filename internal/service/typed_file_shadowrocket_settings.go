@@ -20,9 +20,8 @@ type shadowrocketFileSettings struct {
 }
 
 type shadowrocketAdaptiveGroupSettings struct {
-	Type             *string  `json:"type,omitempty"`
-	MinimumNodeCount *int     `json:"minimum_node_count,omitempty"`
-	Regions          []string `json:"regions,omitempty"`
+	Type    *string  `json:"type,omitempty"`
+	Regions []string `json:"regions,omitempty"`
 }
 
 type shadowrocketGroupSettings struct {
@@ -33,8 +32,6 @@ type shadowrocketGroupSettings struct {
 	Interval          *int      `json:"interval,omitempty"`
 	Timeout           *int      `json:"timeout,omitempty"`
 	Tolerance         *int      `json:"tolerance,omitempty"`
-	PolicySelectName  *string   `json:"policy-select-name,omitempty"`
-	Select            *int      `json:"select,omitempty"`
 	Hidden            *bool     `json:"hidden,omitempty"`
 }
 
@@ -66,7 +63,7 @@ func decodeShadowrocketFileSettings(raw json.RawMessage) (shadowrocketFileSettin
 	if value, ok := fields["adaptive_groups"]; ok {
 		var adaptive shadowrocketAdaptiveGroupSettings
 		if err := decodeStrictJSONObject(value, "config.settings.adaptive_groups", &adaptive,
-			"type", "minimum_node_count", "regions"); err != nil {
+			"type", "regions"); err != nil {
 			return shadowrocketFileSettings{}, shadowrocketSettingsError(err)
 		}
 		settings.AdaptiveGroups = &adaptive
@@ -81,7 +78,7 @@ func decodeShadowrocketFileSettings(raw json.RawMessage) (shadowrocketFileSettin
 			path := fmt.Sprintf("config.settings.groups[%d]", index)
 			if err := decodeStrictJSONObject(item, path, &settings.Groups[index],
 				"name", "type", "proxies", "policy-regex-filter", "interval", "timeout",
-				"tolerance", "policy-select-name", "select", "hidden"); err != nil {
+				"tolerance", "hidden"); err != nil {
 				return shadowrocketFileSettings{}, shadowrocketSettingsError(err)
 			}
 		}
@@ -216,9 +213,6 @@ func validateShadowrocketAdaptiveGroups(settings *shadowrocketAdaptiveGroupSetti
 			return fmt.Errorf("config.settings.adaptive_groups.type must be select, url-test, or load-balance")
 		}
 	}
-	if settings.MinimumNodeCount != nil && *settings.MinimumNodeCount < 1 {
-		return fmt.Errorf("config.settings.adaptive_groups.minimum_node_count must be at least 1")
-	}
 	allowedRegions := map[string]bool{
 		"hk": true, "tw": true, "sg": true, "jp": true, "kr": true, "us": true,
 		"ca": true, "uk": true, "de": true, "fr": true, "mo": true, "au": true,
@@ -296,12 +290,6 @@ func validateShadowrocketGroups(groups []shadowrocketGroupSettings) error {
 		}
 		if group.Tolerance != nil && (*group.Tolerance < 0 || *group.Tolerance > 65535) {
 			return fmt.Errorf("%s.tolerance must be between 0 and 65535", path)
-		}
-		if group.Select != nil && *group.Select < 0 {
-			return fmt.Errorf("%s.select must be a non-negative policy index", path)
-		}
-		if group.PolicySelectName != nil && strings.TrimSpace(*group.PolicySelectName) == "" {
-			return fmt.Errorf("%s.policy-select-name must not be empty", path)
 		}
 	}
 	return validateShadowrocketGroupCycles(groups, names)

@@ -140,7 +140,7 @@ const registeredClientLiteral = new RegExp(
   `["'\`][^"'\`]*(?:${allDriverKinds.map(escapeRegExp).join("|")})[^"'\`]*["'\`]`,
   "i",
 );
-const targetNativeSchemaKey = /\b(?:auto_detect_interface|auto_redirect|auto_route|cache_file|clash_api|default_domain_resolver|domain_suffix|download_detour|fallback_delay|inbound|inbounds|interrupt_exist_connections|ip_cidr|ip_is_private|listen_port|network_strategy|outbound|outbounds|override_address|override_port|proxies|route|route_exclude_address|rule_set|rule_set_ipcidr_match_source|server_port|source_ip_cidr|strict_route|tag|update_interval)\b|(?<![\w-])(?:dialer-proxy|disable-udp|exclude-filter|exclude-type|expected-status|include-all|include-all-proxies|include-all-providers|interface-name|max-failed-times|policy-path|policy-regex-filter|policy-select-name|proxy-groups|proxy-providers|routing-mark|rule-providers)(?![\w-])/i;
+const targetNativeSchemaKey = /\b(?:auto_detect_interface|auto_redirect|auto_route|cache_file|clash_api|default_domain_resolver|domain_suffix|download_detour|fallback_delay|inbound|inbounds|interrupt_exist_connections|ip_cidr|ip_is_private|listen_port|network_strategy|outbound|outbounds|override_address|override_port|proxies|route|route_exclude_address|rule_set|rule_set_ipcidr_match_source|server_port|source_ip_cidr|strict_route|tag|update_interval)\b|(?<![\w-])(?:dialer-proxy|disable-udp|exclude-filter|exclude-type|expected-status|include-all|include-all-proxies|include-all-providers|interface-name|max-failed-times|policy-path|policy-regex-filter|proxy-groups|proxy-providers|routing-mark|rule-providers)(?![\w-])/i;
 const targetNativeActionKey = /(?:\.\s*action\b|["'`]action["'`]\s*:|(?<![\w$])action\s*:)/i;
 
 function escapeRegExp(value: string): string {
@@ -869,7 +869,6 @@ describe("FileDriver boundaries", () => {
       "auto_route",
       "proxy-groups",
       "rule-providers",
-      "policy-select-name",
     ]) {
       expect(targetNativeSchemaKeys(`const native = { "${key}": true };`), key)
         .not.toEqual([]);

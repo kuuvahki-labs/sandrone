@@ -245,7 +245,6 @@ func TestFileEndpointStoresAndRendersTypedConfigFile(t *testing.T) {
 	"settings": {
 	  "adaptive_groups": {
 		"type": "url-test",
-		"minimum_node_count": 2,
 		"regions": ["hk", "jp"]
 	  }
     }
@@ -262,7 +261,7 @@ func TestFileEndpointStoresAndRendersTypedConfigFile(t *testing.T) {
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &spec))
 	require.Equal(t, domain.FileKindMihomo, spec.Kind)
 	require.Equal(t, []string{"provider"}, spec.Config.Subscriptions)
-	require.JSONEq(t, `{"adaptive_groups":{"type":"url-test","minimum_node_count":2,"regions":["hk","jp"]}}`, string(spec.Config.Settings))
+	require.JSONEq(t, `{"adaptive_groups":{"type":"url-test","regions":["hk","jp"]}}`, string(spec.Config.Settings))
 
 	w = httptest.NewRecorder()
 	server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/v1/files/default.yaml", nil))

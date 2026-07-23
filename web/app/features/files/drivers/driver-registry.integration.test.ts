@@ -129,10 +129,10 @@ describe("file driver codecs", () => {
   it.each([
     ["mihomo", {}],
     ["mihomo", { type: "url-test" }],
-    ["mihomo", { minimum_node_count: 2, regions: ["us", "hk"] }],
+    ["mihomo", { regions: ["us", "hk"] }],
     ["shadowrocket", {}],
     ["shadowrocket", { type: "url-test" }],
-    ["shadowrocket", { minimum_node_count: 2, regions: ["us", "hk"] }],
+    ["shadowrocket", { regions: ["us", "hk"] }],
   ] as const)("round-trips partial %s adaptive settings without filling or reordering fields", (kind, adaptiveGroups) => {
     const adapter = structuredAdapter(kind);
     const settings = { adaptive_groups: adaptiveGroups };
@@ -146,7 +146,6 @@ describe("file driver codecs", () => {
   it.each([
     { adaptive_groups: { future: true } },
     { adaptive_groups: { type: 7 } },
-    { adaptive_groups: { minimum_node_count: 2.5 } },
     { adaptive_groups: { regions: ["hk", 7] } },
   ])("falls back to raw mode for backend-unrepresentable Mihomo adaptive settings %#", (settings) => {
     expect(structuredAdapter("mihomo").decode({ settingsPresent: true, settings })).toMatchObject({
@@ -154,6 +153,18 @@ describe("file driver codecs", () => {
       rawSettings: settings,
     });
   });
+
+  it.each(["mihomo", "shadowrocket"] as const)(
+    "falls back to raw mode when %s receives removed minimum_node_count",
+    (kind) => {
+      const settings = { adaptive_groups: { minimum_node_count: 2 } };
+
+      expect(structuredAdapter(kind).decode({ settingsPresent: true, settings })).toMatchObject({
+        settingsMode: "raw",
+        rawSettings: settings,
+      });
+    },
+  );
 
   it("registers Shadowrocket as an INI typed-file target without exposing extra merge modes", () => {
     const driver = FILE_DRIVER_REGISTRY.get("shadowrocket");
@@ -182,13 +193,11 @@ describe("file driver codecs", () => {
   it("round-trips strict Shadowrocket settings and preserves omitted versus explicit empty arrays", () => {
     const adapter = structuredAdapter("shadowrocket");
     const settings = {
-      adaptive_groups: { type: "url-test", minimum_node_count: 2, regions: [] },
+      adaptive_groups: { type: "url-test", regions: [] },
       groups: [{
         name: "Proxy",
         type: "select",
         proxies: ["$nodes", "DIRECT"],
-        "policy-select-name": "Auto",
-        select: 2,
         hidden: false,
       }],
       rule_sets: [{ name: "ads", type: "domain-set", url: "https://example.com/ads.list" }],
@@ -206,6 +215,29 @@ describe("file driver codecs", () => {
       settings: { groups: [], rules: [] },
     });
     expect(adapter.encode(adapter.initialize({ settingsMode: "structured" }))).toEqual({ settings: {} });
+  });
+
+  it.each([
+    ["policy-select-name", "DIRECT"],
+    ["select", 0],
+  ] as const)("falls back to raw mode for removed Shadowrocket group field %s", (key, value) => {
+    const settings = {
+      groups: [{ name: "Proxy", type: "select", proxies: ["DIRECT"], [key]: value }],
+    };
+    expect(structuredAdapter("shadowrocket").decode({ settingsPresent: true, settings })).toMatchObject({
+      settingsMode: "raw",
+      rawSettings: settings,
+    });
+  });
+
+  it("round-trips Mihomo hidden as a normalized group field", () => {
+    const adapter = structuredAdapter("mihomo");
+    const settings = {
+      groups: [{ name: "Proxy", type: "select", proxies: ["DIRECT"], hidden: true }],
+    };
+    const decoded = adapter.decode({ settingsPresent: true, settings })!;
+    expect(decoded.groups[0]).toMatchObject({ hidden: true });
+    expect(adapter.encode(decoded)).toEqual({ settings });
   });
 
   it("accepts trimmed Shadowrocket rule-set types and URLs", () => {
