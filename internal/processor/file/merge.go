@@ -30,10 +30,10 @@ import (
 // Include is the ordered list of part names to merge. When empty, the merger
 // uses every part whose Role is "base" (the implicit MergePolicy semantics).
 type MergeParams struct {
-	Mode      string   `json:"mode"`
-	Include   []string `json:"include,omitempty"`
-	Separator string   `json:"separator,omitempty"`
-	Content   string   `json:"content,omitempty"`
+	Mode      string   `json:"mode" jsonschema:"File merge strategy" enum:"append,replace,yaml_overlay,yaml_override,json_overlay,json_override,ini_override"`
+	Include   []string `json:"include,omitempty" jsonschema:"Internal file part names to include in order"`
+	Separator string   `json:"separator,omitempty" jsonschema:"Separator used by append mode" default:"\\n"`
+	Content   string   `json:"content,omitempty" jsonschema:"Inline content merged after the current public file content"`
 }
 
 // MergePolicy converts a domain.FileMergePolicy into MergeParams. This is

@@ -76,9 +76,8 @@ func TestConvertToolAcceptsRemoteInput(t *testing.T) {
 	result, err := session.CallTool(ctx, &mcp.CallToolParams{
 		Name: "sandrone_convert",
 		Arguments: map[string]any{
-			"from_format": "",
-			"to_format":   "json-nodes",
-			"remote":      map[string]any{"url": subServer.URL},
+			"to_format": "json-nodes",
+			"remote":    map[string]any{"url": subServer.URL},
 		},
 	})
 	require.NoError(t, err)
@@ -88,24 +87,46 @@ func TestConvertToolAcceptsRemoteInput(t *testing.T) {
 	require.Contains(t, string(body), subServer.URL)
 }
 
-func TestManagementToolsCanBeEnabled(t *testing.T) {
-	ctx := context.Background()
-	rt := testRuntime(t, app.Config{MCP: app.MCPConfig{ReadOnly: false, AllowManagementTools: true}})
-	session := connect(t, ctx, mcpapi.SDKServer(rt))
-	defer session.Close()
-
-	tools, err := session.ListTools(ctx, nil)
-	require.NoError(t, err)
-	names := map[string]bool{}
-	for _, tool := range tools.Tools {
-		names[tool.Name] = true
+func TestManagementToolRegistrationFollowsSingleSwitch(t *testing.T) {
+	want := []string{
+		"sandrone_put_subscription",
+		"sandrone_delete_subscription",
+		"sandrone_put_file",
+		"sandrone_delete_file",
 	}
-	require.True(t, names["sandrone_put_subscription"])
+	for _, tt := range []struct {
+		name    string
+		enabled bool
+	}{
+		{name: "disabled", enabled: false},
+		{name: "enabled", enabled: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			rt := testRuntime(t, app.Config{
+				MCP: app.MCPConfig{AllowManagementTools: tt.enabled},
+			})
+			session := connect(t, ctx, mcpapi.SDKServer(rt))
+			defer session.Close()
+
+			tools, err := session.ListTools(ctx, nil)
+			require.NoError(t, err)
+			names := map[string]bool{}
+			for _, tool := range tools.Tools {
+				names[tool.Name] = true
+			}
+			for _, name := range want {
+				require.Equal(t, tt.enabled, names[name], name)
+			}
+		})
+	}
 }
 
 func TestMCPPublicResourceNamesRejectSlash(t *testing.T) {
 	ctx := context.Background()
-	rt := testRuntime(t, app.Config{MCP: app.MCPConfig{ReadOnly: false, AllowManagementTools: true}})
+	rt := testRuntime(t, app.Config{
+		MCP: app.MCPConfig{AllowManagementTools: true},
+	})
 	session := connect(t, ctx, mcpapi.SDKServer(rt))
 	defer session.Close()
 
@@ -160,7 +181,9 @@ func TestMCPPublicResourceNamesRejectSlash(t *testing.T) {
 
 func TestMCPPutFileRejectsNonCanonicalKindAndLegacyConfigWire(t *testing.T) {
 	ctx := context.Background()
-	rt := testRuntime(t, app.Config{MCP: app.MCPConfig{ReadOnly: false, AllowManagementTools: true}})
+	rt := testRuntime(t, app.Config{
+		MCP: app.MCPConfig{AllowManagementTools: true},
+	})
 	session := connect(t, ctx, mcpapi.SDKServer(rt))
 	defer session.Close()
 
@@ -177,7 +200,7 @@ func TestMCPPutFileRejectsNonCanonicalKindAndLegacyConfigWire(t *testing.T) {
 		{
 			name:      "case variant",
 			arguments: map[string]any{"name": "bad.yaml", "kind": "Mihomo", "source": map[string]any{"type": "inline"}},
-			want:      `file kind \"Mihomo\"`,
+			want:      "does not equal any of",
 		},
 		{
 			name:      "legacy config",
@@ -191,6 +214,33 @@ func TestMCPPutFileRejectsNonCanonicalKindAndLegacyConfigWire(t *testing.T) {
 			require.Contains(t, body, test.want)
 		})
 	}
+}
+
+func TestGetFileSourceModeReturnsUncompiledSource(t *testing.T) {
+	ctx := context.Background()
+	rt := testRuntime(t, app.Config{
+		MCP: app.MCPConfig{AllowManagementTools: true},
+	})
+	require.NoError(t, rt.Service.PutFile(ctx, domain.FileSpec{
+		Name:   "source.yaml",
+		Kind:   domain.FileKindStatic,
+		Source: domain.FileSource{Type: "inline", Content: "source: true\n"},
+	}))
+	session := connect(t, ctx, mcpapi.SDKServer(rt))
+	defer session.Close()
+
+	result, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name: "sandrone_get_file",
+		Arguments: map[string]any{
+			"file": "source.yaml",
+			"mode": "source",
+		},
+	})
+	require.NoError(t, err)
+	require.False(t, result.IsError)
+	body, err := json.Marshal(result)
+	require.NoError(t, err)
+	require.Contains(t, string(body), "source: true")
 }
 
 func callToolError(t *testing.T, ctx context.Context, session *mcp.ClientSession, name string, arguments map[string]any) string {
@@ -208,8 +258,13 @@ func connect(t *testing.T, ctx context.Context, server *mcp.Server) *mcp.ClientS
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
 	_, err := server.Connect(ctx, serverTransport, nil)
 	require.NoError(t, err)
+	return connectClient(t, ctx, clientTransport)
+}
+
+func connectClient(t *testing.T, ctx context.Context, transport mcp.Transport) *mcp.ClientSession {
+	t.Helper()
 	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "v0.0.0"}, nil)
-	session, err := client.Connect(ctx, clientTransport, nil)
+	session, err := client.Connect(ctx, transport, nil)
 	require.NoError(t, err)
 	return session
 }

@@ -18,24 +18,78 @@ import (
 type Registry struct {
 	nodeBuilders map[string]NodeBuilder
 	fileBuilders map[string]FileBuilder
+	descriptors  map[descriptorKey]Descriptor
 }
 
 type NodeBuilder func(spec domain.ProcessorSpec) (domain.NodeProcessor, error)
 type FileBuilder func(spec domain.ProcessorSpec) (domain.FileProcessor, error)
 
+type descriptorKey struct {
+	stage    domain.Stage
+	typeName string
+}
+
 func NewRegistry() *Registry {
 	return &Registry{
 		nodeBuilders: map[string]NodeBuilder{},
 		fileBuilders: map[string]FileBuilder{},
+		descriptors:  map[descriptorKey]Descriptor{},
 	}
 }
 
 func (r *Registry) RegisterNode(typeName string, build NodeBuilder) {
 	r.nodeBuilders[typeName] = build
+	delete(r.descriptors, descriptorKey{stage: domain.StageNodes, typeName: typeName})
 }
 
 func (r *Registry) RegisterFile(typeName string, build FileBuilder) {
 	r.fileBuilders[typeName] = build
+	delete(r.descriptors, descriptorKey{stage: domain.StageFile, typeName: typeName})
+}
+
+// RegisterNodeWithDescriptor registers a node builder and its owner-maintained
+// descriptor as one operation.
+func (r *Registry) RegisterNodeWithDescriptor(typeName string, build NodeBuilder, descriptor Descriptor) {
+	descriptor.Type = typeName
+	descriptor.Stage = domain.StageNodes
+	r.nodeBuilders[typeName] = build
+	r.descriptors[descriptorKey{stage: domain.StageNodes, typeName: typeName}] = cloneDescriptor(descriptor)
+}
+
+// RegisterFileWithDescriptor registers a file builder and its owner-maintained
+// descriptor as one operation.
+func (r *Registry) RegisterFileWithDescriptor(typeName string, build FileBuilder, descriptor Descriptor) {
+	descriptor.Type = typeName
+	descriptor.Stage = domain.StageFile
+	r.fileBuilders[typeName] = build
+	r.descriptors[descriptorKey{stage: domain.StageFile, typeName: typeName}] = cloneDescriptor(descriptor)
+}
+
+// Descriptors returns stable copies ordered by stage, then processor type.
+func (r *Registry) Descriptors() []Descriptor {
+	out := make([]Descriptor, 0, len(r.descriptors))
+	for _, descriptor := range r.descriptors {
+		out = append(out, cloneDescriptor(descriptor))
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Stage != out[j].Stage {
+			return out[i].Stage < out[j].Stage
+		}
+		return out[i].Type < out[j].Type
+	})
+	return out
+}
+
+// PublicDescriptors returns only processor schemas intended for public flows.
+func (r *Registry) PublicDescriptors() []Descriptor {
+	descriptors := r.Descriptors()
+	public := make([]Descriptor, 0, len(descriptors))
+	for _, descriptor := range descriptors {
+		if descriptor.Public {
+			public = append(public, descriptor)
+		}
+	}
+	return public
 }
 
 func (r *Registry) HasNode(typeName string) bool { _, ok := r.nodeBuilders[typeName]; return ok }

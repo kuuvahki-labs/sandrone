@@ -166,9 +166,16 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /healthz", s.health)
 	s.mux.HandleFunc("GET /version", s.version)
 	s.mux.HandleFunc("GET /convert", s.publicConvert)
-	s.mux.HandleFunc("/v1/convert", methodNotAllowed)
+	s.mux.HandleFunc("POST /v1/convert", s.agentConvert)
+	s.mux.HandleFunc("POST /v1/probe", s.agentProbe)
 	s.mux.HandleFunc("POST /v1/validate", s.validate)
 	s.mux.HandleFunc("GET /v1/inspect", s.inspect)
+	s.mux.HandleFunc("GET /v1/schemas/processors", s.listProcessorSchemas)
+	s.mux.HandleFunc("GET /v1/schemas/processors/{stage}/{type}", s.getProcessorSchema)
+	s.mux.HandleFunc("GET /v1/schemas/file-kinds/{kind}", s.getFileKindSchema)
+	s.mux.HandleFunc("GET /v1/schemas/script-api/v1", s.getScriptAPISchema)
+	s.mux.HandleFunc("GET /v1/schemas/subscription", s.getSubscriptionSchema)
+	s.mux.HandleFunc("GET /v1/schemas/file-spec", s.getFileSpecSchema)
 	s.mux.HandleFunc("GET /v1/backup", s.getBackup)
 	s.mux.HandleFunc("POST /v1/backup/restore", s.restoreBackup)
 	s.mux.HandleFunc("GET /v1/subscriptions", s.listSubscriptions)
@@ -199,10 +206,6 @@ func (s *Server) routes() {
 	if s.webUI != nil {
 		s.mux.Handle("/", s.webUI)
 	}
-}
-
-func methodNotAllowed(w http.ResponseWriter, _ *http.Request) {
-	http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 }
 
 func (s *Server) auth(next http.Handler) http.Handler {

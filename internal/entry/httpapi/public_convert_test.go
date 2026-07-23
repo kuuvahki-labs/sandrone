@@ -199,10 +199,10 @@ func TestPublicConvertRejectsInvalidQuery(t *testing.T) {
 	}
 }
 
-func TestLegacyPostConvertIsNotAvailable(t *testing.T) {
+func TestPublicPostConvertIsNotAvailable(t *testing.T) {
 	rt := testRuntime(t, app.Config{})
 	server := httpapi.New(rt)
-	req := httptest.NewRequest(http.MethodPost, "/v1/convert", strings.NewReader(`{
+	req := httptest.NewRequest(http.MethodPost, "/convert", strings.NewReader(`{
 		"from_format": "uri-list",
 		"to_format": "json-nodes",
 		"content": "`+publicConvertNode+`"

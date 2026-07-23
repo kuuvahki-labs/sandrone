@@ -35,6 +35,7 @@ func TestTypedFileRegistryRejectsDuplicateRegistration(t *testing.T) {
 	driver := registryTestDriver{descriptor: typedFileDescriptor{
 		Kind: domain.FileKindMihomo, MediaType: "application/yaml", Syntax: "yaml",
 		DefaultExtension: ".yaml", NodeRenderFormat: "mihomo-proxies",
+		SettingsPrototype: struct{}{}, SourceRules: FileKindSourceRules{AllowedTypes: []string{"inline"}},
 	}}
 	require.NoError(t, registry.Register(driver))
 
@@ -55,6 +56,8 @@ func TestTypedFileRegistryRequiresCompleteDescriptor(t *testing.T) {
 		{name: "syntax", descriptor: typedFileDescriptor{Kind: "future", MediaType: "text/plain"}, want: `driver "future" syntax is required`},
 		{name: "extension", descriptor: typedFileDescriptor{Kind: "future", MediaType: "text/plain", Syntax: "text"}, want: `driver "future" default extension is required`},
 		{name: "renderer", descriptor: typedFileDescriptor{Kind: "future", MediaType: "text/plain", Syntax: "text", DefaultExtension: ".txt"}, want: `driver "future" node render format is required`},
+		{name: "settings prototype", descriptor: typedFileDescriptor{Kind: "future", MediaType: "text/plain", Syntax: "text", DefaultExtension: ".txt", NodeRenderFormat: "text"}, want: `driver "future" settings prototype is required`},
+		{name: "source rules", descriptor: typedFileDescriptor{Kind: "future", MediaType: "text/plain", Syntax: "text", DefaultExtension: ".txt", NodeRenderFormat: "text", SettingsPrototype: struct{}{}}, want: `driver "future" source rules are required`},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

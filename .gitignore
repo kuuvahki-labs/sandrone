@@ -17,6 +17,8 @@ private/
 .worktrees/
 *.local.*
 sandrone
+!skills/sandrone/
+!skills/sandrone/**
 /data/
 /internal/entry/cli/data/
 web/.pnpm-store/

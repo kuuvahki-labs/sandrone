@@ -18,30 +18,30 @@ import (
 // Config is the runtime configuration for a script. It is parsed from
 // ProcessorSpec.Params and validated when the processor is constructed.
 type Config struct {
-	Path        string           `json:"path,omitempty"`
-	Content     string           `json:"content,omitempty"`
-	Source      ScriptSource     `json:"source,omitempty"`
-	Engine      string           `json:"engine,omitempty"`
-	Args        map[string]any   `json:"args,omitempty"`
-	TimeoutMS   int              `json:"timeout_ms,omitempty"`
-	ScriptID    string           `json:"id,omitempty"`
-	Permissions PermissionConfig `json:"permissions,omitempty"`
+	Path        string           `json:"path,omitempty" jsonschema:"Legacy controlled file source name"`
+	Content     string           `json:"content,omitempty" jsonschema:"Legacy inline JavaScript source"`
+	Source      ScriptSource     `json:"source,omitempty" jsonschema:"Structured inline controlled file or controlled remote source"`
+	Engine      string           `json:"engine,omitempty" jsonschema:"Script engine" enum:"js" default:"js"`
+	Args        map[string]any   `json:"args,omitempty" jsonschema:"Arguments exposed to the script envelope"`
+	TimeoutMS   int              `json:"timeout_ms,omitempty" jsonschema:"Execution timeout in milliseconds" minimum:"0"`
+	ScriptID    string           `json:"id,omitempty" jsonschema:"Stable identifier for inline source diagnostics"`
+	Permissions PermissionConfig `json:"permissions,omitempty" jsonschema:"Explicit side-effect permissions"`
 }
 
 type ScriptSource struct {
-	Type    string              `json:"type,omitempty"`
-	Content string              `json:"content,omitempty"`
-	Name    string              `json:"name,omitempty"`
-	Remote  *domain.RemoteInput `json:"remote,omitempty"`
-	SHA256  string              `json:"sha256,omitempty"`
+	Type    string              `json:"type,omitempty" jsonschema:"Script source kind" enum:"inline,file,remote"`
+	Content string              `json:"content,omitempty" jsonschema:"JavaScript body for inline source"`
+	Name    string              `json:"name,omitempty" jsonschema:"Controlled resource name for file source"`
+	Remote  *domain.RemoteInput `json:"remote,omitempty" jsonschema:"Controlled remote source configuration"`
+	SHA256  string              `json:"sha256,omitempty" jsonschema:"Optional lowercase SHA-256 integrity digest" pattern:"^[0-9a-f]{64}$"`
 }
 
 // PermissionConfig declares which side-effect APIs the script may use.
 // The default is all-off: network and store access remain disabled until
 // explicitly enabled in the spec.
 type PermissionConfig struct {
-	Network   bool     `json:"network,omitempty"`
-	Resources []string `json:"resources,omitempty"`
+	Network   bool     `json:"network,omitempty" jsonschema:"Allow controlled remote reads through injected APIs"`
+	Resources []string `json:"resources,omitempty" jsonschema:"Controlled subscription and file resources the script may read"`
 }
 
 type Loader func(source ScriptSource) (content string, id string, err error)

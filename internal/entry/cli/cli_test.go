@@ -672,6 +672,16 @@ func TestServeCommandTreeIncludesSubcommands(t *testing.T) {
 	}
 }
 
+func TestServeMCPHelpDocumentsSingleManagementSwitch(t *testing.T) {
+	for _, command := range []string{"mcp", "all"} {
+		t.Run(command, func(t *testing.T) {
+			help := runHelp(t, "serve", command)
+
+			require.Contains(t, help, "--allow-management-tools")
+		})
+	}
+}
+
 func TestServeHTTPPassesFlagsToRuntime(t *testing.T) {
 	dataDir := t.TempDir()
 	stopErr := errors.New("stop after runtime")

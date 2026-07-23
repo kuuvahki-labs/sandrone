@@ -15,8 +15,8 @@ import (
 // (type, server, port, uuid, password); set Strategy to "name" to dedup by
 // name only.
 type DedupParams struct {
-	Strategy string   `json:"strategy,omitempty"`
-	Fields   []string `json:"fields,omitempty"`
+	Strategy string   `json:"strategy,omitempty" jsonschema:"Key strategy used to identify duplicates" enum:"identity,name,fields" default:"identity"`
+	Fields   []string `json:"fields,omitempty" jsonschema:"Node fields used when strategy is fields"`
 }
 
 type dedupProc struct {

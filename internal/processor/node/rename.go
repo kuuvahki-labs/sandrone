@@ -13,12 +13,12 @@ import (
 // RenameParams rewrites each node name once. Cleanup always runs before the
 // optional rename mode; use multiple rename processors for multiple passes.
 type RenameParams struct {
-	Trim        bool     `json:"trim,omitempty"`
-	Strip       []string `json:"strip,omitempty"`
-	Mode        string   `json:"mode,omitempty"`
-	Pattern     string   `json:"pattern,omitempty"`
-	Replacement string   `json:"replacement,omitempty"`
-	Value       string   `json:"value,omitempty"`
+	Trim        bool     `json:"trim,omitempty" jsonschema:"Trim leading and trailing whitespace"`
+	Strip       []string `json:"strip,omitempty" jsonschema:"Literal fragments removed from every node name"`
+	Mode        string   `json:"mode,omitempty" jsonschema:"Optional name rewrite mode" enum:"replace,prefix,suffix,template"`
+	Pattern     string   `json:"pattern,omitempty" jsonschema:"Regular expression used by replace mode"`
+	Replacement string   `json:"replacement,omitempty" jsonschema:"Replacement used by replace mode"`
+	Value       string   `json:"value,omitempty" jsonschema:"Value used by prefix suffix or template mode"`
 }
 
 type renameProc struct {

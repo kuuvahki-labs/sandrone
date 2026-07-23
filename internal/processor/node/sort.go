@@ -14,7 +14,7 @@ import (
 // optional + / - prefix to denote ascending / descending order. Default is
 // "+name".
 type SortParams struct {
-	By string `json:"by,omitempty"`
+	By string `json:"by,omitempty" jsonschema:"Comma-separated node fields with optional plus or minus direction prefixes" default:"+name"`
 }
 
 type sortKey struct {

@@ -12,29 +12,37 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
 
-type mihomoFileSettings struct {
-	AdaptiveGroups *domain.FileAdaptiveGroupConfig `json:"adaptive_groups,omitempty"`
-	Groups         []map[string]any                `json:"groups,omitempty"`
-	RuleSets       []map[string]any                `json:"rule_sets,omitempty"`
-	Rules          []string                        `json:"rules,omitempty"`
+type MihomoFileSettings struct {
+	AdaptiveGroups *domain.FileAdaptiveGroupConfig `json:"adaptive_groups,omitempty" jsonschema:"Legacy Web and HTTP compatibility metadata"`
+	Groups         []map[string]any                `json:"groups,omitempty" jsonschema:"Explicit Mihomo proxy-group objects"`
+	RuleSets       []map[string]any                `json:"rule_sets,omitempty" jsonschema:"Explicit Mihomo rule-provider objects"`
+	Rules          []string                        `json:"rules,omitempty" jsonschema:"Ordered Mihomo rule strings"`
 }
 
-type singBoxFileSettings struct {
-	Groups   []map[string]any `json:"groups,omitempty"`
-	RuleSets []map[string]any `json:"rule_sets,omitempty"`
-	Rules    []map[string]any `json:"rules,omitempty"`
+// MihomoFileCapabilitySettings is the public settings surface for capabilities.
+// The real decoder remains broader for legacy HTTP and Web compatibility.
+type MihomoFileCapabilitySettings struct {
+	Groups   []map[string]any `json:"groups,omitempty" jsonschema:"Explicit Mihomo proxy-group objects"`
+	RuleSets []map[string]any `json:"rule_sets,omitempty" jsonschema:"Explicit Mihomo rule-provider objects"`
+	Rules    []string         `json:"rules,omitempty" jsonschema:"Ordered Mihomo rule strings"`
 }
 
-func decodeMihomoFileSettings(raw json.RawMessage) (mihomoFileSettings, error) {
+type SingBoxFileSettings struct {
+	Groups   []map[string]any `json:"groups,omitempty" jsonschema:"Explicit sing-box selector or URL-test outbounds"`
+	RuleSets []map[string]any `json:"rule_sets,omitempty" jsonschema:"Explicit sing-box route rule-set objects"`
+	Rules    []map[string]any `json:"rules,omitempty" jsonschema:"Explicit sing-box route rule objects"`
+}
+
+func decodeMihomoFileSettings(raw json.RawMessage) (MihomoFileSettings, error) {
 	if err := validateMihomoAdaptiveGroupFields(raw); err != nil {
-		return mihomoFileSettings{}, domain.NewError(
+		return MihomoFileSettings{}, domain.NewError(
 			domain.CodeInvalidArgument,
 			fmt.Sprintf("file kind %q %v", domain.FileKindMihomo, err),
 		)
 	}
-	var settings mihomoFileSettings
+	var settings MihomoFileSettings
 	if err := decodeTypedFileSettings(domain.FileKindMihomo, raw, &settings); err != nil {
-		return mihomoFileSettings{}, err
+		return MihomoFileSettings{}, err
 	}
 	return settings, nil
 }
@@ -61,10 +69,10 @@ func validateMihomoAdaptiveGroupFields(raw json.RawMessage) error {
 	}, "config.settings.adaptive_groups")
 }
 
-func decodeSingBoxFileSettings(raw json.RawMessage) (singBoxFileSettings, error) {
-	var settings singBoxFileSettings
+func decodeSingBoxFileSettings(raw json.RawMessage) (SingBoxFileSettings, error) {
+	var settings SingBoxFileSettings
 	if err := decodeTypedFileSettings(domain.FileKindSingBox, raw, &settings); err != nil {
-		return singBoxFileSettings{}, err
+		return SingBoxFileSettings{}, err
 	}
 	return settings, nil
 }

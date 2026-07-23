@@ -243,8 +243,30 @@ func Register(r *processor.Registry, opts ...RegisterOption) {
 			opt(&cfg)
 		}
 	}
-	r.RegisterNode("script", buildNodeProcessorWithProbe(cfg.probeRunner, cfg.resourceResolver, cfg.loader))
-	r.RegisterFile("script", buildFileProcessorWithResources(cfg.resourceResolver, cfg.loader))
+	descriptor := processor.Descriptor{
+		Description:     "Run sandboxed JavaScript against a processor envelope.",
+		ParamsPrototype: Config{},
+		Effects: processor.Effects{
+			RemoteReads: true, RunsScript: true,
+		},
+		Examples: []map[string]any{{
+			"engine": "js",
+			"source": map[string]any{
+				"type":    "inline",
+				"content": "function main(input) { return input; }",
+			},
+		}},
+		ErrorCodes: []domain.ErrorCode{
+			domain.CodeProcessorConfigInvalid,
+			domain.CodeScriptTimeout,
+			domain.CodeScriptRuntime,
+		},
+		Public: true,
+	}
+	nodeDescriptor := descriptor
+	nodeDescriptor.Effects.Probes = true
+	r.RegisterNodeWithDescriptor("script", buildNodeProcessorWithProbe(cfg.probeRunner, cfg.resourceResolver, cfg.loader), nodeDescriptor)
+	r.RegisterFileWithDescriptor("script", buildFileProcessorWithResources(cfg.resourceResolver, cfg.loader), descriptor)
 }
 
 func requestArgs(req domain.RequestInfo) map[string]any {

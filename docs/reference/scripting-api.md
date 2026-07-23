@@ -35,6 +35,11 @@ processors:
 | `permissions` | object | 保留配置；当前不授予原生宿主能力 |
 
 配置结构中虽保留 `permissions` 字段，但它不是授予原生文件系统、子进程、环境变量或通用网络访问的接口。脚本能产生的外部作用仅限本页列出的受控 API。
+在 MCP wire 上，script processor 的 `params` 与其中的 `permissions` 都是
+JSON object，不是字符串。Agent 可通过
+`sandrone://schemas/script-api/v1` 与对应的
+`sandrone://schemas/processors/{stage}/script` resource 读取机器可校验的当前
+契约；resource catalog 见 [MCP 参考](mcp.md#resources-与-schema-templates)。
 
 ## 脚本来源
 
@@ -244,7 +249,10 @@ const prefix = (input.args && input.args.prefix) || "";
 编译发生在该执行时限之前，remote source 使用自己的抓取超时。调用方 context
 取消也会中断执行，但不伪装成脚本自身超时。
 
-运行时是 Go 内嵌 ECMAScript 引擎，不是 Node.js。脚本没有 `require`、Node.js 模块、任意文件系统、子进程、环境变量或通用网络 API。远程脚本抓取、订阅生成、文件读取和节点探测只能通过 Sandrone 的受控边界进行。
+运行时是 Go 内嵌 ECMAScript 引擎，不是 Node.js，也不是通用代码执行环境。
+脚本没有 `require`、Node.js 模块、任意文件系统、子进程、环境变量或通用网络
+API。即使填写保留的 `permissions` object，也不会出现这些能力。远程脚本抓取、
+订阅生成、文件读取和节点探测只能通过 Sandrone 的受控边界进行。
 
 envelope 可能包含代理密码、UUID、token、原始节点字段、请求 metadata 和来源诊断。脚本、`api.log`、`api.warn` 以及错误原因都不得当作脱敏边界；不要把秘密写入 warning、日志或可公开的错误响应。
 

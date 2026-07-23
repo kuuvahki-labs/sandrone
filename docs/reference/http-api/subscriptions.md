@@ -141,11 +141,73 @@ traffic 只适用于 `remote`；它不执行订阅的 nodes processors，不返�
 或完整节点。`local` 和 `collection` 请求会失败，collection 也不会聚合来源
 订阅的用量。
 
+### `POST /v1/subscriptions/{name}/render`
+
+读取已保存的 Subscription，物化输入并按定义执行 nodes-stage processors，再
+渲染成请求指定格式。请求体不会覆盖或写回 Subscription，也不会持久化生成正文
+或 report。
+
+请求体为：
+
+| 字段 | 类型 | 契约 |
+| --- | --- | --- |
+| `format` | string | 必填且非空；目标 renderer 格式。 |
+| `args` | object | 可选 string-to-string 参数，传给本次脚本/资源执行。 |
+
+查询参数 `arg.<key>=<value>` 也进入本次 args；body `args` 的同名键覆盖查询值。
+processor 和脚本参数的完整执行语义分别见
+[Processors](../processors.md)与[JavaScript 脚本 API](../scripting-api.md)。
+
+成功返回 `200` 和完整 render 结果：
+
+```json
+{
+  "content_type": "application/json",
+  "body": "[\n  {\n    \"name\": \"example-node\",\n    \"type\": \"ss\",\n    \"server\": \"proxy.example.invalid\",\n    \"port\": 8388,\n    \"password\": \"example-password\",\n    \"cipher\": \"aes-128-gcm\"\n  }\n]",
+  "report": {
+    "kind": "subscription_render",
+    "status": "ok",
+    "created_at": "2026-01-01T00:00:00Z",
+    "dependencies": [
+      {
+        "kind": "subscription",
+        "name": "example"
+      }
+    ],
+    "warnings": [],
+    "render": {
+      "success_count": 1,
+      "lost_fields": 0
+    }
+  }
+}
+```
+
+`body` 是目标正文的 JSON string，`content_type` 描述正文格式；外层响应仍是
+JSON。`report` 返回本次完整 dependencies、source refs、warnings 与 render
+statistics，字段语义与敏感边界见[错误与诊断](../errors.md#report)。
+
+名称或 format 无效、订阅不存在、输入无法读取、processor 或 renderer 失败时
+返回结构化 service error。render 可能抓取远程订阅、读缓存或执行 processor
+的受控副作用；调用不会修改 Subscription、FileSpec 或 share。
+
+```sh
+curl -sS "$SANDRONE_URL/v1/subscriptions/example/render?arg.environment=test" \
+  -H "Authorization: Bearer $SANDRONE_TOKEN" \
+  -H "Content-Type: application/json" \
+  --data '{
+    "format": "json-nodes",
+    "args": {
+      "prefix": "synthetic-"
+    }
+  }'
+```
+
 ## 失败与安全边界
 
 - `{name}` 必须非空，URL 解码后只能是一个 path segment；包含 `/`、`\`，
-  或名称为 `.`、`..` 都会被拒绝。创建、读取、删除、preview 与 traffic
-  使用同一约束。
+  或名称为 `.`、`..` 都会被拒绝。创建、读取、删除、preview、traffic 与
+  render 使用同一约束。
 - 远程输入只能经 Sandrone 的受控 fetcher 读取；不要在示例、日志或
   `meta` 中暴露真实订阅 URL、凭据或套餐标识。
 - preview 会返回处理前后的节点对象，其中可能含连接凭据；应把响应按敏感数据

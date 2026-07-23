@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sandrone"
+  short_description: "Operate Sandrone resources and conversion workflows safely"
+  default_prompt: "Use $sandrone to inspect my Sandrone resources and complete the requested subscription or FileSpec task safely."

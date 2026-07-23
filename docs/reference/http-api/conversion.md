@@ -2,8 +2,9 @@
 
 ## 用途
 
-本页说明一次性节点转换、无持久化校验和运行时能力检查。公开转换位于
-`/convert`，不使用 bearer token；校验和能力检查位于 `/v1/*`，启用 token
+本页说明一次性节点转换、无持久化校验和运行时能力检查。公开的精简转换是
+`GET /convert`，不使用 bearer token；完整转换是 `POST /v1/convert`，支持
+processor 与完整 report。完整转换、校验和能力检查位于 `/v1/*`，启用 token
 时必须遵循[通用鉴权约定](README.md#鉴权)。
 
 输入/输出格式及字段兼容性以[格式与能力参考](../capabilities.md)为准；
@@ -103,6 +104,113 @@ curl -sS -G "$SANDRONE_URL/convert" \
 示例中的域名、token 与凭据均为虚构值。手工构造浏览器 URL 时必须对 `#`、`+`、
 `&`、换行和嵌套远程 URL 做 percent-encoding；优先使用 `URLSearchParams` 或
 `curl --data-urlencode`，不要直接拼接。
+
+## POST /v1/convert
+
+### 与公开转换的区别
+
+这个受保护接口执行完整 `parse -> parse processors -> render -> render
+processors` 流程。与 `GET /convert` 相比，它：
+
+- 用 JSON body 传递字符串 `content` 或受控 `remote`，不会把节点正文放入 URL；
+- 接受 parse/render processor、render options 和 metadata；
+- 总是返回字符串 `body` 与完整结构化 `report`；
+- 继承 `/v1/*` bearer 鉴权，不是公开转换入口。
+
+processor 的 stage、声明顺序和 config 语义只见
+[Processors 参考](../processors.md)；脚本 processor 只见
+[JavaScript 脚本 API](../scripting-api.md)。
+
+### 请求
+
+| 字段 | 类型 | 契约 |
+| --- | --- | --- |
+| `to_format` | string | 必填 renderer 格式。 |
+| `from_format` | string | inline `content` 时必填；remote 输入省略时允许自动检测。 |
+| `content` | string | inline 节点正文；与 `remote` 互斥。HTTP wire 上始终是字符串，不是 Base64 bytes。 |
+| `remote` | object | 与 `content` 互斥；`url` 必填，可选 `user_agent`、`proxy`、非负 `timeout_ms`、`cache_ttl_seconds`。 |
+| `parse_processors` | array | 可选 parse 后的 processor 声明列表，按声明顺序执行。 |
+| `render_processors` | array | 可选 render flow 的 processor 声明列表，按声明顺序执行。 |
+| `options` | object | 可选 render options；当前公开字段是 `format`。未给出时使用 `to_format`。 |
+| `meta` | object | 可选 string-to-string metadata，传入本次 parse/report 上下文。 |
+
+`content` 与 `remote` 必须且只能提供一个。格式名应先用
+[`GET /v1/inspect`](#get-v1inspect) 或
+[schema catalog](schemas.md)发现；字段兼容性见[格式与能力](../capabilities.md)。
+
+### 响应
+
+成功返回 `200`：
+
+```json
+{
+  "content_type": "application/json",
+  "body": "[\n  {\n    \"name\": \"skill-example\",\n    \"type\": \"ss\",\n    \"server\": \"proxy.example.invalid\",\n    \"port\": 8388,\n    \"password\": \"example-password\",\n    \"cipher\": \"aes-128-gcm\",\n    \"source_format\": \"uri\"\n  }\n]",
+  "report": {
+    "kind": "convert",
+    "status": "ok",
+    "created_at": "2026-01-01T00:00:00Z",
+    "lossy": false,
+    "source_refs": [
+      {
+        "kind": "format",
+        "name": "uri-list"
+      }
+    ],
+    "warnings": [],
+    "render": {
+      "success_count": 1,
+      "lost_fields": 0
+    }
+  }
+}
+```
+
+`body` 始终是目标正文的 JSON string；`content_type` 描述该字符串承载的目标
+格式，外层 HTTP response 仍是 JSON。`report` 不做 MCP output-size 省略，包含
+本次转换的完整 kind/status/time、refs/dependencies/source refs、lossy、
+warnings 与 render statistics；不存在的可选字段按 JSON `omitempty` 省略。
+完整字段与敏感信息边界见[错误与诊断](../errors.md#report)。
+
+### 失败与安全边界
+
+- 两种输入同时存在、格式或 processor config 无效时返回结构化 error。没有输入
+  时当前由 parse flow 返回 `parse_failed`；调用方应在发送前按 schema 约束验证。
+- remote 输入可能执行网络抓取并使用请求指定的受控 User-Agent、proxy、timeout
+  与 cache TTL；它仍受 Sandrone fetcher 边界约束，不提供任意网络 API。
+- processor 可执行受控 probe、订阅/file 读取或 sandboxed script 能力，具体
+  副作用以对应 processor schema 和 canonical 参考为准。
+- `body`、report、warnings 和 source refs 可能包含节点凭据、订阅 URL 或原始
+  上下文；该接口不构成脱敏边界。
+
+### 合成示例
+
+```sh
+curl -sS "$SANDRONE_URL/v1/convert" \
+  -H "Authorization: Bearer $SANDRONE_TOKEN" \
+  -H "Content-Type: application/json" \
+  --data '{
+    "from_format": "uri-list",
+    "to_format": "json-nodes",
+    "content": "ss://aes-128-gcm:example-password@proxy.example.invalid:8388#example-node",
+    "parse_processors": [
+      {
+        "type": "rename",
+        "stage": "nodes",
+        "params": {
+          "mode": "prefix",
+          "value": "skill-"
+        }
+      }
+    ],
+    "options": {
+      "format": "json-nodes"
+    },
+    "meta": {
+      "caller": "example-skill"
+    }
+  }'
+```
 
 ## POST /v1/validate
 

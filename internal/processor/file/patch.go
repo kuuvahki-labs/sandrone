@@ -17,16 +17,16 @@ import (
 // PatchOp is a single RFC 6902 patch operation. The From field is only
 // meaningful for "move" and "copy" operations.
 type PatchOp struct {
-	Op    string          `json:"op"`
-	Path  string          `json:"path"`
-	From  string          `json:"from,omitempty"`
-	Value json.RawMessage `json:"value,omitempty"`
+	Op    string          `json:"op" jsonschema:"Patch operation" enum:"add,replace,remove,test,move,copy"`
+	Path  string          `json:"path" jsonschema:"JSON Pointer target path"`
+	From  string          `json:"from,omitempty" jsonschema:"JSON Pointer source path for move and copy"`
+	Value json.RawMessage `json:"value,omitempty" jsonschema:"JSON value used by add replace and test"`
 }
 
 // PatchParams holds the patch operations applied by the yaml_patch /
 // json_patch processors.
 type PatchParams struct {
-	Ops []PatchOp `json:"ops"`
+	Ops []PatchOp `json:"ops" jsonschema:"Ordered non-empty patch operations" minItems:"1"`
 }
 
 func buildYAMLPatch(spec domain.ProcessorSpec) (domain.FileProcessor, error) {

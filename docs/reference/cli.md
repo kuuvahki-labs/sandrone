@@ -188,8 +188,7 @@ sandrone file render <name-or-spec-path>
 | --- | --- | --- |
 | `--transport` | `stdio` | `stdio` 或 `streamable-http`；下划线写法会规范化为连字符 |
 | `--path` | `/mcp` | streamable HTTP 路径，必须以 `/` 开头 |
-| `--readonly` | `true` | 只注册只读 MCP tools |
-| `--allow-management-tools` | `false` | 与 `--readonly=false` 同时使用时注册管理类 tools |
+| `--allow-management-tools` | `false` | 注册可覆盖或立即删除定义的管理 tools；只应在可信本机 Agent 场景启用 |
 | `--max-output-bytes` | `1048576` | MCP 内联输出上限；不能为负数 |
 
 `stdio` 直接使用进程标准输入/输出；`streamable-http` 使用 `--listen` 和
@@ -198,8 +197,12 @@ sandrone file render <name-or-spec-path>
 ### `serve all`
 
 在一个 HTTP listener 上同时提供 HTTP API、可选 Web UI 与 MCP streamable
-HTTP。它接受 `--path`、`--readonly`、`--allow-management-tools` 和
+HTTP。它接受 `--path`、`--allow-management-tools` 和
 `--max-output-bytes`；传输固定为 `streamable-http`。
+
+MCP 的 tool/resource/prompt catalog、单一管理开关的行为和正文省略规则见
+[MCP 参考](mcp.md)。管理 tools 缺省不注册；启用后 `put` 可覆盖同名定义，
+`delete` 立即生效。
 
 ### 监听与鉴权约束
 

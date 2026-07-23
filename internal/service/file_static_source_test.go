@@ -471,7 +471,7 @@ func TestServiceFileScriptReadsAnotherProcessedFile(t *testing.T) {
 			Stage: domain.StageFile,
 			Params: params(t, map[string]any{
 				"source": inlineScriptSource(`function main(input) {
-  input.file.content = input.file.content + input.args.suffix;
+  input.file.content = input.file.content + ((input.args && input.args.suffix) || "");
   return input;
 }`),
 			}),
@@ -490,7 +490,10 @@ func TestServiceFileScriptReadsAnotherProcessedFile(t *testing.T) {
 			Stage: domain.StageFile,
 			Params: params(t, map[string]any{
 				"source": inlineScriptSource(`function main(input, api) {
-  input.file.content = input.file.content + api.file.content("child.txt", {args: {suffix: "!"}});
+  var omitted = api.file.content("child.txt");
+  var nullable = api.file.content("child.txt", null);
+  var ignored = api.file.content("child.txt", {args: {suffix: "!"}}, "ignored");
+  input.file.content = input.file.content + omitted + ":" + nullable + ":" + ignored;
   return input;
 }`),
 			}),
@@ -500,7 +503,7 @@ func TestServiceFileScriptReadsAnotherProcessedFile(t *testing.T) {
 	result, err := svc.GetFile(ctx, domain.FileRequest{Spec: &parent})
 
 	require.NoError(t, err)
-	require.Equal(t, "parent:child!", string(result.File.Content))
+	require.Equal(t, "parent:child:child:child!", string(result.File.Content))
 	require.Contains(t, result.Report.Dependencies, domain.ResourceRef{Kind: "file", Name: "child.txt"})
 }
 

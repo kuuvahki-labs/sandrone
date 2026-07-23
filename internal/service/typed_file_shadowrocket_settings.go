@@ -12,42 +12,50 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
 
-type shadowrocketFileSettings struct {
-	AdaptiveGroups *shadowrocketAdaptiveGroupSettings
-	Groups         []shadowrocketGroupSettings
-	RuleSets       []shadowrocketRuleSetSettings
-	Rules          []string
+type ShadowrocketFileSettings struct {
+	AdaptiveGroups *ShadowrocketAdaptiveGroupSettings `json:"adaptive_groups,omitempty" jsonschema:"Legacy Web and HTTP compatibility metadata"`
+	Groups         []ShadowrocketGroupSettings        `json:"groups,omitempty" jsonschema:"Explicit Shadowrocket proxy groups"`
+	RuleSets       []ShadowrocketRuleSetSettings      `json:"rule_sets,omitempty" jsonschema:"Named remote rule-set declarations"`
+	Rules          []string                           `json:"rules,omitempty" jsonschema:"Ordered Shadowrocket rules"`
 }
 
-type shadowrocketAdaptiveGroupSettings struct {
-	Type    *string  `json:"type,omitempty"`
-	Regions []string `json:"regions,omitempty"`
+// ShadowrocketFileCapabilitySettings is the public settings surface for capabilities.
+// The real decoder remains broader for legacy HTTP and Web compatibility.
+type ShadowrocketFileCapabilitySettings struct {
+	Groups   []ShadowrocketGroupSettings   `json:"groups,omitempty" jsonschema:"Explicit Shadowrocket proxy groups"`
+	RuleSets []ShadowrocketRuleSetSettings `json:"rule_sets,omitempty" jsonschema:"Named remote rule-set declarations"`
+	Rules    []string                      `json:"rules,omitempty" jsonschema:"Ordered Shadowrocket rules"`
 }
 
-type shadowrocketGroupSettings struct {
-	Name              string    `json:"name"`
-	Type              string    `json:"type"`
-	Proxies           *[]string `json:"proxies,omitempty"`
-	PolicyRegexFilter *string   `json:"policy-regex-filter,omitempty"`
-	Interval          *int      `json:"interval,omitempty"`
-	Timeout           *int      `json:"timeout,omitempty"`
-	Tolerance         *int      `json:"tolerance,omitempty"`
-	Hidden            *bool     `json:"hidden,omitempty"`
+type ShadowrocketAdaptiveGroupSettings struct {
+	Type    *string  `json:"type,omitempty" jsonschema:"Generated group type" enum:"select,url-test,load-balance"`
+	Regions []string `json:"regions,omitempty" jsonschema:"Recognized lowercase region identifiers"`
 }
 
-type shadowrocketRuleSetSettings struct {
-	Name string `json:"name"`
-	Type string `json:"type"`
-	URL  string `json:"url"`
+type ShadowrocketGroupSettings struct {
+	Name              string    `json:"name" jsonschema:"Unique assignment-safe group name"`
+	Type              string    `json:"type" jsonschema:"Shadowrocket group type" enum:"select,url-test,fallback,load-balance,random"`
+	Proxies           *[]string `json:"proxies,omitempty" jsonschema:"Fixed policies or the $nodes expansion token"`
+	PolicyRegexFilter *string   `json:"policy-regex-filter,omitempty" jsonschema:"Dynamic policy regular-expression filter"`
+	Interval          *int      `json:"interval,omitempty" jsonschema:"Health-check interval in seconds" minimum:"1" maximum:"86400"`
+	Timeout           *int      `json:"timeout,omitempty" jsonschema:"Health-check timeout in seconds" minimum:"1" maximum:"300"`
+	Tolerance         *int      `json:"tolerance,omitempty" jsonschema:"Latency tolerance in milliseconds" minimum:"0" maximum:"65535"`
+	Hidden            *bool     `json:"hidden,omitempty" jsonschema:"Whether the group is hidden in the client"`
 }
 
-func decodeShadowrocketFileSettings(raw json.RawMessage) (shadowrocketFileSettings, error) {
+type ShadowrocketRuleSetSettings struct {
+	Name string `json:"name" jsonschema:"Unique name referenced by rules"`
+	Type string `json:"type" jsonschema:"Remote rule-set type" enum:"rule-set,domain-set"`
+	URL  string `json:"url" jsonschema:"Absolute HTTP or HTTPS URL"`
+}
+
+func decodeShadowrocketFileSettings(raw json.RawMessage) (ShadowrocketFileSettings, error) {
 	if len(bytes.TrimSpace(raw)) == 0 {
 		raw = json.RawMessage(`{}`)
 	}
 	fields, err := strictJSONObject(raw, "config.settings")
 	if err != nil {
-		return shadowrocketFileSettings{}, shadowrocketSettingsError(err)
+		return ShadowrocketFileSettings{}, shadowrocketSettingsError(err)
 	}
 	allowed := map[string]bool{
 		"adaptive_groups": true,
@@ -56,56 +64,56 @@ func decodeShadowrocketFileSettings(raw json.RawMessage) (shadowrocketFileSettin
 		"rules":           true,
 	}
 	if err := rejectUnknownJSONFields(fields, allowed, "config.settings"); err != nil {
-		return shadowrocketFileSettings{}, shadowrocketSettingsError(err)
+		return ShadowrocketFileSettings{}, shadowrocketSettingsError(err)
 	}
 
-	var settings shadowrocketFileSettings
+	var settings ShadowrocketFileSettings
 	if value, ok := fields["adaptive_groups"]; ok {
-		var adaptive shadowrocketAdaptiveGroupSettings
+		var adaptive ShadowrocketAdaptiveGroupSettings
 		if err := decodeStrictJSONObject(value, "config.settings.adaptive_groups", &adaptive,
 			"type", "regions"); err != nil {
-			return shadowrocketFileSettings{}, shadowrocketSettingsError(err)
+			return ShadowrocketFileSettings{}, shadowrocketSettingsError(err)
 		}
 		settings.AdaptiveGroups = &adaptive
 	}
 	if value, ok := fields["groups"]; ok {
 		items, err := strictJSONArray(value, "config.settings.groups")
 		if err != nil {
-			return shadowrocketFileSettings{}, shadowrocketSettingsError(err)
+			return ShadowrocketFileSettings{}, shadowrocketSettingsError(err)
 		}
-		settings.Groups = make([]shadowrocketGroupSettings, len(items))
+		settings.Groups = make([]ShadowrocketGroupSettings, len(items))
 		for index, item := range items {
 			path := fmt.Sprintf("config.settings.groups[%d]", index)
 			if err := decodeStrictJSONObject(item, path, &settings.Groups[index],
 				"name", "type", "proxies", "policy-regex-filter", "interval", "timeout",
 				"tolerance", "hidden"); err != nil {
-				return shadowrocketFileSettings{}, shadowrocketSettingsError(err)
+				return ShadowrocketFileSettings{}, shadowrocketSettingsError(err)
 			}
 		}
 	}
 	if value, ok := fields["rule_sets"]; ok {
 		items, err := strictJSONArray(value, "config.settings.rule_sets")
 		if err != nil {
-			return shadowrocketFileSettings{}, shadowrocketSettingsError(err)
+			return ShadowrocketFileSettings{}, shadowrocketSettingsError(err)
 		}
-		settings.RuleSets = make([]shadowrocketRuleSetSettings, len(items))
+		settings.RuleSets = make([]ShadowrocketRuleSetSettings, len(items))
 		for index, item := range items {
 			path := fmt.Sprintf("config.settings.rule_sets[%d]", index)
 			if err := decodeStrictJSONObject(item, path, &settings.RuleSets[index], "name", "type", "url"); err != nil {
-				return shadowrocketFileSettings{}, shadowrocketSettingsError(err)
+				return ShadowrocketFileSettings{}, shadowrocketSettingsError(err)
 			}
 		}
 	}
 	if value, ok := fields["rules"]; ok {
 		if isJSONNull(value) {
-			return shadowrocketFileSettings{}, shadowrocketSettingsError(fmt.Errorf("config.settings.rules must not be null"))
+			return ShadowrocketFileSettings{}, shadowrocketSettingsError(fmt.Errorf("config.settings.rules must not be null"))
 		}
 		if err := json.Unmarshal(value, &settings.Rules); err != nil {
-			return shadowrocketFileSettings{}, shadowrocketSettingsError(fmt.Errorf("config.settings.rules: expected an array of strings"))
+			return ShadowrocketFileSettings{}, shadowrocketSettingsError(fmt.Errorf("config.settings.rules: expected an array of strings"))
 		}
 	}
 	if err := validateShadowrocketSettings(settings); err != nil {
-		return shadowrocketFileSettings{}, shadowrocketSettingsError(err)
+		return ShadowrocketFileSettings{}, shadowrocketSettingsError(err)
 	}
 	return settings, nil
 }
@@ -193,7 +201,7 @@ func shadowrocketSettingsError(err error) error {
 	return domain.NewError(domain.CodeInvalidArgument, fmt.Sprintf(`file kind "shadowrocket" %v`, err))
 }
 
-func validateShadowrocketSettings(settings shadowrocketFileSettings) error {
+func validateShadowrocketSettings(settings ShadowrocketFileSettings) error {
 	if err := validateShadowrocketAdaptiveGroups(settings.AdaptiveGroups); err != nil {
 		return err
 	}
@@ -203,7 +211,7 @@ func validateShadowrocketSettings(settings shadowrocketFileSettings) error {
 	return validateShadowrocketRules(settings.RuleSets, settings.Rules)
 }
 
-func validateShadowrocketAdaptiveGroups(settings *shadowrocketAdaptiveGroupSettings) error {
+func validateShadowrocketAdaptiveGroups(settings *ShadowrocketAdaptiveGroupSettings) error {
 	if settings == nil {
 		return nil
 	}
@@ -232,7 +240,7 @@ func validateShadowrocketAdaptiveGroups(settings *shadowrocketAdaptiveGroupSetti
 	return nil
 }
 
-func validateShadowrocketGroups(groups []shadowrocketGroupSettings) error {
+func validateShadowrocketGroups(groups []ShadowrocketGroupSettings) error {
 	names := make(map[string]int, len(groups))
 	for index := range groups {
 		group := &groups[index]
@@ -295,7 +303,7 @@ func validateShadowrocketGroups(groups []shadowrocketGroupSettings) error {
 	return validateShadowrocketGroupCycles(groups, names)
 }
 
-func validateShadowrocketGroupCycles(groups []shadowrocketGroupSettings, names map[string]int) error {
+func validateShadowrocketGroupCycles(groups []ShadowrocketGroupSettings, names map[string]int) error {
 	state := make([]uint8, len(groups))
 	var visit func(int) bool
 	visit = func(index int) bool {
@@ -324,8 +332,8 @@ func validateShadowrocketGroupCycles(groups []shadowrocketGroupSettings, names m
 	return nil
 }
 
-func validateShadowrocketRules(ruleSets []shadowrocketRuleSetSettings, rules []string) error {
-	sets := make(map[string]shadowrocketRuleSetSettings, len(ruleSets))
+func validateShadowrocketRules(ruleSets []ShadowrocketRuleSetSettings, rules []string) error {
+	sets := make(map[string]ShadowrocketRuleSetSettings, len(ruleSets))
 	for index := range ruleSets {
 		item := &ruleSets[index]
 		path := fmt.Sprintf("config.settings.rule_sets[%d]", index)

@@ -70,6 +70,10 @@ typed 文件的公共 `config` **只有**两个字段：
 `config.settings`。`settings` 必须是 JSON object，不能是数组、标量或
 `null`；未知顶层字段以及已知字段上的 `null` 均报 `invalid_argument`。
 
+在 MCP tool 的 JSON wire 上，`config.settings` 直接是 object；调用方不应把
+它编码成 JSON 字符串。各 canonical kind 的可发现 schema、source rules 与
+examples 见 [MCP resources](mcp.md#resources-与-schema-templates)。
+
 `subscriptions` 省略和显式 `[]` 都产生零个节点。重复的订阅名不会去重。
 解析任一订阅失败会终止整个文件生成，不返回部分配置。
 
@@ -97,7 +101,7 @@ Shadowrocket 的 settings 还执行字段级严格校验：
   `policy-regex-filter`；`proxies` 中的 `$nodes` 在编译时展开为全部节点；
 - `rule_sets[]` 使用 `name`、`type`、`url`；
 - `rules[]` 是 Shadowrocket 规则字符串；
-- `adaptive_groups` 只接受已声明的 type 和 region 值。
+- Web/HTTP 兼容元数据 `adaptive_groups` 只接受已声明的 type 和 region 值。
 
 所有 settings 的未知字段都会失败。Shadowrocket 的嵌套对象也拒绝未知字段；
 Mihomo 和 sing-box 的客户端 object 内容保持开放，以容纳各自客户端字段。

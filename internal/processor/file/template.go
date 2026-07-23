@@ -14,9 +14,9 @@ import (
 // delimiters are {{ and }}; configure Open / Close to change them.
 // Variables come from Vars first, then RequestInfo.Meta keys.
 type TemplateParams struct {
-	Vars  map[string]string `json:"vars,omitempty"`
-	Open  string            `json:"open,omitempty"`
-	Close string            `json:"close,omitempty"`
+	Vars  map[string]string `json:"vars,omitempty" jsonschema:"Explicit substitutions that override request metadata"`
+	Open  string            `json:"open,omitempty" jsonschema:"Opening placeholder delimiter" default:"{{"`
+	Close string            `json:"close,omitempty" jsonschema:"Closing placeholder delimiter" default:"}}"`
 }
 
 type templateProc struct {

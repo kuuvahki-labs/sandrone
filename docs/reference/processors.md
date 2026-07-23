@@ -26,6 +26,10 @@ params:
 type 返回 `processor_unknown`；stage 无法唯一推断或参数无效返回
 `processor_config_invalid`。
 
+在 MCP tool 的 JSON wire 上，`params` 直接是 object；调用方不应把它编码成
+JSON 字符串。可发现的 processor 摘要与逐项 schema URI 见
+[MCP resources](mcp.md#resources-与-schema-templates)，本页继续定义领域语义。
+
 每次运行只选择当前 stage 的项，并保留它们在原数组中的相对顺序。前一步输出
 是后一步输入，warning 也按此顺序累积。file-stage `merge` 与 `script` 没有
 特殊优先级：它们严格出现在声明位置。

@@ -12,11 +12,24 @@ type singBoxFileDriver struct{}
 
 func (singBoxFileDriver) Descriptor() typedFileDescriptor {
 	return typedFileDescriptor{
-		Kind:             domain.FileKindSingBox,
-		MediaType:        "application/json",
-		Syntax:           "json",
-		DefaultExtension: ".json",
-		NodeRenderFormat: "sing-box-outbounds",
+		Kind:              domain.FileKindSingBox,
+		Description:       "Compile subscriptions into a complete sing-box JSON configuration.",
+		MediaType:         "application/json",
+		Syntax:            "json",
+		DefaultExtension:  ".json",
+		NodeRenderFormat:  "sing-box-outbounds",
+		SettingsPrototype: SingBoxFileSettings{},
+		SourceRules: FileKindSourceRules{
+			AllowedTypes: []string{"inline", "local", "remote"},
+		},
+		Defaults: map[string]any{"source": "built-in", "settings": map[string]any{}},
+		Examples: []map[string]any{{
+			"name": "sing-box.json", "kind": string(domain.FileKindSingBox),
+			"config": map[string]any{
+				"subscriptions": []any{},
+				"settings":      map[string]any{"groups": []any{}},
+			},
+		}},
 		DefaultBase: []byte(`{
   "log": { "level": "info" },
   "inbounds": [],

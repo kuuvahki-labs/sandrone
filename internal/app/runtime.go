@@ -40,7 +40,6 @@ type HTTPConfig struct {
 type MCPConfig struct {
 	Transport            string
 	Path                 string
-	ReadOnly             bool
 	AllowManagementTools bool
 	MaxOutputBytes       int
 }

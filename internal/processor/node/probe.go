@@ -13,19 +13,19 @@ import (
 )
 
 type ProbeParams struct {
-	Layer           string `json:"layer,omitempty"`
-	Method          string `json:"method,omitempty"`
-	Core            string `json:"core,omitempty"`
-	URL             string `json:"url,omitempty"`
-	NTPServer       string `json:"ntp_server,omitempty"`
-	ExpectedStatus  string `json:"expected_status,omitempty"`
-	TimeoutMS       int    `json:"timeout_ms,omitempty"`
-	Attempts        int    `json:"attempts,omitempty"`
-	Concurrency     int    `json:"concurrency,omitempty"`
-	CacheTTLSeconds int    `json:"cache_ttl_seconds,omitempty"`
-	FailMode        string `json:"fail_mode,omitempty"`
-	Annotate        bool   `json:"annotate,omitempty"`
-	Sort            string `json:"sort,omitempty"`
+	Layer           string `json:"layer,omitempty" jsonschema:"Probe layer" enum:"protocol,proxy"`
+	Method          string `json:"method,omitempty" jsonschema:"Probe method" enum:"auto,tcp_connect,udp_ntp,url_test"`
+	Core            string `json:"core,omitempty" jsonschema:"Optional proxy core selector"`
+	URL             string `json:"url,omitempty" jsonschema:"URL used for URL tests"`
+	NTPServer       string `json:"ntp_server,omitempty" jsonschema:"NTP server used for UDP NTP probes"`
+	ExpectedStatus  string `json:"expected_status,omitempty" jsonschema:"Expected HTTP status expression"`
+	TimeoutMS       int    `json:"timeout_ms,omitempty" jsonschema:"Per-attempt timeout in milliseconds" minimum:"0"`
+	Attempts        int    `json:"attempts,omitempty" jsonschema:"Number of probe attempts" minimum:"0"`
+	Concurrency     int    `json:"concurrency,omitempty" jsonschema:"Maximum concurrent probes" minimum:"0"`
+	CacheTTLSeconds int    `json:"cache_ttl_seconds,omitempty" jsonschema:"Successful result cache lifetime in seconds" minimum:"0"`
+	FailMode        string `json:"fail_mode,omitempty" jsonschema:"Treatment of nodes that fail probing" enum:"keep,drop,error" default:"keep"`
+	Annotate        bool   `json:"annotate,omitempty" jsonschema:"Write probe result fields into node metadata"`
+	Sort            string `json:"sort,omitempty" jsonschema:"Optional result ordering" enum:"duration"`
 }
 
 type probeProc struct {

@@ -14,11 +14,33 @@ type mihomoFileDriver struct{}
 
 func (mihomoFileDriver) Descriptor() typedFileDescriptor {
 	return typedFileDescriptor{
-		Kind:             domain.FileKindMihomo,
-		MediaType:        "application/yaml",
-		Syntax:           "yaml",
-		DefaultExtension: ".yaml",
-		NodeRenderFormat: "mihomo-proxies",
+		Kind:              domain.FileKindMihomo,
+		Description:       "Compile subscriptions into a complete Mihomo YAML configuration.",
+		MediaType:         "application/yaml",
+		Syntax:            "yaml",
+		DefaultExtension:  ".yaml",
+		NodeRenderFormat:  "mihomo-proxies",
+		SettingsPrototype: MihomoFileCapabilitySettings{},
+		SourceRules: FileKindSourceRules{
+			AllowedTypes: []string{"inline", "local", "remote"},
+		},
+		Defaults: map[string]any{"source": "built-in", "settings": map[string]any{}},
+		Examples: []map[string]any{{
+			"name": "mihomo.yaml", "kind": string(domain.FileKindMihomo),
+			"config": map[string]any{
+				"subscriptions": []any{},
+				"settings": map[string]any{
+					"groups": []any{map[string]any{
+						"name": "Proxy", "type": "select", "proxies": []any{"DIRECT"},
+					}},
+					"rule_sets": []any{map[string]any{
+						"name": "private", "type": "inline", "behavior": "classical",
+						"payload": []any{"DOMAIN-SUFFIX,local"},
+					}},
+					"rules": []any{"MATCH,DIRECT"},
+				},
+			},
+		}},
 		DefaultBase: []byte(`mixed-port: 7890
 allow-lan: false
 mode: rule

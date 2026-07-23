@@ -9,12 +9,17 @@ import (
 )
 
 type typedFileDescriptor struct {
-	Kind             domain.FileKind
-	MediaType        string
-	Syntax           string
-	DefaultExtension string
-	DefaultBase      []byte
-	NodeRenderFormat string
+	Kind              domain.FileKind
+	Description       string
+	MediaType         string
+	Syntax            string
+	DefaultExtension  string
+	DefaultBase       []byte
+	NodeRenderFormat  string
+	SettingsPrototype any
+	SourceRules       FileKindSourceRules
+	Defaults          map[string]any
+	Examples          []map[string]any
 }
 
 type typedFileCompileInput struct {
@@ -60,6 +65,12 @@ func (r *typedFileRegistry) Register(driver typedFileDriver) error {
 	}
 	if descriptor.NodeRenderFormat == "" {
 		return fmt.Errorf("typed file driver %q node render format is required", kind)
+	}
+	if descriptor.SettingsPrototype == nil {
+		return fmt.Errorf("typed file driver %q settings prototype is required", kind)
+	}
+	if len(descriptor.SourceRules.AllowedTypes) == 0 {
+		return fmt.Errorf("typed file driver %q source rules are required", kind)
 	}
 	if _, exists := r.drivers[kind]; exists {
 		return fmt.Errorf("typed file driver %q is already registered", kind)

@@ -26,9 +26,9 @@ import (
 // injected list. The default "replace" overwrites it; "append" merges the
 // two lists in order.
 type InjectNodesParams struct {
-	From string `json:"from,omitempty"`
-	Path string `json:"path,omitempty"`
-	Mode string `json:"mode,omitempty"`
+	From string `json:"from,omitempty" jsonschema:"File part name that contains rendered nodes"`
+	Path string `json:"path,omitempty" jsonschema:"JSON Pointer target for the injected list"`
+	Mode string `json:"mode,omitempty" jsonschema:"How injected nodes combine with the target list" enum:"replace,append" default:"replace"`
 }
 
 // InjectNodes is the file-stage processor that splices a rendered nodes

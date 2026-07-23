@@ -16,12 +16,25 @@ type shadowrocketFileDriver struct{}
 
 func (shadowrocketFileDriver) Descriptor() typedFileDescriptor {
 	return typedFileDescriptor{
-		Kind:             domain.FileKindShadowrocket,
-		MediaType:        "text/plain; charset=utf-8",
-		Syntax:           "ini",
-		DefaultExtension: ".conf",
-		NodeRenderFormat: "shadowrocket-proxies",
-		DefaultBase:      []byte("[General]\n"),
+		Kind:              domain.FileKindShadowrocket,
+		Description:       "Compile subscriptions into a complete Shadowrocket INI configuration.",
+		MediaType:         "text/plain; charset=utf-8",
+		Syntax:            "ini",
+		DefaultExtension:  ".conf",
+		NodeRenderFormat:  "shadowrocket-proxies",
+		SettingsPrototype: ShadowrocketFileCapabilitySettings{},
+		SourceRules: FileKindSourceRules{
+			AllowedTypes: []string{"inline", "local", "remote"},
+		},
+		Defaults: map[string]any{"source": "built-in", "settings": map[string]any{}},
+		Examples: []map[string]any{{
+			"name": "shadowrocket.conf", "kind": string(domain.FileKindShadowrocket),
+			"config": map[string]any{
+				"subscriptions": []any{},
+				"settings":      map[string]any{"groups": []any{}},
+			},
+		}},
+		DefaultBase: []byte("[General]\n"),
 	}
 }
 
@@ -87,7 +100,7 @@ func shadowrocketProxyNames(lines []string) ([]string, error) {
 	return names, nil
 }
 
-func compileShadowrocketGroups(groups []shadowrocketGroupSettings, nodeNames []string) ([]string, error) {
+func compileShadowrocketGroups(groups []ShadowrocketGroupSettings, nodeNames []string) ([]string, error) {
 	if groups == nil {
 		for _, name := range nodeNames {
 			if name == "Proxy" {
@@ -153,7 +166,7 @@ func compileShadowrocketGroups(groups []shadowrocketGroupSettings, nodeNames []s
 	return lines, nil
 }
 
-func appendShadowrocketGroupOptions(values []string, group shadowrocketGroupSettings) []string {
+func appendShadowrocketGroupOptions(values []string, group ShadowrocketGroupSettings) []string {
 	if group.Interval != nil {
 		values = append(values, "interval="+strconv.Itoa(*group.Interval))
 	}
@@ -176,7 +189,7 @@ func shadowrocketBool(value bool) string {
 	return "0"
 }
 
-func compileShadowrocketRules(ruleSets []shadowrocketRuleSetSettings, rules []string, groupLines, nodeNames []string) ([]string, error) {
+func compileShadowrocketRules(ruleSets []ShadowrocketRuleSetSettings, rules []string, groupLines, nodeNames []string) ([]string, error) {
 	if rules == nil {
 		rules = []string{
 			"IP-CIDR,10.0.0.0/8,DIRECT,no-resolve",
@@ -186,7 +199,7 @@ func compileShadowrocketRules(ruleSets []shadowrocketRuleSetSettings, rules []st
 			"FINAL,Proxy",
 		}
 	}
-	sets := make(map[string]shadowrocketRuleSetSettings, len(ruleSets))
+	sets := make(map[string]ShadowrocketRuleSetSettings, len(ruleSets))
 	for _, item := range ruleSets {
 		sets[item.Name] = item
 	}

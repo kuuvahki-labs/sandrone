@@ -32,13 +32,16 @@ func (s *Server) putSubscription(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) getSubscription(w http.ResponseWriter, r *http.Request) {
-	name, err := pathResourceName(r.URL.EscapedPath(), "/v1/subscriptions/")
+	escapedPath := r.URL.EscapedPath()
+	for _, action := range []string{"preview", "traffic", "render"} {
+		if strings.HasSuffix(escapedPath, "/"+action) {
+			writeError(w, domain.NewError(domain.CodeInvalidArgument, "subscription action requires POST"), http.StatusBadRequest)
+			return
+		}
+	}
+	name, err := pathResourceName(escapedPath, "/v1/subscriptions/")
 	if err != nil {
 		writeError(w, err, http.StatusBadRequest)
-		return
-	}
-	if strings.HasSuffix(name, "/preview") || strings.HasSuffix(name, "/traffic") {
-		writeError(w, domain.NewError(domain.CodeInvalidArgument, "subscription action requires POST"), http.StatusBadRequest)
 		return
 	}
 	result, err := s.rt.Service.GetSubscription(r.Context(), name)
@@ -74,6 +77,23 @@ func (s *Server) subscriptionAction(w http.ResponseWriter, r *http.Request) {
 			Refresh: req.Refresh,
 		})
 		writeResult(w, result, err)
+		return
+	case "render":
+		var req subscriptionRenderRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		if strings.TrimSpace(req.Format) == "" {
+			writeError(w, domain.NewError(domain.CodeInvalidArgument, "subscription render format is required"), http.StatusBadRequest)
+			return
+		}
+		result, err := s.rt.Service.RenderSubscription(
+			r.Context(),
+			name,
+			req.Format,
+			domain.RequestInfo{Args: requestArgs(r, req.Args)},
+		)
+		writeAgentRenderResult(w, result, err)
 		return
 	default:
 		writeError(w, domain.NewError(domain.CodeInvalidArgument, "unsupported subscription action"), http.StatusBadRequest)

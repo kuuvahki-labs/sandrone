@@ -16,8 +16,9 @@
 ## 查契约
 
 - [CLI](reference/cli.md)：命令、flags、输出和退出约定。
-- [HTTP API](reference/http-api/README.md)：鉴权、通用响应和各资源接口导航。
-- [MCP](reference/mcp.md)：transport、tools、resources、prompts 和安全边界。
+- [HTTP API](reference/http-api/README.md)：鉴权、通用响应、执行与 schema 接口导航。
+- [MCP](reference/mcp.md)：完整 Agent workflow、transport、tools、resources、
+  prompts、结构化输出和安全边界。
 - [FileSpec](reference/file-spec.md)：文件类型、来源、typed config 和 settings。
 - [Processors](reference/processors.md)：nodes/file stages、内建处理器和执行语义。
 - [JavaScript 脚本 API](reference/scripting-api.md)：envelope、注入 API、sandbox 和失败边界。

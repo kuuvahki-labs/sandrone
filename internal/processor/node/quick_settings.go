@@ -18,11 +18,11 @@ const (
 )
 
 type QuickSettingsParams struct {
-	UDP           string `json:"udp,omitempty"`
-	TFO           string `json:"tfo,omitempty"`
-	AllowInsecure string `json:"allow_insecure,omitempty"`
-	VMessAEAD     string `json:"vmess_aead,omitempty"`
-	Reuse         string `json:"reuse,omitempty"`
+	UDP           string `json:"udp,omitempty" jsonschema:"UDP relay override" enum:"default,enabled,disabled" default:"default"`
+	TFO           string `json:"tfo,omitempty" jsonschema:"TCP Fast Open override" enum:"default,enabled,disabled" default:"default"`
+	AllowInsecure string `json:"allow_insecure,omitempty" jsonschema:"TLS certificate verification override" enum:"default,enabled,disabled" default:"default"`
+	VMessAEAD     string `json:"vmess_aead,omitempty" jsonschema:"VMess AEAD override" enum:"default,enabled,disabled" default:"default"`
+	Reuse         string `json:"reuse,omitempty" jsonschema:"Snell connection reuse override" enum:"default,enabled,disabled" default:"default"`
 }
 
 type quickSettingsProc struct {

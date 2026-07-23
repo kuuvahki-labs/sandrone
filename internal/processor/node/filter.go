@@ -15,11 +15,11 @@ import (
 
 // FilterParams selects or drops nodes using one explicit match rule.
 type FilterParams struct {
-	Action  string   `json:"action"`
-	Field   string   `json:"field"`
-	Match   string   `json:"match"`
-	Pattern string   `json:"pattern,omitempty"`
-	Values  []string `json:"values,omitempty"`
+	Action  string   `json:"action" jsonschema:"Whether matching nodes are kept or dropped" enum:"keep,drop"`
+	Field   string   `json:"field" jsonschema:"Node field to inspect" enum:"name,type,server"`
+	Match   string   `json:"match" jsonschema:"Matching strategy" enum:"regex,in"`
+	Pattern string   `json:"pattern,omitempty" jsonschema:"Regular expression used when match is regex"`
+	Values  []string `json:"values,omitempty" jsonschema:"Accepted values used when match is in"`
 }
 
 type filterProc struct {

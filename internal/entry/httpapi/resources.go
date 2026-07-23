@@ -132,7 +132,7 @@ func subscriptionActionName(r *http.Request) (string, string, error) {
 	if strings.HasSuffix(escapedPath, "/stats") {
 		return "", "", errSubscriptionActionNotFound
 	}
-	for _, action := range []string{"preview", "traffic"} {
+	for _, action := range []string{"preview", "traffic", "render"} {
 		suffix := "/" + action
 		if !strings.HasSuffix(escapedPath, suffix) {
 			continue
@@ -150,5 +150,5 @@ func subscriptionActionName(r *http.Request) (string, string, error) {
 		}
 		return action, name, nil
 	}
-	return "", "", domain.NewError(domain.CodeInvalidArgument, "subscription action path must end with /preview or /traffic")
+	return "", "", domain.NewError(domain.CodeInvalidArgument, "subscription action path must end with /preview or /traffic or /render")
 }

@@ -21,7 +21,6 @@ type serveOptions struct {
 	webUIStaticDir string
 	transport      string
 	path           string
-	readonly       bool
 	management     bool
 	maxOutput      int
 	logLevel       string
@@ -34,7 +33,6 @@ func newServeCommand(cfg *config) *cobra.Command {
 		webUIStaticDir: cfg.env[EnvWebUIStaticDir],
 		transport:      "stdio",
 		path:           app.DefaultMCPPath,
-		readonly:       true,
 		maxOutput:      1 << 20,
 		logLevel:       firstNonEmpty(cfg.env[EnvLogLevel], "info"),
 	}
@@ -112,7 +110,6 @@ func newServeAllCommand(cfg *config, opts *serveOptions) *cobra.Command {
 func addMCPFlags(cmd *cobra.Command, opts *serveOptions) {
 	cmd.Flags().StringVar(&opts.transport, "transport", opts.transport, "MCP transport: stdio or streamable-http")
 	cmd.Flags().StringVar(&opts.path, "path", opts.path, "MCP HTTP path")
-	cmd.Flags().BoolVar(&opts.readonly, "readonly", opts.readonly, "register only read-only MCP tools")
 	cmd.Flags().BoolVar(&opts.management, "allow-management-tools", opts.management, "register MCP management tools")
 	cmd.Flags().IntVar(&opts.maxOutput, "max-output-bytes", opts.maxOutput, "maximum MCP inline output bytes")
 }
@@ -131,7 +128,6 @@ func newServeRuntime(cfg *config, opts serveOptions, transport string) (*app.Run
 		MCP: app.MCPConfig{
 			Transport:            normalizeTransport(opts.transport),
 			Path:                 opts.path,
-			ReadOnly:             opts.readonly,
 			AllowManagementTools: opts.management,
 			MaxOutputBytes:       opts.maxOutput,
 		},

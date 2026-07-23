@@ -2,6 +2,28 @@ package httpapi
 
 import "github.com/kuuvahki-labs/sandrone/internal/domain"
 
+type convertRequest struct {
+	FromFormat       string                 `json:"from_format"`
+	ToFormat         string                 `json:"to_format"`
+	Content          *string                `json:"content,omitempty"`
+	Remote           *domain.RemoteInput    `json:"remote,omitempty"`
+	ParseProcessors  []domain.ProcessorSpec `json:"parse_processors,omitempty"`
+	RenderProcessors []domain.ProcessorSpec `json:"render_processors,omitempty"`
+	Options          domain.RenderOptions   `json:"options,omitempty"`
+	Meta             map[string]string      `json:"meta,omitempty"`
+}
+
+type subscriptionRenderRequest struct {
+	Format string            `json:"format"`
+	Args   map[string]string `json:"args,omitempty"`
+}
+
+type agentRenderResponse struct {
+	ContentType string        `json:"content_type,omitempty"`
+	Body        string        `json:"body"`
+	Report      domain.Report `json:"report"`
+}
+
 type validateRequest struct {
 	File       string                 `json:"file,omitempty"`
 	Spec       *domain.FileSpec       `json:"spec,omitempty"`
