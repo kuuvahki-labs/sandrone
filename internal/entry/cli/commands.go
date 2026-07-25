@@ -15,7 +15,7 @@ import (
 
 const (
 	inputFormatsHelp  = "input formats: uri, uri-list, base64, mihomo, sing-box, json-nodes"
-	targetFormatsHelp = "target formats: json-nodes, mihomo-proxies, shadowrocket-proxies, sing-box-outbounds, uri-list"
+	targetFormatsHelp = "target formats: base64, json-nodes, mihomo-proxies, shadowrocket-proxies, sing-box-outbounds, uri-list"
 	probeMethodsHelp  = "probe methods: auto, tcp-connect, udp-ntp, url-test"
 )
 

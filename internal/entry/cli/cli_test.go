@@ -43,6 +43,7 @@ func TestConvertHelpDocumentsFormatsAndExamples(t *testing.T) {
 	} {
 		require.Contains(t, help, want)
 	}
+	require.Contains(t, help, "target formats: base64")
 }
 
 func TestProbeHelpDocumentsHealthCheckMethods(t *testing.T) {
@@ -657,7 +658,7 @@ func TestDoctorReportsFormatsAndDataDir(t *testing.T) {
 	for _, check := range result.RenderFormats {
 		renderFormats = append(renderFormats, check.Name)
 	}
-	require.ElementsMatch(t, []string{"mihomo-proxies", "shadowrocket-proxies", "sing-box-outbounds", "json-nodes", "uri-list"}, renderFormats)
+	require.ElementsMatch(t, []string{"base64", "mihomo-proxies", "shadowrocket-proxies", "sing-box-outbounds", "json-nodes", "uri-list"}, renderFormats)
 }
 
 func TestServeCommandTreeIncludesSubcommands(t *testing.T) {

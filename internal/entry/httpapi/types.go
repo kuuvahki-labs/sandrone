@@ -65,6 +65,16 @@ type inspectResponse struct {
 	Capabilities map[string]any `json:"capabilities,omitempty"`
 }
 
+type shareListResponse struct {
+	Shares []shareResponse `json:"shares"`
+}
+
+type shareResponse struct {
+	domain.Share
+	PublicFilename  string            `json:"public_filename"`
+	FormatFilenames map[string]string `json:"format_filenames,omitempty"`
+}
+
 type subscriptionPreviewResponse struct {
 	SubscriptionName string                               `json:"subscription_name"`
 	Type             domain.SubscriptionType              `json:"type,omitempty"`

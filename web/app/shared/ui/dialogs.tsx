@@ -8,7 +8,17 @@ import DialogTitle from "@mui/material/DialogTitle";
 
 import { useI18n } from "~/shared/i18n/context";
 
-export function AppDialog({ children, onClose, title }: { children: ReactNode; onClose: () => void; title: string }) {
+export function AppDialog({
+  children,
+  disableClose = false,
+  onClose,
+  title,
+}: {
+  children: ReactNode;
+  disableClose?: boolean;
+  onClose: () => void;
+  title: string;
+}) {
   const titleId = useId();
   return (
     <Dialog
@@ -17,7 +27,9 @@ export function AppDialog({ children, onClose, title }: { children: ReactNode; o
       aria-labelledby={titleId}
       maxWidth="sm"
       scroll="paper"
-      onClose={onClose}
+      onClose={() => {
+        if (!disableClose) onClose();
+      }}
     >
       <DialogTitle id={titleId}>{title}</DialogTitle>
       <DialogContent dividers>{children}</DialogContent>

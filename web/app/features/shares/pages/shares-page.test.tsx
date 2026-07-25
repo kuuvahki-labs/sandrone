@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -13,9 +13,9 @@ const shares: ShareItem[] = [
 describe("shares page", () => {
   it("copies a file share with the primary action and leaves only delete in its menu", async () => {
     const user = userEvent.setup();
-    const onCopy = vi.fn();
+    const onCopy = vi.fn().mockResolvedValue({ copied: true });
     const onDelete = vi.fn();
-    render(<SharesPage items={shares} onCopy={onCopy} onDelete={onDelete} />);
+    render(<SharesPage items={shares} onCopy={onCopy} onCopyUrl={vi.fn()} onDelete={onDelete} />);
 
     expect(screen.getByRole("heading", { name: "分享" })).toBeInTheDocument();
     expect(screen.getByText("https://example.com/s/sh_123")).toBeInTheDocument();
@@ -31,9 +31,47 @@ describe("shares page", () => {
     expect(onDelete).toHaveBeenCalledWith(shares[0]);
   });
 
+  it("selects the public URL without triggering the card copy action", async () => {
+    const user = userEvent.setup();
+    const onCopy = vi.fn().mockResolvedValue({ copied: true });
+    render(<SharesPage items={shares} onCopy={onCopy} onCopyUrl={vi.fn()} onDelete={vi.fn()} />);
+
+    await user.click(screen.getByText(shares[0].publicUrl));
+
+    expect(window.getSelection()?.toString()).toBe(shares[0].publicUrl);
+    expect(onCopy).not.toHaveBeenCalled();
+  });
+
+  it("preserves a partial public URL selection made by dragging", () => {
+    render(<SharesPage items={shares} onCopy={vi.fn().mockResolvedValue({ copied: true })} onCopyUrl={vi.fn()} onDelete={vi.fn()} />);
+    const publicUrl = screen.getByText(shares[0].publicUrl);
+    const text = publicUrl.firstChild;
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.setStart(text!, 0);
+    range.setEnd(text!, 5);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+
+    fireEvent.click(publicUrl);
+
+    expect(selection?.toString()).toBe("https");
+  });
+
+  it("selects the public URL when the card copy action cannot use the clipboard", async () => {
+    const user = userEvent.setup();
+    const onCopy = vi.fn().mockResolvedValue({ copied: false, url: shares[0].publicUrl });
+    render(<SharesPage items={shares} onCopy={onCopy} onCopyUrl={vi.fn()} onDelete={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: "复制链接：mobile" }));
+
+    expect(window.getSelection()?.toString()).toBe(shares[0].publicUrl);
+    expect(screen.queryByRole("dialog", { name: "请手动复制链接" })).not.toBeInTheDocument();
+  });
+
   it("offers every client format for subscription shares and forwards exact overrides", async () => {
     const user = userEvent.setup();
-    const onCopy = vi.fn();
+    const onCopy = vi.fn().mockResolvedValue({ copied: true });
     const item: ShareItem = {
       ...shares[0],
       id: "sh_nodes",
@@ -43,10 +81,11 @@ describe("shares page", () => {
       targetName: "provider",
       title: "nodes",
     };
-    render(<SharesPage items={[item]} onCopy={onCopy} onDelete={vi.fn()} />);
+    render(<SharesPage items={[item]} onCopy={onCopy} onCopyUrl={vi.fn()} onDelete={vi.fn()} />);
 
     const more = screen.getByRole("button", { name: "nodes 更多操作" });
     const cases = [
+      ["复制为通用订阅（Base64）", "base64"],
       ["复制为 URI list", "uri-list"],
       ["复制为 Mihomo", "mihomo-proxies"],
       ["复制为 sing-box", "sing-box-outbounds"],
@@ -59,7 +98,38 @@ describe("shares page", () => {
       expect(onCopy).toHaveBeenLastCalledWith(item, format);
     }
 
-    expect(onCopy).toHaveBeenCalledTimes(4);
+    expect(onCopy).toHaveBeenCalledTimes(5);
+    expect(screen.queryByRole("dialog", { name: "请手动复制链接" })).not.toBeInTheDocument();
+  });
+
+  it("shows the exact attempted format URL when a menu copy fails", async () => {
+    const user = userEvent.setup();
+    const attemptedUrl = "https://example.com/s/sh_nodes/nodes.txt?format=base64#install";
+    const onCopy = vi.fn().mockResolvedValue({ copied: false, url: attemptedUrl });
+    const item: ShareItem = {
+      ...shares[0],
+      id: "sh_nodes",
+      targetKind: "subscription",
+      targetName: "provider",
+      formatFilenames: { base64: "nodes.txt" },
+      title: "nodes",
+    };
+
+    render(
+      <SharesPage
+        items={[item]}
+        onCopy={onCopy}
+        onCopyUrl={vi.fn().mockResolvedValue({ copied: true })}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "nodes 更多操作" }));
+    await user.click(screen.getByRole("menuitem", { name: "复制为通用订阅（Base64）" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "请手动复制链接" });
+    expect(within(dialog).getByText(attemptedUrl)).toBeInTheDocument();
+    await waitFor(() => expect(window.getSelection()?.toString()).toBe(attemptedUrl));
   });
 
   it("summarizes each share status in a balanced four-card grid", () => {
@@ -71,7 +141,7 @@ describe("shares page", () => {
       { ...shares[0], id: "exhausted", title: "exhausted", status: "exhausted" },
     ];
 
-    render(<SharesPage items={items} onCopy={vi.fn()} onDelete={vi.fn()} />);
+    render(<SharesPage items={items} onCopy={vi.fn()} onCopyUrl={vi.fn()} onDelete={vi.fn()} />);
 
     const summary = screen.getByLabelText("分享链接摘要");
     expect(Array.from(summary.children).map((item) => item.textContent)).toEqual([

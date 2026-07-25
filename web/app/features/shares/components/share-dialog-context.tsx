@@ -4,6 +4,7 @@ import {
   useCallback,
   useContext,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -22,28 +23,41 @@ interface ShareDialogContextValue {
 interface ShareDialogProviderProps {
   children: ReactNode;
   client: ApiClient;
+  publicBaseUrl: string;
   showNotice: (message: string, severity?: "success" | "error" | "warning") => void;
 }
 
 const ShareDialogContext = createContext<ShareDialogContextValue | null>(null);
 
-export function ShareDialogProvider({ children, client, showNotice }: ShareDialogProviderProps) {
-  const [target, setTarget] = useState<ShareTarget | null>(null);
+export function ShareDialogProvider({ children, client, publicBaseUrl, showNotice }: ShareDialogProviderProps) {
+  const [dialog, setDialog] = useState<{ id: number; target: ShareTarget } | null>(null);
+  const nextDialogId = useRef(0);
   const { t } = useI18n();
-  const close = useCallback(() => setTarget(null), []);
-  const open = useCallback((nextTarget: ShareTarget) => setTarget(nextTarget), []);
-  const { createShare } = useMemo(() => createShareActions({
+  const close = useCallback(() => setDialog(null), []);
+  const open = useCallback((target: ShareTarget) => {
+    nextDialogId.current += 1;
+    setDialog({ id: nextDialogId.current, target });
+  }, []);
+  const { copyShare, createShare } = useMemo(() => createShareActions({
     client,
-    closeSheet: close,
+    publicBaseUrl,
     showNotice,
     t,
-  }), [client, close, showNotice, t]);
+  }), [client, publicBaseUrl, showNotice, t]);
   const value = useMemo(() => ({ close, open }), [close, open]);
 
   return (
     <ShareDialogContext.Provider value={value}>
       {children}
-      {target ? <ShareDialog target={target} onClose={close} onSubmit={createShare} /> : null}
+      {dialog ? (
+        <ShareDialog
+          key={dialog.id}
+          target={dialog.target}
+          onClose={close}
+          onCopy={copyShare}
+          onSubmit={createShare}
+        />
+      ) : null}
     </ShareDialogContext.Provider>
   );
 }

@@ -18,7 +18,8 @@
 ```sh
 nvm install 24.17.0
 nvm use 24.17.0
-npm install -g pnpm@11.5.2
+corepack enable
+corepack install --global pnpm@11.5.2
 pnpm --dir web install --frozen-lockfile
 ```
 

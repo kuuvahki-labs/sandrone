@@ -8,7 +8,20 @@ import (
 
 func (s *Server) listShares(w http.ResponseWriter, r *http.Request) {
 	result, err := s.rt.Service.ListShares(r.Context())
-	writeResult(w, result, err)
+	if err != nil {
+		writeResult(w, nil, err)
+		return
+	}
+	shares := make([]shareResponse, 0, len(result.Shares))
+	for _, share := range result.Shares {
+		presentation := result.Presentations[share.ID]
+		shares = append(shares, shareResponse{
+			Share:           share,
+			PublicFilename:  presentation.PublicFilename,
+			FormatFilenames: presentation.FormatFilenames,
+		})
+	}
+	writeResult(w, shareListResponse{Shares: shares}, nil)
 }
 
 func (s *Server) createShare(w http.ResponseWriter, r *http.Request) {
@@ -29,12 +42,18 @@ func (s *Server) createShare(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	share, err := s.rt.Service.CreateShare(r.Context(), req)
+	result, err := s.rt.Service.CreateShare(r.Context(), req)
 	if err != nil {
 		writeServiceError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]any{"share": share})
+	writeJSON(w, http.StatusCreated, map[string]any{
+		"share": shareResponse{
+			Share:           result.Share,
+			PublicFilename:  result.Presentation.PublicFilename,
+			FormatFilenames: result.Presentation.FormatFilenames,
+		},
+	})
 }
 
 func (s *Server) getShare(w http.ResponseWriter, r *http.Request) {
@@ -56,14 +75,15 @@ func (s *Server) deleteShare(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) publicShare(w http.ResponseWriter, r *http.Request) {
-	id, err := pathResourceName(r.URL.EscapedPath(), "/s/")
+	id, filename, err := publicSharePath(r.URL.EscapedPath())
 	if err != nil {
 		writeError(w, err, http.StatusBadRequest)
 		return
 	}
 	result, err := s.rt.Service.RenderShare(r.Context(), domain.ShareRenderRequest{
-		ID:     id,
-		Format: r.URL.Query().Get("format"),
+		ID:                id,
+		Format:            r.URL.Query().Get("format"),
+		PresentedFilename: filename,
 		Request: domain.RequestInfo{
 			Args: queryArgs(r.URL.Query()),
 		},

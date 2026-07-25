@@ -1,9 +1,12 @@
 package service
 
 import (
+	"context"
+	"encoding/base64"
 	"mime"
 	"testing"
 
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
@@ -48,4 +51,23 @@ func TestAgeShareFilenameCollapsesTerminalSuffixes(t *testing.T) {
 			require.Equal(t, tt.expected, ageShareFilename(tt.filename))
 		})
 	}
+}
+
+func TestRenderShareDefaultsPersistedMissingSubscriptionFormatToBase64(t *testing.T) {
+	ctx := context.Background()
+	svc := New(WithFS(afero.NewMemMapFs()))
+	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+		Name: "nodes", Type: domain.SubscriptionTypeLocal,
+		Format: "uri-list", Content: "ss://aes-128-gcm:secret@example.com:8388#node",
+	}))
+	require.NoError(t, svc.metaStore.CreateShare(ctx, domain.Share{
+		ID: "legacy-share", Name: "mobile",
+		TargetKind: "subscription", TargetName: "nodes",
+	}))
+
+	rendered, err := svc.RenderShare(ctx, domain.ShareRenderRequest{ID: "legacy-share"})
+	require.NoError(t, err)
+	decoded, err := base64.StdEncoding.DecodeString(string(rendered.Body))
+	require.NoError(t, err)
+	require.Contains(t, string(decoded), "ss://")
 }

@@ -1,4 +1,4 @@
-import { type SyntheticEvent, useState } from "react";
+import { type SyntheticEvent, useRef, useState } from "react";
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
 import DialogActions from "@mui/material/DialogActions";
@@ -10,41 +10,85 @@ import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 
+import type { CopyShareResult } from "~/features/shares/data/create-share-actions";
 import { shareCopyFormats } from "~/features/shares/model/share-formats";
-import type { ShareTarget } from "~/features/shares/model/types";
+import type { ShareItem, ShareTarget } from "~/features/shares/model/types";
 import { useI18n } from "~/shared/i18n/context";
 import { AppDialog } from "~/shared/ui/dialogs";
+
+import { hasSelectionWithin, selectContents } from "./share-url-selection";
 
 interface ShareDialogProps {
   target: ShareTarget;
   onClose: () => void;
-  onSubmit: (form: FormData) => Promise<void>;
+  onCopy: (item: ShareItem) => Promise<CopyShareResult>;
+  onSubmit: (form: FormData) => Promise<ShareItem | null>;
 }
 
-export function ShareDialog({ target, onClose, onSubmit }: ShareDialogProps) {
+export function ShareDialog({ target, onClose, onCopy, onSubmit }: ShareDialogProps) {
   const { t } = useI18n();
   const [error, setError] = useState("");
+  const [result, setResult] = useState<ShareItem | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const publicUrlElement = useRef<HTMLElement | null>(null);
 
   async function handleSubmit(event: SyntheticEvent<HTMLFormElement, SubmitEvent>) {
     event.preventDefault();
     setError("");
+    setSubmitting(true);
     try {
-      await onSubmit(new FormData(event.currentTarget));
+      const created = await onSubmit(new FormData(event.currentTarget));
+      if (created) setResult(created);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : t("errors.operationFailedRetry"));
+    } finally {
+      setSubmitting(false);
     }
   }
 
+  async function copyResult() {
+    if (result && !(await onCopy(result)).copied) {
+      selectContents(publicUrlElement.current);
+    }
+  }
+
+  if (result) {
+    return (
+      <AppDialog title={t("messages.shareCreated")} onClose={onClose}>
+        <Typography
+          className="block cursor-text break-words select-text"
+          component="code"
+          ref={publicUrlElement}
+          onClick={(event) => {
+            if (!hasSelectionWithin(event.currentTarget)) {
+              selectContents(event.currentTarget);
+            }
+          }}
+        >
+          {result.publicUrl}
+        </Typography>
+        <DialogActions className="px-0 pb-0">
+          <Button type="button" onClick={onClose}>{t("share.result.done")}</Button>
+          <Button type="button" variant="contained" onClick={() => { void copyResult(); }}>
+            {t("shares.actions.copy")}
+          </Button>
+        </DialogActions>
+      </AppDialog>
+    );
+  }
+
   return (
-    <AppDialog title={t("share.create.title")} onClose={onClose}>
+    <AppDialog disableClose={submitting} title={t("share.create.title")} onClose={onClose}>
       <Stack component="form" spacing={2} onSubmit={(event) => { void handleSubmit(event); }}>
         <ShareFields target={target} />
         {error ? (
           <Alert severity="error">{error}</Alert>
         ) : null}
         <DialogActions className="px-0 pb-0">
-          <Button type="button" onClick={onClose}>{t("actions.cancel")}</Button>
-          <Button aria-label={t("share.create.save")} type="submit" variant="contained">{t("actions.save")}</Button>
+          <Button disabled={submitting} type="button" onClick={onClose}>{t("actions.cancel")}</Button>
+          <Button aria-label={t("share.create.save")} disabled={submitting} type="submit" variant="contained">
+            {submitting ? t("share.create.saving") : t("actions.save")}
+          </Button>
         </DialogActions>
       </Stack>
     </AppDialog>
@@ -79,7 +123,7 @@ function ShareFields({ target }: { target: ShareTarget }) {
             id="share-target-format"
             inputProps={{ "aria-describedby": "share-target-format-helper", "aria-label": t("share.field.targetFormat") }}
             name="target_format"
-            defaultValue="uri-list"
+            defaultValue="base64"
           >
             {shareCopyFormats.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}
           </NativeSelect>

@@ -40,7 +40,7 @@ func TestServiceParseAndRenderRegistry(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, parsed.Nodes, 2)
 
-	for _, format := range []string{"mihomo-proxies", "shadowrocket-proxies", "sing-box-outbounds", "json-nodes", "uri-list"} {
+	for _, format := range []string{"base64", "mihomo-proxies", "shadowrocket-proxies", "sing-box-outbounds", "json-nodes", "uri-list"} {
 		t.Run(format, func(t *testing.T) {
 			rendered, err := svc.Render(context.Background(), domain.RenderRequest{
 				Format: format,

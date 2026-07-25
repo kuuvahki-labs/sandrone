@@ -6,7 +6,22 @@ const manifest = {
     { name: "default", type: "collection", meta: { node_count: "12", source_count: "1" } },
   ],
   files: [{ name: "default.yaml", type: "inline", target: "mihomo", format: "yaml", meta: { description: "main config" } }],
-  shares: [{ id: "sh_123", name: "mobile", target_kind: "subscription", target_name: "provider", target_format: "uri-list" }],
+  shares: [{
+    id: "sh_123",
+    name: "mobile",
+    target_kind: "subscription",
+    target_name: "provider",
+    target_format: "uri-list",
+    public_filename: "mobile.txt",
+    format_filenames: {
+      "base64": "mobile.txt",
+      "uri-list": "mobile.txt",
+      "mihomo-proxies": "mobile.yaml",
+      "sing-box-outbounds": "mobile.json",
+      "shadowrocket-proxies": "mobile.conf",
+      "json-nodes": "mobile.json",
+    },
+  }],
 };
 
 const subscriptionDetail = {
@@ -119,6 +134,22 @@ test.beforeEach(async ({ page }) => {
     await route.fulfill({ json: { items: manifest.files } });
   });
   await page.route("**/v1/shares", async (route) => {
+    if (route.request().method() === "POST") {
+      await route.fulfill({
+        status: 201,
+        json: {
+          share: {
+            id: "sh_created",
+            name: "provider",
+            target_kind: "subscription",
+            target_name: "provider",
+            target_format: "uri-list",
+            public_filename: "provider.txt",
+          },
+        },
+      });
+      return;
+    }
     await route.fulfill({ json: { shares: manifest.shares } });
   });
   await page.route("**/v1/settings/runtime", async (route) => {
@@ -161,7 +192,7 @@ test.beforeEach(async ({ page }) => {
 
 const routes = [
   { path: "/", heading: "我的订阅", text: "default", focus: false, responsive: true },
-  { path: "/subscriptions", heading: "我的订阅", text: "default", focus: false, responsive: false },
+  { path: "/subscriptions", heading: "我的订阅", text: "default", focus: false, responsive: true },
   { path: "/subscriptions/collection/default/edit", heading: "编辑订阅", text: "组合信息", focus: true, responsive: false },
   { path: "/subscriptions/remote/provider/edit", heading: "编辑订阅", text: "基本信息", focus: true, responsive: true },
   { path: "/files", heading: "我的文件", text: "default.yaml", focus: false, responsive: false },
@@ -170,7 +201,7 @@ const routes = [
   { path: "/files/new?source=shadowrocket", heading: "新建文件", text: "基础配置", focus: true, responsive: false },
   { path: "/files/default.yaml/edit", heading: "编辑文件", text: "配置模板", focus: true, responsive: true },
   { path: "/files/default.yaml/preview", heading: "文件预览", text: longPreviewNode, focus: true, responsive: true },
-  { path: "/shares", heading: "分享", text: "https://example.com/s/sh_123?format=uri-list", focus: false, responsive: false },
+  { path: "/shares", heading: "分享", text: "https://example.com/s/sh_123/mobile.txt?format=uri-list", focus: false, responsive: true },
   { path: "/settings", heading: "设置", text: "关于 Sandrone", focus: false, responsive: false },
 ];
 
@@ -221,6 +252,27 @@ for (const route of routes) {
         return { icon: box(icon), label: box(label) };
       });
       expect(searchBounds.label?.x ?? 0, "subscription search label should not overlap the search icon").toBeGreaterThanOrEqual((searchBounds.icon?.x ?? 0) + (searchBounds.icon?.width ?? 0) + 4);
+      if (testInfo.project.name === "mobile") {
+        await page.getByRole("button", { name: "provider 更多操作" }).click();
+        await page.getByRole("menuitem", { name: "分享" }).click();
+        const create = page.getByRole("dialog", { name: "创建分享链接" });
+        await create.getByRole("button", { name: "保存分享链接" }).click();
+
+        const result = page.getByRole("dialog", { name: "分享链接已创建" });
+        const publicUrl = "https://example.com/s/sh_created/provider.txt?format=uri-list";
+        await expect(result.getByText(publicUrl)).toBeVisible();
+        const dialogMetrics = await result.evaluate((dialog) => ({
+          clientWidth: dialog.clientWidth,
+          scrollWidth: dialog.scrollWidth,
+        }));
+        expect(dialogMetrics.scrollWidth).toBeLessThanOrEqual(dialogMetrics.clientWidth);
+
+        await result.getByRole("button", { name: "复制链接" }).click();
+        await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(publicUrl);
+        await result.getByRole("button", { name: "完成" }).click();
+        await expect(page.getByRole("heading", { name: "我的订阅", level: 2 })).toBeVisible();
+      }
+      expect(consoleIssues).toEqual([]);
     }
     if (route.path === "/files") {
       await page.getByRole("button", { name: "default.yaml 更多操作" }).click();
@@ -294,21 +346,43 @@ for (const route of routes) {
       expect(consoleIssues).toEqual([]);
     }
     if (route.path === "/shares") {
+      const publicUrl = "https://example.com/s/sh_123/mobile.txt?format=uri-list";
+      await page.getByText(publicUrl).click();
+      await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe(publicUrl);
+
       await page.getByRole("button", { name: "复制链接：mobile" }).click();
       await expect(page.getByRole("status")).toHaveText("已复制链接");
-      await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe("https://example.com/s/sh_123?format=uri-list");
+      await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(publicUrl);
 
       await page.getByRole("button", { name: "mobile 更多操作" }).click();
       const shareMenu = page.getByRole("menu");
       await expect(shareMenu.getByRole("menuitem")).toHaveText([
+        "复制为通用订阅（Base64）",
         "复制为 URI list",
         "复制为 Mihomo",
         "复制为 sing-box",
         "复制为 Shadowrocket",
         "删除",
       ]);
-      await shareMenu.getByRole("menuitem", { name: "复制为 Mihomo" }).click();
-      await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe("https://example.com/s/sh_123?format=mihomo-proxies");
+      await page.evaluate(() => {
+        Object.defineProperty(navigator, "clipboard", {
+          configurable: true,
+          value: undefined,
+        });
+      });
+      await shareMenu.getByRole("menuitem", { name: "复制为通用订阅（Base64）" }).click();
+      const attemptedUrl = "https://example.com/s/sh_123/mobile.txt?format=base64";
+      const manualCopyDialog = page.getByRole("dialog", { name: "请手动复制链接" });
+      await expect(manualCopyDialog.getByText(attemptedUrl)).toBeVisible();
+      await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe(attemptedUrl);
+      const dialogMetrics = await manualCopyDialog.evaluate((dialog) => ({
+        clientWidth: dialog.clientWidth,
+        scrollWidth: dialog.scrollWidth,
+      }));
+      expect(dialogMetrics.scrollWidth, `${testInfo.project.name} manual copy dialog should not overflow`).toBeLessThanOrEqual(dialogMetrics.clientWidth);
+      await manualCopyDialog.getByRole("button", { name: "完成" }).click();
+      await expect(manualCopyDialog).toBeHidden();
+      expect(consoleIssues).toEqual([]);
     }
     if (route.path === "/settings") {
       const dataManagement = page.getByRole("heading", { name: "数据管理" }).locator("xpath=ancestor::article[1]");

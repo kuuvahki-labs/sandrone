@@ -35,14 +35,26 @@ type ShareCreateRequest struct {
 }
 
 type ShareListResult struct {
-	Shares []Share `json:"shares" yaml:"shares"`
+	Shares        []Share                      `json:"shares" yaml:"shares"`
+	Presentations map[string]SharePresentation `json:"-" yaml:"-"`
+}
+
+type ShareCreateResult struct {
+	Share
+	Presentation SharePresentation `json:"-" yaml:"-"`
+}
+
+type SharePresentation struct {
+	PublicFilename  string            `json:"public_filename" yaml:"public_filename"`
+	FormatFilenames map[string]string `json:"format_filenames,omitempty" yaml:"format_filenames,omitempty"`
 }
 
 type ShareRenderRequest struct {
-	ID      string            `json:"id" yaml:"id"`
-	Format  string            `json:"format,omitempty" yaml:"format,omitempty"`
-	Request RequestInfo       `json:"request,omitempty" yaml:"request,omitempty"`
-	Meta    map[string]string `json:"meta,omitempty" yaml:"meta,omitempty"`
+	ID                string            `json:"id" yaml:"id"`
+	Format            string            `json:"format,omitempty" yaml:"format,omitempty"`
+	PresentedFilename string            `json:"presented_filename,omitempty" yaml:"presented_filename,omitempty"`
+	Request           RequestInfo       `json:"request,omitempty" yaml:"request,omitempty"`
+	Meta              map[string]string `json:"meta,omitempty" yaml:"meta,omitempty"`
 }
 
 type ShareRenderResult struct {

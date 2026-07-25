@@ -2,6 +2,7 @@ package service_test
 
 import (
 	"context"
+	"encoding/base64"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -31,7 +32,7 @@ func TestCapabilitySummaryIncludesAdapterCapabilities(t *testing.T) {
 		require.Contains(t, seen, format+"\x00"+string(shared.DirectionParse))
 	}
 	renderFormats := summary["render_formats"].([]string)
-	require.ElementsMatch(t, []string{"mihomo-proxies", "shadowrocket-proxies", "sing-box-outbounds", "json-nodes", "uri-list"}, renderFormats)
+	require.ElementsMatch(t, []string{"base64", "mihomo-proxies", "shadowrocket-proxies", "sing-box-outbounds", "json-nodes", "uri-list"}, renderFormats)
 	for _, format := range renderFormats {
 		require.Contains(t, seen, format+"\x00"+string(shared.DirectionRender))
 	}
@@ -39,6 +40,27 @@ func TestCapabilitySummaryIncludesAdapterCapabilities(t *testing.T) {
 	uriList := seen["uri-list\x00"+string(shared.DirectionParse)]
 	require.NotContains(t, uriList.Types, domain.NodeTypeWireGuard)
 	require.NotEmpty(t, seen["uri-list\x00"+string(shared.DirectionRender)].Lossy)
+}
+
+func TestServiceRendersBase64Subscription(t *testing.T) {
+	svc := service.New()
+	result, err := svc.Render(context.Background(), domain.RenderRequest{
+		Format: "base64",
+		Nodes: []domain.NodeIR{{
+			Type:     domain.NodeTypeShadowsocks,
+			Name:     "node",
+			Server:   "example.com",
+			Port:     8388,
+			Cipher:   "aes-128-gcm",
+			Password: "secret",
+		}},
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "text/plain; charset=utf-8", result.ContentType)
+	decoded, err := base64.StdEncoding.DecodeString(string(result.Body))
+	require.NoError(t, err)
+	require.Equal(t, "ss://YWVzLTEyOC1nY206c2VjcmV0@example.com:8388#node", string(decoded))
 }
 func TestServiceWithProcessor(t *testing.T) {
 	svc := service.New(service.WithProcessor(func(r *processor.Registry) {

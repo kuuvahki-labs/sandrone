@@ -154,6 +154,7 @@ func New(opts ...Option) *Service {
 	singBoxParser := singbox.NewParser()
 	jsonParser := jsonnodes.NewParser()
 	uriRenderer := uri.NewRenderer()
+	base64Renderer := uri.NewBase64Renderer(uriRenderer)
 	mihomoRenderer := mihomo.NewRenderer()
 	singBoxRenderer := singbox.NewRenderer()
 	jsonRenderer := jsonnodes.NewRenderer()
@@ -176,6 +177,7 @@ func New(opts ...Option) *Service {
 			"json-nodes": jsonParser,
 		},
 		renderers: map[string]Renderer{
+			"base64":               base64Renderer,
 			"mihomo-proxies":       mihomoRenderer,
 			"shadowrocket-proxies": shadowrocketRenderer,
 			"sing-box-outbounds":   singBoxRenderer,
@@ -209,7 +211,7 @@ func (s *Service) CapabilitySummary() map[string]any {
 			"uri", "uri-list", "base64", "mihomo", "sing-box", "json-nodes",
 		},
 		"render_formats": []string{
-			"mihomo-proxies", "shadowrocket-proxies", "sing-box-outbounds", "json-nodes", "uri-list",
+			"base64", "mihomo-proxies", "shadowrocket-proxies", "sing-box-outbounds", "json-nodes", "uri-list",
 		},
 		"node_processors": s.registry.NodeTypes(),
 		"file_processors": s.registry.FileTypes(),

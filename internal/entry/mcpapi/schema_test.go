@@ -53,10 +53,10 @@ func TestToolSchemasExposeObjectValuesAndBoundaryValidation(t *testing.T) {
 	require.JSONEq(t, `["uri","uri-list","base64","mihomo","sing-box","json-nodes"]`, extractSchema(
 		t, result.Tools, "sandrone_convert", "properties.from_format.enum",
 	))
-	require.JSONEq(t, `["mihomo-proxies","shadowrocket-proxies","sing-box-outbounds","json-nodes","uri-list"]`, extractSchema(
+	require.JSONEq(t, `["base64","mihomo-proxies","shadowrocket-proxies","sing-box-outbounds","json-nodes","uri-list"]`, extractSchema(
 		t, result.Tools, "sandrone_convert", "properties.to_format.enum",
 	))
-	require.JSONEq(t, `["mihomo-proxies","shadowrocket-proxies","sing-box-outbounds","json-nodes","uri-list"]`, extractSchema(
+	require.JSONEq(t, `["base64","mihomo-proxies","shadowrocket-proxies","sing-box-outbounds","json-nodes","uri-list"]`, extractSchema(
 		t, result.Tools, "sandrone_convert", "properties.options.properties.format.enum",
 	))
 	require.JSONEq(t, `["auto","uri","uri-list","base64","mihomo","sing-box","json-nodes"]`, extractSchema(

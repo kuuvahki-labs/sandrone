@@ -27,7 +27,11 @@ export function AppLayout() {
   if (app.needsToken) return <AuthScreen />;
 
   return (
-    <ShareDialogProvider client={app.client} showNotice={app.showNotice}>
+    <ShareDialogProvider
+      client={app.client}
+      publicBaseUrl={app.publicBaseUrl}
+      showNotice={app.showNotice}
+    >
       <ShellFrame activePath={location.pathname}>
         <Outlet />
         <AppOverlays />

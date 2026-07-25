@@ -153,7 +153,7 @@ func (s *Service) ListFiles(ctx context.Context) (*domain.ResourceListResult, er
 	return &domain.ResourceListResult{Items: items}, nil
 }
 
-func (s *Service) CreateShare(ctx context.Context, req domain.ShareCreateRequest) (*domain.Share, error) {
+func (s *Service) CreateShare(ctx context.Context, req domain.ShareCreateRequest) (*domain.ShareCreateResult, error) {
 	if s.metaStore == nil {
 		return nil, storeUnavailable()
 	}
@@ -182,7 +182,7 @@ func (s *Service) CreateShare(ctx context.Context, req domain.ShareCreateRequest
 	kind := strings.ToLower(strings.TrimSpace(req.TargetKind))
 	targetFormat := strings.TrimSpace(req.TargetFormat)
 	if kind == "subscription" && targetFormat == "" {
-		targetFormat = "uri-list"
+		targetFormat = "base64"
 	}
 	now := s.now().UTC()
 	share := domain.Share{
@@ -204,7 +204,10 @@ func (s *Service) CreateShare(ctx context.Context, req domain.ShareCreateRequest
 		return nil, err
 	}
 	s.logResource(ctx, "put", "share", share.ID)
-	return &share, nil
+	return &domain.ShareCreateResult{
+		Share:        share,
+		Presentation: sharePresentation(share),
+	}, nil
 }
 
 func (s *Service) ensureShareTargetExists(ctx context.Context, kind string, name string) error {
@@ -228,7 +231,11 @@ func (s *Service) ListShares(ctx context.Context) (*domain.ShareListResult, erro
 	if err != nil {
 		return nil, err
 	}
-	return &domain.ShareListResult{Shares: shares}, nil
+	presentations := make(map[string]domain.SharePresentation, len(shares))
+	for _, share := range shares {
+		presentations[share.ID] = sharePresentation(share)
+	}
+	return &domain.ShareListResult{Shares: shares, Presentations: presentations}, nil
 }
 
 func (s *Service) GetShare(ctx context.Context, id string) (*domain.Share, error) {
@@ -296,7 +303,7 @@ func (s *Service) RenderShare(ctx context.Context, req domain.ShareRenderRequest
 			format = strings.TrimSpace(share.TargetFormat)
 		}
 		if format == "" {
-			format = "uri-list"
+			format = "base64"
 		}
 		result, err := s.RenderSubscription(ctx, share.TargetName, format, req.Request)
 		if err != nil {
@@ -312,7 +319,11 @@ func (s *Service) RenderShare(ctx context.Context, req domain.ShareRenderRequest
 			return nil, err
 		}
 	}
-	setShareContentDisposition(&out, shareResponseFilename(share, finalFileName, format))
+	filename := shareResponseFilename(share, finalFileName, format)
+	if req.PresentedFilename != "" && req.PresentedFilename != filename {
+		return nil, domain.NewError(domain.CodeInvalidArgument, "share filename does not match the requested format")
+	}
+	setShareContentDisposition(&out, filename)
 	if _, err := s.metaStore.ConsumeShare(ctx, share.ID, s.now()); err != nil {
 		return nil, err
 	}

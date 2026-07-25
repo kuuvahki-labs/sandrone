@@ -3,6 +3,7 @@ package service_test
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"io"
 	"mime"
 	"os"
@@ -53,7 +54,7 @@ func TestServiceShareFileLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "application/yaml", rendered.ContentType)
 	require.Equal(t, "proxies: []\n", string(rendered.Body))
-	requireInlineShareFilename(t, rendered.Headers, "exports_default.yaml")
+	requireInlineShareFilename(t, rendered.Headers, "default mihomo")
 	accessed, err := svc.GetShare(ctx, created.ID)
 	require.NoError(t, err)
 	require.False(t, accessed.LastAccessedAt.IsZero())
@@ -61,6 +62,125 @@ func TestServiceShareFileLifecycle(t *testing.T) {
 	require.NoError(t, svc.DeleteShare(ctx, created.ID))
 	_, err = svc.RenderShare(ctx, domain.ShareRenderRequest{ID: created.ID})
 	require.True(t, os.IsNotExist(err))
+}
+
+func TestServiceListSharesUsesStoredFileShareNameForPresentation(t *testing.T) {
+	ctx := context.Background()
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	require.NoError(t, svc.PutFile(ctx, domain.FileSpec{
+		Name:   "generated-client",
+		Kind:   domain.FileKindStatic,
+		Source: domain.FileSource{Type: "inline", Content: "ok"},
+	}))
+	share, err := svc.CreateShare(ctx, domain.ShareCreateRequest{
+		ID:         "file-share",
+		Name:       "shadowrocket.conf",
+		TargetKind: "file",
+		TargetName: "generated-client",
+	})
+	require.NoError(t, err)
+
+	result, err := svc.ListShares(ctx)
+	require.NoError(t, err)
+	require.Equal(t, domain.SharePresentation{
+		PublicFilename: "shadowrocket.conf",
+	}, result.Presentations[share.ID])
+}
+
+func TestServiceListSharesIncludesEveryRegisteredSubscriptionFormatPresentation(t *testing.T) {
+	ctx := context.Background()
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+		Name:    "nodes",
+		Type:    domain.SubscriptionTypeLocal,
+		Format:  "uri-list",
+		Content: "ss://aes-128-gcm:secret@example.com:8388#node-a",
+	}))
+	share, err := svc.CreateShare(ctx, domain.ShareCreateRequest{
+		ID:           "nodes-share",
+		Name:         "mobile.conf",
+		TargetKind:   "subscription",
+		TargetName:   "nodes",
+		TargetFormat: "uri-list",
+	})
+	require.NoError(t, err)
+
+	result, err := svc.ListShares(ctx)
+	require.NoError(t, err)
+	require.Equal(t, domain.SharePresentation{
+		PublicFilename: "mobile.txt",
+		FormatFilenames: map[string]string{
+			"base64":               "mobile.txt",
+			"uri-list":             "mobile.txt",
+			"mihomo-proxies":       "mobile.yaml",
+			"shadowrocket-proxies": "mobile.conf",
+			"sing-box-outbounds":   "mobile.json",
+			"json-nodes":           "mobile.json",
+		},
+	}, result.Presentations[share.ID])
+}
+
+func TestServiceCreateShareReturnsCanonicalPresentation(t *testing.T) {
+	ctx := context.Background()
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+		Name: "provider", Type: domain.SubscriptionTypeLocal,
+		Format: "uri-list", Content: "ss://aes-128-gcm:secret@example.com:8388#node",
+	}))
+
+	created, err := svc.CreateShare(ctx, domain.ShareCreateRequest{
+		ID: "mobile-share", Name: "mobile.conf", TargetKind: "subscription",
+		TargetName: "provider", TargetFormat: "mihomo-proxies",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "mobile.yaml", created.Presentation.PublicFilename)
+	require.Equal(t, "mobile.txt", created.Presentation.FormatFilenames["uri-list"])
+	require.Equal(t, "mobile.conf", created.Presentation.FormatFilenames["shadowrocket-proxies"])
+}
+
+func TestServiceDefaultsNewSubscriptionSharesToBase64(t *testing.T) {
+	ctx := context.Background()
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+		Name: "nodes", Type: domain.SubscriptionTypeLocal,
+		Format: "uri-list", Content: "ss://aes-128-gcm:secret@example.com:8388#node",
+	}))
+
+	created, err := svc.CreateShare(ctx, domain.ShareCreateRequest{
+		ID: "default-share", Name: "mobile",
+		TargetKind: "subscription", TargetName: "nodes",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "base64", created.Share.TargetFormat)
+	require.Equal(t, "mobile.txt", created.Presentation.PublicFilename)
+	require.Equal(t, "mobile.txt", created.Presentation.FormatFilenames["base64"])
+	require.Equal(t, "mobile.txt", created.Presentation.FormatFilenames["uri-list"])
+
+	rendered, err := svc.RenderShare(ctx, domain.ShareRenderRequest{ID: created.Share.ID})
+	require.NoError(t, err)
+	decoded, err := base64.StdEncoding.DecodeString(string(rendered.Body))
+	require.NoError(t, err)
+	require.Contains(t, string(decoded), "ss://")
+}
+
+func TestServicePreservesExplicitURIListShareFormat(t *testing.T) {
+	ctx := context.Background()
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+		Name: "nodes", Type: domain.SubscriptionTypeLocal,
+		Format: "uri-list", Content: "ss://aes-128-gcm:secret@example.com:8388#node",
+	}))
+
+	created, err := svc.CreateShare(ctx, domain.ShareCreateRequest{
+		ID: "plain-share", Name: "mobile",
+		TargetKind: "subscription", TargetName: "nodes", TargetFormat: "uri-list",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "uri-list", created.Share.TargetFormat)
+
+	rendered, err := svc.RenderShare(ctx, domain.ShareRenderRequest{ID: created.Share.ID})
+	require.NoError(t, err)
+	require.Contains(t, string(rendered.Body), "ss://")
 }
 
 func TestServiceShareEncryptsForOneAgeX25519RecipientAndLimitsUses(t *testing.T) {
@@ -77,6 +197,7 @@ func TestServiceShareEncryptsForOneAgeX25519RecipientAndLimitsUses(t *testing.T)
 	require.NoError(t, err)
 	require.Equal(t, identity.Recipient().String(), share.AgeRecipient)
 	require.Equal(t, 1, share.MaxUses)
+	require.Equal(t, "backup.age", share.Presentation.PublicFilename)
 
 	rendered, err := svc.RenderShare(ctx, domain.ShareRenderRequest{ID: share.ID})
 	require.NoError(t, err)
@@ -95,6 +216,42 @@ func TestServiceShareEncryptsForOneAgeX25519RecipientAndLimitsUses(t *testing.T)
 	require.Equal(t, 1, stored.UseCount)
 	_, err = svc.RenderShare(ctx, domain.ShareRenderRequest{ID: share.ID})
 	require.ErrorIs(t, err, os.ErrNotExist)
+}
+
+func TestServiceShareFilenameMismatchDoesNotConsumeUse(t *testing.T) {
+	ctx := context.Background()
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	require.NoError(t, svc.PutFile(ctx, domain.FileSpec{
+		Name:   "client",
+		Kind:   domain.FileKindStatic,
+		Source: domain.FileSource{Type: "inline", Content: "ok"},
+	}))
+	_, err := svc.CreateShare(ctx, domain.ShareCreateRequest{
+		ID:         "limited",
+		Name:       "shadowrocket.conf",
+		TargetKind: "file",
+		TargetName: "client",
+		MaxUses:    1,
+	})
+	require.NoError(t, err)
+
+	_, err = svc.RenderShare(ctx, domain.ShareRenderRequest{
+		ID:                "limited",
+		PresentedFilename: "wrong.conf",
+	})
+	require.Error(t, err)
+	require.True(t, domain.IsCode(err, domain.CodeInvalidArgument))
+
+	stored, err := svc.GetShare(ctx, "limited")
+	require.NoError(t, err)
+	require.Zero(t, stored.UseCount)
+
+	rendered, err := svc.RenderShare(ctx, domain.ShareRenderRequest{
+		ID:                "limited",
+		PresentedFilename: "shadowrocket.conf",
+	})
+	require.NoError(t, err)
+	requireInlineShareFilename(t, rendered.Headers, "shadowrocket.conf")
 }
 
 func TestServiceShareMaxUsesIsAtomic(t *testing.T) {
@@ -163,7 +320,7 @@ func TestServiceRenderFileShareUsesProcessedFileContent(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "application/x-client-config", rendered.ContentType)
 	require.Equal(t, "proxies: []\n# processed\n", string(rendered.Body))
-	requireInlineShareFilename(t, rendered.Headers, "mobile.prod.yaml")
+	requireInlineShareFilename(t, rendered.Headers, "client-share")
 }
 
 func TestServiceRenderSubscriptionShareSupportsDefaultAndOverrideFormat(t *testing.T) {

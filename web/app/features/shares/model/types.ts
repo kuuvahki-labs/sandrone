@@ -11,6 +11,7 @@ export interface ShareItem {
   useCount?: number;
   status: "valid" | "upcoming" | "expired" | "exhausted";
   publicUrl: string;
+  formatFilenames?: Record<string, string>;
 }
 
 export interface ShareTarget {

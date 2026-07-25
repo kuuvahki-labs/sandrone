@@ -112,9 +112,9 @@ export function SubscriptionsPage({
                 actionTitle={item.name}
                 icon={subscriptionIcon(item.kind)}
                 key={`${item.kind}:${item.name}`}
-                details={(
+                details={traffic ? (
                   <SubscriptionListTraffic traffic={traffic} />
-                )}
+                ) : undefined}
                 meta={(
                   <>
                     <Chip label={subscriptionKindLabel(item.kind, t)} size="small" variant="outlined" />

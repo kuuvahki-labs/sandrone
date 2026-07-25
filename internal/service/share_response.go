@@ -12,6 +12,30 @@ const maxShareFilenameBaseRunes = 128
 
 var subscriptionFilenameExtensions = []string{".txt", ".yaml", ".yml", ".json", ".conf"}
 
+func sharePresentation(share domain.Share) domain.SharePresentation {
+	switch normalizeFormat(share.TargetKind) {
+	case "subscription":
+		format := normalizeFormat(share.TargetFormat)
+		if format == "" {
+			format = "base64"
+		}
+		filenames := make(map[string]string, len(renderPresentations))
+		for registeredFormat := range renderPresentations {
+			filenames[registeredFormat] = shareResponseFilename(share, "", registeredFormat)
+		}
+		return domain.SharePresentation{
+			PublicFilename:  shareResponseFilename(share, "", format),
+			FormatFilenames: filenames,
+		}
+	case "file":
+		return domain.SharePresentation{
+			PublicFilename: stableFileShareFilename(share),
+		}
+	default:
+		return domain.SharePresentation{PublicFilename: "share"}
+	}
+}
+
 func shareResponseFilename(share domain.Share, finalFileName, format string) string {
 	var filename string
 	switch normalizeFormat(share.TargetKind) {
@@ -28,6 +52,10 @@ func shareResponseFilename(share domain.Share, finalFileName, format string) str
 	return filename
 }
 
+func stableFileShareFilename(share domain.Share) string {
+	return shareResponseFilename(share, "", "")
+}
+
 func subscriptionShareFilename(share domain.Share, format string) string {
 	presentation, _ := renderPresentationFor(format)
 	for _, candidate := range []string{share.Name, share.TargetName, share.ID} {
@@ -41,7 +69,7 @@ func subscriptionShareFilename(share domain.Share, format string) string {
 }
 
 func fileShareFilename(share domain.Share, finalFileName string) string {
-	for _, candidate := range []string{finalFileName, share.TargetName, share.ID} {
+	for _, candidate := range []string{share.Name, share.TargetName, finalFileName, share.ID} {
 		if filename := truncateFileShareFilename(sanitizeShareFilename(candidate)); filename != "" {
 			return filename
 		}

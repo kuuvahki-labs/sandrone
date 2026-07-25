@@ -54,7 +54,13 @@ export const resources: ResourceFixture = {
     { name: "default", type: "collection", meta: { node_count: "12", source_count: "2" } },
   ],
   files: [{ name: "default.yaml", type: "remote", target: "static", meta: { description: "main config" } }],
-  shares: [{ id: "sh_123", name: "mobile", target_kind: "file", target_name: "default.yaml" }],
+  shares: [{
+    id: "sh_123",
+    name: "mobile",
+    target_kind: "file",
+    target_name: "default.yaml",
+    public_filename: "mobile",
+  }],
 };
 
 export const remoteSubscriptionDefinition = {

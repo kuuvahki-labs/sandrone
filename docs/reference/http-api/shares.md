@@ -28,9 +28,12 @@ Share 把一个现有文件或订阅暴露为公开、只读、按请求实时�
 
 物理删除 share，成功返回 `200`。删除 share 不删除其目标资源。
 
-### `GET /s/:id`
+### `GET /s/:id`、`GET /s/:id/:filename`
 
 公开读取 share 内容。该接口只允许 `GET`，不要求管理员 bearer token。
+`/s/:id` 是兼容形式；Sandrone Web UI 复制的 canonical 形式为
+`/s/:id/:filename`，让按 URL 末段命名的客户端也能显示可读文件名。
+`:filename` 只负责展示，资源查找始终只使用 `:id`。
 
 ## 请求
 
@@ -57,7 +60,7 @@ Share 把一个现有文件或订阅暴露为公开、只读、按请求实时�
 | 字段 | 契约 |
 | --- | --- |
 | `id` | 可省略；自定义值必须唯一，并且是单个 path segment |
-| `name` | 可选显示名，也必须满足单个 path segment 约束 |
+| `name` | 可选分享名，也是公开文件名的首选来源；必须满足单个 path segment 约束 |
 | `target_kind` | 必填，只能是 `file` 或 `subscription` |
 | `target_name` | 必填，目标必须已存在；HTTP 接口只接受单个 path segment |
 | `target_format` | 仅对订阅生效；省略时默认为 `uri-list`，但不锁定公开请求的格式 |
@@ -76,6 +79,7 @@ Share 把一个现有文件或订阅暴露为公开、只读、按请求实时�
 
 ```text
 GET /s/mobile?format=sing-box-outbounds
+GET /s/mobile/mobile.json?format=sing-box-outbounds
 GET /s/mobile?arg.profile=travel
 ```
 
@@ -108,6 +112,14 @@ file-stage processor 中消费它们，订阅 share 可在订阅的 node-stage p
     "target_kind": "subscription",
     "target_name": "default",
     "target_format": "mihomo-proxies",
+    "public_filename": "mobile.yaml",
+    "format_filenames": {
+      "uri-list": "mobile.txt",
+      "mihomo-proxies": "mobile.yaml",
+      "sing-box-outbounds": "mobile.json",
+      "shadowrocket-proxies": "mobile.conf",
+      "json-nodes": "mobile.json"
+    },
     "created_at": "2026-07-22T12:00:00Z",
     "updated_at": "2026-07-22T12:00:00Z",
     "max_uses": 5,
@@ -127,11 +139,24 @@ file-stage processor 中消费它们，订阅 share 可在订阅的 node-stage p
       "id": "mobile",
       "target_kind": "subscription",
       "target_name": "default",
-      "target_format": "mihomo-proxies"
+      "target_format": "mihomo-proxies",
+      "public_filename": "mobile.yaml",
+      "format_filenames": {
+        "uri-list": "mobile.txt",
+        "mihomo-proxies": "mobile.yaml",
+        "sing-box-outbounds": "mobile.json",
+        "shadowrocket-proxies": "mobile.conf",
+        "json-nodes": "mobile.json"
+      }
     }
   ]
 }
 ```
+
+`public_filename` 是保存的默认格式对应的 canonical 文件名，创建和列表响应都会
+返回。
+订阅 share 还返回服务端为每个已注册输出格式推导的 `format_filenames`；
+文件 share 不返回该 map。它们都是管理响应的派生字段，不写入 share 存储。
 
 管理对象还可能包含 `content_type`、`valid_from`、`valid_until`、
 `last_accessed_at`、`age_recipient`、`use_count` 等字段；零值时间与多数零值
@@ -151,11 +176,24 @@ file-stage processor 中消费它们，订阅 share 可在订阅的 node-stage p
 不会强制 attachment 下载，也不改变正文。
 
 订阅文件名依次从 share `name`、`target_name`、share `id` 回退，并按实际
-生效的 `format` 使用上表扩展名。文件 share 依次从处理后的最终文档名称、
-`target_name`、share `id` 回退，并保留最终扩展名。控制字符和路径字符等
-不安全字符会被替换，边界空格与点会被清理，过长基名截断为 128 个 Unicode
-码点；清理后为空则继续回退。文件处理器提供的任何 `Content-Disposition`
-都会被 Sandrone 最终替换。
+生效的 `format` 使用上表扩展名。文件 share 依次从 share `name`、
+`target_name`、share `id` 回退，并保留选中名称的扩展名；列表请求不会为了
+推导名称而执行文件处理链。控制字符和路径字符等不安全字符会被替换，边界
+空格与点会被清理，过长基名截断为 128 个 Unicode 码点；清理后为空则继续
+回退。文件处理器提供的任何 `Content-Disposition` 都会被 Sandrone 最终替换。
+
+canonical 路径把该文件名 percent-encode 为单个 path segment。订阅 share
+切换 `format` 时，路径末段和 query 必须同时切换，例如：
+
+```text
+/s/mobile/mobile.yaml?format=mihomo-proxies
+/s/mobile/mobile.conf?format=shadowrocket-proxies
+```
+
+服务端会精确校验解码后的 `:filename` 与实际格式对应的 canonical 文件名。
+名称不匹配、空名称、额外 path segment 或编码后的路径分隔符返回
+`invalid_argument`，并且不会消耗 `max_uses`。省略 `:filename` 的旧链接继续
+有效且不重定向。
 
 设置 `age_recipient` 后，正文使用该公钥加密，响应改为
 `Content-Type: application/age`；原内容类型通过
@@ -175,9 +213,9 @@ file-stage processor 中消费它们，订阅 share 可在订阅的 node-stage p
 share 名称、目标名称或最终文件名。
 
 `max_uses` 通过 Store compare-and-swap 原子消费，并发成功次数不会超过上限。
-加密 share 使用相同计数规则。格式无效或生成失败不会消费次数；服务器在写出
-响应前完成消费，因此客户端中途断开仍可能已经计数。链接持有者可以主动耗尽
-有限配额，`max_uses` 不是身份认证机制。
+加密 share 使用相同计数规则。文件名不匹配、格式无效或生成失败不会消费次数；
+服务器在写出响应前完成消费，因此客户端中途断开仍可能已经计数。链接持有者
+可以主动耗尽有限配额，`max_uses` 不是身份认证机制。
 
 以下情况对公开接口统一表现为 `404`，不向链接持有者区分原因：
 
@@ -207,5 +245,5 @@ curl -fsS -X POST \
 ```sh
 curl -fsS \
   -o mobile.yaml \
-  'https://public.example/s/mobile?format=mihomo-proxies'
+  'https://public.example/s/mobile/mobile.yaml?format=mihomo-proxies'
 ```

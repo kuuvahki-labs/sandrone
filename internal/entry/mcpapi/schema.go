@@ -206,7 +206,7 @@ func parseFormatSchema() *jsonschema.Schema {
 }
 
 func renderFormatSchema() *jsonschema.Schema {
-	return enumSchema("mihomo-proxies", "shadowrocket-proxies", "sing-box-outbounds", "json-nodes", "uri-list")
+	return enumSchema("base64", "mihomo-proxies", "shadowrocket-proxies", "sing-box-outbounds", "json-nodes", "uri-list")
 }
 
 func nodeInputTypeSchema() *jsonschema.Schema {

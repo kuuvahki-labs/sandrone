@@ -1,18 +1,21 @@
+import { shareFromCreateResponse } from "~/features/shares/model/codec";
 import { type ShareCopyFormat, shareUrlWithFormat } from "~/features/shares/model/share-formats";
 import type { ShareItem } from "~/features/shares/model/types";
 import type { ApiClient, ShareCreateRequest } from "~/shared/api/client";
 import { defaultTranslator, type Translator } from "~/shared/i18n/context";
 
+export type CopyShareResult =
+  | { copied: true }
+  | { copied: false; url: string };
+
 export function createShareActions({
   client,
-  closeSheet,
-  onShareCreated,
+  publicBaseUrl,
   showNotice,
   t = defaultTranslator(),
 }: {
   client: ApiClient;
-  closeSheet: () => void;
-  onShareCreated?: () => Promise<void>;
+  publicBaseUrl: string;
   showNotice: (message: string, severity?: "success" | "error" | "warning") => void;
   t?: Translator;
 }) {
@@ -21,7 +24,7 @@ export function createShareActions({
     const targetName = String(form.get("target") ?? "").trim();
     if (!targetName) {
       showNotice(targetKind === "subscription" ? t("messages.needSubscriptionBeforeShare") : t("messages.needFileBeforeShare"), "warning");
-      return;
+      return null;
     }
     const payload: ShareCreateRequest = {
       name: String(form.get("name") ?? "").trim() || targetName,
@@ -30,7 +33,7 @@ export function createShareActions({
       meta: { ui: "web" },
     };
     if (targetKind === "subscription") {
-      payload.target_format = String(form.get("target_format") ?? "").trim() || "uri-list";
+      payload.target_format = String(form.get("target_format") ?? "").trim() || "base64";
     } else {
       payload.content_type = "application/octet-stream";
     }
@@ -43,21 +46,35 @@ export function createShareActions({
 	const maxUses = Number.parseInt(String(form.get("max_uses") ?? ""), 10);
 	if (Number.isFinite(maxUses) && maxUses > 0) payload.max_uses = maxUses;
 
-    await client.createShare(payload);
-    await onShareCreated?.();
-    closeSheet();
-    showNotice(t("messages.shareCreated"));
+    const response = await client.createShare(payload);
+    return shareFromCreateResponse(response, publicBaseUrl);
   }
 
-  async function copyShare(item: ShareItem, format?: ShareCopyFormat) {
-    if (navigator.clipboard) {
-      await navigator.clipboard.writeText(format ? shareUrlWithFormat(item.publicUrl, format) : item.publicUrl);
+  async function copyShareUrl(publicUrl: string): Promise<CopyShareResult> {
+    if (!navigator.clipboard) {
+      showNotice(t("shares.messages.copyUnavailable"), "warning");
+      return { copied: false, url: publicUrl };
+    }
+    try {
+      await navigator.clipboard.writeText(publicUrl);
+    } catch {
+      showNotice(t("shares.messages.copyUnavailable"), "warning");
+      return { copied: false, url: publicUrl };
     }
     showNotice(t("messages.linkCopied"));
+    return { copied: true };
+  }
+
+  async function copyShare(item: ShareItem, format?: ShareCopyFormat): Promise<CopyShareResult> {
+    const publicUrl = format
+      ? shareUrlWithFormat(item.publicUrl, format, item.formatFilenames?.[format])
+      : item.publicUrl;
+    return copyShareUrl(publicUrl);
   }
 
   return {
     copyShare,
+    copyShareUrl,
     createShare,
   };
 }

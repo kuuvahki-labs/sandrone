@@ -79,7 +79,7 @@ func runDoctor(ctx context.Context, engine engine, dataDir string) doctorResult 
 			result.OK = false
 		}
 	}
-	for _, format := range []string{"json-nodes", "mihomo-proxies", "shadowrocket-proxies", "sing-box-outbounds", "uri-list"} {
+	for _, format := range []string{"base64", "json-nodes", "mihomo-proxies", "shadowrocket-proxies", "sing-box-outbounds", "uri-list"} {
 		_, err := engine.Render(ctx, sandrone.RenderRequest{
 			Format: format,
 			Nodes:  doctorNodes(),

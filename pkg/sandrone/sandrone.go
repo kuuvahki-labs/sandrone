@@ -266,7 +266,11 @@ func (e *Engine) ListFiles(ctx context.Context) (*ResourceListResult, error) {
 }
 
 func (e *Engine) CreateShare(ctx context.Context, req ShareCreateRequest) (*Share, error) {
-	return e.service.CreateShare(ctx, req)
+	result, err := e.service.CreateShare(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return &result.Share, nil
 }
 
 func (e *Engine) ListShares(ctx context.Context) (*ShareListResult, error) {

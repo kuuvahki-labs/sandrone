@@ -225,7 +225,7 @@ describe("React Router app boot and auth workflows", () => {
     await user.click(within(shareDialog).getByRole("button", { name: "保存分享链接" }));
 
     expect(await screen.findByRole("heading", { name: "需要认证" })).toBeInTheDocument();
-    expect(screen.queryByRole("dialog", { name: "创建分享链接" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("renders the token form in English when the locale is en-US", async () => {

@@ -124,6 +124,21 @@ describe("SubscriptionsPage", () => {
     const progress = within(list).getByRole("progressbar", { name: "↑ 1 KiB · ↓ 2 KiB · TOT 10 KiB" });
     expect(progress).toHaveAttribute("aria-valuenow", "30");
   });
+  it("does not reserve a details area when traffic is unavailable", () => {
+    render(
+      <SubscriptionsPage
+        createActions={[createAction("远程", noop, "新建远程订阅")]}
+        items={subscriptions}
+        onDelete={noop}
+        onEdit={noop}
+        onShare={noop}
+      />,
+    );
+
+    const primaryRow = screen.getByRole("button", { name: "编辑：provider" }).parentElement;
+    expect(primaryRow).not.toBeNull();
+    expect(primaryRow?.nextElementSibling).toBeNull();
+  });
   it("renders subscription traffic on the list page", () => {
     const trafficWithUsage = {
       ...subscriptionTraffic,

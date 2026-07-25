@@ -66,6 +66,35 @@ func pathResourceName(rawPath string, prefix string) (string, error) {
 	return name, nil
 }
 
+func publicSharePath(rawPath string) (string, string, error) {
+	raw := strings.TrimPrefix(rawPath, "/s/")
+	if raw == rawPath || raw == "" {
+		return "", "", domain.NewError(domain.CodeInvalidArgument, "share id is required")
+	}
+	segments := strings.Split(raw, "/")
+	if len(segments) < 1 || len(segments) > 2 {
+		return "", "", domain.NewError(domain.CodeInvalidArgument, "public share path must contain a share id and optional filename")
+	}
+	id, err := url.PathUnescape(segments[0])
+	if err != nil {
+		return "", "", domain.WrapError(domain.CodeInvalidArgument, "invalid share id", err)
+	}
+	if err := validateRequiredPublicResourceName("share id", id); err != nil {
+		return "", "", err
+	}
+	if len(segments) == 1 {
+		return id, "", nil
+	}
+	filename, err := url.PathUnescape(segments[1])
+	if err != nil {
+		return "", "", domain.WrapError(domain.CodeInvalidArgument, "invalid share filename", err)
+	}
+	if err := validateRequiredPublicResourceName("share filename", filename); err != nil {
+		return "", "", err
+	}
+	return id, filename, nil
+}
+
 func validateDeleteResourcePath(r *http.Request) error {
 	if r.Method != http.MethodDelete {
 		return nil

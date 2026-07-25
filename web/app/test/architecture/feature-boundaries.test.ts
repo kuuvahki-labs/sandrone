@@ -94,6 +94,8 @@ const featureOwnedModules = [
   "features/settings/sections/runtime-settings-section.tsx",
   "features/shares/components/share-dialog-context.tsx",
   "features/shares/components/share-dialog.tsx",
+  "features/shares/components/manual-copy-dialog.tsx",
+  "features/shares/components/share-url-selection.ts",
   "features/shares/data/create-share-actions.ts",
   "features/shares/data/use-shares-resource.ts",
   "features/shares/model/codec.ts",
@@ -576,7 +578,6 @@ describe("application dependency graph", () => {
       "routes/files.$name.edit.tsx",
       "routes/files.new.tsx",
       "routes/files.tsx",
-      "routes/shares.tsx",
       "routes/subscriptions.$kind.$name.edit.tsx",
       "routes/subscriptions.new.tsx",
     ]);

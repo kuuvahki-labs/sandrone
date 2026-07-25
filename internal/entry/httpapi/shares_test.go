@@ -3,6 +3,7 @@ package httpapi_test
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"mime"
@@ -68,7 +69,7 @@ func TestShareManagementAndPublicEndpoint(t *testing.T) {
 	server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/s/"+createResult.Share.ID, nil))
 	require.Equal(t, http.StatusOK, w.Code)
 	require.Equal(t, "application/yaml", w.Header().Get("Content-Type"))
-	requireInlineHTTPFilename(t, w.Header(), "default.yaml")
+	requireInlineHTTPFilename(t, w.Header(), "default mihomo")
 	require.Equal(t, "proxies: []\n", w.Body.String())
 
 	w = httptest.NewRecorder()
@@ -118,6 +119,237 @@ func TestHTTPCreateAndRenderSubscriptionShareWithFormatOverride(t *testing.T) {
 	requireInlineHTTPFilename(t, w.Header(), "nodes-share.yaml")
 	require.Contains(t, w.Body.String(), "proxies:")
 	require.Contains(t, w.Body.String(), "node-a")
+}
+
+func TestHTTPNewSubscriptionShareDefaultsToBase64(t *testing.T) {
+	ctx := context.Background()
+	rt := testRuntime(t, app.Config{})
+	require.NoError(t, rt.Service.PutSubscription(ctx, domain.Subscription{
+		Name:    "nodes",
+		Type:    domain.SubscriptionTypeLocal,
+		Format:  "uri-list",
+		Content: "ss://aes-128-gcm:secret@example.com:8388#node-a",
+	}))
+	server := httpapi.New(rt)
+
+	w := httptest.NewRecorder()
+	server.Handler().ServeHTTP(w, httptest.NewRequest(
+		http.MethodPost,
+		"/v1/shares",
+		bytes.NewBufferString(`{"id":"nodes-share","name":"mobile","target_kind":"subscription","target_name":"nodes"}`),
+	))
+	require.Equal(t, http.StatusCreated, w.Code)
+	var created struct {
+		Share struct {
+			TargetFormat    string            `json:"target_format"`
+			PublicFilename  string            `json:"public_filename"`
+			FormatFilenames map[string]string `json:"format_filenames"`
+		} `json:"share"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &created))
+	require.Equal(t, "base64", created.Share.TargetFormat)
+	require.Equal(t, "mobile.txt", created.Share.PublicFilename)
+	require.Equal(t, "mobile.txt", created.Share.FormatFilenames["base64"])
+	require.Equal(t, "mobile.txt", created.Share.FormatFilenames["uri-list"])
+
+	w = httptest.NewRecorder()
+	server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/s/nodes-share", nil))
+	require.Equal(t, http.StatusOK, w.Code)
+	decoded, err := base64.StdEncoding.DecodeString(w.Body.String())
+	require.NoError(t, err)
+	require.Contains(t, string(decoded), "ss://")
+
+	w = httptest.NewRecorder()
+	server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/s/nodes-share?format=uri-list", nil))
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Contains(t, w.Body.String(), "ss://")
+}
+
+func TestHTTPCreateShareReturnsPresentation(t *testing.T) {
+	ctx := context.Background()
+	rt := testRuntime(t, app.Config{})
+	require.NoError(t, rt.Service.PutSubscription(ctx, domain.Subscription{
+		Name:    "provider",
+		Type:    domain.SubscriptionTypeLocal,
+		Format:  "uri-list",
+		Content: "ss://aes-128-gcm:secret@example.com:8388#node",
+	}))
+	server := httpapi.New(rt)
+
+	createBody := `{"name":"mobile.conf","target_kind":"subscription","target_name":"provider","target_format":"mihomo-proxies"}`
+	w := httptest.NewRecorder()
+	server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/v1/shares", bytes.NewBufferString(createBody)))
+	require.Equal(t, http.StatusCreated, w.Code)
+
+	var response struct {
+		Share struct {
+			ID              string            `json:"id"`
+			PublicFilename  string            `json:"public_filename"`
+			FormatFilenames map[string]string `json:"format_filenames"`
+		} `json:"share"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	require.NotEmpty(t, response.Share.ID)
+	require.Equal(t, "mobile.yaml", response.Share.PublicFilename)
+	require.Equal(t, "mobile.txt", response.Share.FormatFilenames["base64"])
+	require.Equal(t, "mobile.txt", response.Share.FormatFilenames["uri-list"])
+}
+
+func TestHTTPPublicShareFriendlyFilename(t *testing.T) {
+	ctx := context.Background()
+	rt := testRuntime(t, app.Config{})
+	require.NoError(t, rt.Service.PutFile(ctx, domain.FileSpec{
+		Name:   "client",
+		Kind:   domain.FileKindStatic,
+		Source: domain.FileSource{Type: "inline", Content: "ok"},
+	}))
+	_, err := rt.Service.CreateShare(ctx, domain.ShareCreateRequest{
+		ID:         "file-share",
+		Name:       "shadowrocket.conf",
+		TargetKind: "file",
+		TargetName: "client",
+	})
+	require.NoError(t, err)
+	require.NoError(t, rt.Service.PutSubscription(ctx, domain.Subscription{
+		Name:    "nodes",
+		Type:    domain.SubscriptionTypeLocal,
+		Format:  "uri-list",
+		Content: "ss://aes-128-gcm:secret@example.com:8388#node-a",
+	}))
+	_, err = rt.Service.CreateShare(ctx, domain.ShareCreateRequest{
+		ID:           "nodes-share",
+		Name:         "配置.conf",
+		TargetKind:   "subscription",
+		TargetName:   "nodes",
+		TargetFormat: "uri-list",
+	})
+	require.NoError(t, err)
+	server := httpapi.New(rt)
+
+	w := httptest.NewRecorder()
+	server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/s/file-share/shadowrocket.conf", nil))
+	require.Equal(t, http.StatusOK, w.Code)
+	requireInlineHTTPFilename(t, w.Header(), "shadowrocket.conf")
+
+	w = httptest.NewRecorder()
+	server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/s/nodes-share/%E9%85%8D%E7%BD%AE.yaml?format=mihomo-proxies", nil))
+	require.Equal(t, http.StatusOK, w.Code)
+	requireInlineHTTPFilename(t, w.Header(), "配置.yaml")
+	require.Contains(t, w.Body.String(), "proxies:")
+
+	w = httptest.NewRecorder()
+	server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/s/nodes-share/%E9%85%8D%E7%BD%AE.conf?format=shadowrocket-proxies", nil))
+	require.Equal(t, http.StatusOK, w.Code)
+	requireInlineHTTPFilename(t, w.Header(), "配置.conf")
+	require.Contains(t, w.Body.String(), "[Proxy]")
+}
+
+func TestHTTPPublicShareRejectsInvalidFriendlyPathWithoutConsumingUse(t *testing.T) {
+	ctx := context.Background()
+	rt := testRuntime(t, app.Config{})
+	require.NoError(t, rt.Service.PutFile(ctx, domain.FileSpec{
+		Name:   "client",
+		Kind:   domain.FileKindStatic,
+		Source: domain.FileSource{Type: "inline", Content: "ok"},
+	}))
+	_, err := rt.Service.CreateShare(ctx, domain.ShareCreateRequest{
+		ID:         "limited",
+		Name:       "client.conf",
+		TargetKind: "file",
+		TargetName: "client",
+		MaxUses:    1,
+	})
+	require.NoError(t, err)
+	server := httpapi.New(rt)
+
+	for _, path := range []string{
+		"/s/limited/wrong.conf",
+		"/s/limited/client.conf/extra",
+		"/s/limited/",
+		"/s/limited/client%2Fconf",
+		"/s/limited/client%5Cconf",
+	} {
+		t.Run(path, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
+			require.Equal(t, http.StatusBadRequest, w.Code)
+			require.Contains(t, w.Body.String(), `"code": "invalid_argument"`)
+		})
+	}
+
+	stored, err := rt.Service.GetShare(ctx, "limited")
+	require.NoError(t, err)
+	require.Zero(t, stored.UseCount)
+
+	w := httptest.NewRecorder()
+	server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/s/limited/client.conf", nil))
+	require.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestHTTPShareListIncludesPublicFilenames(t *testing.T) {
+	ctx := context.Background()
+	rt := testRuntime(t, app.Config{})
+	require.NoError(t, rt.Service.PutFile(ctx, domain.FileSpec{
+		Name:   "client",
+		Kind:   domain.FileKindStatic,
+		Source: domain.FileSource{Type: "inline", Content: "ok"},
+	}))
+	_, err := rt.Service.CreateShare(ctx, domain.ShareCreateRequest{
+		ID:         "file-share",
+		Name:       "shadowrocket.conf",
+		TargetKind: "file",
+		TargetName: "client",
+	})
+	require.NoError(t, err)
+	require.NoError(t, rt.Service.PutSubscription(ctx, domain.Subscription{
+		Name:    "nodes",
+		Type:    domain.SubscriptionTypeLocal,
+		Format:  "uri-list",
+		Content: "ss://aes-128-gcm:secret@example.com:8388#node-a",
+	}))
+	_, err = rt.Service.CreateShare(ctx, domain.ShareCreateRequest{
+		ID:           "nodes-share",
+		Name:         "mobile.conf",
+		TargetKind:   "subscription",
+		TargetName:   "nodes",
+		TargetFormat: "uri-list",
+	})
+	require.NoError(t, err)
+	server := httpapi.New(rt)
+
+	w := httptest.NewRecorder()
+	server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/v1/shares", nil))
+	require.Equal(t, http.StatusOK, w.Code)
+	var result struct {
+		Shares []struct {
+			ID              string            `json:"id"`
+			PublicFilename  string            `json:"public_filename"`
+			FormatFilenames map[string]string `json:"format_filenames"`
+		} `json:"shares"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &result))
+	require.Equal(t, []struct {
+		ID              string            `json:"id"`
+		PublicFilename  string            `json:"public_filename"`
+		FormatFilenames map[string]string `json:"format_filenames"`
+	}{
+		{
+			ID:             "file-share",
+			PublicFilename: "shadowrocket.conf",
+		},
+		{
+			ID:             "nodes-share",
+			PublicFilename: "mobile.txt",
+			FormatFilenames: map[string]string{
+				"base64":               "mobile.txt",
+				"uri-list":             "mobile.txt",
+				"mihomo-proxies":       "mobile.yaml",
+				"shadowrocket-proxies": "mobile.conf",
+				"sing-box-outbounds":   "mobile.json",
+				"json-nodes":           "mobile.json",
+			},
+		},
+	}, result.Shares)
 }
 
 func TestHTTPPublicShareReturnsAgePayloadAndEnforcesMaxUses(t *testing.T) {

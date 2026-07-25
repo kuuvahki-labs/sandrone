@@ -4,7 +4,8 @@ Sandrone Web UI 是一个静态 React Router SPA。本页提供安装、开发�
 构建和验证的快速入口；模块所有权、依赖与测试放置规则见
 [Web UI 模块约定](AGENTS.md)。
 
-以下命令除特别说明外都从仓库根目录运行。
+以下 pnpm 命令都从本 `web/` 目录运行；`make` 和 `go` 等仓库级命令会另行
+注明从仓库根目录运行。
 
 ## 环境与安装
 
@@ -12,8 +13,9 @@ Web 开发使用 Node.js 24.17.0 LTS（见 [`.nvmrc`](.nvmrc)）和 pnpm
 11.5.2：
 
 ```sh
-npm install -g pnpm@11.5.2
-pnpm --dir web install --frozen-lockfile
+corepack enable
+corepack install
+pnpm install --frozen-lockfile
 ```
 
 ## 开发
@@ -21,7 +23,7 @@ pnpm --dir web install --frozen-lockfile
 启动 React Router/Vite 开发服务器：
 
 ```sh
-pnpm --dir web dev
+pnpm dev
 ```
 
 页面默认位于 `http://localhost:5173`。开发服务器把 `/healthz`、
@@ -29,7 +31,7 @@ pnpm --dir web dev
 `http://127.0.0.1:1137`；可按需覆盖后端地址：
 
 ```sh
-SANDRONE_DEV_API_TARGET=http://127.0.0.1:18080 pnpm --dir web dev
+SANDRONE_DEV_API_TARGET=http://127.0.0.1:18080 pnpm dev
 ```
 
 ## 构建
@@ -37,11 +39,11 @@ SANDRONE_DEV_API_TARGET=http://127.0.0.1:18080 pnpm --dir web dev
 只生成 Web 产物：
 
 ```sh
-pnpm --dir web build
+pnpm build
 ```
 
 Web 构建只生成 `web/build/client` 中的 client-side 静态资源。如需让仓库内
-的 Sandrone HTTP server 按默认路径发现这些资源，执行：
+的 Sandrone HTTP server 按默认路径发现这些资源，在仓库根目录执行：
 
 ```sh
 make build-webui
@@ -56,11 +58,11 @@ make build-webui
 本地预览已经构建的 client：
 
 ```sh
-pnpm --dir web start
+pnpm start
 ```
 
 预览地址默认为 `http://127.0.0.1:4173`。生产运行时不需要 Node server；
-先执行 `make build-webui`，再启动 Sandrone HTTP server：
+在仓库根目录先执行 `make build-webui`，再启动 Sandrone HTTP server：
 
 ```sh
 go run -mod=readonly -tags probe_singbox ./cmd/sandrone serve http
@@ -73,13 +75,14 @@ go run -mod=readonly -tags probe_singbox ./cmd/sandrone serve http
 迭代时先运行最窄的相关 Vitest 文件；交付前运行：
 
 ```sh
-pnpm --dir web test:run
-pnpm --dir web typecheck
-pnpm --dir web lint
-pnpm --dir web build
+pnpm test:run
+pnpm typecheck
+pnpm lint
+pnpm build
 ```
 
-涉及路由流程或响应式行为时，再运行构建后 SPA 的 Playwright smoke：
+涉及路由流程或响应式行为时，再在仓库根目录运行构建后 SPA 的 Playwright
+smoke：
 
 ```sh
 make test-webui-e2e

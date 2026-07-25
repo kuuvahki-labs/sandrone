@@ -1,3 +1,4 @@
+import { useRef, useState } from "react";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import LinkIcon from "@mui/icons-material/Link";
@@ -5,6 +6,9 @@ import Chip from "@mui/material/Chip";
 import List from "@mui/material/List";
 import Typography from "@mui/material/Typography";
 
+import { ManualCopyDialog } from "~/features/shares/components/manual-copy-dialog";
+import { hasSelectionWithin, selectContents } from "~/features/shares/components/share-url-selection";
+import type { CopyShareResult } from "~/features/shares/data/create-share-actions";
 import { type ShareCopyFormat, shareCopyFormats } from "~/features/shares/model/share-formats";
 import type { ShareItem } from "~/features/shares/model/types";
 import { type Translator, useI18n } from "~/shared/i18n/context";
@@ -17,12 +21,15 @@ import {
 
 export interface SharesPageProps {
   items: ShareItem[];
-  onCopy: (item: ShareItem, format?: ShareCopyFormat) => void;
+  onCopy: (item: ShareItem, format?: ShareCopyFormat) => Promise<CopyShareResult>;
+  onCopyUrl: (url: string) => Promise<CopyShareResult>;
   onDelete: (item: ShareItem) => void;
 }
 
-export function SharesPage({ items, onCopy, onDelete }: SharesPageProps) {
+export function SharesPage({ items, onCopy, onCopyUrl, onDelete }: SharesPageProps) {
   const { t } = useI18n();
+  const [manualCopyUrl, setManualCopyUrl] = useState<string | null>(null);
+  const publicUrlElements = useRef(new Map<string, HTMLElement>());
   const validCount = items.filter((item) => item.status === "valid").length;
   const upcomingCount = items.filter((item) => item.status === "upcoming").length;
 	const expiredCount = items.filter((item) => item.status === "expired").length;
@@ -45,7 +52,13 @@ export function SharesPage({ items, onCopy, onDelete }: SharesPageProps) {
         <List aria-label={t("shares.list")} className="grid gap-3 p-0">
           {items.map((item) => (
             <DestinationListItem
-              actions={shareActions(item, { onCopy, onDelete }, t)}
+              actions={shareActions(item, {
+                onCopy: async (format) => {
+                  const copy = await onCopy(item, format);
+                  if (!copy.copied) setManualCopyUrl(copy.url);
+                },
+                onDelete: () => onDelete(item),
+              }, t)}
               icon={<LinkIcon aria-hidden color="action" />}
               key={item.id}
               meta={(
@@ -53,7 +66,24 @@ export function SharesPage({ items, onCopy, onDelete }: SharesPageProps) {
                   {shareStatusChip(item, t)}
 				  {item.ageRecipient ? <Chip label="age X25519" size="small" variant="outlined" /> : null}
 				  {item.maxUses ? <Chip label={t("shares.uses", { used: item.useCount ?? 0, max: item.maxUses })} size="small" variant="outlined" /> : null}
-                  <Typography className="block break-words" component="code" variant="body2">
+                  <Typography
+                    className="block cursor-text break-words select-text"
+                    component="code"
+                    ref={(element) => {
+                      if (element) {
+                        publicUrlElements.current.set(item.id, element);
+                      } else {
+                        publicUrlElements.current.delete(item.id);
+                      }
+                    }}
+                    variant="body2"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (!hasSelectionWithin(event.currentTarget)) {
+                        selectContents(event.currentTarget);
+                      }
+                    }}
+                  >
                     {item.publicUrl}
                   </Typography>
                 </>
@@ -61,13 +91,26 @@ export function SharesPage({ items, onCopy, onDelete }: SharesPageProps) {
               primaryLabel={t("shares.actions.copy")}
               subtitle={item.targetKind === "subscription" && item.targetFormat ? `${item.targetName} · ${item.targetFormat}` : item.targetName}
               title={item.title}
-              onPrimaryAction={() => onCopy(item)}
+              onPrimaryAction={() => {
+                void onCopy(item).then((copy) => {
+                  if (!copy.copied) {
+                    selectContents(publicUrlElements.current.get(item.id));
+                  }
+                });
+              }}
             />
           ))}
         </List>
       ) : (
         <EmptyState title={t("shares.empty")} />
       )}
+      {manualCopyUrl ? (
+        <ManualCopyDialog
+          url={manualCopyUrl}
+          onClose={() => setManualCopyUrl(null)}
+          onRetry={() => onCopyUrl(manualCopyUrl)}
+        />
+      ) : null}
     </section>
   );
 }
@@ -75,8 +118,8 @@ export function SharesPage({ items, onCopy, onDelete }: SharesPageProps) {
 function shareActions(
   item: ShareItem,
   handlers: {
-    onCopy: (item: ShareItem, format?: ShareCopyFormat) => void;
-    onDelete: (item: ShareItem) => void;
+    onCopy: (format: ShareCopyFormat) => Promise<void>;
+    onDelete: () => void;
   },
   t: Translator,
 ): DestinationListAction[] {
@@ -84,7 +127,7 @@ function shareActions(
     ? shareCopyFormats.map((entry) => ({
         icon: <ContentCopyIcon aria-hidden fontSize="small" />,
         label: t(entry.copyActionKey),
-        onSelect: () => handlers.onCopy(item, entry.value),
+        onSelect: () => { void handlers.onCopy(entry.value); },
       }))
     : [];
   return [
@@ -92,7 +135,7 @@ function shareActions(
     {
       icon: <DeleteOutlinedIcon aria-hidden fontSize="small" />,
       label: t("actions.delete"),
-      onSelect: () => handlers.onDelete(item),
+      onSelect: handlers.onDelete,
       tone: "danger",
     },
   ];

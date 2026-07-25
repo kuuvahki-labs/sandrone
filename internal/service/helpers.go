@@ -157,6 +157,7 @@ type renderPresentation struct {
 }
 
 var renderPresentations = map[string]renderPresentation{
+	"base64":               {contentType: "text/plain; charset=utf-8", extension: ".txt"},
 	"uri-list":             {contentType: "text/plain", extension: ".txt"},
 	"mihomo-proxies":       {contentType: "application/yaml", extension: ".yaml"},
 	"shadowrocket-proxies": {contentType: "text/plain; charset=utf-8", extension: ".conf"},
