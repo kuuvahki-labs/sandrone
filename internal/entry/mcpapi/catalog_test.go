@@ -280,6 +280,9 @@ func TestScriptAPIMetadataMatchesPositionalInvocationAndJSONValues(t *testing.T)
 		{name: "api.yaml.stringify", arity: "0-1", zero: "returns empty string", returns: "value", extraIgnored: true},
 		{name: "api.json.parse", arity: "0-1", zero: "returns void", returns: "value_or_void", extraIgnored: true},
 		{name: "api.json.stringify", arity: "0-1", zero: "returns empty string", returns: "value", extraIgnored: true},
+		{name: "api.ini.parse", arity: "0-1", zero: "returns void", returns: "value_or_void", extraIgnored: true},
+		{name: "api.ini.stringify", arity: "0-1", zero: "returns empty string", returns: "value", extraIgnored: true},
+		{name: "api.ini.override", arity: "2", zero: "returns script_runtime error", returns: "value", extraIgnored: true},
 		{name: "api.base64.encode", arity: "0-1", zero: "returns empty string", returns: "value", extraIgnored: true},
 		{name: "api.base64.decode", arity: "0-1", zero: "returns empty string", returns: "value", extraIgnored: true},
 		{name: "api.hash.sha256", arity: "0-1", zero: "returns empty string", returns: "value", extraIgnored: true},
@@ -295,7 +298,8 @@ func TestScriptAPIMetadataMatchesPositionalInvocationAndJSONValues(t *testing.T)
 	}
 	for _, name := range []string{
 		"api.warn", "api.yaml.parse", "api.yaml.stringify", "api.json.parse",
-		"api.json.stringify", "api.base64.encode", "api.base64.decode", "api.hash.sha256",
+		"api.json.stringify", "api.ini.parse", "api.ini.stringify",
+		"api.base64.encode", "api.base64.decode", "api.hash.sha256",
 	} {
 		require.False(t, scriptMethod(t, document.Methods, name).Arguments[0].Required, name)
 	}

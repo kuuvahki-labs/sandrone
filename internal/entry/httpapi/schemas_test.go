@@ -36,6 +36,7 @@ func TestSchemaRoutesPublishServerCatalogs(t *testing.T) {
 		{"/v1/schemas/script-api/v1", func(t *testing.T, body string) {
 			require.Contains(t, body, `"version": 1`)
 			require.Contains(t, body, `"sandbox"`)
+			require.Contains(t, body, `"api.ini.override"`)
 		}},
 		{"/v1/schemas/subscription", func(t *testing.T, body string) {
 			require.Contains(t, body, `"name"`)

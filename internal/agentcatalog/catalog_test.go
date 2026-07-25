@@ -42,3 +42,37 @@ func TestCatalogBuildsServerOwnedDocuments(t *testing.T) {
 	require.Equal(t, "object", agentcatalog.FileSpecSchema(true).Type)
 	require.Contains(t, agentcatalog.FileSpecSchema(true).Required, "kind")
 }
+
+func TestScriptAPICatalogDescribesINIHelpers(t *testing.T) {
+	document, err := agentcatalog.ScriptAPI()
+	require.NoError(t, err)
+
+	method := func(name string) agentcatalog.ScriptMethodDocument {
+		t.Helper()
+		for _, candidate := range document.Methods {
+			if candidate.Name == name {
+				return candidate
+			}
+		}
+		require.FailNow(t, "script API method not found", name)
+		return agentcatalog.ScriptMethodDocument{}
+	}
+
+	parse := method("api.ini.parse")
+	require.Equal(t, []domain.Stage{domain.StageNodes, domain.StageFile}, parse.Stages)
+	require.Equal(t, "value_or_void", parse.Returns.Kind)
+	require.Equal(t, "object", parse.Returns.Schema.Type)
+	require.Contains(t, parse.Returns.Schema.Properties, "sections")
+
+	stringify := method("api.ini.stringify")
+	require.Len(t, stringify.Arguments, 1)
+	require.False(t, stringify.Arguments[0].Required)
+	require.Equal(t, "object", stringify.Arguments[0].Schema.Type)
+
+	override := method("api.ini.override")
+	require.Len(t, override.Arguments, 2)
+	require.True(t, override.Arguments[0].Required)
+	require.True(t, override.Arguments[1].Required)
+	require.Equal(t, "string", override.Returns.Schema.Type)
+	require.Equal(t, []domain.ErrorCode{domain.CodeScriptRuntime}, override.ErrorCodes)
+}

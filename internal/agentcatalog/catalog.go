@@ -10,6 +10,7 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
+	"github.com/kuuvahki-labs/sandrone/internal/inidoc"
 	"github.com/kuuvahki-labs/sandrone/internal/processor"
 	scriptproc "github.com/kuuvahki-labs/sandrone/internal/processor/script"
 	"github.com/kuuvahki-labs/sandrone/internal/service"
@@ -274,6 +275,27 @@ func scriptMethodCatalog() ([]ScriptMethodDocument, error) {
 			name: "api.json.stringify", description: "Encode JavaScript data as JSON.", stages: allStages,
 			arguments:        []argumentSpec{{name: "value", anyJSON: true}},
 			recommendedArity: "0-1", extraArgumentsIgnored: true, zeroArguments: "returns empty string",
+			returnKind: "value", result: "", codes: runtimeOnly,
+		},
+		{
+			name: "api.ini.parse", description: "Parse INI into an ordered document that preserves duplicate sections and raw body lines.", stages: allStages,
+			arguments:        []argumentSpec{{name: "value", prototype: ""}},
+			recommendedArity: "0-1", extraArgumentsIgnored: true, zeroArguments: "returns void",
+			returnKind: "value_or_void", result: inidoc.Model{}, codes: runtimeOnly,
+		},
+		{
+			name: "api.ini.stringify", description: "Validate and encode an ordered INI document using canonical section headers.", stages: allStages,
+			arguments:        []argumentSpec{{name: "document", prototype: inidoc.Model{}}},
+			recommendedArity: "0-1", extraArgumentsIgnored: true, zeroArguments: "returns empty string",
+			returnKind: "value", result: "", codes: runtimeOnly,
+		},
+		{
+			name: "api.ini.override", description: "Apply an ordered, lossless INI section override patch.", stages: allStages,
+			arguments: []argumentSpec{
+				{name: "base", prototype: "", required: true},
+				{name: "patch", prototype: "", required: true},
+			},
+			recommendedArity: "2", extraArgumentsIgnored: true, zeroArguments: "returns script_runtime error",
 			returnKind: "value", result: "", codes: runtimeOnly,
 		},
 		{

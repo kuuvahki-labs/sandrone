@@ -314,6 +314,156 @@ func TestScriptAPIExercise(t *testing.T) {
 	require.True(t, foundExt)
 }
 
+func TestScriptAPIINIParseAndStringifyOrderedDocument(t *testing.T) {
+	r := processor.NewRegistry()
+	registerScript(r)
+	proc, err := r.BuildFile(domain.ProcessorSpec{
+		Type: "script", Stage: domain.StageFile,
+		Params: params(t, map[string]any{
+			"source": inlineScriptSource(`
+function main(input, api) {
+  const doc = api.ini.parse(input.file.content);
+  if (!doc.bom || doc.newline !== "\r\n" || !doc.trailing_newline) {
+    throw new Error("document metadata was not preserved");
+  }
+  if (doc.sections.length !== 2 || doc.sections[1].name !== "Rule") {
+    throw new Error("ordered sections were not preserved");
+  }
+  doc.newline = "\n";
+  doc.trailing_newline = false;
+  doc.sections[0].lines[0] = "dns-server = 8.8.8.8";
+  doc.sections.push({name: "Rule", lines: ["DOMAIN,example.com,Proxy"]});
+  input.file.content = api.ini.stringify(doc);
+  return input;
+}`),
+		}),
+	})
+	require.NoError(t, err)
+
+	body := append([]byte{0xef, 0xbb, 0xbf}, []byte(
+		"# generated\r\n[General]\r\ndns-server = 1.1.1.1\r\n[Rule]\r\nFINAL,Proxy\r\n",
+	)...)
+	out, err := proc.ApplyFile(context.Background(), domain.FileProcessInput{
+		File: domain.FileDocument{Kind: "shadowrocket", Content: body},
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, append([]byte{0xef, 0xbb, 0xbf}, []byte(
+		"# generated\n[General]\ndns-server = 8.8.8.8\n[Rule]\nFINAL,Proxy\n[Rule]\nDOMAIN,example.com,Proxy",
+	)...), out.File.Content)
+}
+
+func TestScriptAPIINIAvailableInNodesStageAndHandlesZeroArguments(t *testing.T) {
+	r := processor.NewRegistry()
+	registerScript(r)
+	proc, err := r.BuildNode(domain.ProcessorSpec{
+		Type: "script", Stage: domain.StageNodes,
+		Params: params(t, map[string]any{
+			"source": inlineScriptSource(`
+function main(input, api) {
+  if (api.ini.parse() !== undefined) throw new Error("parse() must return undefined");
+  if (api.ini.stringify() !== "") throw new Error("stringify() must return an empty string");
+  const text = api.ini.stringify({
+    bom: false,
+    newline: "\n",
+    trailing_newline: true,
+    preamble: [],
+    sections: [{name: "General", lines: ["profile = test"]}]
+  });
+  input.nodes[0].name = api.ini.parse(text).sections[0].lines[0];
+  return input;
+}`),
+		}),
+	})
+	require.NoError(t, err)
+
+	out, err := proc.ApplyNodes(context.Background(), domain.NodeProcessInput{
+		Nodes: []domain.NodeIR{{Name: "node", Type: domain.NodeTypeShadowsocks}},
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "profile = test", out.Nodes[0].Name)
+}
+
+func TestScriptAPIINIOverrideUsesFileOverrideSemantics(t *testing.T) {
+	r := processor.NewRegistry()
+	registerScript(r)
+	proc, err := r.BuildFile(domain.ProcessorSpec{
+		Type: "script", Stage: domain.StageFile,
+		Params: params(t, map[string]any{
+			"source": inlineScriptSource(`
+function main(input, api) {
+  input.file.content = api.ini.override(input.file.content,
+    "[General]\nfoo = new\n[Rule+]\nDOMAIN,example.com,Proxy\n");
+  return input;
+}`),
+		}),
+	})
+	require.NoError(t, err)
+
+	out, err := proc.ApplyFile(context.Background(), domain.FileProcessInput{
+		File: domain.FileDocument{
+			Kind:    "shadowrocket",
+			Content: []byte("[General]\r\nfoo = old\r\n[Rule]\r\nFINAL,DIRECT\r\n"),
+		},
+	})
+
+	require.NoError(t, err)
+	require.Equal(t,
+		"[General]\r\nfoo = new\r\n[Rule]\r\nFINAL,DIRECT\r\nDOMAIN,example.com,Proxy\r\n",
+		string(out.File.Content),
+	)
+}
+
+func TestScriptAPIINIRejectsInvalidModelAndMissingOverrideArgument(t *testing.T) {
+	tests := []struct {
+		name   string
+		script string
+	}{
+		{
+			name: "invalid model",
+			script: `function main(input, api) {
+  api.ini.stringify({bom: false, newline: "\n", trailing_newline: false,
+    preamble: [], sections: [{name: "General", lines: ["[Rule]"]}]});
+  return input;
+}`,
+		},
+		{
+			name:   "missing override patch",
+			script: `function main(input, api) { api.ini.override("[General]\n"); return input; }`,
+		},
+		{
+			name: "unknown document field",
+			script: `function main(input, api) {
+  api.ini.stringify({bom: false, newline: "\n", trailing_newline: false,
+    preamble: [], sections: [], extra: true});
+  return input;
+}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := processor.NewRegistry()
+			registerScript(r)
+			proc, err := r.BuildFile(domain.ProcessorSpec{
+				Type: "script", Stage: domain.StageFile,
+				Params: params(t, map[string]any{
+					"source": inlineScriptSource(tt.script),
+				}),
+			})
+			require.NoError(t, err)
+
+			_, err = proc.ApplyFile(context.Background(), domain.FileProcessInput{
+				File: domain.FileDocument{Kind: "shadowrocket", Content: []byte("[General]\n")},
+			})
+
+			require.Error(t, err)
+			require.True(t, domain.IsCode(err, domain.CodeScriptRuntime))
+		})
+	}
+}
+
 func TestScriptAPIProbeFiltersNodesAndAppendsWarnings(t *testing.T) {
 	runner := &scriptProbeRunner{result: &domain.ProbeResult{
 		Results: []domain.NodeProbeResult{

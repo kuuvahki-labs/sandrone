@@ -1,6 +1,7 @@
 package script
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -11,6 +12,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
+	"github.com/kuuvahki-labs/sandrone/internal/inidoc"
 )
 
 type scriptAPI struct {
@@ -46,6 +48,7 @@ func (a *scriptAPI) attach(vm *goja.Runtime) {
 	must(obj.Set("warn", a.jsWarn()))
 	must(obj.Set("yaml", a.jsYAML(vm)))
 	must(obj.Set("json", a.jsJSON(vm)))
+	must(obj.Set("ini", a.jsINI(vm)))
 	must(obj.Set("base64", a.jsBase64(vm)))
 	must(obj.Set("hash", a.jsHash(vm)))
 	if a.resourceResolver != nil {
@@ -270,6 +273,16 @@ func exportJSValue(value goja.Value, out any) error {
 	return json.Unmarshal(body, out)
 }
 
+func exportJSValueStrict(value goja.Value, out any) error {
+	body, err := json.Marshal(value.Export())
+	if err != nil {
+		return err
+	}
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.DisallowUnknownFields()
+	return decoder.Decode(out)
+}
+
 func scriptProbeNodeCounts(nodes []ScriptNode) map[string]int {
 	out := make(map[string]int, len(nodes))
 	for _, node := range nodes {
@@ -348,6 +361,51 @@ func (a *scriptAPI) jsJSON(vm *goja.Runtime) goja.Value {
 			return vm.ToValue("")
 		}
 		body, err := json.Marshal(call.Argument(0).Export())
+		if err != nil {
+			panic(vm.NewGoError(err))
+		}
+		return vm.ToValue(string(body))
+	}))
+	return obj
+}
+
+func (a *scriptAPI) jsINI(vm *goja.Runtime) goja.Value {
+	obj := vm.NewObject()
+	must(obj.Set("parse", func(call goja.FunctionCall) goja.Value {
+		if len(call.Arguments) == 0 {
+			return goja.Undefined()
+		}
+		model, err := inidoc.ParseModel([]byte(call.Argument(0).String()))
+		if err != nil {
+			panic(vm.NewGoError(err))
+		}
+		return jsJSONValue(vm, model)
+	}))
+	must(obj.Set("stringify", func(call goja.FunctionCall) goja.Value {
+		if len(call.Arguments) == 0 {
+			return vm.ToValue("")
+		}
+		var model inidoc.Model
+		if err := exportJSValueStrict(call.Argument(0), &model); err != nil {
+			panic(vm.NewGoError(fmt.Errorf("decode INI document: %w", err)))
+		}
+		body, err := inidoc.RenderModel(model)
+		if err != nil {
+			panic(vm.NewGoError(err))
+		}
+		return vm.ToValue(string(body))
+	}))
+	must(obj.Set("override", func(call goja.FunctionCall) goja.Value {
+		if len(call.Arguments) < 2 {
+			panic(vm.NewGoError(&domain.AppError{
+				Code:    domain.CodeScriptRuntime,
+				Message: "api.ini.override requires base and patch",
+			}))
+		}
+		body, err := inidoc.Override(
+			[]byte(call.Argument(0).String()),
+			[]byte(call.Argument(1).String()),
+		)
 		if err != nil {
 			panic(vm.NewGoError(err))
 		}

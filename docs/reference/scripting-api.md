@@ -190,11 +190,43 @@ const prefix = (input.args && input.args.prefix) || "";
 | `api.yaml.stringify(value)` | 返回 YAML 字符串；无参数返回空字符串 |
 | `api.json.parse(text)` | 返回普通 JS 值；无参数返回 `undefined` |
 | `api.json.stringify(value)` | 返回紧凑 JSON 字符串；无参数返回空字符串 |
+| `api.ini.parse(text)` | 返回保留顺序与重复 section 的 INI 文档；无参数返回 `undefined` |
+| `api.ini.stringify(document)` | 严格校验并返回 INI 字符串；无参数返回空字符串 |
+| `api.ini.override(base, patch)` | 按 `ini_override` 的 section 规则覆盖正文；两个参数都必需 |
 | `api.base64.encode(text)` | 返回标准、有 padding 的 Base64；无参数返回空字符串 |
 | `api.base64.decode(text)` | 解码标准 Base64 并返回字符串；无参数返回空字符串 |
 | `api.hash.sha256(text)` | 返回小写十六进制 SHA-256；无参数返回空字符串 |
 
 `api.warn` 接受 warning 的当前字段：`code`、`message`、`node`、`node_index`、`node_context`、`field`、`source`、`target`。无法转换为该结构的值不会产生 warning。
+
+### INI 文档模型
+
+`api.ini.parse` 不会把 INI 折叠为 section/key object。返回值保留 physical
+section 的顺序、重复 section、注释、空行和 Shadowrocket 的非 assignment
+记录：
+
+```js
+{
+  bom: false,
+  newline: "\n",
+  trailing_newline: true,
+  preamble: ["# generated"],
+  sections: [
+    {name: "General", lines: ["dns-server = 1.1.1.1"]},
+    {name: "Rule", lines: ["FINAL,Proxy"]}
+  ]
+}
+```
+
+`newline` 只能是 `"\n"` 或 `"\r\n"`；`preamble`、`sections` 和每个
+section 的 `lines` 都必须是数组。section 名必须是已去除首尾空白的非空名称，
+且不能包含方括号或换行。单行不能包含 CR/LF，也不能伪装成新的 section
+header；未知字段同样会使 `api.ini.stringify` 失败。输出统一使用 `newline`
+并规范化为 `[name]` header，因此混合换行和原 header 外观不会逐字节保留。
+
+`api.ini.override(base, patch)` 直接使用 file-stage
+`merge(mode: ini_override)` 的同一套覆盖实现，包括 section 合并、前插、追加、
+替换和删除语义；具体 patch 写法见 [Processors](processors.md#merge)。
 
 ### `api.probe(nodes, options?)`
 
