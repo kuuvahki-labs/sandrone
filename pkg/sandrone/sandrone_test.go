@@ -132,6 +132,8 @@ func TestNewWithStoreBacksResourcesWithCallerStore(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "custom.yaml", spec.Name)
 	require.Equal(t, "custom store", spec.Meta["description"])
+	require.Equal(t, "inline", spec.Source.Type)
+	require.Equal(t, "mixed-port: 7890\n", spec.Source.Content)
 
 	result, err := engine.GetFile(ctx, sandrone.FileRequest{Name: "custom.yaml"})
 	require.NoError(t, err)
@@ -142,7 +144,7 @@ func TestNewWithStoreBacksResourcesWithCallerStore(t *testing.T) {
 	require.Len(t, files.Items, 1)
 	require.Equal(t, "custom.yaml", files.Items[0].Name)
 
-	require.True(t, store.has("files/custom.yaml"))
+	require.False(t, store.has("files/custom.yaml"))
 	require.True(t, store.has("files/custom.yaml.json"))
 }
 

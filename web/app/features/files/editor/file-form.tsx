@@ -93,7 +93,7 @@ export function FileFormFields({ configDefault, defaultName, description = "", d
 				language={driver.source.syntax}
                 onValidityChange={setSourceValid}
                 placeholder={driver.source.basePlaceholder}
-                preserveImplicit={driver.source.preserveImplicit}
+                preserveImplicit={driver.source.strategy === "optional-base"}
                 remoteURLPlaceholder={driver.source.remoteURLPlaceholder}
                 validateSource={driver.source.validate}
               />

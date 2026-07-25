@@ -38,17 +38,15 @@ export function FileSourceEditor({
   const initial = defaultValue ?? { type: "inline", content: "" };
   const [sourceType, setSourceType] = useState(initialSourceType(initial));
   const [preserveImplicitSource, setPreserveImplicitSource] = useState(preserveImplicit && isImplicitSource(initial));
-  const [preserveLocalSource, setPreserveLocalSource] = useState(initial?.type === "local");
-  const [content, setContent] = useState(initial?.content ?? "");
-  const [localPath] = useState(initial?.path ?? "");
+  const [content, setContent] = useState(initial.content ?? (preserveImplicit && isImplicitSource(initial) ? inlineFallback : ""));
   const [url, setURL] = useState(initial?.remote?.url ?? "");
   const [userAgent, setUserAgent] = useState(initial?.remote?.user_agent ?? "");
   const [proxy, setProxy] = useState(initial?.remote?.proxy ?? "");
   const [timeoutMS, setTimeoutMS] = useState(numberInputValue(initial?.remote?.timeout_ms));
   const [cacheTTLSeconds] = useState(initial?.remote?.cache_ttl_seconds);
   const serialized = useMemo(
-    () => JSON.stringify(preserveImplicitSource ? {} : serializeSource({ cacheTTLSeconds, content, localPath, preserveLocalSource, proxy, sourceType, timeoutMS, url, userAgent })),
-    [cacheTTLSeconds, content, localPath, preserveImplicitSource, preserveLocalSource, proxy, sourceType, timeoutMS, url, userAgent],
+    () => JSON.stringify(preserveImplicitSource ? {} : serializeSource({ cacheTTLSeconds, content, proxy, sourceType, timeoutMS, url, userAgent })),
+    [cacheTTLSeconds, content, preserveImplicitSource, proxy, sourceType, timeoutMS, url, userAgent],
   );
   const validationError = validateSource ? validateSource(preserveImplicitSource
     ? {}
@@ -62,7 +60,6 @@ export function FileSourceEditor({
     if (!nextType || nextType === sourceType) return;
     setSourceType(nextType);
     setPreserveImplicitSource(false);
-    setPreserveLocalSource(false);
     if (nextType === "inline" && initial.content === undefined) {
       setContent((current) => current || inlineFallback);
     }
@@ -96,7 +93,6 @@ export function FileSourceEditor({
             value={content}
             onChange={(event) => {
               setPreserveImplicitSource(false);
-              setPreserveLocalSource(false);
               setContent(event.target.value);
             }}
           />
@@ -131,8 +127,6 @@ function sourceValidationMessage(error: FileInputValidationCode, t: Translator):
 type SourceDraft = {
   cacheTTLSeconds?: number;
   content: string;
-  localPath: string;
-  preserveLocalSource: boolean;
   proxy: string;
   sourceType: SourceType;
   timeoutMS: string;
@@ -151,10 +145,7 @@ function isImplicitSource(source: FileSourceDetail): boolean {
 
 function serializeSource(draft: SourceDraft): Record<string, unknown> {
   if (draft.sourceType === "inline") {
-    if (draft.preserveLocalSource) {
-      return cleanSource({ type: "local", path: draft.localPath });
-    }
-    return { type: "inline", content: draft.content, ...(draft.localPath ? { path: draft.localPath } : {}) };
+    return { type: "inline", content: draft.content };
   }
   return cleanSource({
     type: "remote",

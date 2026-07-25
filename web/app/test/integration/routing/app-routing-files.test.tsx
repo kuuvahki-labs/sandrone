@@ -107,7 +107,7 @@ describe("React Router app file workflows", () => {
     });
   });
 
-  it("hydrates a typed config source and snapshots it on save", async () => {
+  it("edits inline typed content from the complete spec without requesting source", async () => {
     const user = userEvent.setup();
     const requests: Array<{ url: string; init?: RequestInit }> = [];
     const typedResources = {
@@ -123,7 +123,7 @@ describe("React Router app file workflows", () => {
         return jsonResponse({
           name: "default.yaml",
           kind: "mihomo",
-          source: {},
+          source: { type: "inline", content: "mixed-port: 7890\nallow-lan: false\n" },
           config: {
             settings: {
               groups: [{ name: "Proxy", type: "select", proxies: ["DIRECT"] }],
@@ -133,9 +133,6 @@ describe("React Router app file workflows", () => {
           },
           processors: [],
         });
-      }
-      if (url.includes("/v1/files/default.yaml?mode=source&response=json")) {
-        return jsonResponse({ content_type: "application/yaml", body: "mixed-port: 7890\nallow-lan: false\n" });
       }
       return jsonResponse({ ok: true }, { status: init?.method === "POST" ? 201 : 200 });
     }));
@@ -153,72 +150,39 @@ describe("React Router app file workflows", () => {
         source: { type: "inline", content: "mixed-port: 7890\nallow-lan: false\n" },
       });
     });
+    expect(requests.some((request) => request.url.includes("?mode=source"))).toBe(false);
   });
 
-  it("blocks editing when a typed config source cannot be loaded", async () => {
+  it("shows a typed driver base for an implicit source and saves the empty source object", async () => {
+    const user = userEvent.setup();
+    const requests: Array<{ url: string; init?: RequestInit }> = [];
     const typedResources = {
       ...resources,
       files: [{ name: "default.yaml", type: "mihomo", target: "mihomo" }],
     };
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
+      requests.push({ url, init });
       const resourceResponse = resourceListResponse(url, typedResources, init);
       if (resourceResponse) return resourceResponse;
       if (url.includes("/v1/files/default.yaml?mode=spec")) {
         return jsonResponse({ name: "default.yaml", kind: "mihomo", source: {}, processors: [] });
       }
-      if (url.includes("/v1/files/default.yaml?mode=source&response=json")) {
-        return jsonResponse({ error: { code: "internal_error", message: "source unavailable" } }, { status: 500 });
-      }
-      return jsonResponse({ ok: true });
+      return jsonResponse({ ok: true }, { status: init?.method === "POST" ? 201 : 200 });
     }));
 
     renderApp("/files/default.yaml/edit");
 
-    expect(await screen.findByRole("heading", { name: "文件定义读取失败" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "保存文件" })).not.toBeInTheDocument();
-  });
-
-  it("hydrates and preserves an ordinary local file source on save", async () => {
-    const user = userEvent.setup();
-    const requests: Array<{ url: string; init?: RequestInit }> = [];
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      requests.push({ url, init });
-      const resourceResponse = resourceListResponse(url, resources, init);
-      if (resourceResponse) return resourceResponse;
-      if (url.includes("/v1/files/default.yaml?mode=spec")) {
-        return jsonResponse({
-          ...fileSpec,
-          source: { type: "local", path: "files/default.yaml" },
-        });
-      }
-      if (url.includes("/v1/files/default.yaml?mode=source&response=json")) {
-        return jsonResponse({ content_type: "text/plain; charset=utf-8", body: "port: 7890" });
-      }
-      return jsonResponse({ ok: true }, { status: init?.method === "POST" ? 201 : 200 });
-    }));
-    const { router } = renderApp("/files/default.yaml/edit");
-
     const content = await screen.findByRole("textbox", { name: "内容" });
-    expect(content).toHaveValue("port: 7890");
-    expect(screen.getByRole("group", { name: "处理器 文件脚本" })).toBeInTheDocument();
+    expect((content as HTMLTextAreaElement).value).toContain("mixed-port: 7890");
     await user.click(screen.getByRole("button", { name: "保存文件" }));
 
     await waitFor(() => {
       const post = requests.find((request) => request.url.endsWith("/v1/files") && request.init?.method === "POST");
       expect(post).toBeDefined();
-      expect(JSON.parse(String(post?.init?.body))).toMatchObject({
-        name: "default.yaml",
-        source: { type: "local", path: "files/default.yaml" },
-        processors: fileSpec.processors,
-        meta: { ui: "web" },
-      });
+      expect(JSON.parse(String(post?.init?.body)).source).toEqual({});
     });
-    await screen.findByText("文件已保存");
-    expect(router.state.location.pathname).toBe("/files/default.yaml/edit");
-    expect(screen.getByRole("heading", { name: "编辑文件" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "我的文件" })).not.toBeInTheDocument();
+    expect(requests.some((request) => request.url.includes("?mode=source"))).toBe(false);
   });
 
   it("saves empty file text without leaving the editor route", async () => {
@@ -231,9 +195,6 @@ describe("React Router app file workflows", () => {
       if (resourceResponse) return resourceResponse;
       if (url.includes("/v1/files/default.yaml?mode=spec")) {
         return jsonResponse({ ...fileSpec, source: { type: "inline", content: "port: 7890" } });
-      }
-      if (url.includes("/v1/files/default.yaml?mode=source&response=json")) {
-        return jsonResponse({ content_type: "text/plain; charset=utf-8", body: "port: 7890" });
       }
       return jsonResponse({ ok: true }, { status: init?.method === "POST" ? 201 : 200 });
     }));
@@ -255,7 +216,7 @@ describe("React Router app file workflows", () => {
     expect(router.state.location.pathname).toBe("/files/default.yaml/edit");
   });
 
-  it("hydrates remote file content while preserving its request metadata", async () => {
+  it("round-trips a remote descriptor without fetching remote content", async () => {
     const user = userEvent.setup();
     const requests: Array<{ url: string; init?: RequestInit }> = [];
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -278,9 +239,6 @@ describe("React Router app file workflows", () => {
           },
         });
       }
-      if (url.includes("/v1/files/default.yaml?mode=source&response=json")) {
-        return jsonResponse({ content_type: "text/plain; charset=utf-8", body: "remote: source\n" });
-      }
       return jsonResponse({ ok: true });
     }));
 
@@ -296,8 +254,7 @@ describe("React Router app file workflows", () => {
     await waitFor(() => {
       const post = requests.find((request) => request.url.endsWith("/v1/files") && request.init?.method === "POST");
       expect(post).toBeDefined();
-      expect(JSON.parse(String(post?.init?.body))).toMatchObject({
-        source: {
+      expect(JSON.parse(String(post?.init?.body)).source).toEqual({
           type: "remote",
           remote: {
             url: "https://example.com/base.yaml",
@@ -306,14 +263,10 @@ describe("React Router app file workflows", () => {
             timeout_ms: 2500,
             cache_ttl_seconds: 60,
           },
-        },
       });
     });
 
-    await user.click(within(contentSource).getByRole("button", { name: "本地" }));
-
-    expect(within(contentSource).getByRole("textbox", { name: "内容" })).toHaveValue("remote: source\n");
-    expect(requests.some((request) => request.url.includes("?mode=source&response=json"))).toBe(true);
+    expect(requests.some((request) => request.url.includes("?mode=source"))).toBe(false);
   });
 
   it("opens a saved file preview and returns to the editor", async () => {
@@ -368,9 +321,6 @@ describe("React Router app file workflows", () => {
           future_field: { keep: true },
           processors: [],
         });
-      }
-      if (url.includes("/v1/files/future.json?mode=source&response=json")) {
-        return jsonResponse({ content_type: "application/json", body: "{}" });
       }
       if (url.includes("/v1/files/future.json?response=json")) {
         return jsonResponse({ content_type: "application/json", body: "{\"future\":true}", warnings: [] });

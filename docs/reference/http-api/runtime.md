@@ -193,7 +193,7 @@ Shadowrocket 条目还带 `reference_type`：`DOMAIN-SET` 对应 `domain`，
 ## 失败与安全边界
 
 备份 ZIP 是**未加密、未签名的明文**。它可能包含订阅和节点凭据、远程
-URL、脚本、运行设置、显式 local source path，以及 Store 实现未知的数据。
+URL、脚本、inline file 正文、运行设置，以及 Store 实现未知的数据。
 下载后必须按敏感配置文件保存，并在恢复前通过可信渠道确认来源。
 
 导出包含全部非目录、非 cache Store 文件，包括 Sandrone 当前不认识的安全

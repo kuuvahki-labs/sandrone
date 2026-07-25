@@ -168,7 +168,7 @@ func TestRuntimeSettingsEndpointAcceptsExplicitZeroCacheDefaults(t *testing.T) {
 	require.Equal(t, 0, settings.CacheDefaults.SubscriptionTrafficTTLSeconds)
 }
 
-func TestFileEndpointStoresInlineContentAsLocalMetadata(t *testing.T) {
+func TestFileEndpointStoresCompleteInlineSourceInJSONRecord(t *testing.T) {
 	rt := testRuntime(t, app.Config{})
 	server := httpapi.New(rt)
 	body := []byte(`{
@@ -187,13 +187,12 @@ func TestFileEndpointStoresInlineContentAsLocalMetadata(t *testing.T) {
 	server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/v1/files", bytes.NewReader(body)))
 	require.Equal(t, http.StatusCreated, w.Code)
 
-	rawBody, err := os.ReadFile(filepath.Join(rt.Config.DataDir, "files", "rename.js"))
-	require.NoError(t, err)
-	require.Equal(t, "function main(input) { return input; }\n", string(rawBody))
+	_, err := os.ReadFile(filepath.Join(rt.Config.DataDir, "files", "rename.js"))
+	require.True(t, os.IsNotExist(err))
 
 	metadataBody, err := os.ReadFile(filepath.Join(rt.Config.DataDir, "files", "rename.js.json"))
 	require.NoError(t, err)
-	require.NotContains(t, string(metadataBody), "function main")
+	require.Contains(t, string(metadataBody), "function main")
 
 	w = httptest.NewRecorder()
 	server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/v1/files/rename.js?mode=spec", nil))
@@ -203,9 +202,8 @@ func TestFileEndpointStoresInlineContentAsLocalMetadata(t *testing.T) {
 	require.Equal(t, "rename.js", spec.Name)
 	require.Equal(t, "Rename Script", spec.DisplayName)
 	require.Equal(t, "node rename script\nused by file stage", spec.Meta["description"])
-	require.Equal(t, "local", spec.Source.Type)
-	require.Empty(t, spec.Source.Content)
-	require.Empty(t, spec.Source.Path)
+	require.Equal(t, "inline", spec.Source.Type)
+	require.Equal(t, "function main(input) { return input; }\n", spec.Source.Content)
 
 	w = httptest.NewRecorder()
 	server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/v1/files", nil))
@@ -291,6 +289,8 @@ func TestFileEndpointRejectsNonCanonicalKindsAndLegacyConfigWire(t *testing.T) {
 		{name: "legacy config", body: `{"name":"bad.yaml","kind":"mihomo","source":{},"config":{"groups":[]}}`, want: "invalid JSON body"},
 		{name: "null settings", body: `{"name":"bad.yaml","kind":"mihomo","source":{},"config":{"settings":null}}`, want: "config.settings"},
 		{name: "unknown settings", body: `{"name":"bad.yaml","kind":"sing-box","source":{},"config":{"settings":{"future":true}}}`, want: "config.settings.future"},
+		{name: "empty source with content", body: `{"name":"bad.yaml","kind":"mihomo","source":{"content":"ignored"},"config":{}}`, want: "empty file source must not include content or remote"},
+		{name: "empty source with remote", body: `{"name":"bad.yaml","kind":"mihomo","source":{"remote":{"url":"https://example.com/ignored"}},"config":{}}`, want: "empty file source must not include content or remote"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -422,8 +422,8 @@ func TestFileEndpointExposesSourceAsBodyOrJSONWithoutChangingSpec(t *testing.T) 
 	require.Equal(t, http.StatusOK, w.Code)
 	var spec domain.FileSpec
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &spec))
-	require.Equal(t, "local", spec.Source.Type)
-	require.Empty(t, spec.Source.Content)
+	require.Equal(t, "inline", spec.Source.Type)
+	require.Equal(t, "mixed-port: 7891\nmarker: source\n", spec.Source.Content)
 
 	w = httptest.NewRecorder()
 	server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/v1/files/default.yaml", nil))
@@ -453,6 +453,50 @@ func TestDeleteResourcePreservesLiteralPercentSlashName(t *testing.T) {
 	w = httptest.NewRecorder()
 	server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, path+"?mode=spec", nil))
 	require.Equal(t, http.StatusNotFound, w.Code)
+}
+
+func TestFilesNamedConfigAndConfigJSONRenderAndDeleteIndependently(t *testing.T) {
+	ctx := context.Background()
+	rt := testRuntime(t, app.Config{})
+	require.NoError(t, rt.Service.PutFile(ctx, domain.FileSpec{
+		Name: "config", Kind: domain.FileKindStatic,
+		Source: domain.FileSource{Type: "inline", Content: "plain"},
+	}))
+	require.NoError(t, rt.Service.PutFile(ctx, domain.FileSpec{
+		Name: "config.json", Kind: domain.FileKindStatic,
+		Source: domain.FileSource{Type: "inline", Content: "json"},
+	}))
+	server := httpapi.New(rt)
+
+	w := httptest.NewRecorder()
+	server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/v1/files", nil))
+	require.Equal(t, http.StatusOK, w.Code)
+	var files domain.ResourceListResult
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &files))
+	require.Len(t, files.Items, 2)
+	require.Equal(t, []string{"config", "config.json"}, []string{files.Items[0].Name, files.Items[1].Name})
+
+	for path, want := range map[string]string{
+		"/v1/files/config":      "plain",
+		"/v1/files/config.json": "json",
+	} {
+		w = httptest.NewRecorder()
+		server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
+		require.Equal(t, http.StatusOK, w.Code)
+		require.Equal(t, want, w.Body.String())
+	}
+
+	w = httptest.NewRecorder()
+	server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodDelete, "/v1/files/config", nil))
+	require.Equal(t, http.StatusOK, w.Code)
+	w = httptest.NewRecorder()
+	server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/v1/files/config.json", nil))
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, "json", w.Body.String())
+
+	w = httptest.NewRecorder()
+	server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodDelete, "/v1/files/config.json", nil))
+	require.Equal(t, http.StatusOK, w.Code)
 }
 
 func TestDeleteResourceRejectsTrailingSlashAlias(t *testing.T) {

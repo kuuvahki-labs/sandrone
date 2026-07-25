@@ -110,15 +110,15 @@ func TestMetaStoreRoundTrip(t *testing.T) {
 	require.Equal(t, "mihomo/base.yaml", gotFile.Name)
 	require.Equal(t, file.CreatedAt, gotFile.CreatedAt)
 	require.Equal(t, file.UpdatedAt, gotFile.UpdatedAt)
-	require.Equal(t, "local", gotFile.Source.Type)
-	require.Empty(t, gotFile.Source.Content)
-	rawFile, err := st.Read(ctx, "files/mihomo/base.yaml")
+	require.Equal(t, "inline", gotFile.Source.Type)
+	require.Equal(t, "proxies: []", gotFile.Source.Content)
+	entries, err := st.List(ctx, "files/mihomo")
 	require.NoError(t, err)
-	require.Equal(t, "proxies: []", string(rawFile))
-
+	require.Len(t, entries, 1)
+	require.Equal(t, []string{"files/mihomo/base.yaml.json"}, []string{entries[0].Key})
 }
 
-func TestMetaStorePutFileSplitsInlineContentFromMetadata(t *testing.T) {
+func TestMetaStorePutFileStoresCompleteInlineSourceInJSONRecord(t *testing.T) {
 	ctx := context.Background()
 	fsStore := store.NewFSStore(afero.NewMemMapFs())
 	meta := store.NewMetaStore(fsStore)
@@ -133,33 +133,87 @@ func TestMetaStorePutFileSplitsInlineContentFromMetadata(t *testing.T) {
 		Meta: map[string]string{"description": "node rename script\nused by file stage"},
 	}))
 
-	rawBody, err := fsStore.Read(ctx, "files/rename.js")
-	require.NoError(t, err)
-	require.Equal(t, "function main(input) { return input; }\n", string(rawBody))
+	_, err := fsStore.Read(ctx, "files/rename.js")
+	require.True(t, os.IsNotExist(err))
 
 	metadataBody, err := fsStore.Read(ctx, "files/rename.js.json")
 	require.NoError(t, err)
-	require.NotContains(t, string(metadataBody), "function main")
+	require.Contains(t, string(metadataBody), "function main")
 
 	got, err := meta.GetFile(ctx, "rename.js")
 	require.NoError(t, err)
 	require.Equal(t, "rename.js", got.Name)
 	require.Equal(t, "rename", got.DisplayName)
-	require.Equal(t, "local", got.Source.Type)
-	require.Empty(t, got.Source.Content)
-	require.Empty(t, got.Source.Path)
+	require.Equal(t, "inline", got.Source.Type)
+	require.Equal(t, "function main(input) { return input; }\n", got.Source.Content)
 	require.Equal(t, "node rename script\nused by file stage", got.Meta["description"])
 
 	files, err := meta.ListFiles(ctx)
 	require.NoError(t, err)
 	require.Equal(t, []domain.ResourceSummary{{
 		Kind:        "file",
-		Type:        "local",
+		Type:        "inline",
 		Name:        "rename.js",
 		DisplayName: "rename",
 		Meta:        map[string]string{"description": "node rename script\nused by file stage"},
 		Size:        files[0].Size,
 	}}, files)
+}
+
+func TestMetaStoreRemoteSourceClearsInlineFields(t *testing.T) {
+	ctx := context.Background()
+	meta := store.NewMetaStore(store.NewFSStore(afero.NewMemMapFs()))
+
+	require.NoError(t, meta.PutFile(ctx, domain.FileSpec{
+		Name: "remote.txt",
+		Source: domain.FileSource{
+			Type:    " REMOTE ",
+			Content: "stale inline content",
+			Remote:  &domain.RemoteInput{URL: "https://example.com/file"},
+		},
+	}))
+
+	got, err := meta.GetFile(ctx, "remote.txt")
+	require.NoError(t, err)
+	require.Equal(t, "remote", got.Source.Type)
+	require.Empty(t, got.Source.Content)
+	require.Equal(t, "https://example.com/file", got.Source.Remote.URL)
+}
+
+func TestMetaStoreFilesNamedConfigAndConfigJSONCoexistAndDeleteIndependently(t *testing.T) {
+	ctx := context.Background()
+	fsStore := store.NewFSStore(afero.NewMemMapFs())
+	meta := store.NewMetaStore(fsStore)
+
+	require.NoError(t, meta.PutFile(ctx, domain.FileSpec{
+		Name: "config", Kind: domain.FileKindStatic,
+		Source: domain.FileSource{Type: "inline", Content: "plain"},
+	}))
+	require.NoError(t, meta.PutFile(ctx, domain.FileSpec{
+		Name: "config.json", Kind: domain.FileKindStatic,
+		Source: domain.FileSource{Type: "inline", Content: "json"},
+	}))
+
+	files, err := meta.ListFiles(ctx)
+	require.NoError(t, err)
+	require.Len(t, files, 2)
+	require.Equal(t, []string{"config", "config.json"}, []string{files[0].Name, files[1].Name})
+	plain, err := meta.GetFile(ctx, "config")
+	require.NoError(t, err)
+	require.Equal(t, "plain", plain.Source.Content)
+	jsonFile, err := meta.GetFile(ctx, "config.json")
+	require.NoError(t, err)
+	require.Equal(t, "json", jsonFile.Source.Content)
+
+	require.NoError(t, meta.DeleteFile(ctx, "config"))
+	_, err = meta.GetFile(ctx, "config")
+	require.True(t, os.IsNotExist(err))
+	jsonFile, err = meta.GetFile(ctx, "config.json")
+	require.NoError(t, err)
+	require.Equal(t, "json", jsonFile.Source.Content)
+	require.NoError(t, meta.DeleteFile(ctx, "config.json"))
+	_, err = meta.GetFile(ctx, "config.json")
+	require.True(t, os.IsNotExist(err))
 }
 
 func TestMetaStoreListFilesIncludesProcessorsForUsageInference(t *testing.T) {
@@ -186,23 +240,6 @@ func TestMetaStoreListFilesIncludesProcessorsForUsageInference(t *testing.T) {
 	require.Equal(t, "script", processor.Type)
 	require.Equal(t, domain.StageFile, processor.Stage)
 	require.JSONEq(t, `{"type":"inline","content":"function main(input) { return input; }"}`, string(processor.Params["source"]))
-}
-
-func TestMetaStoreListFilesIgnoresRawContentEntries(t *testing.T) {
-	ctx := context.Background()
-	fsStore := store.NewFSStore(afero.NewMemMapFs())
-	meta := store.NewMetaStore(fsStore)
-
-	require.NoError(t, fsStore.Write(ctx, "files/orphan.js", []byte("raw only")))
-	require.NoError(t, meta.PutFile(ctx, domain.FileSpec{
-		Name:   "default.yaml",
-		Source: domain.FileSource{Type: "inline", Content: "port: 7890\n"},
-	}))
-
-	files, err := meta.ListFiles(ctx)
-	require.NoError(t, err)
-	require.Len(t, files, 1)
-	require.Equal(t, "default.yaml", files[0].Name)
 }
 
 func TestMetaStoreListResourceSummariesExposeTimestamps(t *testing.T) {
@@ -240,7 +277,7 @@ func TestMetaStoreListResourceSummariesExposeTimestamps(t *testing.T) {
 	}
 }
 
-func TestMetaStoreDeleteFileRemovesMetadataAndRawContent(t *testing.T) {
+func TestMetaStoreDeleteFileRemovesJSONRecord(t *testing.T) {
 	ctx := context.Background()
 	fsStore := store.NewFSStore(afero.NewMemMapFs())
 	meta := store.NewMetaStore(fsStore)
@@ -253,28 +290,7 @@ func TestMetaStoreDeleteFileRemovesMetadataAndRawContent(t *testing.T) {
 	require.NoError(t, meta.DeleteFile(ctx, "rename.js"))
 
 	_, err := fsStore.Read(ctx, "files/rename.js.json")
-	require.True(t, os.IsNotExist(err), "metadata should be deleted: %v", err)
-	_, err = fsStore.Read(ctx, "files/rename.js")
-	require.True(t, os.IsNotExist(err), "raw content should be deleted: %v", err)
-}
-
-func TestMetaStoreDeleteFileRemovesCustomLocalSourcePath(t *testing.T) {
-	ctx := context.Background()
-	fsStore := store.NewFSStore(afero.NewMemMapFs())
-	meta := store.NewMetaStore(fsStore)
-
-	require.NoError(t, fsStore.Write(ctx, "files/scripts/rename.js", []byte("function main(input) { return input; }\n")))
-	require.NoError(t, meta.PutFile(ctx, domain.FileSpec{
-		Name:   "rename.js",
-		Source: domain.FileSource{Type: "local", Path: "files/scripts/rename.js"},
-	}))
-
-	require.NoError(t, meta.DeleteFile(ctx, "rename.js"))
-
-	_, err := fsStore.Read(ctx, "files/rename.js.json")
-	require.True(t, os.IsNotExist(err), "metadata should be deleted: %v", err)
-	_, err = fsStore.Read(ctx, "files/scripts/rename.js")
-	require.True(t, os.IsNotExist(err), "custom raw content should be deleted: %v", err)
+	require.True(t, os.IsNotExist(err), "JSON record should be deleted: %v", err)
 }
 
 func TestMetaStoreRoundTripSubscription(t *testing.T) {

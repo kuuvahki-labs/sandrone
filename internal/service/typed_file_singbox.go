@@ -20,7 +20,7 @@ func (singBoxFileDriver) Descriptor() typedFileDescriptor {
 		NodeRenderFormat:  "sing-box-outbounds",
 		SettingsPrototype: SingBoxFileSettings{},
 		SourceRules: FileKindSourceRules{
-			AllowedTypes: []string{"inline", "local", "remote"},
+			AllowedTypes: []string{"inline", "remote"},
 		},
 		Defaults: map[string]any{"source": "built-in", "settings": map[string]any{}},
 		Examples: []map[string]any{{

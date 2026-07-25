@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import type { FileDetail } from "~/features/files/model/types";
 import { type ApiClient, ApiError } from "~/shared/api/client";
 import type { Translator } from "~/shared/i18n/context";
 
@@ -27,11 +28,10 @@ describe("file resource data", () => {
     expect(result.current.items.map((item) => item.name)).toEqual(["newer.yaml", "older.yaml"]);
   });
 
-  it("starts spec and source together, hydrates the body, and caches by name", async () => {
+  it("loads complete inline details from the spec without requesting source content", async () => {
     const spec = deferred<unknown>();
-    const source = deferred<unknown>();
     const getFileSpec = vi.fn(() => spec.promise);
-    const getFileSource = vi.fn(() => source.promise);
+    const getFileSource = vi.fn();
     const client = apiClient({ getFileSource, getFileSpec });
     const { result } = renderHook(() => useFileDetailsResource({ client, showNotice: ignoreNotice, t }));
 
@@ -40,16 +40,14 @@ describe("file resource data", () => {
       detailPromise = result.current.loadFileDetail("profile.yaml");
     });
     expect(getFileSpec).toHaveBeenCalledWith("profile.yaml");
-    expect(getFileSource).toHaveBeenCalledWith("profile.yaml");
-    expect(getFileSpec.mock.invocationCallOrder[0]).toBeLessThan(getFileSource.mock.invocationCallOrder[0]);
+    expect(getFileSource).not.toHaveBeenCalled();
 
     spec.resolve({
       name: "profile.yaml",
       kind: "static",
-      source: { type: "remote", remote: { url: "https://example.test/profile" } },
+      source: { type: "inline", content: "proxies: []\n" },
     });
-    source.resolve({ body: "proxies: []\n", content_type: "application/yaml" });
-    let detail = null;
+    let detail: FileDetail | null = null;
     await act(async () => {
       detail = await detailPromise;
     });
@@ -57,27 +55,26 @@ describe("file resource data", () => {
     expect(detail).toMatchObject({
       name: "profile.yaml",
       source: {
-        type: "remote",
+        type: "inline",
         content: "proxies: []\n",
-        remote: { url: "https://example.test/profile" },
       },
     });
     expect(result.current.fileDetails["profile.yaml"]).toEqual(detail);
   });
 
-  it("keeps the inline fallback when the source type is missing", async () => {
+  it("keeps an implicit typed source distinct from explicit empty inline content", async () => {
     const client = apiClient({
       getFileSpec: vi.fn().mockResolvedValue({ name: "legacy.txt", kind: "static", source: {} }),
-      getFileSource: vi.fn().mockResolvedValue({ body: "legacy body", content_type: "text/plain" }),
+      getFileSource: vi.fn(),
     });
     const { result } = renderHook(() => useFileDetailsResource({ client, showNotice: ignoreNotice, t }));
 
-    let detail = null;
     await act(async () => {
-      detail = await result.current.loadFileDetail("legacy.txt");
+      await result.current.loadFileDetail("legacy.txt");
     });
 
-    expect(detail).toMatchObject({ source: { type: "inline", content: "legacy body" } });
+    expect(result.current.fileDetails["legacy.txt"]?.source).toEqual({});
+    expect(client.getFileSource).not.toHaveBeenCalled();
   });
 
   it("decodes file previews", async () => {
@@ -106,7 +103,6 @@ describe("file resource data", () => {
     const showNotice = vi.fn();
     const client = apiClient({
       getFileSpec: vi.fn().mockRejectedValue(new ApiError(401, "unauthorized", "unauthorized")),
-      getFileSource: vi.fn().mockResolvedValue({ body: "", content_type: "text/plain" }),
       previewFile: vi.fn().mockRejectedValue("offline"),
     });
     const { result } = renderHook(() => useFileDetailsResource({ client, showNotice, t }));

@@ -23,13 +23,7 @@ export type FileKind = string;
 export interface FileSourceDetail {
   type?: string;
   content?: string;
-  path?: string;
   remote?: RemoteInputDetail;
-}
-
-export interface FileSourceContent {
-  body: string;
-  contentType: string;
 }
 
 export interface FileAdaptiveGroupConfigDetail {

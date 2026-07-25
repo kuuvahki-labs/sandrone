@@ -348,6 +348,180 @@ func TestServiceTypedConfigRunsFileProcessorsAfterGeneration(t *testing.T) {
 	require.Contains(t, string(result.Content), "# target=mihomo")
 }
 
+func TestServiceTypedFileScriptSourceCyclesFailAcrossNodeStage(t *testing.T) {
+	tests := map[string]struct {
+		scriptSource string
+		files        []domain.FileSpec
+	}{
+		"direct": {
+			scriptSource: "a.yaml",
+			files: []domain.FileSpec{{
+				Name:   "a.yaml",
+				Kind:   domain.FileKindStatic,
+				Source: domain.FileSource{Type: "inline", Content: "function main(input) { return input; }"},
+			}},
+		},
+		"indirect": {
+			scriptSource: "b.js",
+			files: []domain.FileSpec{
+				{
+					Name:   "a.yaml",
+					Kind:   domain.FileKindStatic,
+					Source: domain.FileSource{Type: "inline", Content: "function main(input) { return input; }"},
+				},
+				{
+					Name:   "b.js",
+					Kind:   domain.FileKindStatic,
+					Source: domain.FileSource{Type: "inline", Content: "function main(input) { return input; }"},
+					Processors: []domain.ProcessorSpec{{
+						Type:  "script",
+						Stage: domain.StageFile,
+						Params: params(t, map[string]any{
+							"source": fileScriptSource("a.yaml"),
+						}),
+					}},
+				},
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			svc := service.New(service.WithFS(afero.NewMemMapFs()))
+			for _, file := range test.files {
+				require.NoError(t, svc.PutFile(ctx, file))
+			}
+			require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+				Name:    "nodes",
+				Type:    domain.SubscriptionTypeLocal,
+				Format:  "uri-list",
+				Content: "ss://aes-128-gcm:secret@example.com:8388#node-a",
+				Processors: []domain.ProcessorSpec{{
+					Type:  "script",
+					Stage: domain.StageNodes,
+					Params: params(t, map[string]any{
+						"source": fileScriptSource(test.scriptSource),
+					}),
+				}},
+			}))
+			outer := domain.FileSpec{
+				Name:   "a.yaml",
+				Kind:   domain.FileKindMihomo,
+				Source: domain.FileSource{},
+				Config: &domain.FileConfig{Subscriptions: []string{"nodes"}},
+			}
+
+			_, err := svc.GetFile(ctx, domain.FileRequest{Spec: &outer})
+
+			require.Error(t, err)
+			require.True(t, domain.IsCode(err, domain.CodeFileDependencyCycle), "got %v", err)
+		})
+	}
+}
+
+type countingFileProcessor struct {
+	calls *int
+}
+
+func (p countingFileProcessor) Name() string { return "count" }
+
+func (p countingFileProcessor) ApplyFile(_ context.Context, in domain.FileProcessInput) (domain.FileProcessOutput, error) {
+	(*p.calls)++
+	return domain.FileProcessOutput{File: in.File}, nil
+}
+
+func TestServiceTypedFileScriptSourcesReuseFileMemoAndRecordDependencies(t *testing.T) {
+	ctx := context.Background()
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	calls := 0
+	svc.Registry().RegisterFile("count", func(domain.ProcessorSpec) (domain.FileProcessor, error) {
+		return countingFileProcessor{calls: &calls}, nil
+	})
+	require.NoError(t, svc.PutFile(ctx, domain.FileSpec{
+		Name:   "helper.js",
+		Kind:   domain.FileKindStatic,
+		Source: domain.FileSource{Type: "inline", Content: "function main(input) { return input; }"},
+		Processors: []domain.ProcessorSpec{{
+			Type:  "count",
+			Stage: domain.StageFile,
+		}},
+	}))
+	for _, name := range []string{"first", "second"} {
+		require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+			Name:    name,
+			Type:    domain.SubscriptionTypeLocal,
+			Format:  "uri-list",
+			Content: "ss://aes-128-gcm:secret@example.com:8388#" + name,
+			Processors: []domain.ProcessorSpec{{
+				Type:  "script",
+				Stage: domain.StageNodes,
+				Params: params(t, map[string]any{
+					"source": fileScriptSource("helper.js"),
+				}),
+			}},
+		}))
+	}
+	spec := domain.FileSpec{
+		Name:   "config.yaml",
+		Kind:   domain.FileKindMihomo,
+		Source: domain.FileSource{},
+		Config: &domain.FileConfig{Subscriptions: []string{"first", "second"}},
+	}
+
+	result, err := svc.GetFile(ctx, domain.FileRequest{Spec: &spec})
+
+	require.NoError(t, err)
+	require.Equal(t, 1, calls)
+	require.Contains(t, result.Report.Dependencies, domain.ResourceRef{Kind: "subscription", Name: "first"})
+	require.Contains(t, result.Report.Dependencies, domain.ResourceRef{Kind: "subscription", Name: "second"})
+	require.Contains(t, result.Report.Dependencies, domain.ResourceRef{Kind: "file", Name: "helper.js"})
+}
+
+func TestServiceTypedNodeScriptsDoNotGainFileAPIFromResolutionContext(t *testing.T) {
+	ctx := context.Background()
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	require.NoError(t, svc.PutFile(ctx, domain.FileSpec{
+		Name:   "helper.js",
+		Kind:   domain.FileKindStatic,
+		Source: domain.FileSource{Type: "inline", Content: "helper"},
+	}))
+	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+		Name:    "nodes",
+		Type:    domain.SubscriptionTypeLocal,
+		Format:  "uri-list",
+		Content: "ss://aes-128-gcm:secret@example.com:8388#node-a",
+		Processors: []domain.ProcessorSpec{{
+			Type:  "script",
+			Stage: domain.StageNodes,
+			Params: params(t, map[string]any{
+				"source": inlineScriptSource(`function main(input, api) {
+  var rejected = false;
+  try {
+    api.file.content("helper.js");
+  } catch (error) {
+    rejected = true;
+  }
+  if (!rejected) throw new Error("resolution context exposed api.file.content");
+  return input;
+}`),
+			}),
+		}},
+	}))
+	spec := domain.FileSpec{
+		Name:   "config.yaml",
+		Kind:   domain.FileKindMihomo,
+		Source: domain.FileSource{},
+		Config: &domain.FileConfig{Subscriptions: []string{"nodes"}},
+	}
+
+	result, err := svc.GetFile(ctx, domain.FileRequest{Spec: &spec})
+
+	require.NoError(t, err)
+	require.NotEmpty(t, result.Content)
+	require.NotContains(t, result.Report.Dependencies, domain.ResourceRef{Kind: "file", Name: "helper.js"})
+}
+
 func containsOutboundTag(outbounds []any, tag string) bool {
 	for _, item := range outbounds {
 		outbound, ok := item.(map[string]any)

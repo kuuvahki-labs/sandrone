@@ -65,6 +65,21 @@ curl -sS -X POST \
 
 响应中的 `after` 节点名应以 `script-` 开头。只需标准重命名、过滤或排序时，优先使用内建 processor。
 
+引用文件脚本时，Sandrone 会先渲染目标文件资源，再把最终正文作为脚本执行。
+若脚本文件本身需要渲染参数，把字符串键值放在 `params.source.args`；当前脚本的
+业务参数仍放在 `params.args`。两组参数彼此不继承：
+
+```json
+{
+  "source": {
+    "type": "file",
+    "name": "generated-script.js",
+    "args": {"variant": "production"}
+  },
+  "args": {"prefix": "script-"}
+}
+```
+
 ## File-stage：补充 YAML 字段
 
 保存一个读取当前文件、修改 `mixed-port` 再序列化的脚本：

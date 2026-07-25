@@ -26,7 +26,7 @@ func params(t *testing.T, m map[string]any) map[string]json.RawMessage {
 }
 
 func registerScript(r *processor.Registry, opts ...script.RegisterOption) {
-	loader := script.WithLoader(func(source script.ScriptSource) (string, string, error) {
+	loader := script.WithLoader(func(_ context.Context, source script.ScriptSource) (string, string, error) {
 		body, err := os.ReadFile(source.Name)
 		return string(body), source.Name, err
 	})
@@ -80,6 +80,40 @@ func TestScriptNodesFilterRename(t *testing.T) {
 	require.NotContains(t, warningCodes(out.Nodes[0].Warnings), "script_modified")
 }
 
+func TestScriptLoadsFileSourceAtExecutionWithContext(t *testing.T) {
+	type contextKey struct{}
+	ctx := context.WithValue(context.Background(), contextKey{}, "execution")
+	calls := 0
+	r := processor.NewRegistry()
+	registerScript(r, script.WithLoader(func(loadCtx context.Context, source script.ScriptSource) (string, string, error) {
+		calls++
+		require.Equal(t, "execution", loadCtx.Value(contextKey{}))
+		require.Equal(t, "rename.js", source.Name)
+		return `function main(input) {
+  input.nodes.forEach(function(node) { node.name = "runtime-" + node.name; });
+  return input;
+}`, source.Name, nil
+	}))
+
+	proc, err := r.BuildNode(domain.ProcessorSpec{
+		Type:  "script",
+		Stage: domain.StageNodes,
+		Params: params(t, map[string]any{
+			"source": fileScriptSource("rename.js"),
+		}),
+	})
+	require.NoError(t, err)
+	require.Zero(t, calls)
+
+	out, err := proc.ApplyNodes(ctx, domain.NodeProcessInput{
+		Nodes: []domain.NodeIR{{Name: "a", Type: domain.NodeTypeShadowsocks}},
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, 1, calls)
+	require.Equal(t, "runtime-a", out.Nodes[0].Name)
+}
+
 func TestScriptFileAppendsGroups(t *testing.T) {
 	r := processor.NewRegistry()
 	registerScript(r)
@@ -127,6 +161,119 @@ func TestScriptRegistryAmbiguousWithoutStage(t *testing.T) {
 	_, err := r.SelectSpecs([]domain.ProcessorSpec{{Type: "script"}}, domain.StageNodes)
 	require.Error(t, err)
 	require.True(t, domain.IsCode(err, domain.CodeProcessorConfigInvalid))
+}
+
+func TestScriptSourceSerializesArgs(t *testing.T) {
+	var source script.ScriptSource
+	require.NoError(t, json.Unmarshal([]byte(`{
+		"type": "file",
+		"name": "rename.js",
+		"args": {"prefix": "rendered-"}
+	}`), &source))
+
+	body, err := json.Marshal(source)
+
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"type": "file",
+		"name": "rename.js",
+		"args": {"prefix": "rendered-"}
+	}`, string(body))
+}
+
+func TestScriptRejectsSourceArgsForNonFileSources(t *testing.T) {
+	tests := map[string]map[string]any{
+		"missing type": {
+			"args": map[string]string{"name": "missing"},
+		},
+		"inline": {
+			"type":    "inline",
+			"content": "function main(input) { return input; }",
+			"args":    map[string]string{"name": "inline"},
+		},
+		"remote": {
+			"type":   "remote",
+			"remote": map[string]any{"url": "https://example.com/script.js"},
+			"args":   map[string]string{"name": "remote"},
+		},
+	}
+
+	for name, source := range tests {
+		t.Run(name, func(t *testing.T) {
+			r := processor.NewRegistry()
+			registerScript(r)
+
+			_, err := r.BuildNode(domain.ProcessorSpec{
+				Type:  "script",
+				Stage: domain.StageNodes,
+				Params: params(t, map[string]any{
+					"source": source,
+				}),
+			})
+
+			require.Error(t, err)
+			require.True(t, domain.IsCode(err, domain.CodeProcessorConfigInvalid), "got %v", err)
+			require.ErrorContains(t, err, "source.args")
+		})
+	}
+}
+
+func TestScriptRejectsNullSourceArgs(t *testing.T) {
+	tests := map[string]map[string]any{
+		"inline": {
+			"type":    "inline",
+			"content": "function main(input) { return input; }",
+			"args":    nil,
+		},
+		"remote": {
+			"type":   "remote",
+			"remote": map[string]any{"url": "https://example.com/script.js"},
+			"args":   nil,
+		},
+		"file": {
+			"type": "file",
+			"name": "rename.js",
+			"args": nil,
+		},
+	}
+
+	for name, source := range tests {
+		t.Run(name, func(t *testing.T) {
+			r := processor.NewRegistry()
+			registerScript(r)
+
+			_, err := r.BuildNode(domain.ProcessorSpec{
+				Type:   "script",
+				Stage:  domain.StageNodes,
+				Params: params(t, map[string]any{"source": source}),
+			})
+
+			require.Error(t, err)
+			require.True(t, domain.IsCode(err, domain.CodeProcessorConfigInvalid), "got %v", err)
+			require.ErrorContains(t, err, "source.args")
+		})
+	}
+}
+
+func TestScriptSourceStrictDecodeStillRejectsUnknownFields(t *testing.T) {
+	r := processor.NewRegistry()
+	registerScript(r)
+
+	_, err := r.BuildNode(domain.ProcessorSpec{
+		Type:  "script",
+		Stage: domain.StageNodes,
+		Params: params(t, map[string]any{
+			"source": map[string]any{
+				"type":       "file",
+				"name":       "rename.js",
+				"unexpected": true,
+			},
+		}),
+	})
+
+	require.Error(t, err)
+	require.True(t, domain.IsCode(err, domain.CodeProcessorConfigInvalid), "got %v", err)
+	require.ErrorContains(t, err, "unknown field")
 }
 
 func TestScriptLegacyInlineContent(t *testing.T) {

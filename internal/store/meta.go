@@ -54,18 +54,8 @@ func (s *MetaStore) PutFile(ctx context.Context, file domain.FileSpec) error {
 	if file.Name == "" {
 		return fmt.Errorf("%w: file name is required", ErrInvalidKey)
 	}
-	metadata, rawKey, rawBody, err := normalizeFileForStorage(file)
-	if err != nil {
-		return err
-	}
-	return s.update(ctx, func(resourceStore Store) error {
-		if rawKey != "" {
-			if err := resourceStore.Write(ctx, rawKey, rawBody); err != nil {
-				return err
-			}
-		}
-		return writeJSON(ctx, resourceStore, "files", metadata.Name, metadata)
-	})
+	file = normalizeFileForStorage(file)
+	return s.writeJSON(ctx, "files", file.Name, file)
 }
 
 func (s *MetaStore) GetFile(ctx context.Context, name string) (domain.FileSpec, error) {
@@ -211,25 +201,7 @@ func (s *MetaStore) DeleteSubscription(ctx context.Context, name string) error {
 }
 
 func (s *MetaStore) DeleteFile(ctx context.Context, name string) error {
-	return s.update(ctx, func(resourceStore Store) error {
-		var file domain.FileSpec
-		if err := readJSON(ctx, resourceStore, "files", name, &file); err != nil {
-			return err
-		}
-		keys, err := fileContentKeysForDelete(name, file.Source)
-		if err != nil {
-			return err
-		}
-		if err := deleteResource(ctx, resourceStore, "files", name); err != nil {
-			return err
-		}
-		for _, key := range keys {
-			if err := resourceStore.Delete(ctx, key); err != nil && !errors.Is(err, os.ErrNotExist) {
-				return err
-			}
-		}
-		return nil
-	})
+	return s.deleteResource(ctx, "files", name)
 }
 
 func (s *MetaStore) DeleteShare(ctx context.Context, id string) error {
@@ -291,13 +263,6 @@ func deleteResource(ctx context.Context, resourceStore Store, prefix string, nam
 	return resourceStore.Delete(ctx, key)
 }
 
-func (s *MetaStore) update(ctx context.Context, update func(Store) error) error {
-	if coordinator, ok := s.store.(Coordinator); ok {
-		return coordinator.Update(ctx, update)
-	}
-	return update(s.store)
-}
-
 func (s *MetaStore) list(ctx context.Context, kind, prefix string, enrich func([]byte, *domain.ResourceSummary)) ([]domain.ResourceSummary, error) {
 	entries, err := s.store.List(ctx, prefix)
 	if err != nil {
@@ -352,71 +317,14 @@ func resourceKey(prefix string, name string) (string, error) {
 	return prefix + "/" + name + ".json", nil
 }
 
-func normalizeFileForStorage(file domain.FileSpec) (domain.FileSpec, string, []byte, error) {
+func normalizeFileForStorage(file domain.FileSpec) domain.FileSpec {
 	file.DisplayName = strings.TrimSpace(file.DisplayName)
 	file.Source.Type = strings.ToLower(strings.TrimSpace(file.Source.Type))
-	file.Source.Path = strings.TrimSpace(file.Source.Path)
 	switch file.Source.Type {
 	case "inline":
-		rawKey, err := fileContentKey(file.Name, file.Source.Path)
-		if err != nil {
-			return domain.FileSpec{}, "", nil, err
-		}
-		rawBody := []byte(file.Source.Content)
-		file.Source = domain.FileSource{Type: "local"}
-		file.Source.Path = metadataPathForRawKey(file.Name, rawKey)
-		return file, rawKey, rawBody, nil
-	case "local":
-		if _, err := fileContentKey(file.Name, file.Source.Path); err != nil {
-			return domain.FileSpec{}, "", nil, err
-		}
-		file.Source.Content = ""
 		file.Source.Remote = nil
-		return file, "", nil, nil
 	case "remote":
 		file.Source.Content = ""
-		file.Source.Path = ""
-		return file, "", nil, nil
-	default:
-		return file, "", nil, nil
 	}
-}
-
-func fileContentKey(name string, sourcePath string) (string, error) {
-	sourcePath = strings.TrimSpace(sourcePath)
-	if sourcePath != "" {
-		return CleanKey(sourcePath)
-	}
-	name, err := CleanKey(name)
-	if err != nil {
-		return "", err
-	}
-	return "files/" + name, nil
-}
-
-func metadataPathForRawKey(name, rawKey string) string {
-	defaultKey, err := fileContentKey(name, "")
-	if err == nil && rawKey == defaultKey {
-		return ""
-	}
-	return rawKey
-}
-
-func fileContentKeysForDelete(name string, source domain.FileSource) ([]string, error) {
-	keys := []string{}
-	defaultKey, err := fileContentKey(name, "")
-	if err != nil {
-		return nil, err
-	}
-	keys = append(keys, defaultKey)
-	if strings.TrimSpace(source.Path) != "" {
-		key, err := fileContentKey(name, source.Path)
-		if err != nil {
-			return nil, err
-		}
-		if key != defaultKey {
-			keys = append(keys, key)
-		}
-	}
-	return keys, nil
+	return file
 }

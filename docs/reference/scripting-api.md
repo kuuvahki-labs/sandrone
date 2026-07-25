@@ -64,9 +64,15 @@ source:
 source:
   type: file
   name: normalize.js
+  args:
+    environment: production
 ```
 
-加载器读取该文件资源的源内容，不执行该资源自身的 processors。资源可以使用受支持的 inline、local 或 remote 文件来源；非法、绝对或越界资源名会被拒绝。
+加载器以 `render` 模式执行该文件资源，并把最终正文当作 JavaScript。也就是说，
+typed 编译和该资源自身的 file-stage processors 都会生效。`source.args` 只接受
+字符串键值，并只传给这次脚本文件渲染；它不会进入随后脚本运行的
+`input.args`。文件资源自身只能使用支持的 inline 或 remote FileSource；非法、
+绝对、越界或写成内部 `files/` key 的资源名会被拒绝。
 
 ### `remote`
 
@@ -176,7 +182,12 @@ JSON 中带 `omitempty` 的成员在无值时可能不存在。脚本应对 `arg
 const prefix = (input.args && input.args.prefix) || "";
 ```
 
-`api.subscription.produce` 与 `api.file.content` 的 `options.args` 只接受字符串键值，并传给被解析资源；当前调用的请求参数仍作为基值，同名显式参数覆盖它。
+file-backed source 的 `source.args` 与这里的 `params.args` 是两个独立层：
+前者只渲染脚本文件，后者只参与当前脚本的 `input.args` 合并，彼此不继承。
+
+`api.subscription.produce` 与 `api.file.content` 的 `options.args` 只接受字符串
+键值，并作为子调用的完整参数集。省略 `options.args` 表示子调用无参数；父文件
+请求参数和当前脚本 `input.args` 都不会隐式继承。
 
 ## 注入 API
 
@@ -254,7 +265,8 @@ header；未知字段同样会使 `api.ini.stringify` 失败。输出统一使�
 
 ### `api.subscription.produce(name, options?)`
 
-解析已登记订阅。`options` 可含 `target` 与字符串 `args`：
+解析已登记订阅。`options` 可含 `target` 与字符串 `args`；`args` 是该子调用的
+完整参数集，不继承父调用：
 
 - 没有 `target` 时返回 `{kind: "nodes", nodes, report}`；
 - 有 `target` 时用对应 renderer 返回 `{kind: "content", target, content, report}`；
@@ -264,7 +276,9 @@ header；未知字段同样会使 `api.ini.stringify` 失败。输出统一使�
 
 ### `api.file.content(name, options?)`
 
-读取另一个已登记文件的最终处理结果，返回内容字符串。`options.args` 是传给该文件的字符串参数。该 API 只在文件渲染上下文中可用，并记录动态文件依赖；依赖环得到 `file_dependency_cycle`。
+读取另一个已登记文件的最终处理结果，返回内容字符串。`options.args` 是传给
+该文件的完整字符串参数集，省略时不会继承父调用参数。该 API 只在文件渲染
+上下文中可用，并记录动态文件依赖；依赖环得到 `file_dependency_cycle`。
 
 ## 返回值与转换
 

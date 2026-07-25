@@ -53,9 +53,8 @@ func fileConfigSchema() *jsonschema.Schema {
 
 func fileSourceSchema() *jsonschema.Schema {
 	return closedObject(map[string]*jsonschema.Schema{
-		"type":    enumSchema("inline", "local", "remote"),
+		"type":    enumSchema("inline", "remote"),
 		"content": stringSchema(),
-		"path":    stringSchema(),
 		"remote":  remoteInputSchema(),
 	}, nil)
 }

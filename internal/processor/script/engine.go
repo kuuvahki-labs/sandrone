@@ -2,6 +2,7 @@
 package script
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -32,8 +33,45 @@ type ScriptSource struct {
 	Type    string              `json:"type,omitempty" jsonschema:"Script source kind" enum:"inline,file,remote"`
 	Content string              `json:"content,omitempty" jsonschema:"JavaScript body for inline source"`
 	Name    string              `json:"name,omitempty" jsonschema:"Controlled resource name for file source"`
+	Args    map[string]string   `json:"args,omitempty" jsonschema:"Arguments used to render a file source"`
 	Remote  *domain.RemoteInput `json:"remote,omitempty" jsonschema:"Controlled remote source configuration"`
 	SHA256  string              `json:"sha256,omitempty" jsonschema:"Optional lowercase SHA-256 integrity digest" pattern:"^[0-9a-f]{64}$"`
+
+	argsPresent bool
+}
+
+func (s *ScriptSource) UnmarshalJSON(body []byte) error {
+	var wire struct {
+		Type    string              `json:"type,omitempty"`
+		Content string              `json:"content,omitempty"`
+		Name    string              `json:"name,omitempty"`
+		Args    json.RawMessage     `json:"args,omitempty"`
+		Remote  *domain.RemoteInput `json:"remote,omitempty"`
+		SHA256  string              `json:"sha256,omitempty"`
+	}
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&wire); err != nil {
+		return err
+	}
+	*s = ScriptSource{
+		Type:    wire.Type,
+		Content: wire.Content,
+		Name:    wire.Name,
+		Remote:  wire.Remote,
+		SHA256:  wire.SHA256,
+	}
+	if wire.Args == nil {
+		return nil
+	}
+	s.argsPresent = true
+	if bytes.Equal(bytes.TrimSpace(wire.Args), []byte("null")) {
+		return errors.New("source.args must be an object, not null")
+	}
+	if err := json.Unmarshal(wire.Args, &s.Args); err != nil {
+		return fmt.Errorf("decode source.args: %w", err)
+	}
+	return nil
 }
 
 // PermissionConfig declares which side-effect APIs the script may use.
@@ -44,13 +82,13 @@ type PermissionConfig struct {
 	Resources []string `json:"resources,omitempty" jsonschema:"Controlled subscription and file resources the script may read"`
 }
 
-type Loader func(source ScriptSource) (content string, id string, err error)
+type Loader func(ctx context.Context, source ScriptSource) (content string, id string, err error)
 
 const defaultTimeout = 2 * time.Second
 
 // loadScriptContent resolves Config.Source into the script body and a stable
 // identifier used by the JS compiler and source trace.
-func loadScriptContent(cfg Config, loader Loader) (string, string, error) {
+func loadScriptContent(ctx context.Context, cfg Config, loader Loader) (string, string, error) {
 	if cfg.Source.Type == "inline" {
 		id := cfg.ScriptID
 		if id == "" {
@@ -70,8 +108,11 @@ func loadScriptContent(cfg Config, loader Loader) (string, string, error) {
 			Message: "script source loading is not configured",
 		}
 	}
-	body, id, err := loader(cfg.Source)
+	body, id, err := loader(ctx, cfg.Source)
 	if err != nil {
+		if domain.IsCode(err, domain.CodeFileDependencyCycle) {
+			return "", "", err
+		}
 		return "", "", &domain.AppError{
 			Code:    domain.CodeProcessorConfigInvalid,
 			Message: fmt.Sprintf("load script %s", scriptSourceID(cfg.Source)),
@@ -101,30 +142,41 @@ func scriptSourceID(source ScriptSource) string {
 // invocation grabs the mutex.
 type runner struct {
 	mu      sync.Mutex
-	content string
 	id      string
 	program *goja.Program
 	cfg     Config
 	api     *scriptAPI
+	loader  Loader
 }
 
 func newRunner(cfg Config, api *scriptAPI, loader Loader) (*runner, error) {
-	content, id, err := loadScriptContent(cfg, loader)
+	r := &runner{cfg: cfg, api: api, loader: loader}
+	if cfg.Source.Type != "inline" {
+		if loader == nil {
+			return nil, &domain.AppError{
+				Code:    domain.CodeProcessorConfigInvalid,
+				Message: "script source loading is not configured",
+			}
+		}
+		return r, nil
+	}
+	content, id, err := loadScriptContent(context.Background(), cfg, loader)
 	if err != nil {
 		return nil, err
 	}
-	program, err := goja.Compile(id, content, true)
+	r.id = id
+	r.program, err = compileScript(content, id)
 	if err != nil {
-		return nil, &domain.AppError{
-			Code:    domain.CodeScriptRuntime,
-			Message: fmt.Sprintf("compile script %s", id),
-			Cause:   err,
-		}
+		return nil, err
 	}
-	return &runner{content: content, id: id, program: program, cfg: cfg, api: api}, nil
+	return r, nil
 }
 
 func (r *runner) run(ctx context.Context, envelope ScriptEnvelope) (ScriptEnvelope, error) {
+	program, id, err := r.programForRun(ctx)
+	if err != nil {
+		return envelope, err
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.resetAPISinks()
@@ -165,16 +217,16 @@ func (r *runner) run(ctx context.Context, envelope ScriptEnvelope) (ScriptEnvelo
 	}()
 	defer close(done)
 
-	if _, err := vm.RunProgram(r.program); err != nil {
+	if _, err := vm.RunProgram(program); err != nil {
 		if isScriptTimeout() {
 			return envelope, &domain.AppError{
 				Code:    domain.CodeScriptTimeout,
-				Message: fmt.Sprintf("script %s timed out", r.id),
+				Message: fmt.Sprintf("script %s timed out", id),
 			}
 		}
 		return envelope, &domain.AppError{
 			Code:    domain.CodeScriptRuntime,
-			Message: fmt.Sprintf("eval script %s", r.id),
+			Message: fmt.Sprintf("eval script %s", id),
 			Cause:   err,
 		}
 	}
@@ -183,7 +235,7 @@ func (r *runner) run(ctx context.Context, envelope ScriptEnvelope) (ScriptEnvelo
 	if !ok {
 		return envelope, &domain.AppError{
 			Code:    domain.CodeScriptRuntime,
-			Message: fmt.Sprintf("script %s missing main(input, api)", r.id),
+			Message: fmt.Sprintf("script %s missing main(input, api)", id),
 		}
 	}
 
@@ -197,7 +249,7 @@ func (r *runner) run(ctx context.Context, envelope ScriptEnvelope) (ScriptEnvelo
 		if isScriptTimeout() {
 			return envelope, &domain.AppError{
 				Code:    domain.CodeScriptTimeout,
-				Message: fmt.Sprintf("script %s timed out", r.id),
+				Message: fmt.Sprintf("script %s timed out", id),
 			}
 		}
 		var appErr *domain.AppError
@@ -206,7 +258,7 @@ func (r *runner) run(ctx context.Context, envelope ScriptEnvelope) (ScriptEnvelo
 		}
 		return envelope, &domain.AppError{
 			Code:    domain.CodeScriptRuntime,
-			Message: fmt.Sprintf("script %s main() failed", r.id),
+			Message: fmt.Sprintf("script %s main() failed", id),
 			Cause:   err,
 		}
 	}
@@ -218,6 +270,33 @@ func (r *runner) run(ctx context.Context, envelope ScriptEnvelope) (ScriptEnvelo
 		return envelope, err
 	}
 	return r.appendAPIWarnings(updated), nil
+}
+
+func (r *runner) programForRun(ctx context.Context) (*goja.Program, string, error) {
+	if r.cfg.Source.Type == "inline" {
+		return r.program, r.id, nil
+	}
+	content, id, err := loadScriptContent(ctx, r.cfg, r.loader)
+	if err != nil {
+		return nil, "", err
+	}
+	program, err := compileScript(content, id)
+	if err != nil {
+		return nil, "", err
+	}
+	return program, id, nil
+}
+
+func compileScript(content, id string) (*goja.Program, error) {
+	program, err := goja.Compile(id, content, true)
+	if err != nil {
+		return nil, &domain.AppError{
+			Code:    domain.CodeScriptRuntime,
+			Message: fmt.Sprintf("compile script %s", id),
+			Cause:   err,
+		}
+	}
+	return program, nil
 }
 
 func (r *runner) resetAPISinks() {

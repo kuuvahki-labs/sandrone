@@ -12,10 +12,10 @@ or diagnosis does not.
 definition before replacement. `delete` is immediate and has no recycle bin:
 
 - Subscription deletion removes its saved definition.
-- File deletion removes the FileSpec and service-managed default or explicitly
-  controlled local source content.
+- File deletion removes the single JSON record containing the complete
+  FileSpec, including inline content.
 
-Read the definition and any source that must be preserved before deletion.
+Read the complete definition before deletion.
 
 ## External Effects
 

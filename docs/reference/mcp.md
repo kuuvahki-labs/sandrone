@@ -55,10 +55,9 @@ script，以 `SANDRONE_URL` 指向 Sandrone server，并通过可选
 管理模式面向可信本机 Agent，不是多租户授权边界。启用后，任何能连接该 MCP
 server 的客户端都可以写入当前 data dir：`put` 会立即保存并覆盖同名定义，
 `delete` 会立即删除，不提供确认、回收站或预览式写入。调用方应先读取当前
-resource，并只在用户明确要求持久化或删除时调用管理 tool。尤其是
-`sandrone_delete_file`：除 FileSpec definition 外，它还会删除 service 管理的
-默认或显式受控 local source 内容；如需备份，Agent 应在删除前分别读取
-definition 和 source。完整删除语义见
+resource，并只在用户明确要求持久化或删除时调用管理 tool。
+`sandrone_delete_file` 只删除保存完整 FileSpec 的单个 JSON record；如需备份，
+Agent 应先读取 definition。完整删除语义见
 [文件 HTTP API 的删除章节](http-api/files.md#delete-v1filesname)。
 
 MCP SDK 发布每个 tool 的封闭 input schema。调用方应以 `tools/list` 返回的
@@ -80,7 +79,7 @@ schema 为准；未知字段会被拒绝。与 Go/持久化表示不同，MCP wi
 | `sandrone_preview_subscription` | 已保存的 subscription `name` 与可选字符串 `args`。 | processor 前后的节点、数量与 `report`。 |
 | `sandrone_render_subscription` | 已保存的 subscription `name`、目标 `format` 与可选字符串 `args`。 | `content_type`、可选 `body` 与 `report`。 |
 | `sandrone_get_subscription_traffic` | 已保存的 remote subscription `name`；可用 `refresh` 强制刷新。 | 流量 metadata 与 `report`。 |
-| `sandrone_get_file` | 已保存的 `file` 名称、可选 `target`/字符串 `args`；`mode` 为 `render`、`source` 或 `spec`。 | render 返回正文与 report；source 返回 `FileDocument`；spec 返回定义与 `resource_uri`。 |
+| `sandrone_get_file` | 已保存的 `file` 名称、可选 `target`/字符串 `args`；`mode` 为 `render`、`source` 或 `spec`，省略时默认 `render`。 | render 返回正文与 report；source 返回 `FileDocument`；spec 返回完整定义与 `resource_uri`。 |
 | `sandrone_validate_file` | 已保存的 `file` 名称或 inline `spec`，以及可选 `target`/字符串 `args`。 | `ok` 与完整 `report`，不发布最终文件正文。 |
 
 `sandrone_convert` 的格式与有损边界见[格式与能力参考](capabilities.md)；
@@ -100,7 +99,7 @@ cursor；后续页必须沿用生成该 cursor 时相同的 `kind`。列表按 k
 | `sandrone_put_subscription` | 完整具名 `Subscription` 定义。 | `ok` 与定义的 `resource_uri`；同名定义被覆盖。 |
 | `sandrone_delete_subscription` | subscription `name`。 | `ok`、`deleted` 与原定义的 `resource_uri`。 |
 | `sandrone_put_file` | 完整具名 `FileSpec` 定义。 | `ok` 与定义的 `resource_uri`；同名定义被覆盖。 |
-| `sandrone_delete_file` | file `name`。 | 立即删除 FileSpec definition 及其 service 管理的默认/显式受控 local source 内容；返回 `ok`、`deleted` 与原定义的 `resource_uri`。 |
+| `sandrone_delete_file` | file `name`。 | 立即删除保存完整 FileSpec 的 JSON record；返回 `ok`、`deleted` 与原定义的 `resource_uri`。 |
 
 Subscription 的类型与保存语义见
 [HTTP 订阅资源参考](http-api/subscriptions.md)；`FileSpec.kind`、source、

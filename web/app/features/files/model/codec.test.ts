@@ -4,7 +4,6 @@ import {
   fileDetailFromAPI,
   filePreviewFromAPI,
   filesFromResourceList,
-  fileSourceContentFromAPI,
   ruleSetCatalogFromAPI,
 } from "./codec";
 
@@ -44,13 +43,6 @@ describe("file model codec", () => {
         { name: "domain-set", url: "https://example.com/domain.list", ruleKind: "domain", referenceType: "DOMAIN-SET" },
         { name: "invalid-reference", url: "https://example.com/invalid.list", ruleKind: "mixed" },
       ],
-    });
-  });
-
-  it("maps file source content envelopes", () => {
-    expect(fileSourceContentFromAPI({ content_type: "application/json", body: "{\n}\n" })).toEqual({
-      contentType: "application/json",
-      body: "{\n}\n",
     });
   });
 
@@ -101,6 +93,19 @@ describe("file model codec", () => {
         kind: "static",
       },
     });
+  });
+
+  it("preserves implicit and explicit empty file sources as distinct values", () => {
+    expect(fileDetailFromAPI({
+      name: "implicit.yaml",
+      kind: "mihomo",
+      source: {},
+    }).source).toEqual({});
+    expect(fileDetailFromAPI({
+      name: "empty.txt",
+      kind: "static",
+      source: { type: "inline", content: "" },
+    }).source).toEqual({ type: "inline", content: "" });
   });
 
   it("keeps kind separate from source type in file summaries", () => {

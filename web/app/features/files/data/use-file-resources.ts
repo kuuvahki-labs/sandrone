@@ -4,7 +4,6 @@ import {
   fileDetailFromAPI,
   filePreviewFromAPI,
   filesFromResourceList,
-  fileSourceContentFromAPI,
 } from "~/features/files/model/codec";
 import type { FileDetail, FileItem } from "~/features/files/model/types";
 import { type ApiClient, ApiError } from "~/shared/api/client";
@@ -32,20 +31,9 @@ export function useFileDetailsResource({ client, showNotice, t }: FileResourcePo
 
   const loadFileDetail = useCallback(async (name: string) => {
     try {
-      const [specValue, sourceValue] = await Promise.all([
-        client.getFileSpec(name),
-        client.getFileSource(name),
-      ]);
-      const detail = fileDetailFromAPI(specValue);
-      const source = fileSourceContentFromAPI(sourceValue);
-      const hydratedDetail: FileDetail = {
-        ...detail,
-        source: detail.source.type
-          ? { ...detail.source, content: source.body }
-          : { type: "inline", content: source.body },
-      };
-      setFileDetails((current) => ({ ...current, [name]: hydratedDetail }));
-      return hydratedDetail;
+      const detail = fileDetailFromAPI(await client.getFileSpec(name));
+      setFileDetails((current) => ({ ...current, [name]: detail }));
+      return detail;
     } catch (error) {
       showDetailError(error, showNotice, t, "errors.fileDefinitionLoadFailed");
       return null;

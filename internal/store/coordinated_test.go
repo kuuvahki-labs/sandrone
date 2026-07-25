@@ -3,14 +3,12 @@ package store_test
 import (
 	"context"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 
-	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/store"
 )
 
@@ -124,141 +122,6 @@ func TestCoordinatorCallbacksUseRawStoreWithoutReentrantDeadlock(t *testing.T) {
 		})
 	}()
 	require.NoError(t, requireResult(t, viewDone, "callback store read deadlocked"))
-}
-
-func TestMetaStorePutFileCannotBeViewedBetweenBodyAndMetadataWrites(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	bodyWritten := make(chan struct{})
-	releaseBodyWrite := make(chan struct{})
-	rawStore := &writeGateStore{
-		Store:   store.NewFSStore(afero.NewMemMapFs()),
-		gateKey: "files/atomic.txt",
-		written: bodyWritten,
-		release: releaseBodyWrite,
-	}
-	coordinator := store.Coordinate(rawStore)
-	metaStore := store.NewMetaStore(coordinator)
-
-	putDone := make(chan error, 1)
-	go func() {
-		putDone <- metaStore.PutFile(ctx, domain.FileSpec{
-			Name:   "atomic.txt",
-			Source: domain.FileSource{Type: "inline", Content: "complete"},
-		})
-	}()
-	requireSignal(t, bodyWritten, "file body was not written")
-
-	viewAttempted := make(chan struct{})
-	viewEntered := make(chan struct{})
-	viewDone := make(chan error, 1)
-	go func() {
-		close(viewAttempted)
-		viewDone <- coordinator.View(ctx, func(callbackStore store.Store) error {
-			close(viewEntered)
-			if _, err := callbackStore.Read(ctx, "files/atomic.txt"); err != nil {
-				return fmt.Errorf("read body: %w", err)
-			}
-			if _, err := callbackStore.Read(ctx, "files/atomic.txt.json"); err != nil {
-				return fmt.Errorf("read metadata: %w", err)
-			}
-			return nil
-		})
-	}()
-	requireSignal(t, viewAttempted, "view was not attempted")
-	requireBlocked(t, viewEntered, "view observed the file after its body write but before its metadata write")
-
-	close(releaseBodyWrite)
-	require.NoError(t, requireResult(t, putDone, "PutFile did not finish"))
-	requireSignal(t, viewEntered, "view did not enter after PutFile finished")
-	require.NoError(t, requireResult(t, viewDone, "view did not finish"))
-}
-
-func TestMetaStoreDeleteFileCannotBeViewedBetweenMetadataAndBodyDeletes(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	baseStore := store.NewFSStore(afero.NewMemMapFs())
-	require.NoError(t, store.NewMetaStore(baseStore).PutFile(ctx, domain.FileSpec{
-		Name:   "atomic.txt",
-		Source: domain.FileSource{Type: "inline", Content: "complete"},
-	}))
-	metadataDeleted := make(chan struct{})
-	releaseMetadataDelete := make(chan struct{})
-	rawStore := &deleteGateStore{
-		Store:   baseStore,
-		gateKey: "files/atomic.txt.json",
-		deleted: metadataDeleted,
-		release: releaseMetadataDelete,
-	}
-	coordinator := store.Coordinate(rawStore)
-	metaStore := store.NewMetaStore(coordinator)
-
-	deleteDone := make(chan error, 1)
-	go func() {
-		deleteDone <- metaStore.DeleteFile(ctx, "atomic.txt")
-	}()
-	requireSignal(t, metadataDeleted, "file metadata was not deleted")
-
-	viewAttempted := make(chan struct{})
-	viewEntered := make(chan struct{})
-	viewDone := make(chan error, 1)
-	go func() {
-		close(viewAttempted)
-		viewDone <- coordinator.View(ctx, func(callbackStore store.Store) error {
-			close(viewEntered)
-			for _, key := range []string{"files/atomic.txt.json", "files/atomic.txt"} {
-				if _, err := callbackStore.Read(ctx, key); !os.IsNotExist(err) {
-					return fmt.Errorf("Read(%q) error = %v, want not exist", key, err)
-				}
-			}
-			return nil
-		})
-	}()
-	requireSignal(t, viewAttempted, "view was not attempted")
-	requireBlocked(t, viewEntered, "view observed the file after its metadata delete but before its body delete")
-
-	close(releaseMetadataDelete)
-	require.NoError(t, requireResult(t, deleteDone, "DeleteFile did not finish"))
-	requireSignal(t, viewEntered, "view did not enter after DeleteFile finished")
-	require.NoError(t, requireResult(t, viewDone, "view did not finish"))
-}
-
-type writeGateStore struct {
-	store.Store
-	gateKey string
-	written chan<- struct{}
-	release <-chan struct{}
-}
-
-func (s *writeGateStore) Write(ctx context.Context, key string, value []byte) error {
-	if err := s.Store.Write(ctx, key, value); err != nil {
-		return err
-	}
-	if key == s.gateKey {
-		close(s.written)
-		<-s.release
-	}
-	return nil
-}
-
-type deleteGateStore struct {
-	store.Store
-	gateKey string
-	deleted chan<- struct{}
-	release <-chan struct{}
-}
-
-func (s *deleteGateStore) Delete(ctx context.Context, key string) error {
-	if err := s.Store.Delete(ctx, key); err != nil {
-		return err
-	}
-	if key == s.gateKey {
-		close(s.deleted)
-		<-s.release
-	}
-	return nil
 }
 
 func requireSignal(t *testing.T, ch <-chan struct{}, message string) {

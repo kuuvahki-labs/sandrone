@@ -37,20 +37,20 @@ describe("FileSourceEditor", () => {
     expect(currentSource()).toEqual({ type: "inline", content: "port: 7890" });
   });
 
-  it("preserves an untouched local path but clears it after switching source modes", async () => {
-    const user = userEvent.setup();
-    render(<FileSourceEditor defaultValue={{ type: "local", path: "/config/base.yaml" }} />);
+  it("shows the driver base for an implicit source while preserving the empty source object", () => {
+    render(
+      <FileSourceEditor
+        defaultValue={{}}
+        inlineFallback="mixed-port: 7890"
+        preserveImplicit
+      />,
+    );
 
-    expect(currentSource()).toEqual({ type: "local", path: "/config/base.yaml" });
-    await user.click(screen.getByRole("button", { name: "远程" }));
-    await user.type(screen.getByRole("textbox", { name: "远程地址" }), "https://example.com/remote.yaml");
-    expect(currentSource()).toEqual({
-      type: "remote",
-      remote: { url: "https://example.com/remote.yaml" },
-    });
+    expect(screen.getByRole("textbox", { name: "内容" })).toHaveValue("mixed-port: 7890");
+    expect(currentSource()).toEqual({});
   });
 
-  it("keeps resolved empty remote content when switching to inline", async () => {
+  it("keeps explicit empty remote content when switching to inline", async () => {
     const user = userEvent.setup();
     render(
       <FileSourceEditor

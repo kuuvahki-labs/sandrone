@@ -50,7 +50,7 @@ func staticFileKindCapability() FileKindCapability {
 		DefaultExtension: ".txt",
 		SourceRules: FileKindSourceRules{
 			Required:     true,
-			AllowedTypes: []string{"inline", "local", "remote"},
+			AllowedTypes: []string{"inline", "remote"},
 		},
 		Defaults: map[string]any{},
 		Examples: []map[string]any{{

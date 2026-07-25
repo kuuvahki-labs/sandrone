@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
-	"github.com/kuuvahki-labs/sandrone/internal/store"
 )
 
 func (s *Service) ValidateFile(ctx context.Context, req domain.FileRequest) (*domain.ValidateResult, error) {
@@ -50,6 +49,7 @@ func (s *Service) getFile(ctx context.Context, req domain.FileRequest, state *fi
 		state.stack[spec.Name] = true
 		defer delete(state.stack, spec.Name)
 	}
+	ctx = withFileResolutionContext(ctx, req, state)
 	report := domain.Report{}
 	doc, sourceRef, compileWarnings, err := s.resolveFileDocument(ctx, spec, req, state)
 	if err != nil {
@@ -110,16 +110,6 @@ func (s *Service) resolveFileSource(ctx context.Context, spec domain.FileSpec) (
 			Content: []byte(source.Content),
 			Meta:    cloneStringMap(spec.Meta),
 		}, &domain.SourceRef{Kind: "inline", Name: spec.Name}, nil
-	case "local":
-		body, key, err := s.readLocalFileSource(ctx, spec)
-		if err != nil {
-			return domain.FileDocument{}, nil, err
-		}
-		return domain.FileDocument{
-			Name:    spec.Name,
-			Content: body,
-			Meta:    cloneStringMap(spec.Meta),
-		}, &domain.SourceRef{Kind: "file", Name: spec.Name, Path: key}, nil
 	case "remote":
 		if source.Remote == nil || strings.TrimSpace(source.Remote.URL) == "" {
 			return domain.FileDocument{}, nil, domain.NewError(domain.CodeInvalidArgument, "remote file source requires remote.url")
@@ -134,35 +124,8 @@ func (s *Service) resolveFileSource(ctx context.Context, spec domain.FileSpec) (
 			Meta:    cloneStringMap(spec.Meta),
 		}, &result.SourceRef, nil
 	default:
-		return domain.FileDocument{}, nil, domain.NewError(domain.CodeInvalidArgument, "file source type must be inline, local, or remote")
+		return domain.FileDocument{}, nil, domain.NewError(domain.CodeInvalidArgument, "file source type must be inline or remote")
 	}
-}
-
-func (s *Service) readLocalFileSource(ctx context.Context, spec domain.FileSpec) ([]byte, string, error) {
-	if s.store == nil {
-		return nil, "", storeUnavailable()
-	}
-	key, err := localFileSourceKey(spec)
-	if err != nil {
-		return nil, "", domain.WrapError(domain.CodeInvalidArgument, "invalid local file source path", err)
-	}
-	body, err := s.store.Read(ctx, key)
-	if err != nil {
-		return nil, "", err
-	}
-	return body, key, nil
-}
-
-func localFileSourceKey(spec domain.FileSpec) (string, error) {
-	sourcePath := strings.TrimSpace(spec.Source.Path)
-	if sourcePath != "" {
-		return store.CleanKey(sourcePath)
-	}
-	name, err := store.CleanKey(spec.Name)
-	if err != nil {
-		return "", err
-	}
-	return "files/" + name, nil
 }
 
 func (s *Service) resolveSpec(ctx context.Context, req domain.FileRequest) (domain.FileSpec, error) {

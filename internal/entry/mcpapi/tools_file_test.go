@@ -85,6 +85,9 @@ func TestFileLifecycle(t *testing.T) {
 			})
 			require.Equal(t, "sandrone://files/"+test.fileName, spec["resource_uri"])
 			require.Equal(t, test.fileName, spec["spec"].(map[string]any)["name"])
+			specSource := spec["spec"].(map[string]any)["source"].(map[string]any)
+			require.Equal(t, "inline", specSource["type"])
+			require.Equal(t, test.initialSource, specSource["content"])
 
 			source := callToolSuccess(t, ctx, session, "sandrone_get_file", map[string]any{
 				"file": test.fileName,

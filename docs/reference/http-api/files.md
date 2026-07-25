@@ -43,10 +43,9 @@ path segment，`kind` 也必须显式使用 canonical 值，包括 `static`。�
 }
 ```
 
-保存 `source.type: "inline"` 时，正文和元数据会分离存储。之后读取 spec 会看到
-`source.type: "local"`，`source.content` 为空；这不改变随后 source/render
-读取到的正文。保存 `remote` 只记录抓取描述，保存 typed 文件也只校验结构，
-不会在此请求中编译最终客户端配置。
+保存时完整 `FileSpec` 写入一个 JSON record。`inline` 正文继续位于
+`source.content`，之后 `mode=spec` 会返回同一完整定义；`remote` 只记录抓取
+描述。保存 typed 文件只校验结构，不会在此请求中编译最终客户端配置。
 
 ### `GET /v1/files/{name}`
 
@@ -77,8 +76,8 @@ render 时，`arg.*` 会随请求上下文传给文件引用的订阅处理链�
 }
 ```
 
-删除会移除保存的 `FileSpec`、默认的本地正文 key，以及定义中显式配置的 local
-source key。它不会级联删除订阅、其他文件或 share。
+删除只移除保存完整 `FileSpec` 的 JSON record。它不会级联删除订阅、其他文件、
+share 或 Store 中与该 record 无关的 raw key。
 
 ## 响应
 
@@ -126,8 +125,7 @@ typed render 的完整阶段顺序见[文件管线](../../architecture/file-pipe
 
 - `{name}` 必须非空，URL 解码后只能是一个 path segment；包含 `/`、`\`，
   或名称为 `.`、`..` 都会被拒绝。创建、读取和删除使用同一约束。
-- `source.type: "local"` 读取 Sandrone 受控 store key，不是宿主机任意路径；
-  `remote` 只经受控 HTTP(S) fetcher 读取。详细路径和缓存边界见
+- `source.type: "remote"` 只经受控 HTTP(S) fetcher 读取。详细抓取和缓存边界见
   [FileSpec 参考](../file-spec.md)。
 - source 可能包含凭据、脚本或未处理配置；`mode=source` 与 `mode=spec`
   响应应按敏感数据处理。

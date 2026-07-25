@@ -24,7 +24,7 @@ func (shadowrocketFileDriver) Descriptor() typedFileDescriptor {
 		NodeRenderFormat:  "shadowrocket-proxies",
 		SettingsPrototype: ShadowrocketFileCapabilitySettings{},
 		SourceRules: FileKindSourceRules{
-			AllowedTypes: []string{"inline", "local", "remote"},
+			AllowedTypes: []string{"inline", "remote"},
 		},
 		Defaults: map[string]any{"source": "built-in", "settings": map[string]any{}},
 		Examples: []map[string]any{{

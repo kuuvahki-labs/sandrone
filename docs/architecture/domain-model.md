@@ -76,7 +76,7 @@ subscription 的定义见 [`subscription.go`](../../internal/domain/subscription
 `FileSpec` 是可持久化的文件定义，描述：
 
 - 稳定的 canonical `kind`。
-- inline、local 或 remote source。
+- inline、remote 或 typed driver 的内建 base。
 - typed file 的公共 `config` envelope。
 - 按顺序声明的 file-stage processors。
 - 名称、时间与 metadata。

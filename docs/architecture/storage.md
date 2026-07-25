@@ -50,7 +50,8 @@ Store 不提供数据库事务、跨进程锁或自动 schema 迁移。
 - 空 path segment。
 - `.`、`..` 和目录穿越。
 
-service 对显式 local source path、资源名和备份条目重复应用同一 `CleanKey` 语义。Store key 不是任意宿主文件路径，entrypoint 也不能把用户输入直接拼成 OS path。
+service 对资源名和备份条目重复应用同一 `CleanKey` 语义。Store key 不是任意
+宿主文件路径，entrypoint 也不能把用户输入直接拼成 OS path。
 
 自定义 Store 的 `List` 必须返回安全、规范且不重复的 keys；备份和资源枚举会把这一点当作后端契约。
 
@@ -66,17 +67,18 @@ service 对显式 local source path、资源名和备份条目重复应用同一
 
 ## `MetaStore`
 
-`MetaStore` 构建在任意 Store 上，把 JSON 资源与 raw file content 映射到 keys。它不是另一个持久化后端，也不向 service 暴露数据库式查询。
+`MetaStore` 构建在任意 Store 上，把 JSON 资源映射到 keys。它不是另一个
+持久化后端，也不向 service 暴露数据库式查询。
 
 它负责：
 
 - subscription、file、runtime settings 和 share 的 JSON 编解码。
 - 资源摘要列举。
-- inline file source 的正文与 metadata 分离。
 - share 创建和消费的 CAS 更新。
-- file definition 与其 local content 的组合删除。
 
-保存 inline file 时，正文写入 raw content key，metadata 写入相邻 JSON key，并把 metadata source 规范化为 local。这样文件定义保持可审阅，生成时仍通过统一 source 读取路径取得正文。
+每个 file 使用一个 `files/<name>.json` record 保存完整 `FileSpec`。inline
+正文留在 `source.content`，不会拆成相邻 raw key，也不会在保存时改写 source
+类型。覆盖和删除 file 因此都是单个资源 key 操作。
 
 `Report`、`FileResult`、`ProbeResult` 和编译后的客户端文件不是 MetaStore 管理资源。内部 cache 可以暂存请求结果，但它有独立前缀和 TTL 语义。
 
@@ -87,7 +89,6 @@ service 对显式 local source path、资源名和备份条目重复应用同一
 ```text
 subscriptions/<name>.json
 files/<name>.json
-files/<name>
 settings/runtime.json
 shares/<id>.json
 cache/probe/<hash>.json
@@ -98,7 +99,6 @@ cache/subscription_traffic/<hash>.json
 其中：
 
 - `subscriptions/`、`files/`、`settings/` 和 `shares/` 是领域资源。
-- `files/<name>` 是默认 local file content；显式安全 source path 可以指向其它 raw key。
 - `cache/` 只用于可重建的内部加速，不是权威资源。
 - 未知安全 key 可以由自定义集成保存；raw Store 备份会保留非 cache key。
 
@@ -119,7 +119,7 @@ Coordinator 提供的是单进程 isolation：
 
 - export 可以在同一个 read view 中完成 List 与多次 Read。
 - restore 可以阻止同一 service 的普通读写观察到替换中间态。
-- MetaStore 的复合 file 更新和删除不会与同一 coordinator 的其它操作交错。
+- MetaStore 的资源操作和备份操作共享同一 coordinator 边界。
 
 它不是事务管理器。`Update` 回调中前一个 Write 成功、后一个 Write 失败时，不会自动回滚；它也不提供 write-ahead log、crash atomicity 或多个 Sandrone 进程之间的锁。
 
@@ -131,7 +131,6 @@ Coordinator 提供的是单进程 isolation：
 
 - 单 key 资源更新使用覆盖写。
 - 需要竞争语义的计数或“仅当不存在”创建必须使用 CAS。
-- 跨 key file metadata/content 操作在 Coordinator 独占区间执行，但失败恢复取决于具体操作。
 - 删除 file 不级联删除它引用的 subscription、其它 file 或 share。
 - cache miss、损坏或写入失败不能改变权威资源。
 
@@ -139,7 +138,9 @@ Coordinator 提供的是单进程 isolation：
 
 ## 备份与恢复边界
 
-Store 备份面向管理员搬运原始存储，不重新编码 `Subscription` 或 `FileSpec`。导出在 Coordinator read view 中读取所有非目录、非 cache keys，并保留未知安全 key 和显式 local source path。
+Store 备份面向管理员搬运原始存储，不重新编码 `Subscription` 或 `FileSpec`。
+导出在 Coordinator read view 中读取所有非目录、非 cache keys，并保留未知安全
+key。
 
 cache 被排除，因为它可重建、可能过期，也不应决定恢复后的权威状态。
 
@@ -158,6 +159,11 @@ cache 被排除，因为它可重建、可能过期，也不应决定恢复后�
 - 共享同一后端的其它进程不受当前 Coordinator 约束。
 - 只接受当前支持的 storage schema，不在恢复时自动迁移。
 
+`storage_schema_version=1` 是备份容器和 key tree 的版本，不是每个 JSON
+资源 shape 的迁移承诺。恢复会原样写回资源 bytes；当前运行时要求 file record
+本身是包含 inline 正文或 remote 描述的完整 `FileSpec`，不会从其它 raw key
+补齐或迁移定义。
+
 备份包含 Store 原始 bytes，可能包括订阅 URL、节点凭据、脚本和运行设置。归档不提供加密或签名保证，必须由部署方保护传输、访问和静态存储，并在恢复前确认来源可信。
 
 归档 wire、大小限制、HTTP 鉴权和错误响应属于运行时接口契约，见 [运行时与备份接口](../reference/http-api/runtime.md)；本页只定义存储一致性与恢复后果。
@@ -168,4 +174,4 @@ cache 被排除，因为它可重建、可能过期，也不应决定恢复后�
 - 多进程共享 Store 时，维护窗口、写入者停止和存储级快照由外部协调。
 - 关键数据仍需独立的存储级备份；应用归档不能替代底层 durability。
 - 自定义 Store 必须通过 key 和 CAS 契约测试，再用于有竞争的 share 或恢复场景。
-- cache 永远可以丢弃，领域资源和显式 local content 才是恢复目标。
+- cache 永远可以丢弃，领域资源和其它非 cache Store 数据才是恢复目标。

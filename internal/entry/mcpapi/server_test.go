@@ -207,6 +207,16 @@ func TestMCPPutFileRejectsNonCanonicalKindAndLegacyConfigWire(t *testing.T) {
 			arguments: map[string]any{"name": "bad.yaml", "kind": "mihomo", "source": map[string]any{"type": "inline"}, "config": map[string]any{"groups": []any{}}},
 			want:      `unexpected additional properties [\"groups\"]`,
 		},
+		{
+			name:      "file local source",
+			arguments: map[string]any{"name": "bad.yaml", "kind": "static", "source": map[string]any{"type": "local"}},
+			want:      "does not equal any of",
+		},
+		{
+			name:      "file source path",
+			arguments: map[string]any{"name": "bad.yaml", "kind": "static", "source": map[string]any{"type": "inline", "content": "body", "path": "files/bad.yaml"}},
+			want:      `unexpected additional properties [\"path\"]`,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

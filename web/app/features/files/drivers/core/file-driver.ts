@@ -150,7 +150,6 @@ interface FileDriverBase {
     remoteURLPlaceholder: string;
     syntax: "text" | "yaml" | "json" | "ini";
     strategy: "required" | "optional-base";
-    preserveImplicit?: boolean;
     validate: (source: FileSourceDetail) => FileInputValidationCode | null;
   };
   processors: {

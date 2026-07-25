@@ -8,7 +8,7 @@
 
 | 字段 | 类型 | 契约 |
 | --- | --- | --- |
-| `name` | string | 资源名。保存资源时必须非空；内联渲染时可由请求的 `name` 补入。名称也参与默认本地存储键。 |
+| `name` | string | 资源名。保存资源时必须非空；内联渲染时可由请求的 `name` 补入。 |
 | `display_name` | string | 可选显示名；保存时会去除首尾空白。 |
 | `kind` | string | 必填且区分大小写，必须是下列 canonical kind 之一。 |
 | `source` | object | `FileSource`。typed 文件可以用空对象选择内建 base；`static` 必须给出可读取的 source。 |
@@ -36,11 +36,9 @@
 | `type` | 字段 | 读取语义 |
 | --- | --- | --- |
 | `inline` | `content` | 直接以 UTF-8 字符串字节作为 base。空字符串也是有效内容。 |
-| `local` | `path` | 从 Sandrone 的受控 store 读取；不是宿主机任意路径。 |
 | `remote` | `remote` | 受控抓取 `remote.url`；URL 必须为 `http` 或 `https`。 |
 
-`local.path` 为空时使用 `files/<name>`。非空值是 store key，绝对路径、父目录
-跳转和反斜杠路径会被拒绝。`remote` 对象支持：
+`remote` 对象支持：
 
 - `url`：必填；
 - `user_agent`、`proxy`、`timeout_ms`：可选抓取参数；
@@ -48,13 +46,12 @@
   形成持久缓存。零值继承 runtime 的 `cache_defaults.remote_fetch_ttl_seconds`；
   两者都为零时才会每次重新抓取。
 
-保存 `source.type: inline` 的资源时，正文与 JSON 元数据分开存储：正文写入
-`path` 指定的 key，或默认 `files/<name>`；保存后的 metadata source 变为
-`local`，不会继续内嵌正文。保存 `local` 只记录安全 store key；保存
-`remote` 只记录远程描述，不预先抓取。
+保存文件时，完整 `FileSpec` 作为单个 JSON record 写入 Store。`inline`
+正文继续保存在 `source.content` 中；`remote` 只保存远程描述，不预先抓取。
+读取 `mode=spec` 或 MCP definition resource 会返回这一完整定义。
 
 对 typed kind，`source.type` 为空表示使用该 driver 的内建 base。若给出
-`inline`、`local` 或 `remote`，读取结果就是自定义 base，并必须能按该 kind
+`inline` 或 `remote`，读取结果就是自定义 base，并必须能按该 kind
 的 YAML、JSON 或 INI 语法解析。对 `static`，空 `source.type` 会在读取时失败。
 
 ## FileConfig
@@ -167,4 +164,4 @@ config:
 ```
 
 这三个示例都使用内建 base。若要自带 base，把 `source` 改成完整的
-`inline`、`local` 或 `remote` source。
+`inline` 或 `remote` source。

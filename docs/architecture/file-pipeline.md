@@ -37,15 +37,15 @@ FileSpec(kind=registered typed kind) -> driver lookup -> read/build base -> reso
 
 ## Source 读取
 
-`FileSource` 有三类受控来源：
+`FileSource` 有两类受控来源：
 
 - `inline`：使用定义内的正文。
-- `local`：从 Store 的安全相对 key 读取；空 path 使用该文件的默认内容 key。
 - `remote`：通过统一 HTTP(S) fetcher 读取，并应用超时、User-Agent、代理与 TTL cache 设置。
 
-保存 inline source 时，MetaStore 把正文与 JSON metadata 分离，并把 metadata 中的 source 规范化为 local。remote source 只保存读取配置，生成时重新获取或命中内部缓存。
-
-source 读取不会让 processor 获得任意宿主路径。local path 必须通过 Store key 校验；remote 内容受 fetcher 的协议、响应状态和大小边界限制。
+保存时，inline 正文作为完整 `FileSpec` 的 `source.content` 留在单个 JSON
+record 中；remote source 只保存读取配置，生成时重新获取或命中内部缓存。
+source 读取不会让 processor 获得任意宿主路径；remote 内容受 fetcher 的协议、
+响应状态和大小边界限制。
 
 `GetFileSource` 返回编译前的 source：
 
@@ -61,7 +61,7 @@ static 文件适合原样交付或在文件阶段做有限改写。service 的�
 
 1. 从请求内 spec 或 MetaStore 解析 `FileSpec`。
 2. 校验 kind、禁止的 config 和 source 声明。
-3. 读取 inline、local 或 remote source。
+3. 读取 inline 或 remote source。
 4. 构造带名称、kind、正文、metadata 和 source trace 的 `FileDocument`。
 5. 按声明顺序执行 file-stage processors。
 6. 在全部步骤成功后构造 `FileResult` 和本次 report。
@@ -138,7 +138,10 @@ file-stage script 可以通过窄接口读取已保存 subscription 的节点或
 
 service 为同一次文件请求维护调用栈和 memo：
 
-- 递归读取共享当前请求参数和受控资源边界。
+- file-backed script 的 `source.args` 只用于渲染脚本文件资源；脚本运行时的
+  `params.args` 仍单独与当前请求参数合并。
+- `api.subscription.produce` 与 `api.file.content` 的子调用参数只来自各自显式
+  `options.args`，不会继承父文件请求参数。
 - 动态 subscription/file 引用加入 report dependencies。
 - 重复读取可以复用本次请求中的结果。
 - 文件循环依赖返回 `file_dependency_cycle`，不继续展开。
@@ -154,7 +157,7 @@ typed `config.subscriptions` 是声明式依赖；脚本读取是动态依赖。
 这是“单次生成结果只在完整成功后发布”的边界，不是 Store 事务承诺：
 
 - `PutFile` 会在持久化前校验 kind、driver、renderer 和 settings 结构。
-- definition/source 的多 key 写入遵守 Store 与 Coordinator 的一致性能力。
+- FileSpec definition 以单个 JSON record 写入 Store。
 - 进程崩溃、多进程并发和存储级恢复不由文件管线提供。
 
 持久化与备份边界见[存储架构](storage.md)，节点物化与渲染的详细兼容语义见[节点管线](node-pipeline.md)。

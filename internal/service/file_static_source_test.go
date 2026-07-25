@@ -34,45 +34,61 @@ func TestServiceFileInlineSourceOutputsContent(t *testing.T) {
 	require.Equal(t, "file", result.Report.Kind)
 }
 
-func TestServiceFileLocalSourceReadsStoredRawContent(t *testing.T) {
-	ctx := context.Background()
-	fs := afero.NewMemMapFs()
-	svc := service.New(service.WithFS(fs))
-	require.NoError(t, afero.WriteFile(fs, "files/manual.txt", []byte("stored manual content"), 0o644))
-	require.NoError(t, afero.WriteFile(fs, "files/scripts/rename.js", []byte("stored custom content"), 0o644))
-
-	defaultPathSpec := domain.FileSpec{
+func TestServiceRejectsLocalFileSource(t *testing.T) {
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	spec := domain.FileSpec{
 		Name:   "manual.txt",
 		Kind:   domain.FileKindStatic,
 		Source: domain.FileSource{Type: "local"},
 	}
-	defaultPathResult, err := svc.GetFile(ctx, domain.FileRequest{Spec: &defaultPathSpec})
-	require.NoError(t, err)
-	require.Equal(t, "stored manual content", string(defaultPathResult.File.Content))
 
-	customPathSpec := domain.FileSpec{
-		Name:   "rename.js",
-		Kind:   domain.FileKindStatic,
-		Source: domain.FileSource{Type: "local", Path: "files/scripts/rename.js"},
-	}
-	customPathResult, err := svc.GetFile(ctx, domain.FileRequest{Spec: &customPathSpec})
-	require.NoError(t, err)
-	require.Equal(t, "stored custom content", string(customPathResult.File.Content))
+	err := svc.PutFile(context.Background(), spec)
+	require.Error(t, err)
+	require.True(t, domain.IsCode(err, domain.CodeInvalidArgument), "got %v", err)
+	require.Contains(t, err.Error(), "inline or remote")
+
+	_, err = svc.GetFile(context.Background(), domain.FileRequest{Spec: &spec})
+	require.Error(t, err)
+	require.True(t, domain.IsCode(err, domain.CodeInvalidArgument), "got %v", err)
+	require.Contains(t, err.Error(), "inline or remote")
 }
 
-func TestServiceFileLocalSourceRejectsUnsafeStorePath(t *testing.T) {
-	ctx := context.Background()
+func TestServiceRejectsEmptyStaticFileSource(t *testing.T) {
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	spec := domain.FileSpec{Name: "manual.txt", Kind: domain.FileKindStatic}
 
-	for _, sourcePath := range []string{"/files/rename.js", "../rename.js", `files\rename.js`} {
-		t.Run(sourcePath, func(t *testing.T) {
-			_, err := svc.GetFile(ctx, domain.FileRequest{Spec: &domain.FileSpec{
-				Name:   "rename.js",
-				Kind:   domain.FileKindStatic,
-				Source: domain.FileSource{Type: "local", Path: sourcePath},
-			}})
+	err := svc.PutFile(context.Background(), spec)
+	require.Error(t, err)
+	require.True(t, domain.IsCode(err, domain.CodeInvalidArgument), "got %v", err)
+	require.Contains(t, err.Error(), "requires an inline or remote source")
+}
+
+func TestServiceRejectsTypedBuiltinSourceWithPayload(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		source domain.FileSource
+	}{
+		{
+			name:   "content",
+			source: domain.FileSource{Content: "ignored"},
+		},
+		{
+			name:   "remote",
+			source: domain.FileSource{Remote: &domain.RemoteInput{URL: "https://example.com/ignored"}},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			svc := service.New(service.WithFS(afero.NewMemMapFs()))
+			err := svc.PutFile(context.Background(), domain.FileSpec{
+				Name:   "default.yaml",
+				Kind:   domain.FileKindMihomo,
+				Source: test.source,
+				Config: &domain.FileConfig{},
+			})
+
 			require.Error(t, err)
 			require.True(t, domain.IsCode(err, domain.CodeInvalidArgument), "got %v", err)
+			require.Contains(t, err.Error(), "empty file source must not include content or remote")
 		})
 	}
 }
@@ -176,7 +192,7 @@ func TestServiceScriptProcessorLoadsScriptFromFileResource(t *testing.T) {
 		Source: domain.FileSource{
 			Type: "inline",
 			Content: `function main(input) {
-  input.nodes.forEach(function(node) { node.name = "file-" + node.name; });
+  input.nodes.forEach(function(node) { node.name = "__SOURCE_PREFIX____SOURCE_OUTER__" + input.args.prefix + node.name; });
   return input;
 }`,
 		},
@@ -185,7 +201,8 @@ func TestServiceScriptProcessorLoadsScriptFromFileResource(t *testing.T) {
 			Stage: domain.StageFile,
 			Params: params(t, map[string]any{
 				"source": inlineScriptSource(`function main(input) {
-  input.file.content = "function main() { throw new Error('processed script should not load'); }";
+  input.file.content = input.file.content.replace("__SOURCE_PREFIX__", input.args.prefix);
+  input.file.content = input.file.content.replace("__SOURCE_OUTER__", input.args.outer || "isolated-");
   return input;
 }`),
 			}),
@@ -200,17 +217,22 @@ func TestServiceScriptProcessorLoadsScriptFromFileResource(t *testing.T) {
 			Type:  "script",
 			Stage: domain.StageNodes,
 			Params: params(t, map[string]any{
-				"source": fileScriptSource("rename.js"),
+				"source": map[string]any{
+					"type": "file",
+					"name": "rename.js",
+					"args": map[string]string{"prefix": "rendered-"},
+				},
+				"args": map[string]any{"prefix": "params-"},
 			}),
 		}},
 	}))
 
-	preview, err := svc.PreviewSubscription(ctx, "provider")
+	preview, err := svc.PreviewSubscription(ctx, "provider", map[string]string{"outer": "leaked-"})
 
 	require.NoError(t, err)
 	require.Len(t, preview.Nodes, 1)
 	require.Equal(t, "node-a", preview.Nodes[0].Before.Name)
-	require.Equal(t, "file-node-a", preview.Nodes[0].After.Name)
+	require.Equal(t, "rendered-isolated-params-node-a", preview.Nodes[0].After.Name)
 }
 
 func TestServiceScriptProcessorLoadsStructuredFileSourceFromRemoteFileResource(t *testing.T) {
@@ -236,7 +258,7 @@ func TestServiceScriptProcessorLoadsStructuredFileSourceFromRemoteFileResource(t
 			Stage: domain.StageFile,
 			Params: params(t, map[string]any{
 				"source": inlineScriptSource(`function main(input) {
-  input.file.content = "function main() { throw new Error('processed remote script should not load'); }";
+  input.file.content = input.file.content.replace("remote-file-", "processed-remote-file-");
   return input;
 }`),
 			}),
@@ -260,7 +282,7 @@ func TestServiceScriptProcessorLoadsStructuredFileSourceFromRemoteFileResource(t
 
 	require.NoError(t, err)
 	require.Len(t, preview.Nodes, 1)
-	require.Equal(t, "remote-file-node-a", preview.Nodes[0].After.Name)
+	require.Equal(t, "processed-remote-file-node-a", preview.Nodes[0].After.Name)
 }
 
 func TestServiceScriptProcessorLoadsStructuredRemoteSource(t *testing.T) {
@@ -500,7 +522,10 @@ func TestServiceFileScriptReadsAnotherProcessedFile(t *testing.T) {
 		}},
 	}
 
-	result, err := svc.GetFile(ctx, domain.FileRequest{Spec: &parent})
+	result, err := svc.GetFile(ctx, domain.FileRequest{
+		Spec:    &parent,
+		Request: domain.RequestInfo{Args: map[string]string{"suffix": "-outer"}},
+	})
 
 	require.NoError(t, err)
 	require.Equal(t, "parent:child:child:child!", string(result.File.Content))
@@ -547,6 +572,64 @@ func TestServiceFileScriptDependencyCycleFails(t *testing.T) {
 	require.True(t, domain.IsCode(err, domain.CodeFileDependencyCycle), "got %v", err)
 }
 
+func TestServiceScriptFileSourceDependencyCyclesFail(t *testing.T) {
+	tests := map[string][]domain.FileSpec{
+		"direct": {{
+			Name:   "a.js",
+			Kind:   domain.FileKindStatic,
+			Source: domain.FileSource{Type: "inline", Content: "function main(input) { return input; }"},
+			Processors: []domain.ProcessorSpec{{
+				Type:  "script",
+				Stage: domain.StageFile,
+				Params: params(t, map[string]any{
+					"source": fileScriptSource("a.js"),
+				}),
+			}},
+		}},
+		"indirect": {
+			{
+				Name:   "a.js",
+				Kind:   domain.FileKindStatic,
+				Source: domain.FileSource{Type: "inline", Content: "function main(input) { return input; }"},
+				Processors: []domain.ProcessorSpec{{
+					Type:  "script",
+					Stage: domain.StageFile,
+					Params: params(t, map[string]any{
+						"source": fileScriptSource("b.js"),
+					}),
+				}},
+			},
+			{
+				Name:   "b.js",
+				Kind:   domain.FileKindStatic,
+				Source: domain.FileSource{Type: "inline", Content: "function main(input) { return input; }"},
+				Processors: []domain.ProcessorSpec{{
+					Type:  "script",
+					Stage: domain.StageFile,
+					Params: params(t, map[string]any{
+						"source": fileScriptSource("a.js"),
+					}),
+				}},
+			},
+		},
+	}
+
+	for name, specs := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			svc := service.New(service.WithFS(afero.NewMemMapFs()))
+			for _, spec := range specs {
+				require.NoError(t, svc.PutFile(ctx, spec))
+			}
+
+			_, err := svc.GetFile(ctx, domain.FileRequest{Name: "a.js"})
+
+			require.Error(t, err)
+			require.True(t, domain.IsCode(err, domain.CodeFileDependencyCycle), "got %v", err)
+		})
+	}
+}
+
 func TestServiceFileScriptProducesSubscriptionsAsNodesAndContent(t *testing.T) {
 	ctx := context.Background()
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
@@ -586,7 +669,10 @@ func TestServiceFileScriptProducesSubscriptionsAsNodesAndContent(t *testing.T) {
 		}},
 	}
 
-	result, err := svc.GetFile(ctx, domain.FileRequest{Spec: &spec})
+	result, err := svc.GetFile(ctx, domain.FileRequest{
+		Spec:    &spec,
+		Request: domain.RequestInfo{Args: map[string]string{"prefix": "outer-"}},
+	})
 
 	require.NoError(t, err)
 	require.Equal(t, "nodes:node-a\ncontent:json-nodes:api-node-a", string(result.File.Content))

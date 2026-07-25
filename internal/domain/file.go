@@ -110,7 +110,6 @@ type FileAdaptiveGroupConfig struct {
 type FileSource struct {
 	Type    string       `json:"type" yaml:"type"`
 	Content string       `json:"content,omitempty" yaml:"content,omitempty"`
-	Path    string       `json:"path,omitempty" yaml:"path,omitempty"`
 	Remote  *RemoteInput `json:"remote,omitempty" yaml:"remote,omitempty"`
 }
 

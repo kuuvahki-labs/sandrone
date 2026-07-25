@@ -8,7 +8,6 @@ import type {
   FileItem,
   FilePreview,
   FilePreviewWarning,
-  FileSourceContent,
   FileSourceDetail,
   RuleSetCatalogResult,
 } from "./types";
@@ -87,14 +86,6 @@ export function filePreviewFromAPI(value: unknown): FilePreview {
   };
 }
 
-export function fileSourceContentFromAPI(value: unknown): FileSourceContent {
-  const item = asRecord(value);
-  return {
-    body: stringField(item.body),
-    contentType: stringField(item.content_type) || "application/octet-stream",
-  };
-}
-
 function fileConfigFromAPI(value: unknown): FileConfigDetail | undefined {
   const item = asRecord(value);
   if (Object.keys(item).length === 0 && (typeof value !== "object" || value === null || Array.isArray(value))) {
@@ -137,15 +128,15 @@ function fileSourceFromAPI(value: unknown): FileSourceDetail {
   const item = asRecord(value);
   const remote = remoteInputFromAPI(item.remote);
   const type = stringField(item.type);
-  if (type || stringField(item.content) || remote) {
+  const hasContent = Object.prototype.hasOwnProperty.call(item, "content");
+  if (type || hasContent || remote) {
     return {
       type: type || (remote ? "remote" : "inline"),
-      content: stringField(item.content) || undefined,
-      path: stringField(item.path) || undefined,
+      ...(hasContent ? { content: stringField(item.content) } : {}),
       remote,
     };
   }
-  return { type: "inline", content: "" };
+  return {};
 }
 
 function previewWarningsFromAPI(item: Record<string, unknown>): FilePreviewWarning[] {

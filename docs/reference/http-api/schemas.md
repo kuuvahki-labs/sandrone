@@ -84,7 +84,7 @@ properties 为：
 | --- | --- |
 | `name`、`display_name` | `string` |
 | `kind` | enum：`static`、`mihomo`、`sing-box`、`shadowrocket` |
-| `source` | 封闭 object；可选 `type` enum `inline`/`local`/`remote`、`content: string`、`path: string`、`remote`（与 Subscription schema 相同的封闭 remote object） |
+| `source` | 封闭 object；可选 `type` enum `inline`/`remote`、`content: string`、`remote`（与 Subscription schema 相同的封闭 remote object） |
 | `config` | 封闭 object；只允许 `subscriptions: string[]` 与开放 object `settings` |
 | `processors` | 与 Subscription schema 相同的 processor array |
 | `meta` | string-to-string object |

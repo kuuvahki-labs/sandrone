@@ -88,7 +88,7 @@ func TestServiceListResources(t *testing.T) {
 	files, err := svc.ListFiles(context.Background())
 	require.NoError(t, err)
 	require.Len(t, files.Items, 1)
-	require.Equal(t, "local", files.Items[0].Type)
+	require.Equal(t, "inline", files.Items[0].Type)
 	require.Equal(t, "static", files.Items[0].Target)
 }
 

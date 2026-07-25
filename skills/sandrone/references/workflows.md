@@ -106,9 +106,8 @@ unsaved subscription was previewed.
 
 1. Require an explicit delete request and an exact resource kind/name.
 2. Read the exact existing definition through the selected plane.
-3. For a file, also read source content when it must be preserved.
-4. Call the matching HTTP `DELETE` endpoint or MCP delete tool once.
-5. Report `deleted` exactly as returned. After an ambiguous transport failure,
+3. Call the matching HTTP `DELETE` endpoint or MCP delete tool once.
+4. Report `deleted` exactly as returned. After an ambiguous transport failure,
    keep the same plane and reread the exact resource before retrying.
 
 ## Probe Nodes

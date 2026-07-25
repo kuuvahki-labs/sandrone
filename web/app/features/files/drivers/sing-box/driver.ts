@@ -20,7 +20,6 @@ export const singBoxFileDriverDefinition: FileDriverDefinition = {
     remoteURLPlaceholder: "https://example.com/base.json",
     syntax: "json",
     strategy: "optional-base",
-    preserveImplicit: true,
     validate: validateJSONConfigSource,
   },
   processors: {

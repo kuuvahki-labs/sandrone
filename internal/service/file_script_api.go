@@ -13,10 +13,26 @@ import (
 
 type fileScriptContextKey struct{}
 
+type fileResolutionContextKey struct{}
+
+type fileResolutionContext struct {
+	req   domain.FileRequest
+	state *fileResolveState
+}
+
 type fileScriptContext struct {
 	service *Service
 	req     domain.FileRequest
 	state   *fileResolveState
+}
+
+func withFileResolutionContext(ctx context.Context, req domain.FileRequest, state *fileResolveState) context.Context {
+	return context.WithValue(ctx, fileResolutionContextKey{}, &fileResolutionContext{req: req, state: state})
+}
+
+func fileResolutionContextFrom(ctx context.Context) (*fileResolutionContext, bool) {
+	value, ok := ctx.Value(fileResolutionContextKey{}).(*fileResolutionContext)
+	return value, ok && value != nil && value.state != nil
 }
 
 func withFileScriptContext(ctx context.Context, svc *Service, req domain.FileRequest, state *fileResolveState) context.Context {
@@ -28,12 +44,12 @@ func fileScriptContextFrom(ctx context.Context) (*fileScriptContext, bool) {
 	return value, ok && value != nil && value.service != nil && value.state != nil
 }
 
-func (s *Service) loadScriptSource(source scriptproc.ScriptSource) (string, string, error) {
+func (s *Service) loadScriptSource(ctx context.Context, source scriptproc.ScriptSource) (string, string, error) {
 	switch source.Type {
 	case "file":
-		return s.loadScriptFileResource(source.Name)
+		return s.loadScriptFileResource(ctx, source)
 	case "remote":
-		return s.loadRemoteScriptSource(source)
+		return s.loadRemoteScriptSource(ctx, source)
 	case "inline":
 		return source.Content, "<inline>", nil
 	default:
@@ -41,8 +57,8 @@ func (s *Service) loadScriptSource(source scriptproc.ScriptSource) (string, stri
 	}
 }
 
-func (s *Service) loadScriptFileResource(path string) (string, string, error) {
-	name := strings.TrimSpace(path)
+func (s *Service) loadScriptFileResource(ctx context.Context, source scriptproc.ScriptSource) (string, string, error) {
+	name := strings.TrimSpace(source.Name)
 	if name == "" {
 		return "", "", domain.NewError(domain.CodeProcessorConfigInvalid, "script file resource name is required")
 	}
@@ -55,38 +71,40 @@ func (s *Service) loadScriptFileResource(path string) (string, string, error) {
 	if s.metaStore == nil {
 		return "", "", storeUnavailable()
 	}
-	spec, err := s.metaStore.GetFile(context.Background(), name)
+	state := &fileResolveState{
+		stack: map[string]bool{},
+		memo:  map[string]*domain.FileResult{},
+	}
+	req := domain.FileRequest{
+		Name:    name,
+		Request: domain.RequestInfo{Args: cloneArgs(source.Args)},
+	}
+	if rctx, ok := fileResolutionContextFrom(ctx); ok {
+		state = rctx.state
+		req.Request = requestWithExplicitArgs(rctx.req.Request, source.Args)
+		req.Meta = rctx.req.Meta
+		state.dynamicDeps = appendResourceRef(state.dynamicDeps, domain.ResourceRef{Kind: "file", Name: name})
+	} else if fctx, ok := fileScriptContextFrom(ctx); ok {
+		state = fctx.state
+		req.Request = requestWithExplicitArgs(fctx.req.Request, source.Args)
+		req.Meta = fctx.req.Meta
+		state.dynamicDeps = appendResourceRef(state.dynamicDeps, domain.ResourceRef{Kind: "file", Name: name})
+	}
+	result, err := s.getFile(ctx, req, state)
 	if err != nil {
 		return "", "", err
 	}
-	switch strings.ToLower(strings.TrimSpace(spec.Source.Type)) {
-	case "local":
-		body, _, err := s.readLocalFileSource(context.Background(), spec)
-		if err != nil {
-			return "", "", err
-		}
-		return string(body), name, nil
-	case "inline":
-		return spec.Source.Content, name, nil
-	case "remote":
-		body, _, err := s.loadRemoteScriptSource(scriptproc.ScriptSource{Type: "remote", Remote: spec.Source.Remote})
-		if err != nil {
-			return "", "", err
-		}
-		return body, name, nil
-	default:
-		return "", "", domain.NewError(domain.CodeProcessorConfigInvalid, "script file resource must use a local or remote source")
-	}
+	return string(result.Content), name, nil
 }
 
-func (s *Service) loadRemoteScriptSource(source scriptproc.ScriptSource) (string, string, error) {
+func (s *Service) loadRemoteScriptSource(ctx context.Context, source scriptproc.ScriptSource) (string, string, error) {
 	if source.Remote == nil || strings.TrimSpace(source.Remote.URL) == "" {
 		return "", "", domain.NewError(domain.CodeProcessorConfigInvalid, "remote script source requires remote.url")
 	}
 	if s.fetcher == nil {
 		return "", "", domain.NewError(domain.CodeNotImplemented, "remote fetcher is not configured")
 	}
-	result, err := s.fetchRemoteCached(context.Background(), *source.Remote)
+	result, err := s.fetchRemoteCached(ctx, *source.Remote)
 	if err != nil {
 		return "", "", err
 	}
@@ -133,17 +151,9 @@ func optionalRequestArgs(argSets ...map[string]string) map[string]string {
 	return out
 }
 
-func mergeRequestArgs(base domain.RequestInfo, args map[string]string) domain.RequestInfo {
+func requestWithExplicitArgs(base domain.RequestInfo, args map[string]string) domain.RequestInfo {
 	out := base
-	if base.Args != nil || args != nil {
-		out.Args = map[string]string{}
-		for key, value := range base.Args {
-			out.Args[key] = value
-		}
-		for key, value := range args {
-			out.Args[key] = value
-		}
-	}
+	out.Args = cloneArgs(args)
 	if base.Meta != nil {
 		out.Meta = cloneStringMap(base.Meta)
 	}
@@ -165,7 +175,7 @@ func (s *Service) ProduceSubscription(ctx context.Context, name string, opts dom
 	}
 	if fctx, ok := fileScriptContextFrom(ctx); ok {
 		fctx.state.dynamicDeps = appendResourceRef(fctx.state.dynamicDeps, domain.ResourceRef{Kind: "subscription", Name: name})
-		req.Request = mergeRequestArgs(fctx.req.Request, opts.Args)
+		req.Request = requestWithExplicitArgs(fctx.req.Request, opts.Args)
 		req.Meta = fctx.req.Meta
 	}
 
@@ -217,7 +227,7 @@ func (s *Service) FileContent(ctx context.Context, name string, opts domain.Scri
 	fctx.state.dynamicDeps = appendResourceRef(fctx.state.dynamicDeps, domain.ResourceRef{Kind: "file", Name: name})
 	result, err := fctx.service.getFile(ctx, domain.FileRequest{
 		Name:    name,
-		Request: mergeRequestArgs(fctx.req.Request, opts.Args),
+		Request: requestWithExplicitArgs(fctx.req.Request, opts.Args),
 		Meta:    fctx.req.Meta,
 	}, fctx.state)
 	if err != nil {

@@ -20,7 +20,7 @@ func TestServiceFileKindCapabilities(t *testing.T) {
 	kinds := make([]domain.FileKind, len(capabilities))
 	for i, capability := range capabilities {
 		kinds[i] = capability.Kind
-		require.NotEmpty(t, capability.SourceRules.AllowedTypes, "%s", capability.Kind)
+		require.Equal(t, []string{"inline", "remote"}, capability.SourceRules.AllowedTypes, "%s", capability.Kind)
 		require.NotEmpty(t, capability.Examples, "%s", capability.Kind)
 	}
 	require.Equal(t, []domain.FileKind{
