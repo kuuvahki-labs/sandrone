@@ -85,13 +85,12 @@ func TestServiceProbeCache(t *testing.T) {
 			return &domain.ProbeResult{
 				Results: []domain.NodeProbeResult{{
 					NodeName:   "n",
-					Layer:      string(req.Layer),
 					Method:     string(req.Method),
 					Alive:      true,
 					DurationMS: 7,
 					CheckedAt:  time.Date(2026, 5, 28, 1, 2, 3, 0, time.UTC),
 				}},
-				Report: domain.Report{Probe: &domain.ProbeReport{Backend: "fake", Layer: string(req.Layer), Method: string(req.Method), SuccessCount: 1}},
+				Report: domain.Report{Probe: &domain.ProbeReport{Backend: "fake", Method: string(req.Method), SuccessCount: 1}},
 			}, nil
 		}}),
 	)
@@ -133,20 +132,18 @@ func TestServiceProbeUsesRuntimeDefaultsBeforeCache(t *testing.T) {
 			return &domain.ProbeResult{
 				Results: []domain.NodeProbeResult{{
 					NodeName:   "n",
-					Layer:      string(req.Layer),
 					Method:     string(req.Method),
 					Core:       req.Core,
 					Alive:      true,
 					DurationMS: 7,
 					CheckedAt:  time.Date(2026, 5, 28, 1, 2, 3, 0, time.UTC),
 				}},
-				Report: domain.Report{Probe: &domain.ProbeReport{Backend: "fake", Layer: string(req.Layer), Method: string(req.Method), Core: req.Core, SuccessCount: 1}},
+				Report: domain.Report{Probe: &domain.ProbeReport{Backend: "fake", Method: string(req.Method), Core: req.Core, SuccessCount: 1}},
 			}, nil
 		}}),
 	)
 	require.NoError(t, svc.PutRuntimeSettings(context.Background(), domain.RuntimeSettings{
 		ProbeDefaults: domain.ProbeDefaults{
-			Layer:           "protocol",
 			Method:          "tcp_connect",
 			Core:            "mihomo",
 			TimeoutMS:       777,
@@ -176,9 +173,8 @@ func TestServiceProbeUsesRuntimeDefaultsBeforeCache(t *testing.T) {
 	require.True(t, second.Results[0].CacheHit)
 
 	require.Len(t, seen, 1)
-	require.Equal(t, domain.ProbeLayerProtocol, seen[0].Layer)
 	require.Equal(t, domain.ProbeTCPConnect, seen[0].Method)
-	require.Equal(t, "mihomo", seen[0].Core)
+	require.Empty(t, seen[0].Core)
 	require.Equal(t, 777, seen[0].TimeoutMS)
 	require.Equal(t, 3, seen[0].Attempts)
 	require.Equal(t, 4, seen[0].Concurrency)
@@ -199,7 +195,6 @@ func TestServiceProbeCacheKeySeparatesHealthCheckTargets(t *testing.T) {
 			return &domain.ProbeResult{
 				Results: []domain.NodeProbeResult{{
 					NodeName:   "n",
-					Layer:      string(req.Layer),
 					Method:     string(req.Method),
 					Core:       req.Core,
 					Target:     req.URL + req.NTPServer,
@@ -207,7 +202,7 @@ func TestServiceProbeCacheKeySeparatesHealthCheckTargets(t *testing.T) {
 					DurationMS: len(seen),
 					CheckedAt:  time.Date(2026, 5, 28, 1, 2, 3, 0, time.UTC),
 				}},
-				Report: domain.Report{Probe: &domain.ProbeReport{Backend: "fake", Layer: string(req.Layer), Method: string(req.Method), Core: req.Core, SuccessCount: 1}},
+				Report: domain.Report{Probe: &domain.ProbeReport{Backend: "fake", Method: string(req.Method), Core: req.Core, SuccessCount: 1}},
 			}, nil
 		}}),
 	)
@@ -223,7 +218,6 @@ func TestServiceProbeCacheKeySeparatesHealthCheckTargets(t *testing.T) {
 				Password: "p",
 			}},
 		},
-		Layer:           domain.ProbeLayerProtocol,
 		Method:          domain.ProbeTCPConnect,
 		CacheTTLSeconds: 60,
 	}
@@ -232,9 +226,9 @@ func TestServiceProbeCacheKeySeparatesHealthCheckTargets(t *testing.T) {
 		base,
 		withProbeMethod(base, domain.ProbeUDPNTP),
 		withProbeNTPServer(withProbeMethod(base, domain.ProbeUDPNTP), "time.cloudflare.com"),
-		withProbeLayerMethodURL(base, domain.ProbeLayerProxy, domain.ProbeURLTest, "https://example.com/generate_204"),
-		withProbeLayerMethodURL(base, domain.ProbeLayerProxy, domain.ProbeURLTest, "https://example.net/generate_204"),
-		withProbeCore(withProbeLayerMethodURL(base, domain.ProbeLayerProxy, domain.ProbeURLTest, "https://example.net/generate_204"), "sing-box"),
+		withProbeMethodURL(base, domain.ProbeURLTest, "https://example.com/generate_204"),
+		withProbeMethodURL(base, domain.ProbeURLTest, "https://example.net/generate_204"),
+		withProbeCore(withProbeMethodURL(base, domain.ProbeURLTest, "https://example.net/generate_204"), "sing-box"),
 	}
 	for _, req := range requests {
 		_, err := svc.Probe(context.Background(), req)
@@ -254,8 +248,7 @@ func withProbeNTPServer(req domain.ProbeRequest, server string) domain.ProbeRequ
 	return req
 }
 
-func withProbeLayerMethodURL(req domain.ProbeRequest, layer domain.ProbeLayer, method domain.ProbeMethod, url string) domain.ProbeRequest {
-	req.Layer = layer
+func withProbeMethodURL(req domain.ProbeRequest, method domain.ProbeMethod, url string) domain.ProbeRequest {
 	req.Method = method
 	req.URL = url
 	return req

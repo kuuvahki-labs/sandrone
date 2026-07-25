@@ -311,7 +311,6 @@ func TestAgentProbeReturnsLiveResultAndCompleteReport(t *testing.T) {
 	expected, err := rt.Service.Probe(context.Background(), agentProbeRequest(directListener))
 	require.NoError(t, err)
 	require.Equal(t, expected.Results[0].Alive, result.Results[0].Alive)
-	require.Equal(t, expected.Results[0].Layer, result.Results[0].Layer)
 	require.Equal(t, expected.Results[0].Method, result.Results[0].Method)
 	require.Equal(t, expected.Results[0].Backend, result.Results[0].Backend)
 	require.Equal(t, expected.Report.Kind, result.Report.Kind)
@@ -324,19 +323,22 @@ func TestAgentProbePreservesStructuredServiceErrors(t *testing.T) {
 	rt := testRuntime(t, app.Config{})
 	node := `{"type":"inline_nodes","nodes":[{"name":"local","server":"127.0.0.1","port":9}]}`
 	for _, tc := range []struct {
-		name string
-		body string
-		code string
+		name   string
+		body   string
+		code   string
+		status int
 	}{
 		{
-			name: "invalid layer and method",
-			body: `{"input":` + node + `,"layer":"invalid","method":"invalid"}`,
-			code: string(domain.CodeProbeBackendUnavailable),
+			name:   "invalid method",
+			body:   `{"input":` + node + `,"method":"invalid"}`,
+			code:   string(domain.CodeInvalidArgument),
+			status: http.StatusBadRequest,
 		},
 		{
-			name: "unavailable core backend",
-			body: `{"input":` + node + `,"layer":"proxy","method":"url_test","core":"missing"}`,
-			code: string(domain.CodeProbeCoreUnavailable),
+			name:   "unavailable core backend",
+			body:   `{"input":` + node + `,"method":"url_test","core":"missing"}`,
+			code:   string(domain.CodeProbeCoreUnavailable),
+			status: http.StatusInternalServerError,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -344,7 +346,7 @@ func TestAgentProbePreservesStructuredServiceErrors(t *testing.T) {
 			httpapi.New(rt).Handler().ServeHTTP(rec, httptest.NewRequest(
 				http.MethodPost, "/v1/probe", strings.NewReader(tc.body),
 			))
-			require.Equal(t, http.StatusInternalServerError, rec.Code)
+			require.Equal(t, tc.status, rec.Code)
 			require.Contains(t, rec.Body.String(), `"code": "`+tc.code+`"`)
 		})
 	}
@@ -419,7 +421,6 @@ func agentProbeRequest(listener net.Listener) domain.ProbeRequest {
 			Format:  "uri-list",
 			Content: uri,
 		},
-		Layer:       domain.ProbeLayerProtocol,
 		Method:      domain.ProbeTCPConnect,
 		TimeoutMS:   1000,
 		Attempts:    1,

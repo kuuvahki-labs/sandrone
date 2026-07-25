@@ -106,8 +106,7 @@ type ScriptSandboxDocument struct {
 }
 
 type scriptProbeOptions struct {
-	Layer           string            `json:"layer,omitempty" enum:"protocol,proxy"`
-	Method          string            `json:"method,omitempty" enum:"auto,tcp_connect,udp_ntp,url_test"`
+	Method          string            `json:"method,omitempty" enum:"tcp_connect,udp_ntp,url_test"`
 	Core            string            `json:"core,omitempty"`
 	URL             string            `json:"url,omitempty"`
 	NTPServer       string            `json:"ntp_server,omitempty"`

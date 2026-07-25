@@ -103,9 +103,8 @@ sandrone probe [--format <format>] \
 
 | flag | 缺省值 | 契约 |
 | --- | --- | --- |
-| `--layer` | `protocol` | `protocol` 或 `proxy` |
-| `--method` | `auto` | `auto`、`tcp-connect`、`udp-ntp`、`url-test` |
-| `--core` | 空 | `url-test` 或 `udp-ntp` 使用的核心名 |
+| `--method` | `url-test` | `tcp-connect`、`udp-ntp` 或 `url-test` |
+| `--core` | `sing-box` | `url-test` 或 `udp-ntp` 使用的核心名；`url-test` 也支持 `mihomo` |
 | `--url` | 空 | `url-test` 的 HTTP 目标 |
 | `--ntp-server` | 空 | `udp-ntp` 的 NTP 目标 |
 | `--expected-status` | 空 | `url-test` 的状态码或范围，例如 `204`、`200-299` |
@@ -115,8 +114,8 @@ sandrone probe [--format <format>] \
 | `--cache-ttl` | `0` | 缓存秒数；`0` 继承 runtime 的 probe cache TTL，两者都为 `0` 时禁用缓存 |
 | `--output` | 标准输出 | JSON 输出路径或 `-` |
 
-`protocol/auto` 会按节点选择 TCP connect 或 UDP NTP；`proxy` 层使用
-`url-test`。单节点不存活通常记录在结果与 report 中，不等于整条命令失败；
+`tcp-connect` 不使用核心；`udp-ntp` 当前使用 sing-box；`url-test` 支持
+sing-box 和 Mihomo。单节点不存活通常记录在结果与 report 中，不等于整条命令失败；
 整批无法启动或输入无效时才返回非零退出码。错误层次见
 [错误与诊断参考](errors.md)。
 

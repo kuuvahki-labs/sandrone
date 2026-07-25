@@ -52,7 +52,7 @@ func Register(r *processor.Registry, probes ...ProbeRunner) {
 		Description:     "Probe node availability and optionally annotate, filter, or sort results.",
 		ParamsPrototype: ProbeParams{}, Public: true,
 		Effects:  processor.Effects{Probes: true},
-		Examples: []map[string]any{{"layer": "protocol", "fail_mode": "keep", "timeout_ms": 5000}},
+		Examples: []map[string]any{{"method": "url_test", "core": "sing-box", "fail_mode": "keep", "timeout_ms": 5000}},
 		ErrorCodes: []domain.ErrorCode{
 			domain.CodeProcessorConfigInvalid,
 			domain.CodeProbeBackendUnavailable,

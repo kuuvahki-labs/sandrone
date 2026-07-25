@@ -23,7 +23,6 @@ describe("runtime settings model", () => {
         user_agent: "Sandrone Test",
       },
       probe_defaults: {
-        layer: "protocol",
         method: "tcp_connect",
         core: "sing-box",
         url: "http://www.gstatic.com/generate_204",

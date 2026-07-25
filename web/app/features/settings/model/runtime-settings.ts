@@ -5,8 +5,7 @@ export const defaultRuntimeSettings: RuntimeSettingsInput = {
     timeout_ms: 15000,
   },
   probe_defaults: {
-    layer: "protocol",
-    method: "auto",
+    method: "url_test",
     core: "sing-box",
     url: "http://www.gstatic.com/generate_204",
     ntp_server: "time.apple.com",
@@ -30,6 +29,7 @@ export function completeRuntimeSettings(settings: RuntimeSettingsInput | undefin
     probe_defaults: {
       ...defaultRuntimeSettings.probe_defaults,
       ...(settings?.probe_defaults ?? {}),
+      core: "sing-box",
     },
     cache_defaults: {
       ...defaultRuntimeSettings.cache_defaults,

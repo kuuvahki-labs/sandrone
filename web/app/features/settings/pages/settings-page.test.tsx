@@ -69,8 +69,7 @@ describe("settings page", () => {
             timeout_ms: 15000,
           },
           probe_defaults: {
-            layer: "protocol",
-            method: "auto",
+            method: "url_test",
             core: "sing-box",
             url: "http://www.gstatic.com/generate_204",
             ntp_server: "time.apple.com",
@@ -100,6 +99,9 @@ describe("settings page", () => {
     const remoteGroup = screen.getByRole("region", { name: "远程请求" });
     const cacheGroup = screen.getByRole("region", { name: "缓存" });
     const probeGroup = screen.getByRole("region", { name: "测活" });
+    expect(within(probeGroup).getAllByRole("combobox")).toHaveLength(1);
+    expect(probeGroup).not.toHaveTextContent(/sing-box|mihomo/);
+    expect(within(probeGroup).getByRole("combobox", { name: "默认测活方式" })).toHaveTextContent("url_test");
     await user.clear(within(remoteGroup).getByRole("textbox", { name: "User-Agent" }));
     await user.type(within(remoteGroup).getByRole("textbox", { name: "User-Agent" }), "Sandrone Global");
     await user.clear(within(cacheGroup).getByRole("spinbutton", { name: "远程请求缓存（秒）" }));

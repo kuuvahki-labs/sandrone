@@ -86,9 +86,9 @@ func TestRegistryPublicDescriptorExamplesBuild(t *testing.T) {
 
 func TestProbeDescriptorConstraintTagsArePresent(t *testing.T) {
 	probeType := reflect.TypeOf(nodeproc.ProbeParams{})
-	layer, ok := probeType.FieldByName("Layer")
+	method, ok := probeType.FieldByName("Method")
 	require.True(t, ok)
-	require.Equal(t, "protocol,proxy", layer.Tag.Get("enum"))
+	require.Equal(t, "tcp_connect,udp_ntp,url_test", method.Tag.Get("enum"))
 	timeout, ok := probeType.FieldByName("TimeoutMS")
 	require.True(t, ok)
 	require.Equal(t, "0", timeout.Tag.Get("minimum"))

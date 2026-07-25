@@ -179,7 +179,6 @@ describe("SubscriptionPreviewPage", () => {
             meta: {
               "probe.alive": "true",
               "probe.duration_ms": "11",
-              "probe.layer": "protocol",
               "probe.method": "tcp_connect",
             },
           },

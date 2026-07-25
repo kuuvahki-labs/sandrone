@@ -72,8 +72,7 @@ export interface RuntimeSettingsInput {
     timeout_ms?: number;
   };
   probe_defaults: {
-    layer?: "protocol" | "proxy";
-    method?: "auto" | "tcp_connect" | "udp_ntp" | "url_test";
+    method?: "tcp_connect" | "udp_ntp" | "url_test";
     core?: "mihomo" | "sing-box";
     url?: string;
     ntp_server?: string;

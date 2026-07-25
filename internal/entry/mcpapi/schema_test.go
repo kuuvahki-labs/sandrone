@@ -41,10 +41,7 @@ func TestToolSchemasExposeObjectValuesAndBoundaryValidation(t *testing.T) {
 	require.JSONEq(t, `["spec","source","render"]`, extractSchema(
 		t, result.Tools, "sandrone_get_file", "properties.mode.enum",
 	))
-	require.JSONEq(t, `["protocol","proxy"]`, extractSchema(
-		t, result.Tools, "sandrone_probe_nodes", "properties.layer.enum",
-	))
-	require.JSONEq(t, `["auto","tcp_connect","udp_ntp","url_test"]`, extractSchema(
+	require.JSONEq(t, `["tcp_connect","udp_ntp","url_test"]`, extractSchema(
 		t, result.Tools, "sandrone_probe_nodes", "properties.method.enum",
 	))
 	require.JSONEq(t, `["mihomo","sing-box"]`, extractSchema(

@@ -84,7 +84,6 @@ type (
 	RenderRequest   = domain.RenderRequest
 	RenderResult    = domain.RenderResult
 	ConvertRequest  = domain.ConvertRequest
-	ProbeLayer      = domain.ProbeLayer
 	ProbeMethod     = domain.ProbeMethod
 	ProbeRequest    = domain.ProbeRequest
 	ProbeResult     = domain.ProbeResult
@@ -123,12 +122,9 @@ const (
 	FileKindSingBox      = domain.FileKindSingBox
 	FileKindShadowrocket = domain.FileKindShadowrocket
 
-	ProbeLayerProtocol = domain.ProbeLayerProtocol
-	ProbeLayerProxy    = domain.ProbeLayerProxy
-	ProbeAuto          = domain.ProbeAuto
-	ProbeTCPConnect    = domain.ProbeTCPConnect
-	ProbeUDPNTP        = domain.ProbeUDPNTP
-	ProbeURLTest       = domain.ProbeURLTest
+	ProbeTCPConnect = domain.ProbeTCPConnect
+	ProbeUDPNTP     = domain.ProbeUDPNTP
+	ProbeURLTest    = domain.ProbeURLTest
 
 	SubscriptionTypeRemote     = domain.SubscriptionTypeRemote
 	SubscriptionTypeLocal      = domain.SubscriptionTypeLocal

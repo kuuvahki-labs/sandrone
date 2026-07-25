@@ -21,8 +21,7 @@ backend 中执行可达性检查。它不保存输入、节点或 report，但�
 | 字段 | 类型 | 契约 |
 | --- | --- | --- |
 | `input` | `NodeInput` | 必填；完整结构可从 [`GET /v1/schemas/subscription`](schemas.md#nodeinput-结构) 的 `inputs.items` 读取。 |
-| `layer` | string | 可选 canonical layer：`protocol` 或 `proxy`。 |
-| `method` | string | 可选 canonical method：`auto`、`tcp_connect`、`udp_ntp`、`url_test`。 |
+| `method` | string | 可选 canonical method：`tcp_connect`、`udp_ntp`、`url_test`。 |
 | `core` | string | 可选：`mihomo` 或 `sing-box`；用于需要代理核心的 probe。 |
 | `url` | string | `url_test` 目标；省略时使用运行设置。 |
 | `ntp_server` | string | `udp_ntp` 服务器；省略时使用运行设置。 |
@@ -33,11 +32,10 @@ backend 中执行可达性检查。它不保存输入、节点或 report，但�
 | `cache_ttl_seconds` | integer | 非负；正数允许复用成功 probe 结果，`0`/省略使用运行设置。 |
 | `meta` | object | 可选 string-to-string metadata，进入本次受控执行与 report 上下文。 |
 
-默认运行设置是 `layer: "protocol"`、`method: "auto"`、`core: "sing-box"`、
+默认运行设置是 `method: "url_test"`、`core: "sing-box"`、
 `timeout_ms: 5000`、`attempts: 1`、`concurrency: 10`；管理员可通过运行设置更改
-有效值，客户端不应把默认值当作 server capability。`auto` 在 proxy layer
-选择 `url_test`；protocol layer 会依节点类型选择 `tcp_connect` 或
-`udp_ntp`。可用 backend/core 应通过
+有效值，客户端不应把默认值当作 server capability。`tcp_connect` 不使用核心，
+`udp_ntp` 当前使用 sing-box，`url_test` 支持 sing-box 和 Mihomo。可用 backend/core 应通过
 [`GET /v1/inspect`](conversion.md#get-v1inspect) 发现。
 
 `NodeInput` 支持 inline nodes、inline content、受控 local/remote 输入与已保存
@@ -53,7 +51,6 @@ I/O 边界；本页不复制其完整语义。
   "results": [
     {
       "node_name": "example-node",
-      "layer": "protocol",
       "method": "tcp_connect",
       "target": "proxy.example.invalid:8388",
       "backend": "tcp",
@@ -76,7 +73,6 @@ I/O 边界；本页不复制其完整语义。
     ],
     "probe": {
       "backend": "tcp",
-      "layer": "protocol",
       "method": "tcp_connect",
       "success_count": 0,
       "failure_count": 1,
@@ -88,7 +84,7 @@ I/O 边界；本页不复制其完整语义。
 }
 ```
 
-每个 result 可含 `node_id`、`node_name`、`layer`、`method`、`target`、`core`、
+每个 result 可含 `node_id`、`node_name`、`method`、`target`、`core`、
 `backend`、`cache_hit`、`alive`、`duration_ms`、`checked_at`、`error_code`
 和 `error`。单节点失败写入该项且聚合进完整 `report`，不自动把整批变成 HTTP
 error。混合 method/core 时 `report.probe.dimensions` 分组给出各组
@@ -98,7 +94,7 @@ warnings；字段语义以[错误与诊断的 Report 章节](../errors.md#report
 
 ### 失败与受控网络副作用
 
-- `input` 无法解析、资源缺失、节点全部无效、layer/method/core/target 无效，
+- `input` 无法解析、资源缺失、节点全部无效、method/core/target 无效，
   或 backend/core 不可用时返回结构化 service error；不会伪造空的成功 results。
 - inline `NodeInput` 的 `content` 是字符串。示例或日志只能使用合成节点，不要
   记录真实凭据、订阅 URL、result target 或底层网络错误。
@@ -123,7 +119,6 @@ curl -sS "$SANDRONE_URL/v1/probe" \
       "format": "uri-list",
       "content": "ss://aes-128-gcm:example-password@proxy.example.invalid:8388#example-node"
     },
-    "layer": "protocol",
     "method": "tcp_connect",
     "timeout_ms": 1000,
     "attempts": 1,

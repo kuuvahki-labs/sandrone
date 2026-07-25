@@ -48,7 +48,6 @@ JSON merge patch：未提供的字段会回到内建默认值，不会沿用上�
     "timeout_ms": 8000
   },
   "probe_defaults": {
-    "layer": "proxy",
     "method": "url_test",
     "core": "sing-box",
     "url": "https://connectivity.example/generate_204",
@@ -72,9 +71,8 @@ JSON merge patch：未提供的字段会回到内建默认值，不会沿用上�
 | `remote_defaults.user_agent` | 远程抓取默认 User-Agent；空值使用当前 Sandrone 版本的默认值 |
 | `remote_defaults.proxy` | 可为空；非空时必须是带 host 的 `http`、`https` 或 `socks5` URL |
 | `remote_defaults.timeout_ms` | 正整数；省略或 `0` 使用内建默认值 |
-| `probe_defaults.layer` | `protocol` 或 `proxy` |
-| `probe_defaults.method` | `auto`、`tcp_connect`、`udp_ntp` 或 `url_test` |
-| `probe_defaults.core` | `mihomo` 或 `sing-box` |
+| `probe_defaults.method` | `tcp_connect`、`udp_ntp` 或 `url_test`；内建默认值为 `url_test` |
+| `probe_defaults.core` | `mihomo` 或 `sing-box`；内建默认值为 `sing-box`，`tcp_connect` 不使用 core |
 | `probe_defaults.url` | 带 host 的 HTTP(S) URL |
 | `probe_defaults.ntp_server` | NTP 服务地址；空值使用内建默认值 |
 | `probe_defaults.timeout_ms`、`attempts`、`concurrency` | 正整数；省略或 `0` 使用各自内建默认值 |
@@ -135,8 +133,7 @@ data/<safe-store-key>
     "timeout_ms": 15000
   },
   "probe_defaults": {
-    "layer": "protocol",
-    "method": "auto",
+    "method": "url_test",
     "core": "sing-box",
     "url": "http://www.gstatic.com/generate_204",
     "ntp_server": "time.apple.com",

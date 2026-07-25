@@ -114,7 +114,7 @@ unsaved subscription was previewed.
 ## Probe Nodes
 
 1. Read probe capabilities.
-2. Resolve input, layer, method, core, target, timeout, attempts, concurrency,
+2. Resolve input, method, core, target, timeout, attempts, concurrency,
    and cache behavior from the request and current schema.
 3. Use authenticated `POST /v1/probe` or `sandrone_probe_nodes`.
 4. Separate per-node results from aggregate warnings; probing is not a

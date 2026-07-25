@@ -85,7 +85,6 @@ func TestRuntimeSettingsEndpointDefaultsAndRoundTrip(t *testing.T) {
     "timeout_ms": 8000
   },
   "probe_defaults": {
-    "layer": "proxy",
     "method": "url_test",
     "core": "sing-box",
     "url": "https://example.com/generate_204",
@@ -113,7 +112,6 @@ func TestRuntimeSettingsEndpointDefaultsAndRoundTrip(t *testing.T) {
 	require.Equal(t, "Sandrone Test", settings.RemoteDefaults.UserAgent)
 	require.Equal(t, "http://127.0.0.1:7890", settings.RemoteDefaults.Proxy)
 	require.Equal(t, 8000, settings.RemoteDefaults.TimeoutMS)
-	require.Equal(t, "proxy", settings.ProbeDefaults.Layer)
 	require.Equal(t, "url_test", settings.ProbeDefaults.Method)
 	require.Equal(t, "https://example.com/generate_204", settings.ProbeDefaults.URL)
 	require.Equal(t, 300, settings.ProbeDefaults.CacheTTLSeconds)

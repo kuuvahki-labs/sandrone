@@ -34,8 +34,7 @@ const fields = ["name", "type", "server"];
 const fieldOptions = fields.map((field) => ({ value: field, label: field }));
 const informationNodePattern = "(?i)(网址|流量|时间|应急|过期|bandwidth|expire)";
 const probeRuntimeDefaults = {
-  layer: "protocol",
-  method: "auto",
+  method: "url_test",
   core: "sing-box",
   url: "http://www.gstatic.com/generate_204",
   ntpServer: "time.apple.com",
@@ -143,15 +142,12 @@ function ProcessorParamsEditor({ draft, onChange, scriptFiles }: ProcessorParams
         </>
       );
     case "probe": {
-      const layer = stringValue(params.layer) || probeRuntimeDefaults.layer;
       const method = stringValue(params.method) || probeRuntimeDefaults.method;
-      const showNTPServer = layer === "protocol" && (method === "auto" || method === "udp_ntp");
-      const showURLTarget = layer === "proxy" || method === "url_test";
+      const showNTPServer = method === "udp_ntp";
+      const showURLTarget = method === "url_test";
       return (
         <>
-          <SelectField label={t("processors.probe.layer")} options={probeLayerOptions(t)} value={layer} onChange={(value) => onChange({ layer: value })} />
-          <SelectField label={t("processors.probe.method")} options={probeMethodOptions(t)} value={method} onChange={(value) => onChange({ method: value })} />
-          <SelectField label={t("processors.probe.core")} options={probeCoreOptions(t)} value={stringValue(params.core)} onChange={(value) => onChange({ core: value })} />
+          <SelectField label={t("processors.probe.method")} options={probeMethodOptions()} value={method} onChange={(value) => onChange(probeMethodPatch(value))} />
           {showNTPServer ? (
             <TextField fullWidth label={t("processors.probe.ntpServer")} value={stringValue(params.ntp_server)} onChange={(event) => onChange({ ntp_server: event.target.value })} />
           ) : null}
@@ -229,18 +225,33 @@ function serializeDraft(draft: ProcessorDraft, t: Translator): ProcessorDetail {
 
 function sanitizeProbeParams(params: Record<string, unknown>): Record<string, unknown> {
   const out = cleanParams(params);
-  const layer = stringValue(out.layer) || probeRuntimeDefaults.layer;
   const method = stringValue(out.method) || probeRuntimeDefaults.method;
-  const usesNTPServer = layer === "protocol" && (method === "auto" || method === "udp_ntp");
-  const usesURLTarget = layer === "proxy" || method === "url_test";
-  if (!usesNTPServer) {
+  out.method = method;
+  delete out.layer;
+  if (method === "tcp_connect") {
+    delete out.core;
+  } else {
+    out.core = probeRuntimeDefaults.core;
+  }
+  if (method !== "udp_ntp") {
     delete out.ntp_server;
   }
-  if (!usesURLTarget) {
+  if (method !== "url_test") {
     delete out.url;
     delete out.expected_status;
   }
   return out;
+}
+
+function probeMethodPatch(method: string): Record<string, unknown> {
+  switch (method) {
+    case "tcp_connect":
+      return { method, core: undefined, url: undefined, expected_status: undefined, ntp_server: undefined };
+    case "udp_ntp":
+      return { method, core: probeRuntimeDefaults.core, url: undefined, expected_status: undefined, ntp_server: probeRuntimeDefaults.ntpServer };
+    default:
+      return { method: "url_test", core: probeRuntimeDefaults.core, url: probeRuntimeDefaults.url, expected_status: undefined, ntp_server: undefined };
+  }
 }
 
 function processorOptions(t: Translator) {
@@ -313,27 +324,11 @@ function quickValues(t: Translator) {
   ];
 }
 
-function probeLayerOptions(t: Translator) {
+function probeMethodOptions() {
   return [
-    { value: "protocol", label: t("processors.probe.layerProtocol") },
-    { value: "proxy", label: t("processors.probe.layerProxy") },
-  ];
-}
-
-function probeMethodOptions(t: Translator) {
-  return [
-    { value: "auto", label: t("processors.probe.methodAuto") },
     { value: "tcp_connect", label: "tcp_connect" },
     { value: "udp_ntp", label: "udp_ntp" },
     { value: "url_test", label: "url_test" },
-  ];
-}
-
-function probeCoreOptions(t: Translator) {
-  return [
-    { value: "", label: t("processors.probe.coreAuto") },
-    { value: "mihomo", label: "mihomo" },
-    { value: "sing-box", label: "sing-box" },
   ];
 }
 
@@ -362,11 +357,9 @@ function defaultParams(type: string): Record<string, unknown> {
       return {};
     case "probe":
       return {
-        layer: probeRuntimeDefaults.layer,
         method: probeRuntimeDefaults.method,
         core: probeRuntimeDefaults.core,
         url: probeRuntimeDefaults.url,
-        ntp_server: probeRuntimeDefaults.ntpServer,
         timeout_ms: probeRuntimeDefaults.timeoutMS,
         attempts: probeRuntimeDefaults.attempts,
         concurrency: probeRuntimeDefaults.concurrency,

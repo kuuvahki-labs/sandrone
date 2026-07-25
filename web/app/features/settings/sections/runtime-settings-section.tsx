@@ -30,9 +30,7 @@ export function RuntimeSettingsSection({
 }: RuntimeSettingsSectionProps) {
   const { t } = useI18n();
   const [runtimeDraft, setRuntimeDraft] = useState(() => completeRuntimeSettings(runtimeSettings));
-  const probeLayerLabelId = useId();
   const probeMethodLabelId = useId();
-  const probeCoreLabelId = useId();
 
   useEffect(() => {
     setRuntimeDraft(completeRuntimeSettings(runtimeSettings));
@@ -110,41 +108,16 @@ export function RuntimeSettingsSection({
             </RuntimeSettingsGroup>
             <RuntimeSettingsGroup id="runtime-probe-defaults" title={t("settings.runtime.group.probe")}>
               <FormControl fullWidth>
-                <InputLabel id={probeLayerLabelId}>{t("settings.runtime.probeLayer")}</InputLabel>
-                <Select
-                  label={t("settings.runtime.probeLayer")}
-                  labelId={probeLayerLabelId}
-                  value={runtimeDraft.probe_defaults.layer ?? "protocol"}
-                  onChange={(event) => updateProbeDefaults({ layer: event.target.value as RuntimeSettingsInput["probe_defaults"]["layer"] })}
-                >
-                  <MenuItem value="protocol">{t("processors.probe.layerProtocol")}</MenuItem>
-                  <MenuItem value="proxy">{t("processors.probe.layerProxy")}</MenuItem>
-                </Select>
-              </FormControl>
-              <FormControl fullWidth>
                 <InputLabel id={probeMethodLabelId}>{t("settings.runtime.probeMethod")}</InputLabel>
                 <Select
                   label={t("settings.runtime.probeMethod")}
                   labelId={probeMethodLabelId}
-                  value={runtimeDraft.probe_defaults.method ?? "auto"}
+                  value={runtimeDraft.probe_defaults.method ?? "url_test"}
                   onChange={(event) => updateProbeDefaults({ method: event.target.value as RuntimeSettingsInput["probe_defaults"]["method"] })}
                 >
-                  <MenuItem value="auto">auto</MenuItem>
                   <MenuItem value="tcp_connect">tcp_connect</MenuItem>
                   <MenuItem value="udp_ntp">udp_ntp</MenuItem>
                   <MenuItem value="url_test">url_test</MenuItem>
-                </Select>
-              </FormControl>
-              <FormControl fullWidth>
-                <InputLabel id={probeCoreLabelId}>{t("settings.runtime.probeCore")}</InputLabel>
-                <Select
-                  label={t("settings.runtime.probeCore")}
-                  labelId={probeCoreLabelId}
-                  value={runtimeDraft.probe_defaults.core ?? "sing-box"}
-                  onChange={(event) => updateProbeDefaults({ core: event.target.value as RuntimeSettingsInput["probe_defaults"]["core"] })}
-                >
-                  <MenuItem value="sing-box">sing-box</MenuItem>
-                  <MenuItem value="mihomo">mihomo</MenuItem>
                 </Select>
               </FormControl>
               <TextField

@@ -20,8 +20,7 @@ func TestServiceRuntimeSettingsDefaultsAndRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "sandrone/0.1.0", defaults.RemoteDefaults.UserAgent)
 	require.Equal(t, 15000, defaults.RemoteDefaults.TimeoutMS)
-	require.Equal(t, "protocol", defaults.ProbeDefaults.Layer)
-	require.Equal(t, "auto", defaults.ProbeDefaults.Method)
+	require.Equal(t, "url_test", defaults.ProbeDefaults.Method)
 	require.Equal(t, "sing-box", defaults.ProbeDefaults.Core)
 	require.Equal(t, "http://www.gstatic.com/generate_204", defaults.ProbeDefaults.URL)
 	require.Equal(t, "time.apple.com", defaults.ProbeDefaults.NTPServer)
@@ -38,7 +37,6 @@ func TestServiceRuntimeSettingsDefaultsAndRoundTrip(t *testing.T) {
 			TimeoutMS: 8000,
 		},
 		ProbeDefaults: domain.ProbeDefaults{
-			Layer:           "proxy",
 			Method:          "url_test",
 			Core:            "sing-box",
 			URL:             "https://example.com/generate_204",

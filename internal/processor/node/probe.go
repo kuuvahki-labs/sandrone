@@ -13,8 +13,7 @@ import (
 )
 
 type ProbeParams struct {
-	Layer           string `json:"layer,omitempty" jsonschema:"Probe layer" enum:"protocol,proxy"`
-	Method          string `json:"method,omitempty" jsonschema:"Probe method" enum:"auto,tcp_connect,udp_ntp,url_test"`
+	Method          string `json:"method,omitempty" jsonschema:"Probe method" enum:"tcp_connect,udp_ntp,url_test"`
 	Core            string `json:"core,omitempty" jsonschema:"Optional proxy core selector"`
 	URL             string `json:"url,omitempty" jsonschema:"URL used for URL tests"`
 	NTPServer       string `json:"ntp_server,omitempty" jsonschema:"NTP server used for UDP NTP probes"`
@@ -62,6 +61,16 @@ func buildProbe(prober ProbeRunner) processor.NodeBuilder {
 				Processor: spec.Type,
 			}
 		}
+		params.Method = string(probeMethod(params.Method))
+		switch domain.ProbeMethod(params.Method) {
+		case "", domain.ProbeTCPConnect, domain.ProbeUDPNTP, domain.ProbeURLTest:
+		default:
+			return nil, &domain.AppError{
+				Code:      domain.CodeProcessorConfigInvalid,
+				Message:   fmt.Sprintf("unsupported probe method %q", params.Method),
+				Processor: spec.Type,
+			}
+		}
 		if prober == nil {
 			return nil, &domain.AppError{
 				Code:      domain.CodeProcessorConfigInvalid,
@@ -76,7 +85,6 @@ func buildProbe(prober ProbeRunner) processor.NodeBuilder {
 func (p *probeProc) Name() string { return "probe" }
 
 func (p *probeProc) ApplyNodes(ctx context.Context, in domain.NodeProcessInput) (domain.NodeProcessOutput, error) {
-	layer := domain.ProbeLayer(p.params.Layer)
 	method := domain.ProbeMethod(p.params.Method)
 	core := strings.TrimSpace(p.params.Core)
 	url := strings.TrimSpace(p.params.URL)
@@ -88,7 +96,6 @@ func (p *probeProc) ApplyNodes(ctx context.Context, in domain.NodeProcessInput) 
 			Meta:  cloneStringMap(in.Context.Meta),
 		},
 		Method:          method,
-		Layer:           layer,
 		Core:            core,
 		URL:             url,
 		NTPServer:       p.params.NTPServer,
@@ -185,7 +192,6 @@ func annotateProbeMeta(meta map[string]string, result domain.NodeProbeResult) ma
 			delete(out, key)
 		}
 	}
-	out["probe.layer"] = result.Layer
 	out["probe.method"] = result.Method
 	if result.Core != "" {
 		out["probe.core"] = result.Core
@@ -204,6 +210,10 @@ func annotateProbeMeta(meta map[string]string, result domain.NodeProbeResult) ma
 		out["probe.error_code"] = result.ErrorCode
 	}
 	return out
+}
+
+func probeMethod(value string) domain.ProbeMethod {
+	return domain.ProbeMethod(strings.ReplaceAll(strings.ToLower(strings.TrimSpace(value)), "-", "_"))
 }
 
 func cloneStringMap(in map[string]string) map[string]string {

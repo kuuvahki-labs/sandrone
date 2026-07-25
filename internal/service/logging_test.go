@@ -47,13 +47,12 @@ func TestServiceProbeLogsSummary(t *testing.T) {
 			return &domain.ProbeResult{
 				Results: []domain.NodeProbeResult{{
 					NodeName:   "n",
-					Layer:      string(req.Layer),
 					Method:     string(req.Method),
 					Alive:      true,
 					DurationMS: 4,
 					CheckedAt:  time.Date(2026, 6, 24, 1, 2, 3, 0, time.UTC),
 				}},
-				Report: domain.Report{Probe: &domain.ProbeReport{Backend: "fake", Layer: string(req.Layer), Method: string(req.Method), SuccessCount: 1}},
+				Report: domain.Report{Probe: &domain.ProbeReport{Backend: "fake", Method: string(req.Method), SuccessCount: 1}},
 			}, nil
 		}}),
 	)
@@ -75,7 +74,6 @@ func TestServiceProbeLogsSummary(t *testing.T) {
 	out := logs.String()
 	require.Contains(t, out, `"msg":"service probe completed"`)
 	require.Contains(t, out, `"operation":"probe"`)
-	require.Contains(t, out, `"layer":"protocol"`)
 	require.Contains(t, out, `"method":"tcp_connect"`)
 	require.Contains(t, out, `"node_count":1`)
 	require.Contains(t, out, `"success_count":1`)

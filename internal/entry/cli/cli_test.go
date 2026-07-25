@@ -50,8 +50,6 @@ func TestProbeHelpDocumentsHealthCheckMethods(t *testing.T) {
 	help := runHelp(t, "probe")
 
 	for _, want := range []string{
-		"--layer",
-		"auto",
 		"tcp-connect",
 		"udp-ntp",
 		"url-test",
@@ -185,13 +183,13 @@ func TestConvertURIListToJSONNodes(t *testing.T) {
 func TestProbeMapsFlagsToEngineRequest(t *testing.T) {
 	rec := &recordingEngine{
 		probeResult: &sandrone.ProbeResult{
-			Results: []sandrone.NodeProbeResult{{NodeName: "node-a", Layer: "protocol", Method: "tcp_connect", Alive: true}},
+			Results: []sandrone.NodeProbeResult{{NodeName: "node-a", Method: "tcp_connect", Alive: true}},
 		},
 	}
 	dataDir := t.TempDir()
 
 	code, stdout, stderr := runCLI(t,
-		[]string{"--data-dir", dataDir, "probe", "--format", "uri-list", "--layer", "protocol", "--method", "tcp-connect", "--input", "-", "--timeout", "5s", "--attempts", "2", "--concurrency", "3"},
+		[]string{"--data-dir", dataDir, "probe", "--format", "uri-list", "--method", "tcp-connect", "--input", "-", "--timeout", "5s", "--attempts", "2", "--concurrency", "3"},
 		`{"name":"node-a","type":"ss","server":"example.com","port":443}`,
 		WithEngineFactory(func(gotDataDir string) engine {
 			require.Equal(t, dataDir, gotDataDir)
@@ -203,7 +201,6 @@ func TestProbeMapsFlagsToEngineRequest(t *testing.T) {
 	require.NotEmpty(t, stdout)
 	require.Empty(t, stderr)
 	require.Len(t, rec.probeRequests, 1)
-	require.Equal(t, sandrone.ProbeLayerProtocol, rec.probeRequests[0].Layer)
 	require.Equal(t, sandrone.ProbeTCPConnect, rec.probeRequests[0].Method)
 	require.Equal(t, "uri-list", rec.probeRequests[0].Input.Format)
 	require.Equal(t, 5000, rec.probeRequests[0].TimeoutMS)
@@ -214,7 +211,7 @@ func TestProbeMapsFlagsToEngineRequest(t *testing.T) {
 func TestProbeMapsInputURLToRemoteNodeInput(t *testing.T) {
 	rec := &recordingEngine{
 		probeResult: &sandrone.ProbeResult{
-			Results: []sandrone.NodeProbeResult{{NodeName: "node-a", Layer: "protocol", Method: "auto", Alive: true}},
+			Results: []sandrone.NodeProbeResult{{NodeName: "node-a", Method: "url_test", Core: "sing-box", Alive: true}},
 		},
 	}
 	code, _, stderr := runCLI(t,
@@ -225,8 +222,8 @@ func TestProbeMapsInputURLToRemoteNodeInput(t *testing.T) {
 	require.Equal(t, 0, code, stderr)
 	require.Len(t, rec.probeRequests, 1)
 	req := rec.probeRequests[0]
-	require.Equal(t, sandrone.ProbeLayerProtocol, req.Layer)
-	require.Equal(t, sandrone.ProbeAuto, req.Method)
+	require.Equal(t, sandrone.ProbeURLTest, req.Method)
+	require.Equal(t, "sing-box", req.Core)
 	require.Equal(t, 5000, req.TimeoutMS)
 	require.Equal(t, "remote", req.Input.Type)
 	require.Empty(t, req.Input.Format)

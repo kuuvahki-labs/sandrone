@@ -9,19 +9,17 @@ import (
 
 func dimensionsForResults(results []domain.NodeProbeResult) []domain.ProbeReportDimension {
 	type key struct {
-		layer  string
 		method string
 		core   string
 	}
 	order := []key{}
 	byKey := map[key]*domain.ProbeReportDimension{}
 	for _, result := range results {
-		k := key{layer: result.Layer, method: result.Method, core: result.Core}
+		k := key{method: result.Method, core: result.Core}
 		dim := byKey[k]
 		if dim == nil {
 			order = append(order, k)
 			dim = &domain.ProbeReportDimension{
-				Layer:       k.layer,
 				Method:      k.method,
 				Core:        k.core,
 				ErrorCounts: map[string]int{},
@@ -93,7 +91,6 @@ func successResult(req domain.ProbeRequest, node domain.NodeIR, durationMS int, 
 	return domain.NodeProbeResult{
 		NodeID:     node.ID,
 		NodeName:   node.Name,
-		Layer:      string(req.Layer),
 		Method:     string(req.Method),
 		Target:     targetFromRequest(req, node),
 		Core:       req.Core,
@@ -111,7 +108,6 @@ func resultForError(req domain.ProbeRequest, node domain.NodeIR, code string, er
 	return domain.NodeProbeResult{
 		NodeID:    node.ID,
 		NodeName:  node.Name,
-		Layer:     string(req.Layer),
 		Method:    string(req.Method),
 		Target:    targetFromRequest(req, node),
 		Core:      req.Core,
@@ -122,10 +118,9 @@ func resultForError(req domain.ProbeRequest, node domain.NodeIR, code string, er
 	}
 }
 
-func reportForResults(backend, version, layer, method, core string, nodes []domain.NodeIR, results []domain.NodeProbeResult) domain.Report {
+func reportForResults(backend, version, method, core string, nodes []domain.NodeIR, results []domain.NodeProbeResult) domain.Report {
 	probeReport := &domain.ProbeReport{
 		Backend:      backend,
-		Layer:        layer,
 		Method:       method,
 		Core:         core,
 		ErrorCounts:  map[string]int{},

@@ -153,6 +153,7 @@ func TestEngineRuntimeSettingsRoundTrip(t *testing.T) {
 	defaults, err := engine.GetRuntimeSettings(ctx)
 	require.NoError(t, err)
 	require.Equal(t, "sandrone/0.1.0", defaults.RemoteDefaults.UserAgent)
+	require.Equal(t, "url_test", defaults.ProbeDefaults.Method)
 	require.Equal(t, "sing-box", defaults.ProbeDefaults.Core)
 	require.Equal(t, 60, defaults.CacheDefaults.SubscriptionTrafficTTLSeconds)
 
@@ -163,7 +164,6 @@ func TestEngineRuntimeSettingsRoundTrip(t *testing.T) {
 			TimeoutMS: 7000,
 		},
 		ProbeDefaults: sandrone.ProbeDefaults{
-			Layer:           "proxy",
 			Method:          "url_test",
 			Core:            "sing-box",
 			URL:             "https://example.com/generate_204",

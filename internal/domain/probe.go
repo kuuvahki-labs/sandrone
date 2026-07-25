@@ -5,17 +5,9 @@ import "time"
 type ProbeMethod string
 
 const (
-	ProbeAuto       ProbeMethod = "auto"
 	ProbeTCPConnect ProbeMethod = "tcp_connect"
 	ProbeUDPNTP     ProbeMethod = "udp_ntp"
 	ProbeURLTest    ProbeMethod = "url_test"
-)
-
-type ProbeLayer string
-
-const (
-	ProbeLayerProtocol ProbeLayer = "protocol"
-	ProbeLayerProxy    ProbeLayer = "proxy"
 )
 
 const (
@@ -31,7 +23,6 @@ const (
 
 type ProbeRequest struct {
 	Input           NodeInput         `json:"input" yaml:"input"`
-	Layer           ProbeLayer        `json:"layer,omitempty" yaml:"layer,omitempty"`
 	Method          ProbeMethod       `json:"method,omitempty" yaml:"method,omitempty"`
 	Core            string            `json:"core,omitempty" yaml:"core,omitempty"`
 	URL             string            `json:"url,omitempty" yaml:"url,omitempty"`
@@ -52,7 +43,6 @@ type ProbeResult struct {
 type NodeProbeResult struct {
 	NodeID     string    `json:"node_id,omitempty" yaml:"node_id,omitempty"`
 	NodeName   string    `json:"node_name" yaml:"node_name"`
-	Layer      string    `json:"layer" yaml:"layer"`
 	Method     string    `json:"method" yaml:"method"`
 	Target     string    `json:"target,omitempty" yaml:"target,omitempty"`
 	Core       string    `json:"core,omitempty" yaml:"core,omitempty"`
@@ -68,7 +58,6 @@ type NodeProbeResult struct {
 type ProbeReport struct {
 	Backend        string                 `json:"backend,omitempty" yaml:"backend,omitempty"`
 	BackendVersion string                 `json:"backend_version,omitempty" yaml:"backend_version,omitempty"`
-	Layer          string                 `json:"layer,omitempty" yaml:"layer,omitempty"`
 	Method         string                 `json:"method,omitempty" yaml:"method,omitempty"`
 	Core           string                 `json:"core,omitempty" yaml:"core,omitempty"`
 	SuccessCount   int                    `json:"success_count" yaml:"success_count"`
@@ -79,7 +68,6 @@ type ProbeReport struct {
 }
 
 type ProbeReportDimension struct {
-	Layer         string         `json:"layer,omitempty" yaml:"layer,omitempty"`
 	Method        string         `json:"method,omitempty" yaml:"method,omitempty"`
 	Core          string         `json:"core,omitempty" yaml:"core,omitempty"`
 	SuccessCount  int            `json:"success_count" yaml:"success_count"`

@@ -353,7 +353,7 @@ func TestAgentSubscriptionRenderReturnsBodyAndReport(t *testing.T) {
 
 Open a local `net.Listener` on `127.0.0.1:0`, build one synthetic Shadowsocks
 URI targeting that listener, and post a `domain.ProbeRequest` using
-`layer: "protocol"` and `method: "tcp_connect"`. Assert the response returns
+`method: "tcp_connect"`. Assert the response returns
 one live result plus the complete probe report. This exercises the same real
 service/probe boundary as production without external network access.
 
@@ -361,7 +361,7 @@ Before running RED, also add table-driven cases for:
 
 - conversion with both missing input sources and both input sources;
 - conversion processor `params` as a JSON object, never base64;
-- invalid probe layer/method and unavailable backend errors;
+- invalid probe method and unavailable backend errors;
 - missing, multi-segment, and percent-encoded subscription names;
 - missing subscription render format;
 - GET on the three POST-only routes;
@@ -1130,7 +1130,7 @@ In `conversion.md`, distinguish public `GET /convert` from authenticated
 parse/render-processors, options, metadata, and full report response.
 
 In new `probing.md`, document `POST /v1/probe`, the `NodeInput`, canonical
-layers/methods, target options, bounded execution fields, result/report shape,
+methods, target options, bounded execution fields, result/report shape,
 controlled network effects, and synthetic curl example.
 
 In `subscriptions.md`, document

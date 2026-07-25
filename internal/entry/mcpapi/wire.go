@@ -169,7 +169,6 @@ type validateFileInput struct {
 
 type probeInput struct {
 	Input           domain.NodeInput   `json:"input"`
-	Layer           domain.ProbeLayer  `json:"layer,omitempty"`
 	Method          domain.ProbeMethod `json:"method,omitempty"`
 	Core            string             `json:"core,omitempty"`
 	URL             string             `json:"url,omitempty"`

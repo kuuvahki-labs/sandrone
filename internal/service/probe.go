@@ -21,7 +21,6 @@ func (s *Service) Probe(ctx context.Context, req domain.ProbeRequest) (out *doma
 		}
 		s.log(ctx, slog.LevelError, "service probe failed",
 			"operation", "probe",
-			"layer", string(probe.NormalizeLayer(req.Layer)),
 			"method", string(probe.NormalizeMethod(req.Method)),
 			"core", probe.NormalizeCore(req.Core),
 			"node_count", nodeCount,
@@ -36,6 +35,14 @@ func (s *Service) Probe(ctx context.Context, req domain.ProbeRequest) (out *doma
 	req, err = s.probeRequestWithDefaults(ctx, req)
 	if err != nil {
 		return nil, err
+	}
+	req.Method = probe.NormalizeMethod(req.Method)
+	switch req.Method {
+	case domain.ProbeTCPConnect:
+		req.Core = ""
+	case domain.ProbeUDPNTP, domain.ProbeURLTest:
+	default:
+		return nil, domain.NewError(domain.CodeInvalidArgument, fmt.Sprintf("unsupported probe method %q", req.Method))
 	}
 	nodeSet, err := s.resolveNodeInput(ctx, req.Input, domain.FileRequest{
 		Request: domain.RequestInfo{Meta: req.Meta},
@@ -60,7 +67,6 @@ func (s *Service) Probe(ctx context.Context, req domain.ProbeRequest) (out *doma
 		success, failure, cacheHits := probeCounts(cached)
 		s.log(ctx, slog.LevelInfo, "service probe completed",
 			"operation", "probe",
-			"layer", string(probe.NormalizeLayer(req.Layer)),
 			"method", string(probe.NormalizeMethod(req.Method)),
 			"core", probe.NormalizeCore(req.Core),
 			"node_count", nodeCount,
@@ -102,7 +108,6 @@ func (s *Service) Probe(ctx context.Context, req domain.ProbeRequest) (out *doma
 			})
 			s.log(ctx, slog.LevelWarn, "service probe cache write failed",
 				"operation", "probe",
-				"layer", string(probe.NormalizeLayer(req.Layer)),
 				"method", string(probe.NormalizeMethod(req.Method)),
 				"core", probe.NormalizeCore(req.Core),
 				"node_count", nodeCount,
@@ -117,7 +122,6 @@ func (s *Service) Probe(ctx context.Context, req domain.ProbeRequest) (out *doma
 	success, failure, cacheHits := probeCounts(result)
 	s.log(ctx, slog.LevelInfo, "service probe completed",
 		"operation", "probe",
-		"layer", string(probe.NormalizeLayer(req.Layer)),
 		"method", string(probe.NormalizeMethod(req.Method)),
 		"core", probe.NormalizeCore(req.Core),
 		"node_count", nodeCount,
@@ -134,20 +138,14 @@ func (s *Service) Probe(ctx context.Context, req domain.ProbeRequest) (out *doma
 }
 
 func (s *Service) renderProbePayloads(ctx context.Context, req *domain.ProbeRequest, nodes []domain.NodeIR) ([]probe.Payload, []domain.Warning, error) {
-	req.Layer = probe.NormalizeLayer(req.Layer)
 	req.Method = probe.NormalizeMethod(req.Method)
+	if req.Method == domain.ProbeTCPConnect {
+		req.Core = ""
+	}
 	if req.NTPServer == "" {
 		req.NTPServer = probe.NTPServerFromRequest(*req)
 	}
 	needsPayload := req.Method == domain.ProbeURLTest || req.Method == domain.ProbeUDPNTP
-	if req.Method == domain.ProbeAuto {
-		for _, node := range nodes {
-			if req.Layer == domain.ProbeLayerProxy || node.Type == domain.NodeTypeHysteria || node.Type == domain.NodeTypeHysteria2 || node.Type == domain.NodeTypeTUIC || node.Type == domain.NodeTypeWireGuard {
-				needsPayload = true
-				break
-			}
-		}
-	}
 	if !needsPayload {
 		return nil, nil, nil
 	}
@@ -209,7 +207,7 @@ func (s *Service) readProbeCache(ctx context.Context, req domain.ProbeRequest, n
 		}
 	}
 	if result.Report.Probe == nil {
-		result.Report.Probe = &domain.ProbeReport{Layer: string(probe.NormalizeLayer(req.Layer)), Method: string(probe.NormalizeMethod(req.Method)), Core: probe.NormalizeCore(req.Core)}
+		result.Report.Probe = &domain.ProbeReport{Method: string(probe.NormalizeMethod(req.Method)), Core: probe.NormalizeCore(req.Core)}
 	}
 	result.Report.Probe.CacheHitCount = len(result.Results)
 	result.Report.Warnings = append(result.Report.Warnings, domain.Warning{
@@ -235,7 +233,6 @@ func (s *Service) writeProbeCache(ctx context.Context, req domain.ProbeRequest, 
 }
 
 func probeCacheKey(req domain.ProbeRequest, nodes []domain.NodeIR) (string, error) {
-	req.Layer = probe.NormalizeLayer(req.Layer)
 	req.Method = probe.NormalizeMethod(req.Method)
 	req.Core = probe.NormalizeCore(req.Core)
 	if req.NTPServer == "" {
@@ -246,7 +243,6 @@ func probeCacheKey(req domain.ProbeRequest, nodes []domain.NodeIR) (string, erro
 	}
 	value := struct {
 		Nodes          []domain.NodeIR `json:"nodes"`
-		Layer          string          `json:"layer"`
 		Method         string          `json:"method"`
 		Core           string          `json:"core,omitempty"`
 		URL            string          `json:"url,omitempty"`
@@ -256,7 +252,6 @@ func probeCacheKey(req domain.ProbeRequest, nodes []domain.NodeIR) (string, erro
 		Attempts       int             `json:"attempts,omitempty"`
 	}{
 		Nodes:          nodes,
-		Layer:          string(req.Layer),
 		Method:         string(req.Method),
 		Core:           req.Core,
 		URL:            req.URL,

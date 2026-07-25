@@ -212,7 +212,7 @@ endpoint 级限制以 [HTTP API 参考](http-api/README.md)为准。
 | `source_refs` | 输入格式、远程来源或上游 schema 依据 |
 | `warnings` | 跨阶段聚合 warnings |
 | `render` | `success_count`、`lost_fields` 与 renderer warnings |
-| `probe` | backend、layer、method、core、成功/失败/缓存计数及 dimensions |
+| `probe` | backend、method、core、成功/失败/缓存计数及 dimensions |
 
 renderer warnings 会保留在 `report.render.warnings`，同时合并到顶层
 `report.warnings`，便于既按阶段查看又统一处理。若 `refs` 为空而

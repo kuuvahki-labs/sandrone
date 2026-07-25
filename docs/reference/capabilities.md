@@ -15,6 +15,9 @@
 - `node_processors`、`file_processors`、`probe_methods` 和
   `probe_backends`：同一运行时的其它能力。
 
+`probe_methods` 的封闭集合是 `tcp_connect`、`udp_ntp` 和 `url_test`；
+具体可用 core/backend 仍以当前进程返回的 `probe_backends` 为准。
+
 每条 adapter capability 包含：
 
 | 字段 | 含义 |

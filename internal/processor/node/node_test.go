@@ -235,15 +235,14 @@ func TestProbeProcessorAnnotatesAndSorts(t *testing.T) {
 	checkedAt := time.Date(2026, 5, 28, 12, 0, 0, 0, time.UTC)
 	runner := &stubProbeRunner{result: &domain.ProbeResult{
 		Results: []domain.NodeProbeResult{
-			{NodeName: "slow", Layer: "protocol", Method: "tcp_connect", Target: "slow.example:443", Alive: true, DurationMS: 90, CheckedAt: checkedAt},
-			{NodeName: "dead", Layer: "protocol", Method: "tcp_connect", Target: "dead.example:443", Alive: false, CheckedAt: checkedAt, ErrorCode: "probe_tcp_failed"},
-			{NodeName: "fast", Layer: "protocol", Method: "tcp_connect", Target: "fast.example:443", Alive: true, DurationMS: 10, CheckedAt: checkedAt},
+			{NodeName: "slow", Method: "tcp_connect", Target: "slow.example:443", Alive: true, DurationMS: 90, CheckedAt: checkedAt},
+			{NodeName: "dead", Method: "tcp_connect", Target: "dead.example:443", Alive: false, CheckedAt: checkedAt, ErrorCode: "probe_tcp_failed"},
+			{NodeName: "fast", Method: "tcp_connect", Target: "fast.example:443", Alive: true, DurationMS: 10, CheckedAt: checkedAt},
 		},
 		Report: domain.Report{Warnings: []domain.Warning{{Code: "probe_tcp_failed"}}},
 	}}
 	r := makeProbeRegistry(runner)
 	proc := buildNode(t, r, "probe", map[string]any{
-		"layer":       "protocol",
 		"method":      "tcp_connect",
 		"timeout_ms":  123,
 		"concurrency": 2,
@@ -262,7 +261,6 @@ func TestProbeProcessorAnnotatesAndSorts(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Len(t, runner.requests, 1)
-	require.Equal(t, domain.ProbeLayer("protocol"), runner.requests[0].Layer)
 	require.Equal(t, domain.ProbeMethod("tcp_connect"), runner.requests[0].Method)
 	require.Equal(t, 123, runner.requests[0].TimeoutMS)
 	require.Equal(t, 2, runner.requests[0].Concurrency)
@@ -270,11 +268,20 @@ func TestProbeProcessorAnnotatesAndSorts(t *testing.T) {
 	require.Equal(t, []string{"fast", "slow", "dead"}, []string{out.Nodes[0].Name, out.Nodes[1].Name, out.Nodes[2].Name})
 	require.Equal(t, "true", out.Nodes[0].Meta["probe.alive"])
 	require.Equal(t, "10", out.Nodes[0].Meta["probe.duration_ms"])
-	require.Equal(t, "protocol", out.Nodes[0].Meta["probe.layer"])
 	require.Equal(t, "yes", out.Nodes[1].Meta["keep"])
 	require.Equal(t, "false", out.Nodes[2].Meta["probe.alive"])
 	require.Equal(t, "probe_tcp_failed", out.Nodes[2].Meta["probe.error_code"])
 	require.Equal(t, "probe_tcp_failed", out.Warnings[0].Code)
+}
+
+func TestProbeProcessorRejectsUnsupportedMethod(t *testing.T) {
+	r := makeProbeRegistry(&stubProbeRunner{})
+	_, err := r.BuildNode(domain.ProcessorSpec{
+		Type:   "probe",
+		Params: params(t, map[string]any{"method": "future"}),
+	})
+	require.Error(t, err)
+	require.True(t, domain.IsCode(err, domain.CodeProcessorConfigInvalid))
 }
 
 func TestProbeProcessorDropFailed(t *testing.T) {

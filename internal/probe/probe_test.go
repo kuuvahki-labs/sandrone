@@ -46,7 +46,6 @@ func TestTCPConnectSuccessWithLocalListener(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, result.Results, 1)
 	require.True(t, result.Results[0].Alive)
-	require.Equal(t, string(domain.ProbeLayerProtocol), result.Results[0].Layer)
 	require.Equal(t, string(domain.ProbeTCPConnect), result.Results[0].Method)
 	require.Equal(t, net.JoinHostPort("127.0.0.1", strconv.Itoa(addr.Port)), result.Results[0].Target)
 	require.GreaterOrEqual(t, result.Results[0].DurationMS, 1)
@@ -56,30 +55,10 @@ func TestTCPConnectSuccessWithLocalListener(t *testing.T) {
 	<-done
 }
 
-func TestAutoProtocolSelectsTCPConnectForStreamNodes(t *testing.T) {
-	engine := probe.New(probe.WithDialer(&countingDialer{}))
-	result, err := engine.Probe(context.Background(), domain.ProbeRequest{
-		Layer:  domain.ProbeLayerProtocol,
-		Method: domain.ProbeAuto,
-	}, []domain.NodeIR{{
-		Name:   "vmess",
-		Type:   domain.NodeTypeVMess,
-		Server: "example.com",
-		Port:   443,
-	}})
-
-	require.NoError(t, err)
-	require.True(t, result.Results[0].Alive)
-	require.Equal(t, string(domain.ProbeLayerProtocol), result.Results[0].Layer)
-	require.Equal(t, string(domain.ProbeTCPConnect), result.Results[0].Method)
-	require.Equal(t, string(domain.ProbeTCPConnect), result.Report.Probe.Method)
-}
-
-func TestAutoProtocolSelectsUDPNTPForUDPFirstNodes(t *testing.T) {
+func TestExplicitUDPNTPSelectsCoreBackend(t *testing.T) {
 	engine := probe.New(probe.WithBackend(fakeCoreBackend{method: domain.ProbeUDPNTP, core: "sing-box"}))
 	result, err := engine.Probe(context.Background(), domain.ProbeRequest{
-		Layer:     domain.ProbeLayerProtocol,
-		Method:    domain.ProbeAuto,
+		Method:    domain.ProbeUDPNTP,
 		NTPServer: "time.example.com",
 	}, []domain.NodeIR{{
 		Name:   "hy2",
@@ -90,24 +69,22 @@ func TestAutoProtocolSelectsUDPNTPForUDPFirstNodes(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Len(t, result.Results, 1)
-	require.Equal(t, string(domain.ProbeLayerProtocol), result.Results[0].Layer)
 	require.Equal(t, string(domain.ProbeUDPNTP), result.Results[0].Method)
 	require.Equal(t, "time.example.com:123", result.Results[0].Target)
 	require.Equal(t, "sing-box", result.Results[0].Core)
 	require.Equal(t, string(domain.ProbeUDPNTP), result.Report.Probe.Method)
 }
 
-func TestAutoProxySelectsURLTest(t *testing.T) {
+func TestExplicitURLTestSelectsRequestedCore(t *testing.T) {
 	engine := probe.New(probe.WithBackend(fakeCoreBackend{method: domain.ProbeURLTest, core: "mihomo"}))
 	result, err := engine.Probe(context.Background(), domain.ProbeRequest{
-		Layer: domain.ProbeLayerProxy,
-		Core:  "mihomo",
-		URL:   "https://example.com/generate_204",
+		Method: domain.ProbeURLTest,
+		Core:   "mihomo",
+		URL:    "https://example.com/generate_204",
 	}, []domain.NodeIR{{Name: "proxy", Type: domain.NodeTypeHTTP}})
 
 	require.NoError(t, err)
 	require.Len(t, result.Results, 1)
-	require.Equal(t, string(domain.ProbeLayerProxy), result.Results[0].Layer)
 	require.Equal(t, string(domain.ProbeURLTest), result.Results[0].Method)
 	require.Equal(t, "https://example.com/generate_204", result.Results[0].Target)
 	require.Equal(t, "mihomo", result.Results[0].Core)
@@ -222,49 +199,15 @@ func TestCoreURLTestRequiresCoreWhenAmbiguous(t *testing.T) {
 	require.True(t, domain.IsCode(err, domain.CodeInvalidArgument))
 }
 
-func TestAutoProtocolProbeGroupsRunConcurrently(t *testing.T) {
-	started := make(chan domain.ProbeMethod, 2)
-	release := make(chan struct{})
-	engine := probe.New(
-		probe.WithBackend(blockingProbeBackend{method: domain.ProbeTCPConnect, started: started, release: release}),
-		probe.WithBackend(blockingProbeBackend{method: domain.ProbeUDPNTP, core: "sing-box", started: started, release: release}),
-	)
+func TestUnsupportedProbeMethodIsInvalidArgument(t *testing.T) {
+	engine := probe.New()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	done := make(chan error, 1)
-	go func() {
-		_, err := engine.Probe(ctx, domain.ProbeRequest{
-			Layer:  domain.ProbeLayerProtocol,
-			Method: domain.ProbeAuto,
-		}, []domain.NodeIR{{
-			Name:   "stream",
-			Type:   domain.NodeTypeVLESS,
-			Server: "example.com",
-			Port:   443,
-		}, {
-			Name:   "udp",
-			Type:   domain.NodeTypeHysteria2,
-			Server: "example.com",
-			Port:   443,
-		}})
-		done <- err
-	}()
+	_, err := engine.Probe(context.Background(), domain.ProbeRequest{
+		Method: domain.ProbeMethod("future"),
+	}, nil)
 
-	first := waitForStartedMethod(t, started)
-	secondTimer := time.NewTimer(100 * time.Millisecond)
-	defer secondTimer.Stop()
-	select {
-	case second := <-started:
-		require.ElementsMatch(t, []domain.ProbeMethod{domain.ProbeTCPConnect, domain.ProbeUDPNTP}, []domain.ProbeMethod{first, second})
-	case <-secondTimer.C:
-		cancel()
-		<-done
-		t.Fatalf("auto probe groups did not run concurrently; only %s started", first)
-	}
-
-	close(release)
-	require.NoError(t, <-done)
+	require.Error(t, err)
+	require.True(t, domain.IsCode(err, domain.CodeInvalidArgument))
 }
 
 type fakeCoreBackend struct {
@@ -287,7 +230,6 @@ func (b fakeCoreBackend) Probe(_ context.Context, req probe.BackendRequest, _ []
 	}
 	report := domain.Report{Probe: &domain.ProbeReport{
 		Backend:      b.Name(),
-		Layer:        string(req.Probe.Layer),
 		Method:       string(req.Probe.Method),
 		Core:         req.Probe.Core,
 		SuccessCount: 1,
@@ -295,7 +237,6 @@ func (b fakeCoreBackend) Probe(_ context.Context, req probe.BackendRequest, _ []
 	return &domain.ProbeResult{
 		Results: []domain.NodeProbeResult{{
 			NodeName:   "n",
-			Layer:      string(req.Probe.Layer),
 			Method:     string(req.Probe.Method),
 			Target:     target,
 			Core:       req.Probe.Core,
@@ -305,61 +246,6 @@ func (b fakeCoreBackend) Probe(_ context.Context, req probe.BackendRequest, _ []
 		}},
 		Report: report,
 	}, nil
-}
-
-type blockingProbeBackend struct {
-	method  domain.ProbeMethod
-	core    string
-	started chan<- domain.ProbeMethod
-	release <-chan struct{}
-}
-
-func (b blockingProbeBackend) Method() domain.ProbeMethod { return b.method }
-
-func (b blockingProbeBackend) Core() string { return b.core }
-
-func (b blockingProbeBackend) Name() string { return "blocking-" + string(b.method) }
-
-func (b blockingProbeBackend) Version() string { return "" }
-
-func (b blockingProbeBackend) Probe(ctx context.Context, req probe.BackendRequest, nodes []domain.NodeIR) (*domain.ProbeResult, error) {
-	b.started <- req.Probe.Method
-	select {
-	case <-b.release:
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
-	results := make([]domain.NodeProbeResult, len(nodes))
-	for i, node := range nodes {
-		results[i] = domain.NodeProbeResult{
-			NodeName:   node.Name,
-			Layer:      string(req.Probe.Layer),
-			Method:     string(req.Probe.Method),
-			Core:       req.Probe.Core,
-			Alive:      true,
-			DurationMS: 1,
-			CheckedAt:  time.Now(),
-		}
-	}
-	report := domain.Report{Probe: &domain.ProbeReport{
-		Backend:      b.Name(),
-		Layer:        string(req.Probe.Layer),
-		Method:       string(req.Probe.Method),
-		Core:         req.Probe.Core,
-		SuccessCount: len(results),
-	}}
-	return &domain.ProbeResult{Results: results, Report: report}, nil
-}
-
-func waitForStartedMethod(t *testing.T, started <-chan domain.ProbeMethod) domain.ProbeMethod {
-	t.Helper()
-	select {
-	case method := <-started:
-		return method
-	case <-time.After(time.Second):
-		t.Fatal("probe backend did not start")
-		return ""
-	}
 }
 
 type countingDialer struct {

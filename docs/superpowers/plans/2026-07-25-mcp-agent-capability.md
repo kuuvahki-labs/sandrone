@@ -137,7 +137,7 @@ Also assert:
 - `content` and `remote` are mutually exclusive and one is required;
 - `file` and `spec` are mutually exclusive and one is required;
 - file mode is `spec|source|render`;
-- probe layer, method, and core are enums;
+- probe method and core are enums;
 - timeout, attempts, concurrency, cache TTL, limit, and cursor constraints match
   the design.
 

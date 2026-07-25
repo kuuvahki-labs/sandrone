@@ -105,7 +105,7 @@ func (b *SingBoxBackend) Probe(ctx context.Context, backendReq BackendRequest, n
 	}
 	wg.Wait()
 
-	report := reportForResults(b.Name(), b.Version(), string(req.Layer), string(req.Method), req.Core, nodes, results)
+	report := reportForResults(b.Name(), b.Version(), string(req.Method), req.Core, nodes, results)
 	for i := range results {
 		results[i].Backend = b.Name()
 	}
@@ -304,7 +304,7 @@ func (b *SingBoxNTPBackend) Probe(ctx context.Context, backendReq BackendRequest
 	}
 	wg.Wait()
 
-	report := reportForResults(b.Name(), b.Version(), string(req.Layer), string(req.Method), req.Core, nodes, results)
+	report := reportForResults(b.Name(), b.Version(), string(req.Method), req.Core, nodes, results)
 	for i := range results {
 		results[i].Backend = b.Name()
 	}

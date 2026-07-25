@@ -317,8 +317,8 @@ func TestScriptAPIExercise(t *testing.T) {
 func TestScriptAPIProbeFiltersNodesAndAppendsWarnings(t *testing.T) {
 	runner := &scriptProbeRunner{result: &domain.ProbeResult{
 		Results: []domain.NodeProbeResult{
-			{NodeName: "fast", Layer: "protocol", Method: "tcp_connect", Alive: true, DurationMS: 12},
-			{NodeName: "dead", Layer: "protocol", Method: "tcp_connect", Alive: false, ErrorCode: "probe_tcp_failed"},
+			{NodeName: "fast", Method: "tcp_connect", Alive: true, DurationMS: 12},
+			{NodeName: "dead", Method: "tcp_connect", Alive: false, ErrorCode: "probe_tcp_failed"},
 		},
 		Report: domain.Report{Warnings: []domain.Warning{{Code: "probe_tcp_failed", Message: "one failed"}}},
 	}}
@@ -330,7 +330,6 @@ func TestScriptAPIProbeFiltersNodesAndAppendsWarnings(t *testing.T) {
 			"source": inlineScriptSource(`
 function main(input, api) {
   const result = api.probe(input.nodes, {
-    layer: "protocol",
     method: "tcp_connect",
     timeout_ms: 123,
     concurrency: 2,
@@ -355,7 +354,6 @@ function main(input, api) {
 
 	require.NoError(t, err)
 	require.Len(t, runner.requests, 1)
-	require.Equal(t, domain.ProbeLayer("protocol"), runner.requests[0].Layer)
 	require.Equal(t, domain.ProbeMethod("tcp_connect"), runner.requests[0].Method)
 	require.Equal(t, 123, runner.requests[0].TimeoutMS)
 	require.Equal(t, 2, runner.requests[0].Concurrency)

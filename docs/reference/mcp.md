@@ -76,7 +76,7 @@ schema 为准；未知字段会被拒绝。与 Go/持久化表示不同，MCP wi
 | `sandrone_list_resources` | 可选 `kind`（`subscription` 或 `file`）、`cursor`、`limit`。 | 当前定义摘要 `items` 与可选 `next_cursor`。 |
 | `sandrone_inspect_capabilities` | 无参数返回总览；或同时给出 `kind`（`format`、`processor`、`file_kind`）和 `name`。 | 当前 capability catalog 与 `report`。 |
 | `sandrone_convert` | `to_format`，以及 inline `content` + `from_format` 或受控 `remote`；可带 parse/render processors、render options 和 metadata。 | `content_type`、可选 `body` 与 `report`。 |
-| `sandrone_probe_nodes` | 一个 `NodeInput`，以及 layer、method、core、目标、timeout、attempts、concurrency 和 cache TTL 等探测参数。 | 节点级 `results` 与汇总 `report`。 |
+| `sandrone_probe_nodes` | 一个 `NodeInput`，以及 method、core、目标、timeout、attempts、concurrency 和 cache TTL 等探测参数。method 为 `tcp_connect`、`udp_ntp` 或 `url_test`。 | 节点级 `results` 与汇总 `report`。 |
 | `sandrone_preview_subscription` | 已保存的 subscription `name` 与可选字符串 `args`。 | processor 前后的节点、数量与 `report`。 |
 | `sandrone_render_subscription` | 已保存的 subscription `name`、目标 `format` 与可选字符串 `args`。 | `content_type`、可选 `body` 与 `report`。 |
 | `sandrone_get_subscription_traffic` | 已保存的 remote subscription `name`；可用 `refresh` 强制刷新。 | 流量 metadata 与 `report`。 |

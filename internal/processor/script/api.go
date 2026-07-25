@@ -101,7 +101,6 @@ func (a *scriptAPI) jsWarn() func(call goja.FunctionCall) goja.Value {
 }
 
 type scriptProbeOptions struct {
-	Layer           string            `json:"layer,omitempty"`
 	Method          string            `json:"method,omitempty"`
 	Core            string            `json:"core,omitempty"`
 	URL             string            `json:"url,omitempty"`
@@ -151,7 +150,6 @@ func (a *scriptAPI) jsProbe(vm *goja.Runtime) func(call goja.FunctionCall) goja.
 				Nodes: nodes,
 				Meta:  cloneStringMap(options.Meta),
 			},
-			Layer:           domain.ProbeLayer(options.Layer),
 			Method:          domain.ProbeMethod(options.Method),
 			Core:            options.Core,
 			URL:             options.URL,

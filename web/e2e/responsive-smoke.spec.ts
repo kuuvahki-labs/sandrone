@@ -156,7 +156,7 @@ test.beforeEach(async ({ page }) => {
     await route.fulfill({
       json: {
         remote_defaults: { user_agent: "sandrone/0.1.0", timeout_ms: 15000 },
-        probe_defaults: { layer: "protocol", method: "auto", core: "sing-box", timeout_ms: 5000 },
+        probe_defaults: { method: "url_test", core: "sing-box", timeout_ms: 5000 },
         cache_defaults: { remote_fetch_ttl_seconds: 0, subscription_traffic_ttl_seconds: 60 },
       },
     });

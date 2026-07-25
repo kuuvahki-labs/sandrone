@@ -335,7 +335,8 @@ curl -sS "$SANDRONE_URL/v1/validate" \
 
 - `capabilities`：带 direction、format 与字段状态的 adapter 声明；
 - `node_processors`、`file_processors`；
-- `probe_methods`，以及 backend 可报告时的 `probe_backends`；
+- `probe_methods`（`tcp_connect`、`udp_ntp`、`url_test`），以及 backend
+  可报告时的 `probe_backends`；
 - 配置 metadata store 时的 `subscriptions`、`files` 数量与
   `store_configured: true`。
 

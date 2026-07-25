@@ -24,8 +24,7 @@ func DefaultRuntimeSettings() domain.RuntimeSettings {
 			TimeoutMS: int(fetcher.DefaultTimeout / time.Millisecond),
 		},
 		ProbeDefaults: domain.ProbeDefaults{
-			Layer:       string(domain.ProbeLayerProtocol),
-			Method:      string(domain.ProbeAuto),
+			Method:      string(domain.ProbeURLTest),
 			Core:        "sing-box",
 			URL:         probe.URLTestTarget(domain.ProbeRequest{Method: domain.ProbeURLTest}),
 			NTPServer:   probe.NTPServerFromRequest(domain.ProbeRequest{}),
@@ -102,9 +101,6 @@ func (s *Service) probeRequestWithDefaults(ctx context.Context, req domain.Probe
 	}
 	defaults := settings.ProbeDefaults
 	out := req
-	if strings.TrimSpace(string(out.Layer)) == "" {
-		out.Layer = domain.ProbeLayer(defaults.Layer)
-	}
 	if strings.TrimSpace(string(out.Method)) == "" {
 		out.Method = domain.ProbeMethod(defaults.Method)
 	}
@@ -174,9 +170,6 @@ func normalizeRuntimeSettings(settings domain.RuntimeSettings) (domain.RuntimeSe
 		out.RemoteDefaults.TimeoutMS = settings.RemoteDefaults.TimeoutMS
 	}
 
-	if value := strings.TrimSpace(settings.ProbeDefaults.Layer); value != "" {
-		out.ProbeDefaults.Layer = string(probe.NormalizeLayer(domain.ProbeLayer(value)))
-	}
 	if value := strings.TrimSpace(settings.ProbeDefaults.Method); value != "" {
 		out.ProbeDefaults.Method = string(probe.NormalizeMethod(domain.ProbeMethod(value)))
 	}
@@ -217,13 +210,8 @@ func validateRuntimeSettings(settings domain.RuntimeSettings) error {
 	if settings.RemoteDefaults.TimeoutMS <= 0 {
 		return domain.NewError(domain.CodeInvalidArgument, "remote timeout_ms must be positive")
 	}
-	switch settings.ProbeDefaults.Layer {
-	case string(domain.ProbeLayerProtocol), string(domain.ProbeLayerProxy):
-	default:
-		return domain.NewError(domain.CodeInvalidArgument, fmt.Sprintf("unsupported probe layer %q", settings.ProbeDefaults.Layer))
-	}
 	switch settings.ProbeDefaults.Method {
-	case string(domain.ProbeAuto), string(domain.ProbeTCPConnect), string(domain.ProbeUDPNTP), string(domain.ProbeURLTest):
+	case string(domain.ProbeTCPConnect), string(domain.ProbeUDPNTP), string(domain.ProbeURLTest):
 	default:
 		return domain.NewError(domain.CodeInvalidArgument, fmt.Sprintf("unsupported probe method %q", settings.ProbeDefaults.Method))
 	}

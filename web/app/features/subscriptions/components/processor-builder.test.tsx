@@ -22,7 +22,6 @@ describe("ProcessorBuilder", () => {
         type: "probe",
         stage: "nodes",
         params: {
-          layer: "proxy",
           method: "url_test",
           core: "sing-box",
           url: "https://www.gstatic.com/generate_204",
@@ -41,9 +40,9 @@ describe("ProcessorBuilder", () => {
     render(<SubscriptionEditPage item={subscriptions[0]} onBack={noop} onSave={onSave} definition={definition} sources={subscriptions} />);
 
     const probeGroup = screen.getByRole("group", { name: "处理器 测活" });
-    expect(within(probeGroup).getByRole("combobox", { name: "测活层级" })).toHaveTextContent("真实代理");
     expect(within(probeGroup).getByRole("combobox", { name: "测活方式" })).toHaveTextContent("url_test");
-    expect(within(probeGroup).getByRole("combobox", { name: "核心" })).toHaveTextContent("sing-box");
+    expect(within(probeGroup).getAllByRole("combobox")).toHaveLength(3);
+    expect(probeGroup).not.toHaveTextContent(/sing-box|mihomo/);
     expect(within(probeGroup).getByRole("textbox", { name: "测活 URL" })).toHaveValue("https://www.gstatic.com/generate_204");
     expect(within(probeGroup).getByRole("textbox", { name: "期望状态" })).toHaveValue("204");
     expect(within(probeGroup).getByRole("spinbutton", { name: "超时毫秒" })).toHaveValue(5000);
@@ -62,7 +61,6 @@ describe("ProcessorBuilder", () => {
         type: "probe",
         stage: "nodes",
         params: {
-          layer: "proxy",
           method: "url_test",
           core: "sing-box",
           url: "https://www.gstatic.com/generate_204",
@@ -89,12 +87,12 @@ describe("ProcessorBuilder", () => {
     await user.click(screen.getByRole("button", { name: "添加处理器" }));
 
     const probeGroup = screen.getByRole("group", { name: "处理器 测活" });
-    expect(within(probeGroup).getByRole("combobox", { name: "测活层级" })).toHaveTextContent("协议层");
-    expect(within(probeGroup).getByRole("combobox", { name: "测活方式" })).toHaveTextContent("自动");
-    expect(within(probeGroup).getByRole("combobox", { name: "核心" })).toHaveTextContent("sing-box");
+    expect(within(probeGroup).getByRole("combobox", { name: "测活方式" })).toHaveTextContent("url_test");
+    expect(within(probeGroup).getAllByRole("combobox")).toHaveLength(3);
+    expect(probeGroup).not.toHaveTextContent(/sing-box|mihomo/);
     expect(within(probeGroup).getByRole("combobox", { name: "失败处理" })).toHaveTextContent("保留");
-    expect(within(probeGroup).getByRole("textbox", { name: "NTP 服务器" })).toHaveValue("time.apple.com");
-    expect(within(probeGroup).queryByRole("textbox", { name: "测活 URL" })).not.toBeInTheDocument();
+    expect(within(probeGroup).queryByRole("textbox", { name: "NTP 服务器" })).not.toBeInTheDocument();
+    expect(within(probeGroup).getByRole("textbox", { name: "测活 URL" })).toHaveValue("http://www.gstatic.com/generate_204");
     expect(within(probeGroup).getByRole("spinbutton", { name: "超时毫秒" })).toHaveValue(5000);
     expect(within(probeGroup).getByRole("spinbutton", { name: "尝试次数" })).toHaveValue(1);
     expect(within(probeGroup).getByRole("spinbutton", { name: "并发数" })).toHaveValue(10);
@@ -110,10 +108,9 @@ describe("ProcessorBuilder", () => {
         type: "probe",
         stage: "nodes",
         params: {
-          layer: "protocol",
-          method: "auto",
+          method: "url_test",
           core: "sing-box",
-          ntp_server: "time.apple.com",
+          url: "http://www.gstatic.com/generate_204",
           timeout_ms: 5000,
           attempts: 1,
           concurrency: 10,
@@ -137,7 +134,7 @@ describe("ProcessorBuilder", () => {
     await user.click(within(probeGroup).getByRole("combobox", { name: "测活方式" }));
     await user.click(screen.getByRole("option", { name: "url_test" }));
 
-    expect(within(probeGroup).getByRole("combobox", { name: "核心" })).toHaveTextContent("sing-box");
+    expect(probeGroup).not.toHaveTextContent(/sing-box|mihomo/);
     expect(within(probeGroup).getByRole("textbox", { name: "测活 URL" })).toHaveValue("http://www.gstatic.com/generate_204");
 
     await user.click(screen.getByRole("button", { name: "保存订阅" }));
@@ -149,7 +146,6 @@ describe("ProcessorBuilder", () => {
         type: "probe",
         stage: "nodes",
         params: {
-          layer: "protocol",
           method: "url_test",
           core: "sing-box",
           url: "http://www.gstatic.com/generate_204",
@@ -207,7 +203,7 @@ describe("ProcessorBuilder", () => {
       onSave={onSave}
       definition={{
         ...remoteSubscriptionDefinition,
-        processors: [{ type: "probe", stage: "nodes", params: { layer: "protocol", method: "auto" } }],
+        processors: [{ type: "probe", stage: "nodes", params: { method: "url_test", core: "sing-box" } }],
       }}
       sources={subscriptions}
     />);

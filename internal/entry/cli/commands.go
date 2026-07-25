@@ -16,7 +16,7 @@ import (
 const (
 	inputFormatsHelp  = "input formats: uri, uri-list, base64, mihomo, sing-box, json-nodes"
 	targetFormatsHelp = "target formats: base64, json-nodes, mihomo-proxies, shadowrocket-proxies, sing-box-outbounds, uri-list"
-	probeMethodsHelp  = "probe methods: auto, tcp-connect, udp-ntp, url-test"
+	probeMethodsHelp  = "probe methods: tcp-connect, udp-ntp, url-test"
 )
 
 type remoteInputFlags struct {
@@ -138,7 +138,6 @@ need a complete client configuration file.
 }
 
 func newProbeCommand(cfg *config) *cobra.Command {
-	var layer string
 	var method string
 	var format string
 	var input string
@@ -163,11 +162,10 @@ good fit for URI lists. Use base64 for encoded node lists. json-nodes is useful
 when replaying normalized nodes from convert --to json-nodes. When --input-url
 is used, --format may be omitted so that the service auto-detects the source.
 
-The default layer is protocol and the default method is auto. Protocol auto
-uses tcp-connect for TCP-style nodes and udp-ntp for UDP-first nodes. The proxy
-layer uses url-test to ask a client core to run an HTTP URL health check;
---core, --url, and --expected-status are only used by url-test. --ntp-server is
-only used by udp-ntp.
+The default method is url-test through the sing-box core. url-test asks a
+client core to run an HTTP URL health check. --core, --url, and
+--expected-status are only used by url-test. --ntp-server is only used by
+udp-ntp. tcp-connect does not use a client core.
 
 Use Go duration values such as 3s or 500ms for --timeout. Set --attempts or
 --concurrency to 0 to use the service default. Set --cache-ttl to 0 to use the
@@ -175,10 +173,10 @@ service default; caching is disabled when both values are 0. Use
 --remote-timeout for remote input fetches.
 
 ` + probeMethodsHelp,
-		Example: `  sandrone probe --format uri-list --method auto --input sub.txt --timeout 3s --concurrency 10
-  sandrone probe --method auto --input-url https://example.com/sub --remote-timeout 5s
+		Example: `  sandrone probe --format uri-list --method url-test --input sub.txt --timeout 3s --concurrency 10
+  sandrone probe --method url-test --input-url https://example.com/sub --remote-timeout 5s
   sandrone probe --format uri-list --method udp-ntp --input nodes.txt --ntp-server time.apple.com --timeout 3s --cache-ttl 300
-  sandrone probe --format json-nodes --layer proxy --method url-test --core sing-box --input nodes.json --url http://www.gstatic.com/generate_204 --expected-status 204 --timeout 5s`,
+  sandrone probe --format json-nodes --method url-test --core sing-box --input nodes.json --url http://www.gstatic.com/generate_204 --expected-status 204 --timeout 5s`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			remoteInput := remote.remoteInput()
 			if err := rejectInputAndInputURL(input, cmd.Flags().Changed("input"), remoteInput); err != nil {
@@ -212,7 +210,6 @@ service default; caching is disabled when both values are 0. Use
 			}
 			req := sandrone.ProbeRequest{
 				Input:           nodeInput,
-				Layer:           normalizeProbeLayer(layer),
 				Method:          normalizeProbeMethod(method),
 				Core:            core,
 				URL:             url,
@@ -241,13 +238,12 @@ service default; caching is disabled when both values are 0. Use
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&layer, "layer", "protocol", "probe layer: protocol or proxy")
-	cmd.Flags().StringVar(&method, "method", "auto", probeMethodsHelp)
+	cmd.Flags().StringVar(&method, "method", "url-test", probeMethodsHelp)
 	cmd.Flags().StringVar(&format, "format", "uri-list", "input format; defaults to uri-list; examples: uri-list, base64, json-nodes")
 	cmd.Flags().StringVar(&input, "input", "-", "input file path, or - to read from stdin")
 	addRemoteInputFlags(cmd.Flags(), &remote)
 	cmd.Flags().StringVar(&output, "output", "", "output file path, or stdout when empty or -")
-	cmd.Flags().StringVar(&core, "core", "", "core name for url-test or udp-ntp, for example mihomo or sing-box")
+	cmd.Flags().StringVar(&core, "core", "sing-box", "core name for url-test or udp-ntp, for example mihomo or sing-box")
 	cmd.Flags().StringVar(&url, "url", "", "HTTP URL target for url-test, for example http://www.gstatic.com/generate_204")
 	cmd.Flags().StringVar(&ntpServer, "ntp-server", "", "NTP server for udp-ntp, for example time.apple.com")
 	cmd.Flags().StringVar(&expectedStatus, "expected-status", "", "expected HTTP status or range for url-test, for example 204 or 200-299")
@@ -262,11 +258,6 @@ func normalizeProbeMethod(method string) sandrone.ProbeMethod {
 	method = strings.ToLower(strings.TrimSpace(method))
 	method = strings.ReplaceAll(method, "-", "_")
 	return sandrone.ProbeMethod(method)
-}
-
-func normalizeProbeLayer(layer string) sandrone.ProbeLayer {
-	layer = strings.ToLower(strings.TrimSpace(layer))
-	return sandrone.ProbeLayer(layer)
 }
 
 func newValidateCommand(cfg *config) *cobra.Command {

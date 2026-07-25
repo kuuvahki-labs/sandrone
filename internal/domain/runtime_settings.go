@@ -43,7 +43,6 @@ type RemoteDefaults struct {
 }
 
 type ProbeDefaults struct {
-	Layer           string `json:"layer,omitempty" yaml:"layer,omitempty"`
 	Method          string `json:"method,omitempty" yaml:"method,omitempty"`
 	Core            string `json:"core,omitempty" yaml:"core,omitempty"`
 	URL             string `json:"url,omitempty" yaml:"url,omitempty"`

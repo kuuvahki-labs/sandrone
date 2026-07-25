@@ -46,14 +46,15 @@
 
 ## Backend 选择
 
-service 先应用 runtime probe defaults，再规范化 layer、method 和 core。归一化后的请求同时用于 backend 选择、payload 准备和 cache key，避免同一调用在不同阶段采用不同默认值。
+service 先应用 runtime probe defaults，再规范化 method 和 core。归一化后的请求同时用于 backend 选择、payload 准备和 cache key，避免同一调用在不同阶段采用不同默认值。
 
-显式 method 直接选择对应 backend。`auto` 的稳定选择规则是：
+method 是唯一的探测行为选择器，必须显式属于以下三种：
 
-- proxy layer 使用 `url_test`，验证真实代理拨出。
-- protocol layer 的 UDP-first 节点使用 `udp_ntp`。
-- protocol layer 的其它节点使用 `tcp_connect`。
-- 混合节点集按实际 method 分组执行，最后恢复原始节点顺序。
+- `tcp_connect` 直接连接节点 endpoint，不使用 core。
+- `udp_ntp` 通过节点出站发送 NTP 请求，目前使用 sing-box。
+- `url_test` 通过节点出站访问 HTTP URL，支持 sing-box 和 Mihomo。
+
+省略 method 时使用 `url_test`；省略需要的 core 时使用 `sing-box`。
 
 `udp_ntp` 通过节点出站发送 NTP 请求，用来观察 UDP 链路，不等价于 HTTP 代理语义。`url_test` 通过选定核心访问测试 URL，比 TCP connect 覆盖更多协议握手与转发路径。
 
@@ -63,11 +64,11 @@ service 先应用 runtime probe defaults，再规范化 layer、method 和 core�
 
 ## 执行与并发
 
-probe engine 按规范化 method 分组，并在请求 context 下执行。backend 负责单节点 timeout、attempts 和 concurrency 限制；context 取消会停止等待中的工作。
+probe engine 按规范化 method 执行整个节点批次。backend 负责单节点 timeout、attempts 和 concurrency 限制；context 取消会停止等待中的工作。
 
-结果保持输入节点顺序。混合 method 可以并行运行各组，但任一组返回致命 backend error 时整次调用失败，不发布不完整的混合结果。
+结果保持输入节点顺序。backend 返回致命错误时整次调用失败，不发布不完整结果。
 
-`tcp_connect`、`udp_ntp` 和不同核心的 `url_test` 测量口径不同。调用方比较 duration 时必须同时检查 layer、method、core 和 backend，不能把它们视为同一基准。
+`tcp_connect`、`udp_ntp` 和不同核心的 `url_test` 测量口径不同。调用方比较 duration 时必须同时检查 method、core 和 backend，不能把它们视为同一基准。
 
 ## Store-backed cache
 
@@ -76,7 +77,7 @@ probe cache 是 service 管理的内部 TTL cache，用于复用完整批次结�
 cache key 基于：
 
 - 完整且有序的节点集合。
-- 规范化的 layer、method 和 core。
+- 规范化的 method 和 core。
 - 应用默认值后的目标参数。
 - 影响单次探测语义的 timeout 与 attempts。
 
@@ -95,7 +96,7 @@ concurrency 不改变探测目标，因此不进入 key；backend 名称和版�
 
 ## Report 与失败语义
 
-每个 `NodeProbeResult` 记录节点身份、观测维度、backend、存活状态、duration、检查时间和可选错误。`ProbeReport` 汇总成功、失败、cache hit 和 error code；混合探测还按 layer、method、core 提供 dimensions。
+每个 `NodeProbeResult` 记录节点身份、method、core、backend、存活状态、duration、检查时间和可选错误。`ProbeReport` 汇总成功、失败、cache hit 和 error code，并按 method、core 提供 dimensions。
 
 service 在 cache miss 时合并：
 

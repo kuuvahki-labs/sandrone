@@ -27,7 +27,7 @@ func TestURLTestUnavailableByDefault(t *testing.T) {
 func TestUDPNTPUnavailableByDefaultDoesNotFallBack(t *testing.T) {
 	engine := probe.New()
 	_, err := engine.Probe(context.Background(), domain.ProbeRequest{
-		Method:    domain.ProbeAuto,
+		Method:    domain.ProbeUDPNTP,
 		NTPServer: "time.example.com",
 	}, []domain.NodeIR{{
 		Name:   "hy2",

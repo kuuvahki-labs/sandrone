@@ -215,7 +215,7 @@ func (s *Service) CapabilitySummary() map[string]any {
 		},
 		"node_processors": s.registry.NodeTypes(),
 		"file_processors": s.registry.FileTypes(),
-		"probe_methods":   []string{string(domain.ProbeAuto), string(domain.ProbeTCPConnect), string(domain.ProbeUDPNTP), string(domain.ProbeURLTest)},
+		"probe_methods":   []string{string(domain.ProbeTCPConnect), string(domain.ProbeUDPNTP), string(domain.ProbeURLTest)},
 		"capabilities":    s.adapterCapabilities(),
 	}
 	if inspector, ok := s.prober.(interface{ BackendSummary() []map[string]string }); ok {

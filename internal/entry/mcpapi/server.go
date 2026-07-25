@@ -151,7 +151,6 @@ func registerTools(server *mcp.Server, rt *app.Runtime) {
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in probeInput) (*mcp.CallToolResult, probeOutput, error) {
 		result, err := rt.Service.Probe(ctx, domain.ProbeRequest{
 			Input:           in.Input,
-			Layer:           in.Layer,
 			Method:          in.Method,
 			Core:            in.Core,
 			URL:             in.URL,

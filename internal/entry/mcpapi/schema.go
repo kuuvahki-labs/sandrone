@@ -75,8 +75,7 @@ func validateFileInputSchema() *jsonschema.Schema {
 func probeInputSchema() *jsonschema.Schema {
 	return closedObject(map[string]*jsonschema.Schema{
 		"input":             nodeInputSchema(),
-		"layer":             enumSchema("protocol", "proxy"),
-		"method":            enumSchema("auto", "tcp_connect", "udp_ntp", "url_test"),
+		"method":            enumSchema("tcp_connect", "udp_ntp", "url_test"),
 		"core":              enumSchema("mihomo", "sing-box"),
 		"url":               stringSchema(),
 		"ntp_server":        stringSchema(),

@@ -112,7 +112,6 @@ func TestServiceProbeProcessorAllowsRuntimeProbeDefaults(t *testing.T) {
 			return &domain.ProbeResult{
 				Results: []domain.NodeProbeResult{{
 					NodeName:   "node-a",
-					Layer:      string(req.Layer),
 					Method:     string(req.Method),
 					Core:       req.Core,
 					Target:     req.URL,
@@ -120,7 +119,7 @@ func TestServiceProbeProcessorAllowsRuntimeProbeDefaults(t *testing.T) {
 					DurationMS: 7,
 					CheckedAt:  time.Date(2026, 5, 28, 1, 2, 3, 0, time.UTC),
 				}},
-				Report: domain.Report{Probe: &domain.ProbeReport{Backend: "fake", Layer: string(req.Layer), Method: string(req.Method), Core: req.Core, SuccessCount: 1}},
+				Report: domain.Report{Probe: &domain.ProbeReport{Backend: "fake", Method: string(req.Method), Core: req.Core, SuccessCount: 1}},
 			}, nil
 		}}),
 	)
@@ -453,7 +452,6 @@ func TestServicePreviewSubscriptionProbeAnnotationKeepsNodesUnchanged(t *testing
 			return &domain.ProbeResult{
 				Results: []domain.NodeProbeResult{{
 					NodeName:   "node-a",
-					Layer:      "protocol",
 					Method:     "tcp_connect",
 					Alive:      true,
 					DurationMS: 11,

@@ -168,7 +168,7 @@ schema。它定义只负责协议适配的 wire DTO：
 
 Tool 顶层 schema 需要明确：
 
-- format、mode、probe layer/method/core 和 `NodeInput.type` 的 enum；
+- format、mode、probe method/core 和 `NodeInput.type` 的 enum；
 - `content` 与 `remote` 至少一个且互斥；
 - `file` 与 inline `spec` 至少一个且互斥；
 - timeout、attempts、concurrency、cache TTL、pagination 的范围；

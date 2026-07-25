@@ -126,16 +126,19 @@ processors:
 
 `probe` 把当前节点批次交给 service probe runner。探测参数为：
 
-`layer`、`method`、`core`、`url`、`ntp_server`、`expected_status`、
+`method`、`core`、`url`、`ntp_server`、`expected_status`、
 `timeout_ms`、`attempts`、`concurrency`、`cache_ttl_seconds`。
 省略值由 probe service 的规范化和运行时默认值处理。
+method 只接受 `tcp_connect`、`udp_ntp` 和 `url_test`；默认 `url_test`。
+`tcp_connect` 不使用 core，`udp_ntp` 当前使用 sing-box，`url_test` 支持
+sing-box 和 Mihomo，省略 core 时默认 sing-box。
 
 处理结果由以下参数决定：
 
 - `fail_mode: keep`（缺省）：保留失败节点；
 - `fail_mode: drop`：丢弃失败节点；
 - `fail_mode: error`：遇到第一个失败结果即让整步失败；
-- `annotate: true`：重写该节点所有 `probe.*` meta，写入 layer、method、
+- `annotate: true`：重写该节点所有 `probe.*` meta，写入 method、core、
   alive、duration、checked_at、error_code 等已有结果；
 - `sort: duration`：存活节点在前并按延迟升序；失败节点在后，平局保持输入顺序。
 
