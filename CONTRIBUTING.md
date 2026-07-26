@@ -23,7 +23,7 @@ corepack install --global pnpm@11.5.2
 pnpm --dir web install --frozen-lockfile
 ```
 
-运行 `make help` 可以查看维护的 Make targets。`make build` 和 `make build-bin` 会联网生成规则集目录快照；默认质量门 `make check` 使用已有源码完成检查，不依赖该下载步骤。
+运行 `make help` 可以查看维护的 Make targets。`make build` 和 `make build-bin` 会联网生成规则集目录快照；默认质量门 `make check` 使用已有源码完成检查，不依赖该下载步骤。发布构建的 `VERSION`、`REVISION` 和容器 metadata 契约见[构建身份](docs/reference/build-info.md)。
 
 ## 贡献流程
 

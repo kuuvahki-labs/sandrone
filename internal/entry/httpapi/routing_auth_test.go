@@ -1,6 +1,7 @@
 package httpapi_test
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -9,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/kuuvahki-labs/sandrone/internal/app"
+	"github.com/kuuvahki-labs/sandrone/internal/buildinfo"
 	"github.com/kuuvahki-labs/sandrone/internal/entry/httpapi"
 	"github.com/kuuvahki-labs/sandrone/internal/entry/webui"
 )
@@ -133,7 +135,10 @@ func TestVersionIsPublicWhenTokenAuthIsEnabled(t *testing.T) {
 	server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/version", nil))
 
 	require.Equal(t, http.StatusOK, w.Code)
-	require.JSONEq(t, `{"name":"sandrone","version":"0.1.0"}`, w.Body.String())
+	require.JSONEq(t, fmt.Sprintf(
+		`{"name":"sandrone","version":"0.1.0","revision":%q}`,
+		buildinfo.Revision(),
+	), w.Body.String())
 }
 
 func TestVersionRejectsNonGETMethodsWithoutAuthentication(t *testing.T) {

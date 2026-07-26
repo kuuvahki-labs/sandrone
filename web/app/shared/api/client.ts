@@ -90,6 +90,7 @@ export interface RuntimeSettingsInput {
 export interface VersionInfo {
   name: string;
   version: string;
+  revision: string;
 }
 
 export class ApiError extends Error {

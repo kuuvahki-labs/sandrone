@@ -41,12 +41,15 @@ describe("settings page", () => {
     expect(onSaveBaseUrl).toHaveBeenCalledWith("https://public.example.test");
   });
   it.each([
-    ["0.1.0", "v0.1.0"],
-    [undefined, "暂不可用"],
-  ])("shows the project version fallback for %s", (version, expected) => {
+    ["0.1.0", "0123456789abcdef", "v0.1.0 (0123456789ab)"],
+    ["0.1.0", "", "v0.1.0"],
+    ["dev", "", "dev"],
+    [undefined, undefined, "暂不可用"],
+  ])("shows the project build identity for %s", (version, revision, expected) => {
     render(
       <SettingsPage
         publicBaseUrl="https://example.com"
+        revision={revision}
         themeMode="system"
         version={version}
         onSaveBaseUrl={noop}

@@ -20,15 +20,21 @@ FROM golang:1.25.11-bookworm AS build
 WORKDIR /src
 
 ARG GOPROXY=""
-ARG VERSION=""
 
 COPY go.mod go.sum ./
 RUN if [ -n "$GOPROXY" ]; then go env -w GOPROXY="$GOPROXY"; fi \
   && go mod download
 
+ARG VERSION="dev"
+ARG REVISION=""
+RUN if [ -z "$REVISION" ] && [ "$VERSION" != "dev" ]; then \
+    printf '%s\n' 'VERSION requires a complete REVISION; use VERSION=dev for untraceable builds' >&2; \
+    exit 1; \
+  fi
+
 COPY . .
 COPY --from=web /src/web/build/client ./internal/entry/webui/static
-RUN make build BUILD_BIN=/out/sandrone VERSION="$VERSION"
+RUN make build BUILD_BIN=/out/sandrone VERSION="$VERSION" REVISION="$REVISION"
 
 FROM debian:bookworm-slim AS runtime
 
@@ -46,5 +52,12 @@ USER sandrone
 WORKDIR /app
 VOLUME ["/app/data"]
 EXPOSE 1137
+
+ARG VERSION="dev"
+ARG REVISION=""
+LABEL org.opencontainers.image.version=$VERSION \
+  org.opencontainers.image.revision=$REVISION \
+  org.opencontainers.image.source=https://github.com/kuuvahki-labs/sandrone
+
 ENTRYPOINT ["sandrone"]
 CMD ["serve", "http", "--listen", "0.0.0.0:1137", "--data-dir", "/app/data"]

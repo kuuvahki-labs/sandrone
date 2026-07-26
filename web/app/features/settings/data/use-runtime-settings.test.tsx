@@ -14,7 +14,11 @@ describe("useRuntimeSettings", () => {
     const loaded = runtimeSettings("loaded-agent", 15000);
     const saved = runtimeSettings("saved-agent", 30000);
     const getRuntimeSettings = vi.fn().mockResolvedValue(loaded);
-    const getVersion = vi.fn().mockResolvedValue({ name: "sandrone", version: "0.1.0" });
+    const getVersion = vi.fn().mockResolvedValue({
+      name: "sandrone",
+      version: "0.1.0",
+      revision: "0123456789abcdef",
+    });
     const updateRuntimeSettings = vi.fn().mockResolvedValue({ ok: true });
     const showNotice = vi.fn();
     const client = { getRuntimeSettings, getVersion, updateRuntimeSettings } as unknown as ApiClient;
@@ -24,6 +28,7 @@ describe("useRuntimeSettings", () => {
     expect(result.current.runtimeSettings).toEqual(defaultRuntimeSettings);
     await waitFor(() => expect(result.current.runtimeSettings).toEqual(loaded));
     expect(result.current.version).toBe("0.1.0");
+    expect(result.current.revision).toBe("0123456789abcdef");
     expect(getRuntimeSettings).toHaveBeenCalledTimes(1);
     expect(getVersion).toHaveBeenCalledTimes(1);
 

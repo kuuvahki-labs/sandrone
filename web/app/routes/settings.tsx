@@ -15,6 +15,7 @@ export default function SettingsRoute() {
   return (
     <SettingsPage
       publicBaseUrl={app.publicBaseUrl}
+      revision={settings.revision}
       runtimeSettings={settings.runtimeSettings}
       themeMode={app.themeMode}
       version={settings.version}

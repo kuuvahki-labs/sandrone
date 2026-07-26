@@ -9,7 +9,7 @@ Sandrone 是一个轻量的订阅聚合、节点处理与客户端配置生成�
 安装 Docker 后，在仓库根目录运行：
 
 ```sh
-docker compose up --build
+docker compose up --pull always
 ```
 
 服务随后可从 `http://127.0.0.1:1137` 访问。Compose 提供仅供本地开发的 bearer token `sandrone`，并把数据保存在 `sandrone-data` volume；对外提供服务前必须通过 `SANDRONE_TOKEN` 更换 token。

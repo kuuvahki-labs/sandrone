@@ -5,6 +5,8 @@ on:
   push:
     branches:
       - main
+    tags:
+      - "v*"
   workflow_dispatch:
 
 permissions:
@@ -101,6 +103,10 @@ jobs:
   container-image:
     name: Container image
     runs-on: ubuntu-latest
+    concurrency:
+      group: container-image-${{ github.event_name == 'push' && 'publish' || github.run_id }}
+      cancel-in-progress: false
+      queue: max
     needs:
       - go
       - web
@@ -113,24 +119,31 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Build container image
         shell: bash
         run: |
           short_sha="${GITHUB_SHA::12}"
-          docker build \
-            --tag "${IMAGE}:sha-${short_sha}" \
-            --tag "${IMAGE}:latest" \
-            .
+          make image SANDRONE_IMAGE="${IMAGE}:sha-${short_sha}" REVISION="${GITHUB_SHA}"
 
       - name: Log in to GHCR
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push'
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Push container image
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push'
         shell: bash
         run: |
           short_sha="${GITHUB_SHA::12}"
-          docker push "${IMAGE}:sha-${short_sha}"
-          docker push "${IMAGE}:latest"
+          source_image="${IMAGE}:sha-${short_sha}"
+          git fetch --force --tags origin
+          publish_tags="$(./scripts/container-image-tags.sh)"
+          while IFS= read -r tag; do
+            [[ -n "${tag}" ]] || continue
+            if [[ "${tag}" != "${source_image}" ]]; then
+              docker tag "${source_image}" "${tag}"
+            fi
+            docker push "${tag}"
+          done <<< "${publish_tags}"

@@ -22,7 +22,8 @@ sandrone
 ```
 
 所有命令都接受 `--help`。根命令的 `--version` 输出
-`sandrone version <version>`。
+`sandrone version <version>`；构建包含 revision 时追加 12 位短 SHA。版本与
+revision 的来源和职责见[构建身份](build-info.md)。
 
 ## 公共 flag 与环境变量
 

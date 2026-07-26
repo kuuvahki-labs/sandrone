@@ -13,6 +13,7 @@ interface UseRuntimeSettingsOptions {
 export function useRuntimeSettings({ client, showNotice, t }: UseRuntimeSettingsOptions) {
   const [runtimeSettings, setRuntimeSettings] = useState<RuntimeSettingsInput>(defaultRuntimeSettings);
   const [version, setVersion] = useState<string>();
+  const [revision, setRevision] = useState<string>();
   const runtimeSettingsRequest = useRef(0);
 
   useEffect(() => {
@@ -46,6 +47,7 @@ export function useRuntimeSettings({ client, showNotice, t }: UseRuntimeSettings
       .then((versionInfo) => {
         if (!cancelled) {
           setVersion(versionInfo.version);
+          setRevision(versionInfo.revision);
         }
       })
       .catch(() => undefined);
@@ -107,6 +109,7 @@ export function useRuntimeSettings({ client, showNotice, t }: UseRuntimeSettings
   return {
     runtimeSettings,
     version,
+    revision,
     saveRuntimeSettings,
     downloadBackup,
     restoreBackup,

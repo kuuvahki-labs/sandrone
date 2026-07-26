@@ -113,7 +113,7 @@ func newRootCommand(cfg *config) *cobra.Command {
 	root := &cobra.Command{
 		Use:           "sandrone",
 		Short:         "Convert proxy nodes and generated client files",
-		Version:       buildinfo.Version(),
+		Version:       buildinfo.Summary(),
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}

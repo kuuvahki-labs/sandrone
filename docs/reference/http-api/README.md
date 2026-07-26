@@ -124,11 +124,14 @@ curl "$SANDRONE_URL/healthz"
 ```json
 {
   "name": "sandrone",
-  "version": "0.1.0"
+  "version": "0.1.0",
+  "revision": "0123456789abcdef0123456789abcdef01234567"
 }
 ```
 
-`version` 是当前构建提供的规范版本字符串；上例只是示例值，调用方不应写死。
+`version` 是当前构建提供的规范版本字符串，`revision` 是完整 Git object ID；
+无法取得 VCS metadata 时 `revision` 为空字符串。上例只是示例值，调用方不应
+写死。字段来源、短 SHA 展示和容器追溯见[构建身份](../build-info.md)。
 
 ### 最小示例
 

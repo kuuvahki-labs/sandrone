@@ -1,12 +1,6 @@
 services:
   sandrone:
-    build:
-      context: .
-      args:
-        NPM_REGISTRY: ${NPM_REGISTRY:-}
-        PNPM_REGISTRY: ${PNPM_REGISTRY:-}
-        GOPROXY: ${GOPROXY:-}
-    image: ${SANDRONE_IMAGE:-ghcr.io/kuuvahki-labs/sandrone:local}
+    image: ${SANDRONE_IMAGE:-ghcr.io/kuuvahki-labs/sandrone:latest}
     command:
       - serve
       - http

@@ -10,13 +10,25 @@ BUILD_BIN ?= $(TMPDIR)/sandrone-build
 RULESET_CATALOG_DIR ?= $(CURDIR)/internal/service/catalog_builtin
 GOLANGCI_LINT ?= golangci-lint
 TESTFLAGS ?=
-VERSION ?=
+VERSION_FILE ?= $(CURDIR)/internal/buildinfo/VERSION
+DEFAULT_VERSION := $(strip $(file <$(VERSION_FILE)))
+ifeq ($(origin VERSION),undefined)
+VERSION := $(DEFAULT_VERSION)
+endif
+REVISION_ORIGIN := $(origin REVISION)
 LDFLAGS ?=
+DOCKER ?= docker
+SANDRONE_IMAGE ?= ghcr.io/kuuvahki-labs/sandrone:local
 
 # Validate command-line VERSION before storing or expanding it anywhere else. The
 # value function freezes the raw command-line text as a non-recursive variable;
 # command-line variables are exported by Make without recipe interpolation.
 override VERSION := $(value VERSION)
+ifeq ($(REVISION_ORIGIN),undefined)
+override REVISION := $(shell sh ./scripts/resolve-build-revision.sh)
+else
+override REVISION := $(value REVISION)
+endif
 export VERSION
 VERSION_VALIDATION := $(shell sh ./scripts/validate-build-version.sh)
 unexport VERSION
@@ -25,21 +37,42 @@ $(error VERSION must be empty or contain only ASCII letters, digits, dots, plus 
 endif
 BUILD_VERSION := $(value VERSION)
 
+export REVISION
+REVISION_VALIDATION := $(shell sh ./scripts/validate-build-revision.sh)
+unexport REVISION
+ifneq ($(REVISION_VALIDATION),ok)
+$(error REVISION must be empty or a complete 40- or 64-character hexadecimal Git object ID)
+endif
+BUILD_REVISION := $(value REVISION)
+ifeq ($(BUILD_REVISION),)
+BUILD_VERSION := dev
+endif
+IMAGE_VERSION := $(if $(BUILD_REVISION),$(if $(BUILD_VERSION),$(BUILD_VERSION),$(DEFAULT_VERSION)),dev)
+
 VERSION_X :=
 ifneq ($(BUILD_VERSION),)
-ifneq ($(findstring -ldflags,$(GOFLAGS)),)
-$(error VERSION cannot be combined with ldflags in GOFLAGS; move linker arguments to LDFLAGS)
-endif
 VERSION_X := -X github.com/kuuvahki-labs/sandrone/internal/buildinfo.rawVersion=$(BUILD_VERSION)
 endif
 
-BUILD_LDFLAGS := $(strip $(LDFLAGS) $(VERSION_X))
+REVISION_X :=
+ifneq ($(BUILD_REVISION),)
+REVISION_X := -X github.com/kuuvahki-labs/sandrone/internal/buildinfo.rawRevision=$(BUILD_REVISION)
+endif
+
+ifneq ($(strip $(BUILD_VERSION)$(BUILD_REVISION)),)
+ifneq ($(findstring -ldflags,$(GOFLAGS)),)
+$(error VERSION and REVISION cannot be combined with ldflags in GOFLAGS; move linker arguments to LDFLAGS)
+endif
+endif
+
+BUILD_LDFLAGS := $(strip $(LDFLAGS) $(VERSION_X) $(REVISION_X))
 BUILD_LDFLAGS_ARG :=
 ifneq ($(BUILD_LDFLAGS),)
 BUILD_LDFLAGS_ARG := -ldflags "$(BUILD_LDFLAGS)"
 endif
+BUILD_VCS_ARG := $(if $(BUILD_REVISION),,-buildvcs=false)
 
-.PHONY: help check ci fmt fmt-check vet test test-webui test-webui-e2e build build-bin build-check build-webui lint ruleset-catalog \
+.PHONY: help check ci fmt fmt-check vet test test-webui test-webui-e2e build build-bin build-check build-webui image lint ruleset-catalog \
 	test-probe test-probe-mihomo test-probe-singbox \
 	build-probe-mihomo build-probe-singbox
 
@@ -57,6 +90,7 @@ help: ## Show available targets.
 	@printf '  %-28s %s\n' 'build-bin' 'Generate the catalog and build the CLI in the repo; override BIN as needed.'
 	@printf '  %-28s %s\n' 'ruleset-catalog' 'Generate the ignored build-time rule-set URL snapshot.'
 	@printf '  %-28s %s\n' 'build-webui' 'Build web UI assets and copy them into Go embed static files.'
+	@printf '  %-28s %s\n' 'image' 'Build a locally tagged container image.'
 	@printf '  %-28s %s\n' 'lint' 'Run golangci-lint with .golangci.yml.'
 	@printf '  %-28s %s\n' 'test-probe' 'Run mihomo and sing-box probe build tag tests.'
 	@printf '  %-28s %s\n' 'test-probe-mihomo' 'Run probe tests with -tags probe_mihomo.'
@@ -90,16 +124,25 @@ ruleset-catalog:
 	GO="$(GO)" GOFLAGS="-mod=readonly" ./scripts/generate-ruleset-catalog.sh "$(RULESET_CATALOG_DIR)"
 
 build: ruleset-catalog
-	$(GO) build $(GOFLAGS) $(BUILD_LDFLAGS_ARG) -o $(BUILD_BIN) $(CMD_PKG)
+	$(GO) build $(GOFLAGS) $(BUILD_VCS_ARG) $(BUILD_LDFLAGS_ARG) -o $(BUILD_BIN) $(CMD_PKG)
 
 build-bin: ruleset-catalog
-	$(GO) build $(GOFLAGS) $(BUILD_LDFLAGS_ARG) -o $(BIN) $(CMD_PKG)
+	$(GO) build $(GOFLAGS) $(BUILD_VCS_ARG) $(BUILD_LDFLAGS_ARG) -o $(BIN) $(CMD_PKG)
 
 build-check:
-	$(GO) build $(GOFLAGS) $(BUILD_LDFLAGS_ARG) -o $(BUILD_BIN) $(CMD_PKG)
+	$(GO) build $(GOFLAGS) $(BUILD_VCS_ARG) $(BUILD_LDFLAGS_ARG) -o $(BUILD_BIN) $(CMD_PKG)
 
 build-webui:
 	./scripts/build-webui.sh
+
+image:
+	$(DOCKER) build \
+		--build-arg VERSION="$(IMAGE_VERSION)" \
+		--build-arg REVISION="$(BUILD_REVISION)" \
+		--label org.opencontainers.image.version="$(IMAGE_VERSION)" \
+		--label org.opencontainers.image.revision="$(BUILD_REVISION)" \
+		--tag "$(SANDRONE_IMAGE)" \
+		.
 
 lint:
 	$(GOLANGCI_LINT) run
@@ -113,7 +156,7 @@ test-probe-singbox:
 	$(GO) test $(GOFLAGS) $(TESTFLAGS) -tags probe_singbox ./internal/probe ./internal/service
 
 build-probe-mihomo:
-	$(GO) build $(GOFLAGS) $(BUILD_LDFLAGS_ARG) -tags probe_mihomo $(CMD_PKG)
+	$(GO) build $(GOFLAGS) $(BUILD_VCS_ARG) $(BUILD_LDFLAGS_ARG) -tags probe_mihomo $(CMD_PKG)
 
 build-probe-singbox:
-	$(GO) build $(GOFLAGS) $(BUILD_LDFLAGS_ARG) -tags probe_singbox $(CMD_PKG)
+	$(GO) build $(GOFLAGS) $(BUILD_VCS_ARG) $(BUILD_LDFLAGS_ARG) -tags probe_singbox $(CMD_PKG)

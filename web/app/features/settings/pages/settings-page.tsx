@@ -23,6 +23,7 @@ import { PageHeader } from "~/shared/ui/page";
 
 export interface SettingsPageProps {
   publicBaseUrl: string;
+  revision?: string;
   runtimeSettings?: RuntimeSettingsInput;
   themeMode: ThemeMode;
   version?: string;
@@ -36,6 +37,7 @@ export interface SettingsPageProps {
 
 export function SettingsPage({
   publicBaseUrl,
+  revision,
   runtimeSettings,
   themeMode,
   version,
@@ -103,7 +105,9 @@ export function SettingsPage({
                   {t("settings.about.version")}
                 </Typography>
                 <Typography variant="body2">
-                  {version ? `v${version}` : t("settings.about.versionUnavailable")}
+                  {version
+                    ? `${version === "dev" ? "dev" : `v${version}`}${revision ? ` (${revision.slice(0, 12)})` : ""}`
+                    : t("settings.about.versionUnavailable")}
                 </Typography>
               </div>
               <Typography color="text.secondary" variant="body2">

@@ -15,10 +15,10 @@
 在仓库根目录启动服务：
 
 ```sh
-docker compose up --build
+docker compose up --pull always
 ```
 
-构建完成后，打开 <http://127.0.0.1:1137>。登录页出现时，在“管理员 token”中输入：
+镜像拉取并启动后，打开 <http://127.0.0.1:1137>。登录页出现时，在“管理员 token”中输入：
 
 ```text
 sandrone

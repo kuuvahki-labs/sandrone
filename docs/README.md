@@ -24,6 +24,7 @@
 - [JavaScript 脚本 API](reference/scripting-api.md)：envelope、注入 API、sandbox 和失败边界。
 - [格式与能力](reference/capabilities.md)：parser、renderer、协议字段与有损转换。
 - [错误与诊断](reference/errors.md)：error、warning、report 和敏感信息边界。
+- [构建身份](reference/build-info.md)：版本、Git revision、二进制与容器追溯。
 - [Mihomo fake-IP](reference/mihomo-fake-ip.md)：当前默认、适用范围和上游依据。
 
 ## 理解系统

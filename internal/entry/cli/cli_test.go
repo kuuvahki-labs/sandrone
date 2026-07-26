@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/kuuvahki-labs/sandrone/internal/app"
+	"github.com/kuuvahki-labs/sandrone/internal/buildinfo"
 	"github.com/kuuvahki-labs/sandrone/pkg/sandrone"
 )
 
@@ -21,7 +22,7 @@ func TestVersionFlagPrintsBuildVersion(t *testing.T) {
 	code, stdout, stderr := runCLI(t, []string{"--version"}, "")
 
 	require.Equal(t, 0, code)
-	require.Equal(t, "sandrone version 0.1.0\n", stdout)
+	require.Equal(t, "sandrone version "+buildinfo.Summary()+"\n", stdout)
 	require.Empty(t, stderr)
 }
 

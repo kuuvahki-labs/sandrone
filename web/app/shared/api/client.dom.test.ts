@@ -47,7 +47,11 @@ describe("ApiClient", () => {
     const client = new ApiClient({
       fetcher: async (input, init) => {
         calls.push({ input, init });
-        return new Response(JSON.stringify({ name: "sandrone", version: "0.1.0" }), {
+        return new Response(JSON.stringify({
+          name: "sandrone",
+          version: "0.1.0",
+          revision: "0123456789abcdef",
+        }), {
           headers: { "content-type": "application/json" },
         });
       },
@@ -55,7 +59,11 @@ describe("ApiClient", () => {
 
     const version = await client.getVersion();
 
-    expect(version).toEqual({ name: "sandrone", version: "0.1.0" });
+    expect(version).toEqual({
+      name: "sandrone",
+      version: "0.1.0",
+      revision: "0123456789abcdef",
+    });
     expect(String(calls[0]?.input)).toBe("/version");
     expect(calls[0]?.init?.headers).toEqual({});
   });
