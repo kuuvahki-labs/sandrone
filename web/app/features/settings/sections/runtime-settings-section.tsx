@@ -18,6 +18,7 @@ import Typography from "@mui/material/Typography";
 import { completeRuntimeSettings, defaultRuntimeSettings } from "~/features/settings/model/runtime-settings";
 import type { RuntimeSettingsInput } from "~/shared/api/client";
 import { useI18n } from "~/shared/i18n/context";
+import { ProbeURLField } from "~/shared/ui/probe-url-field";
 
 interface RuntimeSettingsSectionProps {
   runtimeSettings?: RuntimeSettingsInput;
@@ -120,12 +121,11 @@ export function RuntimeSettingsSection({
                   <MenuItem value="url_test">url_test</MenuItem>
                 </Select>
               </FormControl>
-              <TextField
+              <ProbeURLField
                 className="md:col-span-2"
-                fullWidth
                 label={t("settings.runtime.probeUrl")}
                 value={runtimeDraft.probe_defaults.url ?? ""}
-                onChange={(event) => updateProbeDefaults({ url: event.target.value })}
+                onChange={(url) => updateProbeDefaults({ url })}
               />
               <TextField
                 fullWidth

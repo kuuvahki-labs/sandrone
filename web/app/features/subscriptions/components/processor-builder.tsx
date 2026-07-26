@@ -29,6 +29,7 @@ import {
 } from "~/shared/processors/model";
 import type { ProcessorDetail, ResourceOption } from "~/shared/resources/types";
 import { SelectField } from "~/shared/ui/form-fields";
+import { ProbeURLField } from "~/shared/ui/probe-url-field";
 
 const fields = ["name", "type", "server"];
 const fieldOptions = fields.map((field) => ({ value: field, label: field }));
@@ -153,7 +154,7 @@ function ProcessorParamsEditor({ draft, onChange, scriptFiles }: ProcessorParams
           ) : null}
           {showURLTarget ? (
             <>
-              <TextField fullWidth label={t("processors.probe.url")} value={stringValue(params.url)} onChange={(event) => onChange({ url: event.target.value })} />
+              <ProbeURLField label={t("processors.probe.url")} value={stringValue(params.url)} onChange={(url) => onChange({ url })} />
               <TextField fullWidth label={t("processors.probe.expectedStatus")} placeholder="200-299" value={stringValue(params.expected_status)} onChange={(event) => onChange({ expected_status: event.target.value })} />
             </>
           ) : null}

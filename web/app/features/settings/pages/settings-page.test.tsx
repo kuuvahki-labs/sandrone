@@ -102,9 +102,15 @@ describe("settings page", () => {
     const remoteGroup = screen.getByRole("region", { name: "远程请求" });
     const cacheGroup = screen.getByRole("region", { name: "缓存" });
     const probeGroup = screen.getByRole("region", { name: "测活" });
-    expect(within(probeGroup).getAllByRole("combobox")).toHaveLength(1);
+    expect(within(probeGroup).getAllByRole("combobox")).toHaveLength(2);
     expect(probeGroup).not.toHaveTextContent(/sing-box|mihomo/);
     expect(within(probeGroup).getByRole("combobox", { name: "默认测活方式" })).toHaveTextContent("url_test");
+    const probeURL = within(probeGroup).getByRole("combobox", { name: "URL" });
+    await user.click(probeURL);
+    await user.keyboard("{ArrowDown}");
+    await user.click(await screen.findByRole("option", {
+      name: "Cloudflare http://cp.cloudflare.com/generate_204",
+    }));
     await user.clear(within(remoteGroup).getByRole("textbox", { name: "User-Agent" }));
     await user.type(within(remoteGroup).getByRole("textbox", { name: "User-Agent" }), "Sandrone Global");
     await user.clear(within(cacheGroup).getByRole("spinbutton", { name: "远程请求缓存（秒）" }));
@@ -125,6 +131,7 @@ describe("settings page", () => {
       probe_defaults: expect.objectContaining({
         cache_ttl_seconds: 300,
         core: "sing-box",
+        url: "http://cp.cloudflare.com/generate_204",
       }),
       cache_defaults: expect.objectContaining({
         remote_fetch_ttl_seconds: 120,
