@@ -1,3 +1,5 @@
+// Package agentcatalog provides catalog schema and metadata generation for processors,
+// files, and subscriptions.
 package agentcatalog
 
 import (

@@ -184,7 +184,7 @@ func TestSandroneAPIScriptRejectsInvalidInputs(t *testing.T) {
 				0o755,
 			))
 			env := append(
-				tt.env,
+				append([]string(nil), tt.env...),
 				"FAKE_CURL_CALLED="+curlCalled,
 				"PATH="+tempDir+string(os.PathListSeparator)+os.Getenv("PATH"),
 			)

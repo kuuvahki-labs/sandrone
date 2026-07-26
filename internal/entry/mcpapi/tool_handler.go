@@ -74,7 +74,7 @@ func addTool[In, Out any](
 		if err != nil {
 			return nil, fmt.Errorf("validate %q output: %w", registeredTool.Name, err)
 		}
-		result.StructuredContent = json.RawMessage(validatedOutput)
+		result.StructuredContent = validatedOutput
 		if result.Content == nil {
 			result.Content = []mcp.Content{&mcp.TextContent{Text: string(validatedOutput)}}
 		}

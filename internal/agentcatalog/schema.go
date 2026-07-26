@@ -1,3 +1,4 @@
+// Package agentcatalog defines wire schemas for agent catalog contracts.
 package agentcatalog
 
 import "github.com/google/jsonschema-go/jsonschema"
@@ -64,8 +65,8 @@ func remoteInputSchema() *jsonschema.Schema {
 		"url":               stringSchema(),
 		"user_agent":        stringSchema(),
 		"proxy":             stringSchema(),
-		"timeout_ms":        boundedIntegerSchema(0, nil),
-		"cache_ttl_seconds": boundedIntegerSchema(0, nil),
+		"timeout_ms":        boundedIntegerSchema(),
+		"cache_ttl_seconds": boundedIntegerSchema(),
 	}, []string{"url"})
 }
 
@@ -82,19 +83,18 @@ func nodeInputSchema() *jsonschema.Schema {
 		"url":               stringSchema(),
 		"user_agent":        stringSchema(),
 		"proxy":             stringSchema(),
-		"timeout_ms":        boundedIntegerSchema(0, nil),
-		"cache_ttl_seconds": boundedIntegerSchema(0, nil),
+		"timeout_ms":        boundedIntegerSchema(),
+		"cache_ttl_seconds": boundedIntegerSchema(),
 		"required":          {Type: "boolean"},
 		"meta":              stringMapSchema(),
 	}, []string{"name", "type"})
 }
 
-func closedObject(properties map[string]*jsonschema.Schema, required []string, oneOf ...*jsonschema.Schema) *jsonschema.Schema {
+func closedObject(properties map[string]*jsonschema.Schema, required []string) *jsonschema.Schema {
 	return &jsonschema.Schema{
 		Type:                 "object",
 		Properties:           properties,
 		Required:             required,
-		OneOf:                oneOf,
 		AdditionalProperties: falseSchema(),
 	}
 }
@@ -138,11 +138,12 @@ func nodeInputTypeSchema() *jsonschema.Schema {
 	return enumSchema("inline_nodes", "inline", "local", "remote", "ref", "subscription")
 }
 
-func boundedIntegerSchema(minimum float64, maximum *float64) *jsonschema.Schema {
+func boundedIntegerSchema() *jsonschema.Schema {
+	const minimum = 0
+	floatMinimum := float64(minimum)
 	return &jsonschema.Schema{
 		Type:    "integer",
-		Minimum: &minimum,
-		Maximum: maximum,
+		Minimum: &floatMinimum,
 	}
 }
 

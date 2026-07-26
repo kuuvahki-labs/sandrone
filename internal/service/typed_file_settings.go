@@ -52,7 +52,10 @@ func validateMihomoAdaptiveGroupFields(raw json.RawMessage) error {
 		return nil
 	}
 	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &fields); err != nil || fields == nil {
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return nil //nolint:nilerr // decodeTypedFileSettings returns the canonical invalid-settings error.
+	}
+	if fields == nil {
 		return nil
 	}
 	adaptive, ok := fields["adaptive_groups"]

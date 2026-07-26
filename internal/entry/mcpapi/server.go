@@ -35,10 +35,6 @@ type probeOutput struct {
 	Report  domain.Report            `json:"report,omitempty"`
 }
 
-type okOutput struct {
-	OK bool `json:"ok"`
-}
-
 type inspectOutput struct {
 	Capabilities map[string]any `json:"capabilities"`
 	Report       domain.Report  `json:"report,omitempty"`

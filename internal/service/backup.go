@@ -136,10 +136,10 @@ func readBackupEntries(ctx context.Context, resourceStore store.Store) ([]backup
 		}
 		key, err := store.CleanKey(item.Key)
 		if err != nil || key != item.Key {
-			return nil, errors.New("Store returned an unsafe backup key")
+			return nil, errors.New("store returned an unsafe backup key")
 		}
 		if _, ok := seen[key]; ok {
-			return nil, errors.New("Store returned a duplicate backup key")
+			return nil, errors.New("store returned a duplicate backup key")
 		}
 		seen[key] = struct{}{}
 		if isBackupCacheKey(key) {
@@ -182,9 +182,12 @@ func encodeBackupArchive(entries []backupEntry, createdAt time.Time) ([]byte, er
 }
 
 func writeBackupZipFile(writer *zip.Writer, name string, body []byte, modified time.Time) error {
-	header := &zip.FileHeader{Name: name, Method: zip.Deflate}
+	header := &zip.FileHeader{
+		Name:     name,
+		Method:   zip.Deflate,
+		Modified: modified.UTC(),
+	}
 	header.SetMode(0o600)
-	header.SetModTime(modified.UTC())
 	entry, err := writer.CreateHeader(header)
 	if err != nil {
 		return err

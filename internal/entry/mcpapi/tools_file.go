@@ -181,7 +181,7 @@ func filePartNodesOutput(nodes []domain.NodeIR) ([]map[string]any, error) {
 	}
 	output := make([]map[string]any, len(nodes))
 	for index, node := range nodes {
-		body, err := json.Marshal(node)
+		body, err := json.Marshal(node) //nolint:gosec // Node credentials are part of the explicitly requested source document.
 		if err != nil {
 			return nil, fmt.Errorf("node %d: %w", index, err)
 		}

@@ -233,7 +233,11 @@ for (const route of routes) {
       ? page.getByRole("region", { name: "最终文件内容" })
       : route.path === "/files/default.yaml/edit"
         ? page.getByRole("group", { name: route.text })
-        : page.getByText(route.text);
+        : route.path === "/files/new?source=mihomo"
+          ? page.getByRole("group", { name: "节点来源" }).first()
+          : route.path === "/files/new?source=sing-box" || route.path === "/files/new?source=shadowrocket"
+            ? page.getByRole("group", { name: "基础配置" }).first()
+            : page.getByText(route.text);
     await expect(routeContent).toBeVisible();
     if (route.focus) {
       await expect(page.locator("[data-page-header-compact]")).toHaveAttribute("data-page-header-compact", "false");
@@ -533,7 +537,7 @@ for (const kind of ["mihomo", "sing-box", "shadowrocket"] as const) {
     await page.getByRole("button", { name: /^规则策略/ }).click();
     const rules = page.getByRole("group", { name: "规则策略" });
     await expect(rules.locator(".MuiChip-root")).toHaveCount(0);
-    const firstRule = page.getByRole("group", { name: "规则 1" });
+    const firstRule = page.getByRole("group", { name: /^规则 1$/ }).first();
     const ruleRowMetrics = await firstRule.evaluate((element) => ({ clientWidth: element.clientWidth, scrollWidth: element.scrollWidth }));
     expect(ruleRowMetrics.scrollWidth).toBeLessThanOrEqual(ruleRowMetrics.clientWidth);
     if (testInfo.project.name === "mobile") {

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 
@@ -98,7 +98,9 @@ it("blocks save when the sing-box inline base is not a JSON object", async () =>
   const save = screen.getByRole("button", { name: "Save file" });
   await waitFor(() => expect(save).toBeEnabled());
 
-  const [content] = screen.getAllByRole("textbox", { name: "Content" });
+  const content = within(
+    screen.getByRole("group", { name: "Base configuration content" }),
+  ).getByRole("textbox", { name: "Content" });
   fireEvent.change(content, { target: { value: "[]" } });
   expect(save).toBeDisabled();
 

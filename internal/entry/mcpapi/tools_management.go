@@ -24,7 +24,6 @@ func registerManagementTools(server *mcp.Server, rt *app.Runtime) {
 	destructive := true
 	openWorld := false
 	annotations := &mcp.ToolAnnotations{
-		ReadOnlyHint:    false,
 		DestructiveHint: &destructive,
 		IdempotentHint:  true,
 		OpenWorldHint:   &openWorld,
@@ -39,7 +38,7 @@ func registerManagementTools(server *mcp.Server, rt *app.Runtime) {
 		if err := validateRequiredPublicResourceName("subscription name", in.Name); err != nil {
 			return nil, putResourceOutput{}, err
 		}
-		sub, err := in.subscription.domain()
+		sub, err := in.domain()
 		if err != nil {
 			return nil, putResourceOutput{}, err
 		}
@@ -77,7 +76,7 @@ func registerManagementTools(server *mcp.Server, rt *app.Runtime) {
 		if err := validateRequiredPublicResourceName("file name", in.Name); err != nil {
 			return nil, putResourceOutput{}, err
 		}
-		spec, err := in.fileSpec.domain()
+		spec, err := in.domain()
 		if err != nil {
 			return nil, putResourceOutput{}, err
 		}

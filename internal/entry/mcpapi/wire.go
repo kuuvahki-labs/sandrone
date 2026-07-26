@@ -28,9 +28,6 @@ func (spec processorSpec) domain() (domain.ProcessorSpec, error) {
 }
 
 func processorSpecsDomain(specs []processorSpec) ([]domain.ProcessorSpec, error) {
-	if specs == nil {
-		return nil, nil
-	}
 	out := make([]domain.ProcessorSpec, len(specs))
 	for index, spec := range specs {
 		converted, err := spec.domain()
@@ -43,9 +40,6 @@ func processorSpecsDomain(specs []processorSpec) ([]domain.ProcessorSpec, error)
 }
 
 func rawObject(values map[string]any) (map[string]json.RawMessage, error) {
-	if values == nil {
-		return nil, nil
-	}
 	out := make(map[string]json.RawMessage, len(values))
 	for key, value := range values {
 		body, err := json.Marshal(value)

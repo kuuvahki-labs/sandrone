@@ -158,7 +158,7 @@ func nodeInputSchema() *jsonschema.Schema {
 		"proxy":             stringSchema(),
 		"timeout_ms":        boundedIntegerSchema(0, nil),
 		"cache_ttl_seconds": boundedIntegerSchema(0, nil),
-		"required":          &jsonschema.Schema{Type: "boolean"},
+		"required":          {Type: "boolean"},
 		"meta":              stringMapSchema(),
 	}, []string{"name", "type"})
 }

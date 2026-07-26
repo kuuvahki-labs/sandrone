@@ -49,41 +49,6 @@ func dimensionsForResults(results []domain.NodeProbeResult) []domain.ProbeReport
 	return out
 }
 
-func combineReports(reports []domain.Report, nodes []domain.NodeIR, results []domain.NodeProbeResult) domain.Report {
-	report := domain.Report{
-		Probe: &domain.ProbeReport{
-			Backend:     "mixed",
-			ErrorCounts: map[string]int{},
-			Dimensions:  dimensionsForResults(results),
-		},
-		Warnings: probeWarnings(nodes, results),
-	}
-	for _, result := range results {
-		if result.Alive {
-			report.Probe.SuccessCount++
-		} else {
-			report.Probe.FailureCount++
-			if result.ErrorCode != "" {
-				report.Probe.ErrorCounts[result.ErrorCode]++
-			}
-		}
-		if result.CacheHit {
-			report.Probe.CacheHitCount++
-		}
-	}
-	for _, source := range reports {
-		for _, warning := range source.Warnings {
-			if warning.Node == "" && warning.NodeIndex == nil {
-				report.Warnings = append(report.Warnings, warning)
-			}
-		}
-	}
-	if len(report.Probe.ErrorCounts) == 0 {
-		report.Probe.ErrorCounts = nil
-	}
-	return report
-}
-
 func successResult(req domain.ProbeRequest, node domain.NodeIR, durationMS int, checkedAt time.Time) domain.NodeProbeResult {
 	if durationMS < 1 {
 		durationMS = 1
