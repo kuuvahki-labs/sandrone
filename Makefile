@@ -20,29 +20,17 @@ LDFLAGS ?=
 DOCKER ?= docker
 SANDRONE_IMAGE ?= ghcr.io/kuuvahki-labs/sandrone:local
 
-# Validate command-line VERSION before storing or expanding it anywhere else. The
-# value function freezes the raw command-line text as a non-recursive variable;
-# command-line variables are exported by Make without recipe interpolation.
+# Freeze raw command-line identity values as non-recursive variables. The
+# validate-build-identity prerequisite checks them before any public target can
+# expand them in a recipe, including on GNU Make 4.3.
 override VERSION := $(value VERSION)
 ifeq ($(REVISION_ORIGIN),undefined)
 override REVISION := $(shell sh ./scripts/resolve-build-revision.sh)
 else
 override REVISION := $(value REVISION)
 endif
-export VERSION
-VERSION_VALIDATION := $(shell sh ./scripts/validate-build-version.sh)
-unexport VERSION
-ifneq ($(VERSION_VALIDATION),ok)
-$(error VERSION must be empty or contain only ASCII letters, digits, dots, plus signs, and hyphens)
-endif
 BUILD_VERSION := $(value VERSION)
 
-export REVISION
-REVISION_VALIDATION := $(shell sh ./scripts/validate-build-revision.sh)
-unexport REVISION
-ifneq ($(REVISION_VALIDATION),ok)
-$(error REVISION must be empty or a complete 40- or 64-character hexadecimal Git object ID)
-endif
 BUILD_REVISION := $(value REVISION)
 ifeq ($(BUILD_REVISION),)
 BUILD_VERSION := dev
@@ -72,9 +60,25 @@ BUILD_LDFLAGS_ARG := -ldflags "$(BUILD_LDFLAGS)"
 endif
 BUILD_VCS_ARG := $(if $(BUILD_REVISION),,-buildvcs=false)
 
-.PHONY: help check ci fmt fmt-check vet test test-webui test-webui-e2e build build-bin build-check build-webui image lint ruleset-catalog \
+VALIDATED_TARGETS := help check ci fmt fmt-check vet test test-webui test-webui-e2e build build-bin build-check build-webui image lint ruleset-catalog \
 	test-probe test-probe-mihomo test-probe-singbox \
 	build-probe-mihomo build-probe-singbox
+
+.PHONY: validate-build-identity $(VALIDATED_TARGETS)
+
+$(VALIDATED_TARGETS): | validate-build-identity
+
+validate-build-identity: override export VERSION := $(value VERSION)
+validate-build-identity: override export REVISION := $(value REVISION)
+validate-build-identity:
+	@if [ "$$(sh ./scripts/validate-build-version.sh)" != "ok" ]; then \
+		printf '%s\n' 'VERSION must be empty or contain only ASCII letters, digits, dots, plus signs, and hyphens' >&2; \
+		exit 2; \
+	fi
+	@if [ "$$(sh ./scripts/validate-build-revision.sh)" != "ok" ]; then \
+		printf '%s\n' 'REVISION must be empty or a complete 40- or 64-character hexadecimal Git object ID' >&2; \
+		exit 2; \
+	fi
 
 help: ## Show available targets.
 	@printf '%s\n' 'Common targets:'

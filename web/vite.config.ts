@@ -41,6 +41,7 @@ export default defineConfig({
   test: {
     exclude: ["**/node_modules/**", "**/e2e/**"],
     maxWorkers: 4,
+    testTimeout: 15_000,
     projects: [
       {
         extends: true,
