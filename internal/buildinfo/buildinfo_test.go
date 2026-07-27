@@ -671,7 +671,7 @@ func TestMakeVersionCannotInjectRecipeCommands(t *testing.T) {
 	marker := filepath.Join(t.TempDir(), "recipe-command-ran")
 	value := "v0.1.0\"; touch \"" + marker + "\"; #"
 
-	if output, err := runMake(t, "build-probe-mihomo", "GO=false", "VERSION="+value); err == nil {
+	if output, err := runMake(t, "build-check", "GO=false", "VERSION="+value); err == nil {
 		t.Errorf("make accepted injectable VERSION:\n%s", output)
 	}
 	if _, err := os.Stat(marker); !os.IsNotExist(err) {

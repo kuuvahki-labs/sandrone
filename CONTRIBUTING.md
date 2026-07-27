@@ -66,11 +66,13 @@ make check
 make ci
 ```
 
-Makefile 默认使用 `GOFLAGS=-mod=readonly -tags probe_singbox`。运行窄测试时也应保留这些 flag：
+Makefile 默认使用
+`GOFLAGS=-mod=readonly -tags probe_singbox,with_quic,with_wireguard,with_utls`。
+运行窄测试时也应保留这些 flag：
 
 ```sh
-go test -mod=readonly -tags probe_singbox ./internal/service
-go test -mod=readonly -tags probe_singbox -run '^TestName$' ./internal/service
+go test -mod=readonly -tags probe_singbox,with_quic,with_wireguard,with_utls ./internal/service
+go test -mod=readonly -tags probe_singbox,with_quic,with_wireguard,with_utls -run '^TestName$' ./internal/service
 make test PKGS=./internal/service TESTFLAGS='-run ^TestName$'
 ```
 
@@ -78,7 +80,8 @@ make test PKGS=./internal/service TESTFLAGS='-run ^TestName$'
 
 - adapter：parse/render 单元测试、能力或 warning 断言，以及必要的 golden fixture。
 - processor、service、store、entrypoint：在最接近公开或层间契约的位置测试；文件流不要只依赖 renderer golden。
-- probe：根据后端运行 `make test-probe-mihomo`、`make test-probe-singbox` 或 `make test-probe`。
+- probe：默认门禁覆盖 sing-box；修改 Mihomo backend 时额外运行
+  `go test -mod=readonly -tags probe_mihomo ./internal/probe ./internal/service`。
 - 用户可见 API、CLI、文件模型或 processor 行为：同时核对 canonical reference 和相关 tutorial/how-to。
 - 删除功能：用 `rg` 扫描旧标识，除明确的兼容说明外应为零命中。
 

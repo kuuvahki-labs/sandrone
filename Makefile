@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := check
 
 GO ?= go
-GOFLAGS ?= -mod=readonly -tags probe_singbox
+GOFLAGS ?= -mod=readonly -tags probe_singbox,with_quic,with_wireguard,with_utls
 PKGS ?= ./...
 CMD_PKG ?= ./cmd/sandrone
 BIN ?= sandrone
@@ -60,9 +60,7 @@ BUILD_LDFLAGS_ARG := -ldflags "$(BUILD_LDFLAGS)"
 endif
 BUILD_VCS_ARG := $(if $(BUILD_REVISION),,-buildvcs=false)
 
-VALIDATED_TARGETS := help check ci fmt fmt-check vet test test-webui test-webui-e2e build build-bin build-check build-webui image lint ruleset-catalog \
-	test-probe test-probe-mihomo test-probe-singbox \
-	build-probe-mihomo build-probe-singbox
+VALIDATED_TARGETS := help check ci fmt fmt-check vet test test-webui test-webui-e2e build build-bin build-check build-webui image lint ruleset-catalog
 
 .PHONY: validate-build-identity $(VALIDATED_TARGETS)
 
@@ -96,11 +94,6 @@ help: ## Show available targets.
 	@printf '  %-28s %s\n' 'build-webui' 'Build web UI assets and copy them into Go embed static files.'
 	@printf '  %-28s %s\n' 'image' 'Build a locally tagged container image.'
 	@printf '  %-28s %s\n' 'lint' 'Run golangci-lint with .golangci.yml.'
-	@printf '  %-28s %s\n' 'test-probe' 'Run mihomo and sing-box probe build tag tests.'
-	@printf '  %-28s %s\n' 'test-probe-mihomo' 'Run probe tests with -tags probe_mihomo.'
-	@printf '  %-28s %s\n' 'test-probe-singbox' 'Run probe tests with -tags probe_singbox.'
-	@printf '  %-28s %s\n' 'build-probe-mihomo' 'Build CLI with -tags probe_mihomo.'
-	@printf '  %-28s %s\n' 'build-probe-singbox' 'Build CLI with -tags probe_singbox.'
 
 check: fmt-check vet test build-check
 
@@ -150,17 +143,3 @@ image:
 
 lint:
 	$(GOLANGCI_LINT) run
-
-test-probe: test-probe-mihomo test-probe-singbox
-
-test-probe-mihomo:
-	$(GO) test $(GOFLAGS) $(TESTFLAGS) -tags probe_mihomo ./internal/probe ./internal/service
-
-test-probe-singbox:
-	$(GO) test $(GOFLAGS) $(TESTFLAGS) -tags probe_singbox ./internal/probe ./internal/service
-
-build-probe-mihomo:
-	$(GO) build $(GOFLAGS) $(BUILD_VCS_ARG) $(BUILD_LDFLAGS_ARG) -tags probe_mihomo $(CMD_PKG)
-
-build-probe-singbox:
-	$(GO) build $(GOFLAGS) $(BUILD_VCS_ARG) $(BUILD_LDFLAGS_ARG) -tags probe_singbox $(CMD_PKG)

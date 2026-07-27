@@ -38,7 +38,9 @@
 - `probe_mihomo` 注册 Mihomo `url_test`。
 - `probe_singbox` 注册 sing-box `url_test` 和 `udp_ntp`。
 
-这些核心作为 Go 依赖编译进当前进程，不调用宿主机上的 mihomo 或 sing-box 可执行文件。sing-box 的临时控制接口只绑定 loopback 随机端口，并随本次 backend 生命周期关闭。
+这些核心作为 Go 依赖编译进当前进程，不调用宿主机上的 mihomo 或 sing-box
+可执行文件。Mihomo 和 sing-box 的 URL backend 都直接调用内嵌核心的测速
+API，不启动本地控制接口。
 
 裸 `go build` 或 `go test` 不带 tag 时只有 TCP backend。仓库的 Makefile 默认使用 `probe_singbox`，发布 Docker 构建也包含 sing-box backend；因此“模块在 `go.mod` 中”与“能力进入这次二进制”是两个不同事实。
 
