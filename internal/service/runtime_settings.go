@@ -35,6 +35,8 @@ func DefaultRuntimeSettings() domain.RuntimeSettings {
 		CacheDefaults: domain.CacheDefaults{
 			RemoteFetchTTLSeconds:         0,
 			SubscriptionTrafficTTLSeconds: 60,
+			SubscriptionRenderTTLSeconds:  0,
+			FileRenderTTLSeconds:          0,
 		},
 	}
 }
@@ -68,6 +70,7 @@ func (s *Service) PutRuntimeSettings(ctx context.Context, settings domain.Runtim
 	if err := s.metaStore.PutRuntimeSettings(ctx, normalized); err != nil {
 		return err
 	}
+	s.invalidateResultCaches(ctx)
 	s.logResource(ctx, "put", "settings", "runtime")
 	return nil
 }
@@ -153,6 +156,12 @@ func normalizeRuntimeSettings(settings domain.RuntimeSettings) (domain.RuntimeSe
 	if settings.CacheDefaults.SubscriptionTrafficTTLSeconds < 0 {
 		return domain.RuntimeSettings{}, domain.NewError(domain.CodeInvalidArgument, "subscription_traffic_ttl_seconds must be non-negative")
 	}
+	if settings.CacheDefaults.SubscriptionRenderTTLSeconds < 0 {
+		return domain.RuntimeSettings{}, domain.NewError(domain.CodeInvalidArgument, "subscription_render_ttl_seconds must be non-negative")
+	}
+	if settings.CacheDefaults.FileRenderTTLSeconds < 0 {
+		return domain.RuntimeSettings{}, domain.NewError(domain.CodeInvalidArgument, "file_render_ttl_seconds must be non-negative")
+	}
 
 	if value := strings.TrimSpace(settings.RemoteDefaults.UserAgent); value != "" {
 		if value == legacyDefaultUserAgent {
@@ -237,6 +246,12 @@ func validateRuntimeSettings(settings domain.RuntimeSettings) error {
 	}
 	if settings.CacheDefaults.SubscriptionTrafficTTLSeconds < 0 {
 		return domain.NewError(domain.CodeInvalidArgument, "subscription_traffic_ttl_seconds must be non-negative")
+	}
+	if settings.CacheDefaults.SubscriptionRenderTTLSeconds < 0 {
+		return domain.NewError(domain.CodeInvalidArgument, "subscription_render_ttl_seconds must be non-negative")
+	}
+	if settings.CacheDefaults.FileRenderTTLSeconds < 0 {
+		return domain.NewError(domain.CodeInvalidArgument, "file_render_ttl_seconds must be non-negative")
 	}
 	return nil
 }

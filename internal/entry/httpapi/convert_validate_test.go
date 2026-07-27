@@ -2,6 +2,7 @@ package httpapi_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
@@ -86,6 +87,36 @@ func TestValidateInspectAndFilesEndpoints(t *testing.T) {
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &argsFileResult))
 	require.Equal(t, "hello:bar", argsFileResult.Body)
 
+}
+
+func TestFileEndpointExposesCacheStatusAndRefresh(t *testing.T) {
+	ctx := context.Background()
+	rt := testRuntime(t, app.Config{})
+	ttl := 60
+	require.NoError(t, rt.Service.PutFile(ctx, domain.FileSpec{
+		Name: "cached.txt", Kind: domain.FileKindStatic,
+		Source:                domain.FileSource{Type: "inline", Content: "body"},
+		RenderCacheTTLSeconds: &ttl,
+	}))
+	handler := httpapi.New(rt).Handler()
+
+	get := func(path string) *httptest.ResponseRecorder {
+		t.Helper()
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		require.Equal(t, http.StatusOK, rec.Code)
+		return rec
+	}
+
+	require.Equal(t, "miss", get("/v1/files/cached.txt").Header().Get("X-Sandrone-Cache"))
+	require.Equal(t, "hit", get("/v1/files/cached.txt").Header().Get("X-Sandrone-Cache"))
+	require.Equal(t, "bypass", get("/v1/files/cached.txt?refresh=true").Header().Get("X-Sandrone-Cache"))
+
+	var response struct {
+		Cached bool `json:"cached"`
+	}
+	require.NoError(t, json.Unmarshal(get("/v1/files/cached.txt?response=json").Body.Bytes(), &response))
+	require.True(t, response.Cached)
 }
 
 func TestValidateEndpointAcceptsRemoteInput(t *testing.T) {

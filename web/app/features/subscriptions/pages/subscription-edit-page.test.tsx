@@ -125,6 +125,8 @@ describe("SubscriptionEditPage", () => {
     expect(screen.getByRole("textbox", { name: "User-Agent" })).toHaveValue("Sandrone Test");
     expect(screen.getByRole("textbox", { name: "代理" })).toHaveValue("http://127.0.0.1:7890");
     expect(screen.getByRole("spinbutton", { name: "超时毫秒" })).toHaveValue(10000);
+    expect(screen.getByRole("spinbutton", { name: "远程请求缓存（秒）" })).toHaveValue(45);
+    expect(screen.getByRole("combobox", { name: "渲染结果缓存" })).toHaveValue("disabled");
     expect(screen.queryByRole("textbox", { name: "SHA-256" })).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "期望状态" })).not.toBeInTheDocument();
     expect(screen.queryByRole("spinbutton", { name: "最大字节" })).not.toBeInTheDocument();

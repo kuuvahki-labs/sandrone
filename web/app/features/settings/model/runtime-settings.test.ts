@@ -35,6 +35,8 @@ describe("runtime settings model", () => {
       cache_defaults: {
         remote_fetch_ttl_seconds: 120,
         subscription_traffic_ttl_seconds: 60,
+        subscription_render_ttl_seconds: 0,
+        file_render_ttl_seconds: 0,
       },
     });
   });

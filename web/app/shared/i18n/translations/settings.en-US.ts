@@ -41,6 +41,8 @@ export const settingsEnUS = {
   "settings.runtime.remoteTimeoutMs": "Timeout (ms)",
   "settings.runtime.remoteUserAgent": "User-Agent",
   "settings.runtime.subscriptionTrafficCacheTTLSeconds": "Subscription traffic cache (seconds)",
+  "settings.runtime.subscriptionRenderCacheTTLSeconds": "Subscription render cache (seconds)",
+  "settings.runtime.fileRenderCacheTTLSeconds": "File render cache (seconds)",
   "settings.runtime.save": "Save runtime defaults",
   "settings.runtime.title": "Runtime defaults",
   "settings.signOut.action": "Sign out",

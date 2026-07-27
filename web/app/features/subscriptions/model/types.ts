@@ -32,6 +32,7 @@ export interface SubscriptionDefinition {
   remote?: RemoteInputDetail;
   sourceRefs: string[];
   processors?: ProcessorDetail[];
+  renderCacheTTLSeconds?: number;
   meta?: Record<string, string>;
 }
 

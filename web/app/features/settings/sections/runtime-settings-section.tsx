@@ -106,6 +106,20 @@ export function RuntimeSettingsSection({
                 value={numberInputValue(runtimeDraft.cache_defaults.subscription_traffic_ttl_seconds)}
                 onChange={(event) => updateCacheDefaults({ subscription_traffic_ttl_seconds: numberOrUndefined(event.target.value) ?? 0 })}
               />
+              <TextField
+                fullWidth
+                label={t("settings.runtime.subscriptionRenderCacheTTLSeconds")}
+                type="number"
+                value={numberInputValue(runtimeDraft.cache_defaults.subscription_render_ttl_seconds)}
+                onChange={(event) => updateCacheDefaults({ subscription_render_ttl_seconds: numberOrUndefined(event.target.value) ?? 0 })}
+              />
+              <TextField
+                fullWidth
+                label={t("settings.runtime.fileRenderCacheTTLSeconds")}
+                type="number"
+                value={numberInputValue(runtimeDraft.cache_defaults.file_render_ttl_seconds)}
+                onChange={(event) => updateCacheDefaults({ file_render_ttl_seconds: numberOrUndefined(event.target.value) ?? 0 })}
+              />
             </RuntimeSettingsGroup>
             <RuntimeSettingsGroup id="runtime-probe-defaults" title={t("settings.runtime.group.probe")}>
               <FormControl fullWidth>

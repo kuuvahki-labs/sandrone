@@ -34,6 +34,7 @@ export function subscriptionDefinitionFromAPI(value: unknown): SubscriptionDefin
     remote,
     sourceRefs: uniqueStrings(arrayField(item.inputs).map(collectionInputSourceName).filter(Boolean)),
     processors: processors.length ? processors : undefined,
+    renderCacheTTLSeconds: optionalNumberField(item.render_cache_ttl_seconds),
     meta: Object.keys(meta).length ? meta : undefined,
   };
 }

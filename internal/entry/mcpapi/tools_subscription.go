@@ -15,9 +15,10 @@ type subscriptionPreviewInput struct {
 }
 
 type subscriptionRenderInput struct {
-	Name   string            `json:"name"`
-	Format string            `json:"format"`
-	Args   map[string]string `json:"args,omitempty"`
+	Name    string            `json:"name"`
+	Format  string            `json:"format"`
+	Args    map[string]string `json:"args,omitempty"`
+	Refresh bool              `json:"refresh,omitempty"`
 }
 
 type subscriptionRenderOutput struct {
@@ -27,6 +28,7 @@ type subscriptionRenderOutput struct {
 	BodyBytes      int           `json:"body_bytes,omitempty"`
 	MaxOutputBytes int           `json:"max_output_bytes,omitempty"`
 	Report         domain.Report `json:"report,omitempty"`
+	Cached         bool          `json:"cached"`
 }
 
 type subscriptionTrafficInput struct {
@@ -67,7 +69,11 @@ func registerSubscriptionTools(server *mcp.Server, rt *app.Runtime) {
 		if err := validateRequiredPublicResourceName("subscription name", in.Name); err != nil {
 			return nil, subscriptionRenderOutput{}, err
 		}
-		result, err := rt.Service.RenderSubscription(ctx, in.Name, in.Format, domain.RequestInfo{Args: in.Args})
+		result, err := rt.Service.RenderSubscriptionRequest(ctx, domain.SubscriptionRenderRequest{
+			Name: in.Name, Format: in.Format,
+			Request: domain.RequestInfo{Args: in.Args},
+			Refresh: in.Refresh,
+		})
 		if err != nil {
 			return nil, subscriptionRenderOutput{}, err
 		}
@@ -75,6 +81,7 @@ func registerSubscriptionTools(server *mcp.Server, rt *app.Runtime) {
 			ContentType: result.ContentType,
 			Body:        string(result.Body),
 			Report:      result.Report,
+			Cached:      result.Cached,
 		}), nil
 	})
 

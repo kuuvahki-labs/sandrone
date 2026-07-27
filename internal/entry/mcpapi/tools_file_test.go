@@ -9,8 +9,35 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/kuuvahki-labs/sandrone/internal/app"
+	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/entry/mcpapi"
 )
+
+func TestGetFileSupportsRefreshAndReturnsCacheStatus(t *testing.T) {
+	ctx := context.Background()
+	rt := testRuntime(t, app.Config{})
+	ttl := 60
+	require.NoError(t, rt.Service.PutFile(ctx, domain.FileSpec{
+		Name: "cached.txt", Kind: domain.FileKindStatic,
+		Source:                domain.FileSource{Type: "inline", Content: "body"},
+		RenderCacheTTLSeconds: &ttl,
+	}))
+	session := connect(t, ctx, mcpapi.SDKServer(rt))
+	defer session.Close()
+
+	get := func(refresh bool) bool {
+		t.Helper()
+		result := callToolSuccess(t, ctx, session, "sandrone_get_file", map[string]any{
+			"file": "cached.txt", "refresh": refresh,
+		})
+		cached, _ := result["cached"].(bool)
+		return cached
+	}
+	require.False(t, get(false))
+	require.True(t, get(false))
+	require.False(t, get(true))
+	require.True(t, get(false))
+}
 
 func TestFileLifecycle(t *testing.T) {
 	tests := []struct {

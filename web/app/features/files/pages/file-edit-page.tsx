@@ -87,6 +87,7 @@ export function FileEditPage({ detail, detailPending = false, item, loadRuleSetC
           onDirty={() => setDirty(true)}
           onValidityChange={setValid}
           processorsDefault={detail?.processors}
+          renderCacheTTLSeconds={detail?.renderCacheTTLSeconds}
           scriptFiles={scriptFiles}
           sourceDefault={detail?.source}
           subscriptions={subscriptions}

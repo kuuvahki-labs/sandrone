@@ -23,19 +23,21 @@ func TestCacheJSONHonorsTTLAndLayeredKeys(t *testing.T) {
 	key, err := cache.HashKey("probe", map[string]any{"node": "a"})
 	require.NoError(t, err)
 
-	require.NoError(t, c.PutJSON(ctx, key, map[string]string{"value": "cached"}))
+	require.NoError(t, c.PutJSON(ctx, key, time.Minute, map[string]string{"value": "cached"}))
 
 	var got map[string]string
-	hit := c.GetJSON(ctx, key, time.Minute, &got)
+	hit := c.GetJSON(ctx, key, &got)
 	require.True(t, hit)
 	require.Equal(t, "cached", got["value"])
 	require.Contains(t, key, "cache/probe/")
 
 	now = now.Add(2 * time.Minute)
 	got = nil
-	hit = c.GetJSON(ctx, key, time.Minute, &got)
+	hit = c.GetJSON(ctx, key, &got)
 	require.False(t, hit)
 	require.Nil(t, got)
+	_, err = st.Stat(ctx, key)
+	require.True(t, errors.Is(err, os.ErrNotExist), "got %v", err)
 }
 
 func TestCacheJSONIgnoresMissingExpiredAndBadRecords(t *testing.T) {
@@ -47,17 +49,21 @@ func TestCacheJSONIgnoresMissingExpiredAndBadRecords(t *testing.T) {
 	require.NoError(t, err)
 
 	var got map[string]string
-	hit := c.GetJSON(ctx, key, time.Minute, &got)
+	hit := c.GetJSON(ctx, key, &got)
 	require.False(t, hit)
 
 	require.NoError(t, st.Write(ctx, key, []byte(`{bad json`)))
-	hit = c.GetJSON(ctx, key, time.Minute, &got)
+	hit = c.GetJSON(ctx, key, &got)
 	require.False(t, hit)
 
-	body, err := json.Marshal(map[string]any{"stored_at": now.Add(-time.Hour), "value": map[string]string{"value": "old"}})
+	body, err := json.Marshal(map[string]any{
+		"stored_at":  now.Add(-time.Hour),
+		"expires_at": now.Add(-time.Minute),
+		"value":      map[string]string{"value": "old"},
+	})
 	require.NoError(t, err)
 	require.NoError(t, st.Write(ctx, key, body))
-	hit = c.GetJSON(ctx, key, time.Minute, &got)
+	hit = c.GetJSON(ctx, key, &got)
 	require.False(t, hit)
 }
 
@@ -69,8 +75,8 @@ func TestCacheDeleteLayerRemovesOnlyThatLayer(t *testing.T) {
 	require.NoError(t, err)
 	probeKey, err := cache.HashKey("probe", "node-a")
 	require.NoError(t, err)
-	require.NoError(t, c.PutJSON(ctx, trafficKey, "traffic"))
-	require.NoError(t, c.PutJSON(ctx, probeKey, "probe"))
+	require.NoError(t, c.PutJSON(ctx, trafficKey, time.Minute, "traffic"))
+	require.NoError(t, c.PutJSON(ctx, probeKey, time.Minute, "probe"))
 
 	require.NoError(t, c.DeleteLayer(ctx, "subscription_traffic"))
 
@@ -78,4 +84,17 @@ func TestCacheDeleteLayerRemovesOnlyThatLayer(t *testing.T) {
 	require.True(t, errors.Is(err, os.ErrNotExist), "got %v", err)
 	_, err = st.Stat(ctx, probeKey)
 	require.NoError(t, err)
+}
+
+func TestCacheJSONDoesNotStoreDisabledEntries(t *testing.T) {
+	ctx := context.Background()
+	st := store.NewFSStore(afero.NewMemMapFs())
+	c := cache.New(st, time.Now)
+	key, err := cache.HashKey("probe", "disabled")
+	require.NoError(t, err)
+
+	require.NoError(t, c.PutJSON(ctx, key, 0, "ignored"))
+
+	_, err = st.Stat(ctx, key)
+	require.True(t, errors.Is(err, os.ErrNotExist), "got %v", err)
 }

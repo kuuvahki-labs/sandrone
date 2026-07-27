@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
@@ -64,9 +65,18 @@ func (s *Server) getFile(w http.ResponseWriter, r *http.Request) {
 		writeError(w, domain.NewError(domain.CodeInvalidArgument, "unsupported file mode"), http.StatusBadRequest)
 		return
 	}
+	refresh := false
+	if raw := strings.TrimSpace(q.Get("refresh")); raw != "" {
+		refresh, err = strconv.ParseBool(raw)
+		if err != nil {
+			writeError(w, domain.NewError(domain.CodeInvalidArgument, "refresh must be a boolean"), http.StatusBadRequest)
+			return
+		}
+	}
 	result, err := s.rt.Service.GetFile(r.Context(), domain.FileRequest{
 		Name:    name,
 		Request: domain.RequestInfo{Args: queryArgs(q)},
+		Refresh: refresh,
 	})
 	if err != nil {
 		writeServiceError(w, err)
@@ -78,9 +88,17 @@ func (s *Server) getFile(w http.ResponseWriter, r *http.Request) {
 			Body:        string(result.Content),
 			Response:    result.Response,
 			Warnings:    reportWarnings(result.Report),
+			Cached:      result.Cached,
 		})
 		return
 	}
+	cacheStatus := "miss"
+	if refresh {
+		cacheStatus = "bypass"
+	} else if result.Cached {
+		cacheStatus = "hit"
+	}
+	w.Header().Set("X-Sandrone-Cache", cacheStatus)
 	writeFileContent(w, result)
 }
 

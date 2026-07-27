@@ -66,6 +66,16 @@ func cloneFileResult(result *domain.FileResult) *domain.FileResult {
 	return &out
 }
 
+func cloneRenderResult(result *domain.RenderResult) *domain.RenderResult {
+	if result == nil {
+		return nil
+	}
+	out := *result
+	out.Body = append([]byte{}, result.Body...)
+	out.Report = cloneReport(result.Report)
+	return &out
+}
+
 func cloneFileDocument(doc domain.FileDocument) domain.FileDocument {
 	out := doc
 	out.Content = append([]byte{}, doc.Content...)

@@ -29,6 +29,8 @@ func TestServiceRuntimeSettingsDefaultsAndRoundTrip(t *testing.T) {
 	require.Equal(t, 10, defaults.ProbeDefaults.Concurrency)
 	require.Equal(t, 0, defaults.CacheDefaults.RemoteFetchTTLSeconds)
 	require.Equal(t, 60, defaults.CacheDefaults.SubscriptionTrafficTTLSeconds)
+	require.Equal(t, 0, defaults.CacheDefaults.SubscriptionRenderTTLSeconds)
+	require.Equal(t, 0, defaults.CacheDefaults.FileRenderTTLSeconds)
 
 	settings := domain.RuntimeSettings{
 		RemoteDefaults: domain.RemoteDefaults{
@@ -49,6 +51,8 @@ func TestServiceRuntimeSettingsDefaultsAndRoundTrip(t *testing.T) {
 		CacheDefaults: domain.CacheDefaults{
 			RemoteFetchTTLSeconds:         120,
 			SubscriptionTrafficTTLSeconds: 15,
+			SubscriptionRenderTTLSeconds:  300,
+			FileRenderTTLSeconds:          600,
 		},
 	}
 	require.NoError(t, svc.PutRuntimeSettings(ctx, settings))
@@ -102,6 +106,18 @@ func TestServiceRuntimeSettingsRejectsNegativeCacheDefaults(t *testing.T) {
 			name: "subscription traffic ttl",
 			settings: domain.RuntimeSettings{
 				CacheDefaults: domain.CacheDefaults{SubscriptionTrafficTTLSeconds: -1},
+			},
+		},
+		{
+			name: "subscription render ttl",
+			settings: domain.RuntimeSettings{
+				CacheDefaults: domain.CacheDefaults{SubscriptionRenderTTLSeconds: -1},
+			},
+		},
+		{
+			name: "file render ttl",
+			settings: domain.RuntimeSettings{
+				CacheDefaults: domain.CacheDefaults{FileRenderTTLSeconds: -1},
 			},
 		},
 	} {

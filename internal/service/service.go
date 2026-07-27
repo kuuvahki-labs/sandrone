@@ -21,6 +21,7 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/shared"
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/singbox"
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/uri"
+	cachepkg "github.com/kuuvahki-labs/sandrone/internal/cache"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/fetcher"
 	"github.com/kuuvahki-labs/sandrone/internal/probe"
@@ -74,6 +75,7 @@ type Service struct {
 	registry         *processor.Registry
 	typedFiles       *typedFileRegistry
 	prober           ProbeEngine
+	cache            cachepkg.Cache
 	store            store.Store
 	storeCoordinator store.Coordinator
 	metaStore        *store.MetaStore
@@ -108,6 +110,14 @@ func WithStore(resourceStore store.Store) Option {
 		s.store = coordinator
 		s.storeCoordinator = coordinator
 		s.metaStore = store.NewMetaStore(coordinator)
+	}
+}
+
+func WithCache(resultCache cachepkg.Cache) Option {
+	return func(s *Service) {
+		if resultCache != nil {
+			s.cache = resultCache
+		}
 	}
 }
 
@@ -196,6 +206,9 @@ func New(opts ...Option) *Service {
 	scriptproc.Register(registry, scriptproc.WithProbeRunner(s), scriptproc.WithResourceResolver(s), scriptproc.WithLoader(s.loadScriptSource))
 	for _, opt := range opts {
 		opt(s)
+	}
+	if s.cache == nil && s.store != nil {
+		s.cache = cachepkg.New(s.store, s.now)
 	}
 	return s
 }

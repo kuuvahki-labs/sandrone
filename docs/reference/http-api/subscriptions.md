@@ -35,6 +35,7 @@
 | `remote` | `remote` 的抓取描述；`remote.url` 必填，另可给出 `user_agent`、`proxy`、`timeout_ms`、`cache_ttl_seconds`。 |
 | `inputs` | `collection` 的有序输入列表；引用订阅时使用 `ref.kind: "subscription"` 与 `ref.name`。 |
 | `processors` | 按声明顺序执行的处理链；字段和失败语义见 [Processors 参考](../processors.md)。 |
+| `render_cache_ttl_seconds` | 可选非负整数；省略继承 runtime subscription-render 默认，显式 `0` 关闭，正数覆盖。 |
 | `meta` | 可选字符串键值元数据。 |
 | `created_at`、`updated_at` | 可选 RFC 3339 时间戳，随定义往返。 |
 
@@ -153,6 +154,7 @@ traffic 只适用于 `remote`；它不执行订阅的 nodes processors，不返�
 | --- | --- | --- |
 | `format` | string | 必填且非空；目标 renderer 格式。 |
 | `args` | object | 可选 string-to-string 参数，传给本次脚本/资源执行。 |
+| `refresh` | boolean | 可选；为 `true` 时跳过结果、remote-fetch 和 probe 缓存读取，并在成功后重新填充。 |
 
 查询参数 `arg.<key>=<value>` 也进入本次 args；body `args` 的同名键覆盖查询值。
 processor 和脚本参数的完整执行语义分别见
@@ -164,6 +166,7 @@ processor 和脚本参数的完整执行语义分别见
 {
   "content_type": "application/json",
   "body": "[\n  {\n    \"name\": \"example-node\",\n    \"type\": \"ss\",\n    \"server\": \"proxy.example.invalid\",\n    \"port\": 8388,\n    \"password\": \"example-password\",\n    \"cipher\": \"aes-128-gcm\"\n  }\n]",
+  "cached": false,
   "report": {
     "kind": "subscription_render",
     "status": "ok",
@@ -184,8 +187,9 @@ processor 和脚本参数的完整执行语义分别见
 ```
 
 `body` 是目标正文的 JSON string，`content_type` 描述正文格式；外层响应仍是
-JSON。`report` 返回本次完整 dependencies、source refs、warnings 与 render
-statistics，字段语义与敏感边界见[错误与诊断](../errors.md#report)。
+JSON。`cached` 表示是否直接命中 `subscription_render`；`report` 返回本次
+完整 dependencies、source refs、warnings 与 render statistics，字段语义与
+敏感边界见[错误与诊断](../errors.md#report)。
 
 名称或 format 无效、订阅不存在、输入无法读取、processor 或 renderer 失败时
 返回结构化 service error。render 可能抓取远程订阅、读缓存或执行 processor
@@ -212,7 +216,8 @@ curl -sS "$SANDRONE_URL/v1/subscriptions/example/render?arg.environment=test" \
   `meta` 中暴露真实订阅 URL、凭据或套餐标识。
 - preview 会返回处理前后的节点对象，其中可能含连接凭据；应把响应按敏感数据
   处理。
-- 保存或删除任一订阅会使 subscription-traffic 缓存失效。
+- 保存或删除任一订阅会使 subscription-traffic、subscription-render 和
+  file-render 缓存失效；文件和 runtime settings 变更也会失效相关结果缓存。
 - handler 级错误码、状态映射和 warning 字段见[错误与诊断参考](../errors.md)；
   router 与未知 action 的 plain-text `404`/`405` 边界见[通用约定](README.md#响应与失败)。
 

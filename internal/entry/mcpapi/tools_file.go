@@ -20,15 +20,16 @@ type validateFileOutput struct {
 }
 
 type fileSpecOutput struct {
-	Name        string                `json:"name"`
-	DisplayName string                `json:"display_name,omitempty"`
-	Kind        domain.FileKind       `json:"kind"`
-	Source      domain.FileSource     `json:"source"`
-	Config      *fileConfigOutput     `json:"config,omitempty"`
-	Processors  []processorSpecOutput `json:"processors,omitempty"`
-	CreatedAt   time.Time             `json:"created_at,omitempty"`
-	UpdatedAt   time.Time             `json:"updated_at,omitempty"`
-	Meta        map[string]string     `json:"meta,omitempty"`
+	Name                  string                `json:"name"`
+	DisplayName           string                `json:"display_name,omitempty"`
+	Kind                  domain.FileKind       `json:"kind"`
+	Source                domain.FileSource     `json:"source"`
+	Config                *fileConfigOutput     `json:"config,omitempty"`
+	Processors            []processorSpecOutput `json:"processors,omitempty"`
+	RenderCacheTTLSeconds *int                  `json:"render_cache_ttl_seconds,omitempty"`
+	CreatedAt             time.Time             `json:"created_at,omitempty"`
+	UpdatedAt             time.Time             `json:"updated_at,omitempty"`
+	Meta                  map[string]string     `json:"meta,omitempty"`
 }
 
 type fileConfigOutput struct {
@@ -109,14 +110,17 @@ func registerFileTools(server *mcp.Server, rt *app.Runtime) {
 			Name:    in.File,
 			Target:  in.Target,
 			Request: domain.RequestInfo{Args: in.Args},
+			Refresh: in.Refresh,
 		})
 		if err != nil {
 			return nil, renderOutput{}, err
 		}
+		cached := result.Cached
 		return nil, limitedRenderOutput(rt, renderOutput{
 			ContentType: result.ContentType,
 			Body:        string(result.Content),
 			Report:      result.Report,
+			Cached:      &cached,
 		}), nil
 	})
 
@@ -200,7 +204,8 @@ func filePartNodesOutput(nodes []domain.NodeIR) ([]map[string]any, error) {
 func newFileSpecOutput(spec domain.FileSpec) (fileSpecOutput, error) {
 	output := fileSpecOutput{
 		Name: spec.Name, DisplayName: spec.DisplayName, Kind: spec.Kind, Source: spec.Source,
-		CreatedAt: spec.CreatedAt, UpdatedAt: spec.UpdatedAt, Meta: spec.Meta,
+		RenderCacheTTLSeconds: spec.RenderCacheTTLSeconds,
+		CreatedAt:             spec.CreatedAt, UpdatedAt: spec.UpdatedAt, Meta: spec.Meta,
 	}
 	if spec.Config != nil {
 		config := &fileConfigOutput{Subscriptions: spec.Config.Subscriptions}

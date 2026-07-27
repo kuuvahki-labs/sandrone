@@ -1,5 +1,5 @@
-// Package cache provides store-backed JSON TTL cache primitives for internal
-// service acceleration.
+// Package cache provides backend-independent JSON TTL cache primitives for
+// internal service acceleration.
 package cache
 
 import (
@@ -16,21 +16,28 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/store"
 )
 
-type Cache struct {
+type Cache interface {
+	GetJSON(ctx context.Context, key string, out any) bool
+	PutJSON(ctx context.Context, key string, ttl time.Duration, value any) error
+	DeleteLayer(ctx context.Context, layer string) error
+}
+
+type storeCache struct {
 	store store.Store
 	now   func() time.Time
 }
 
 type envelope struct {
-	StoredAt time.Time       `json:"stored_at"`
-	Value    json.RawMessage `json:"value"`
+	StoredAt  time.Time       `json:"stored_at"`
+	ExpiresAt time.Time       `json:"expires_at"`
+	Value     json.RawMessage `json:"value"`
 }
 
-func New(st store.Store, now func() time.Time) *Cache {
+func New(st store.Store, now func() time.Time) Cache {
 	if now == nil {
 		now = time.Now
 	}
-	return &Cache{store: st, now: now}
+	return &storeCache{store: st, now: now}
 }
 
 func HashKey(layer string, identity any) (string, error) {
@@ -72,8 +79,8 @@ func LayerPrefix(layer string) (string, error) {
 // GetJSON loads a fresh cache entry into out. Cache access and decoding failures
 // intentionally degrade to a miss because cache availability must not affect
 // the underlying service operation.
-func (c *Cache) GetJSON(ctx context.Context, key string, ttl time.Duration, out any) bool {
-	if c == nil || c.store == nil || ttl <= 0 || strings.TrimSpace(key) == "" {
+func (c *storeCache) GetJSON(ctx context.Context, key string, out any) bool {
+	if c == nil || c.store == nil || strings.TrimSpace(key) == "" {
 		return false
 	}
 	key, err := store.CleanKey(key)
@@ -88,7 +95,8 @@ func (c *Cache) GetJSON(ctx context.Context, key string, ttl time.Duration, out 
 	if err := json.Unmarshal(body, &record); err != nil {
 		return false
 	}
-	if record.StoredAt.IsZero() || c.now().Sub(record.StoredAt) > ttl {
+	if record.StoredAt.IsZero() || record.ExpiresAt.IsZero() || !c.now().Before(record.ExpiresAt) {
+		_ = c.store.Delete(ctx, key)
 		return false
 	}
 	if err := json.Unmarshal(record.Value, out); err != nil {
@@ -97,8 +105,8 @@ func (c *Cache) GetJSON(ctx context.Context, key string, ttl time.Duration, out 
 	return true
 }
 
-func (c *Cache) PutJSON(ctx context.Context, key string, value any) error {
-	if c == nil || c.store == nil || strings.TrimSpace(key) == "" {
+func (c *storeCache) PutJSON(ctx context.Context, key string, ttl time.Duration, value any) error {
+	if c == nil || c.store == nil || ttl <= 0 || strings.TrimSpace(key) == "" {
 		return nil
 	}
 	key, err := store.CleanKey(key)
@@ -109,9 +117,11 @@ func (c *Cache) PutJSON(ctx context.Context, key string, value any) error {
 	if err != nil {
 		return err
 	}
+	storedAt := c.now().UTC()
 	body, err := json.MarshalIndent(envelope{
-		StoredAt: c.now().UTC(),
-		Value:    valueBody,
+		StoredAt:  storedAt,
+		ExpiresAt: storedAt.Add(ttl),
+		Value:     valueBody,
 	}, "", "  ")
 	if err != nil {
 		return err
@@ -120,7 +130,7 @@ func (c *Cache) PutJSON(ctx context.Context, key string, value any) error {
 	return c.store.Write(ctx, key, body)
 }
 
-func (c *Cache) DeleteLayer(ctx context.Context, layer string) error {
+func (c *storeCache) DeleteLayer(ctx context.Context, layer string) error {
 	if c == nil || c.store == nil {
 		return nil
 	}

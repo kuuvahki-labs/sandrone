@@ -33,7 +33,11 @@ func (s *RuntimeSettings) UnmarshalJSON(data []byte) error {
 }
 
 func (s RuntimeSettings) CacheDefaultsSpecified() bool {
-	return s.cacheDefaultsSet || s.CacheDefaults.RemoteFetchTTLSeconds != 0 || s.CacheDefaults.SubscriptionTrafficTTLSeconds != 0
+	return s.cacheDefaultsSet ||
+		s.CacheDefaults.RemoteFetchTTLSeconds != 0 ||
+		s.CacheDefaults.SubscriptionTrafficTTLSeconds != 0 ||
+		s.CacheDefaults.SubscriptionRenderTTLSeconds != 0 ||
+		s.CacheDefaults.FileRenderTTLSeconds != 0
 }
 
 type RemoteDefaults struct {
@@ -56,4 +60,6 @@ type ProbeDefaults struct {
 type CacheDefaults struct {
 	RemoteFetchTTLSeconds         int `json:"remote_fetch_ttl_seconds,omitempty" yaml:"remote_fetch_ttl_seconds,omitempty"`
 	SubscriptionTrafficTTLSeconds int `json:"subscription_traffic_ttl_seconds,omitempty" yaml:"subscription_traffic_ttl_seconds,omitempty"`
+	SubscriptionRenderTTLSeconds  int `json:"subscription_render_ttl_seconds,omitempty" yaml:"subscription_render_ttl_seconds,omitempty"`
+	FileRenderTTLSeconds          int `json:"file_render_ttl_seconds,omitempty" yaml:"file_render_ttl_seconds,omitempty"`
 }

@@ -34,10 +34,11 @@ func convertInputSchema() *jsonschema.Schema {
 
 func getFileInputSchema() *jsonschema.Schema {
 	return closedObject(map[string]*jsonschema.Schema{
-		"file":   stringSchema(),
-		"mode":   defaultedSchema(enumSchema("spec", "source", "render"), "render"),
-		"target": stringSchema(),
-		"args":   stringMapSchema(),
+		"file":    stringSchema(),
+		"mode":    defaultedSchema(enumSchema("spec", "source", "render"), "render"),
+		"target":  stringSchema(),
+		"args":    stringMapSchema(),
+		"refresh": {Type: "boolean"},
 	}, []string{"file"})
 }
 
@@ -50,9 +51,10 @@ func subscriptionPreviewInputSchema() *jsonschema.Schema {
 
 func subscriptionRenderInputSchema() *jsonschema.Schema {
 	return closedObject(map[string]*jsonschema.Schema{
-		"name":   stringSchema(),
-		"format": renderFormatSchema(),
-		"args":   stringMapSchema(),
+		"name":    stringSchema(),
+		"format":  renderFormatSchema(),
+		"args":    stringMapSchema(),
+		"refresh": {Type: "boolean"},
 	}, []string{"name", "format"})
 }
 

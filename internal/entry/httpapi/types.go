@@ -14,14 +14,16 @@ type convertRequest struct {
 }
 
 type subscriptionRenderRequest struct {
-	Format string            `json:"format"`
-	Args   map[string]string `json:"args,omitempty"`
+	Format  string            `json:"format"`
+	Args    map[string]string `json:"args,omitempty"`
+	Refresh bool              `json:"refresh,omitempty"`
 }
 
 type agentRenderResponse struct {
 	ContentType string        `json:"content_type,omitempty"`
 	Body        string        `json:"body"`
 	Report      domain.Report `json:"report"`
+	Cached      bool          `json:"cached"`
 }
 
 type validateRequest struct {
@@ -47,6 +49,7 @@ type renderResponse struct {
 	Body        string              `json:"body,omitempty"`
 	Response    domain.ResponseInfo `json:"response,omitempty"`
 	Warnings    []domain.Warning    `json:"warnings"`
+	Cached      bool                `json:"cached"`
 }
 
 type sourceResponse struct {

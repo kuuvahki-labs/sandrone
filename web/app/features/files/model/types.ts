@@ -59,6 +59,7 @@ export interface FileDetail {
   processors: ProcessorDetail[];
   createdAt?: string;
   updatedAt?: string;
+  renderCacheTTLSeconds?: number;
   meta?: Record<string, string>;
   rawSpec: Record<string, unknown>;
 }

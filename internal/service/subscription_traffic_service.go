@@ -28,7 +28,7 @@ func (s *Service) SubscriptionTraffic(ctx context.Context, req domain.Subscripti
 		}
 	}
 	if req.Refresh {
-		ctx = withRemoteFetchCacheBypass(ctx)
+		ctx = withCacheReadBypass(ctx)
 	}
 
 	sub, err := s.metaStore.GetSubscription(ctx, name)
@@ -73,12 +73,12 @@ func (s *Service) readSubscriptionTrafficCache(ctx context.Context, name string,
 	if err != nil {
 		return nil
 	}
-	c := s.cache()
+	c := s.cache
 	if c == nil {
 		return nil
 	}
 	var result domain.SubscriptionTrafficResult
-	if !c.GetJSON(ctx, key, time.Duration(ttlSeconds)*time.Second, &result) {
+	if !c.GetJSON(ctx, key, &result) {
 		return nil
 	}
 	return cloneSubscriptionTrafficValue(result)
@@ -92,15 +92,15 @@ func (s *Service) writeSubscriptionTrafficCache(ctx context.Context, name string
 	if err != nil {
 		return
 	}
-	c := s.cache()
+	c := s.cache
 	if c == nil {
 		return
 	}
-	_ = c.PutJSON(ctx, key, cloneSubscriptionTrafficResult(result))
+	_ = c.PutJSON(ctx, key, time.Duration(ttlSeconds)*time.Second, cloneSubscriptionTrafficResult(result))
 }
 
 func (s *Service) invalidateSubscriptionTrafficCache(ctx context.Context) {
-	c := s.cache()
+	c := s.cache
 	if c == nil {
 		return
 	}

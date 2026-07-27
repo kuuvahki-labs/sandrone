@@ -63,6 +63,23 @@ describe("subscription actions", () => {
     }));
   });
 
+  it("submits remote-fetch and tri-state render cache settings", async () => {
+    const { client, createSubscription } = setupActions();
+    const form = new FormData();
+    form.set("subscription_type", "remote");
+    form.set("source_input", "https://www.example.com/sub");
+    form.set("cache_ttl_seconds", "45");
+    form.set("render_cache_mode", "disabled");
+    form.set("processors", "[]");
+
+    await createSubscription(form);
+
+    expect(client.createSubscription).toHaveBeenCalledWith(expect.objectContaining({
+      render_cache_ttl_seconds: 0,
+      remote: expect.objectContaining({ cache_ttl_seconds: 45 }),
+    }));
+  });
+
   it("creates subscriptions with frontend-owned created and updated timestamps", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-27T01:02:03.000Z"));

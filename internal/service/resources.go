@@ -28,6 +28,7 @@ func (s *Service) PutSubscription(ctx context.Context, sub domain.Subscription) 
 		return err
 	}
 	s.invalidateSubscriptionTrafficCache(ctx)
+	s.invalidateResultCaches(ctx)
 	s.logResource(ctx, "put", "subscription", normalized.Name)
 	return nil
 }
@@ -42,6 +43,7 @@ func (s *Service) PutFile(ctx context.Context, file domain.FileSpec) error {
 	if err := s.metaStore.PutFile(ctx, file); err != nil {
 		return err
 	}
+	s.invalidateResultCaches(ctx)
 	s.logResource(ctx, "put", "file", file.Name)
 	return nil
 }
@@ -54,6 +56,7 @@ func (s *Service) DeleteSubscription(ctx context.Context, name string) error {
 		return err
 	}
 	s.invalidateSubscriptionTrafficCache(ctx)
+	s.invalidateResultCaches(ctx)
 	s.logResource(ctx, "delete", "subscription", name)
 	return nil
 }
@@ -65,6 +68,7 @@ func (s *Service) DeleteFile(ctx context.Context, name string) error {
 	if err := s.metaStore.DeleteFile(ctx, name); err != nil {
 		return err
 	}
+	s.invalidateResultCaches(ctx)
 	s.logResource(ctx, "delete", "file", name)
 	return nil
 }

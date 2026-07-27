@@ -160,3 +160,26 @@ func TestServiceStoreUnavailableErrors(t *testing.T) {
 	require.Error(t, svc.PutSubscription(context.Background(), domain.Subscription{Name: "sub", Type: domain.SubscriptionTypeLocal}))
 	require.Error(t, svc.PutFile(context.Background(), domain.FileSpec{Name: "file", Kind: domain.FileKindStatic}))
 }
+
+func TestServiceRejectsNegativeResourceRenderCacheTTL(t *testing.T) {
+	ctx := context.Background()
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	negative := -1
+
+	err := svc.PutSubscription(ctx, domain.Subscription{
+		Name:                  "sub",
+		Type:                  domain.SubscriptionTypeLocal,
+		RenderCacheTTLSeconds: &negative,
+	})
+	require.Error(t, err)
+	require.True(t, domain.IsCode(err, domain.CodeInvalidArgument), "got %v", err)
+
+	err = svc.PutFile(ctx, domain.FileSpec{
+		Name:                  "file",
+		Kind:                  domain.FileKindStatic,
+		Source:                domain.FileSource{Type: "inline", Content: "body"},
+		RenderCacheTTLSeconds: &negative,
+	})
+	require.Error(t, err)
+	require.True(t, domain.IsCode(err, domain.CodeInvalidArgument), "got %v", err)
+}

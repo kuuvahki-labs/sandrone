@@ -83,6 +83,32 @@ func TestSubscriptionRenderReturnsContentReportAndReceivesArgs(t *testing.T) {
 	require.NotContains(t, string(body), `"resource_uri":`)
 }
 
+func TestSubscriptionRenderSupportsRefreshAndReturnsCacheStatus(t *testing.T) {
+	ctx := context.Background()
+	rt := testRuntime(t, app.Config{})
+	ttl := 60
+	require.NoError(t, rt.Service.PutSubscription(ctx, domain.Subscription{
+		Name: "cached", Type: domain.SubscriptionTypeLocal, Format: "uri-list",
+		Content:               "ss://aes-128-gcm:secret@example.com:8388#node-a",
+		RenderCacheTTLSeconds: &ttl,
+	}))
+	session := connect(t, ctx, mcpapi.SDKServer(rt))
+	defer session.Close()
+
+	render := func(refresh bool) bool {
+		t.Helper()
+		result := callToolSuccess(t, ctx, session, "sandrone_render_subscription", map[string]any{
+			"name": "cached", "format": "uri-list", "refresh": refresh,
+		})
+		cached, _ := result["cached"].(bool)
+		return cached
+	}
+	require.False(t, render(false))
+	require.True(t, render(false))
+	require.False(t, render(true))
+	require.True(t, render(false))
+}
+
 func TestSubscriptionTrafficReturnsRemoteServiceResult(t *testing.T) {
 	encoded := base64.StdEncoding.EncodeToString(
 		[]byte("ss://aes-128-gcm:secret@example.com:8388#remote-node"),

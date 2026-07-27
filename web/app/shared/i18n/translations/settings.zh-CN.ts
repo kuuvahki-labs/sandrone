@@ -41,6 +41,8 @@ export const settingsZhCN = {
   "settings.runtime.remoteTimeoutMs": "超时（毫秒）",
   "settings.runtime.remoteUserAgent": "User-Agent",
   "settings.runtime.subscriptionTrafficCacheTTLSeconds": "订阅流量缓存（秒）",
+  "settings.runtime.subscriptionRenderCacheTTLSeconds": "订阅渲染缓存（秒）",
+  "settings.runtime.fileRenderCacheTTLSeconds": "文件渲染缓存（秒）",
   "settings.runtime.save": "保存运行默认值",
   "settings.runtime.title": "运行默认值",
   "settings.signOut.action": "退出登录",

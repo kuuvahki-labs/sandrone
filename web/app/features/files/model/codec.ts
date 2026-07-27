@@ -70,6 +70,7 @@ export function fileDetailFromAPI(value: unknown): FileDetail {
     source: fileSourceFromAPI(item.source),
     config: fileConfigFromAPI(item.config),
     processors,
+    renderCacheTTLSeconds: optionalNumberField(item.render_cache_ttl_seconds),
     meta: Object.keys(meta).length ? meta : undefined,
     rawSpec: { ...item },
   };

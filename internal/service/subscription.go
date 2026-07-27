@@ -32,6 +32,9 @@ func newSubscriptionResolveState() *subscriptionResolveState {
 }
 
 func normalizeSubscription(sub domain.Subscription) (domain.Subscription, error) {
+	if sub.RenderCacheTTLSeconds != nil && *sub.RenderCacheTTLSeconds < 0 {
+		return domain.Subscription{}, domain.NewError(domain.CodeInvalidArgument, "subscription render_cache_ttl_seconds must be non-negative")
+	}
 	sub.Type = domain.SubscriptionType(strings.ToLower(strings.TrimSpace(string(sub.Type))))
 	switch sub.Type {
 	case domain.SubscriptionTypeRemote:
@@ -279,9 +282,21 @@ func (s *Service) collectionSubscriptionBaseNodes(ctx context.Context, sub domai
 }
 
 func (s *Service) RenderSubscription(ctx context.Context, name string, format string, req domain.RequestInfo) (*domain.RenderResult, error) {
+	return s.RenderSubscriptionRequest(ctx, domain.SubscriptionRenderRequest{
+		Name: name, Format: format, Request: req,
+	})
+}
+
+func (s *Service) RenderSubscriptionRequest(ctx context.Context, request domain.SubscriptionRenderRequest) (*domain.RenderResult, error) {
 	if s.metaStore == nil {
 		return nil, storeUnavailable()
 	}
+	if request.Refresh {
+		ctx = withCacheReadBypass(ctx)
+	}
+	name := request.Name
+	format := request.Format
+	req := request.Request
 	format = strings.TrimSpace(format)
 	if format == "" {
 		format = "uri-list"
@@ -290,6 +305,22 @@ func (s *Service) RenderSubscription(ctx context.Context, name string, format st
 	sub, err := s.metaStore.GetSubscription(ctx, name)
 	if err != nil {
 		return nil, err
+	}
+	ttlSeconds, err := s.subscriptionRenderTTLSeconds(ctx, sub.RenderCacheTTLSeconds)
+	if err != nil {
+		return nil, err
+	}
+	cacheKey := ""
+	if ttlSeconds > 0 {
+		cacheKey, err = subscriptionRenderCacheKey(sub, format, req)
+		if err != nil {
+			return nil, err
+		}
+		if !request.Refresh {
+			if cached := s.readSubscriptionRenderCache(ctx, cacheKey); cached != nil {
+				return cached, nil
+			}
+		}
 	}
 	nodeSet, err := s.materializeSubscription(ctx, sub, domain.FileRequest{
 		Name:    name,
@@ -315,6 +346,8 @@ func (s *Service) RenderSubscription(ctx context.Context, name string, format st
 	report.Warnings = append(append([]domain.Warning{}, nodeSet.Warnings...), report.Warnings...)
 	report = s.prepareReport("subscription_render", report)
 	rendered.Report = report
+	rendered.Cached = false
+	s.writeSubscriptionRenderCache(ctx, cacheKey, ttlSeconds, rendered)
 	return rendered, nil
 }
 

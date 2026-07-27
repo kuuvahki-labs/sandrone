@@ -74,6 +74,33 @@ func TestEngineGetFile(t *testing.T) {
 	require.Contains(t, string(result.File.Content), "key: value")
 }
 
+func TestEngineRenderSubscriptionExposesResultCacheControls(t *testing.T) {
+	ctx := context.Background()
+	engine := sandrone.NewWithFS(afero.NewMemMapFs())
+	ttl := 60
+	require.NoError(t, engine.PutSubscription(ctx, sandrone.Subscription{
+		Name: "cached", Type: sandrone.SubscriptionTypeLocal, Format: "uri-list",
+		Content:               "ss://aes-128-gcm:secret@example.com:8388#node-a",
+		RenderCacheTTLSeconds: &ttl,
+	}))
+
+	first, err := engine.RenderSubscription(ctx, sandrone.SubscriptionRenderRequest{
+		Name: "cached", Format: "uri-list",
+	})
+	require.NoError(t, err)
+	require.False(t, first.Cached)
+	second, err := engine.RenderSubscription(ctx, sandrone.SubscriptionRenderRequest{
+		Name: "cached", Format: "uri-list",
+	})
+	require.NoError(t, err)
+	require.True(t, second.Cached)
+	refreshed, err := engine.RenderSubscription(ctx, sandrone.SubscriptionRenderRequest{
+		Name: "cached", Format: "uri-list", Refresh: true,
+	})
+	require.NoError(t, err)
+	require.False(t, refreshed.Cached)
+}
+
 func TestEngineTypedFileConfigRoundTrip(t *testing.T) {
 	ctx := context.Background()
 	engine := sandrone.NewWithFS(afero.NewMemMapFs())

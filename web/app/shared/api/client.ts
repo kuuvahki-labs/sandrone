@@ -46,6 +46,7 @@ export interface SubscriptionInput {
     ref: { kind: "subscription"; name: string };
   }>;
   processors?: Array<Record<string, unknown>>;
+  render_cache_ttl_seconds?: number;
   meta?: Record<string, string>;
 }
 
@@ -60,6 +61,7 @@ export interface FileSpecInput {
   source: Record<string, unknown>;
   config?: Record<string, unknown>;
   processors?: Array<Record<string, unknown>>;
+  render_cache_ttl_seconds?: number;
   created_at?: string;
   updated_at?: string;
   meta?: Record<string, string>;
@@ -84,6 +86,8 @@ export interface RuntimeSettingsInput {
   cache_defaults: {
     remote_fetch_ttl_seconds?: number;
     subscription_traffic_ttl_seconds?: number;
+    subscription_render_ttl_seconds?: number;
+    file_render_ttl_seconds?: number;
   };
 }
 

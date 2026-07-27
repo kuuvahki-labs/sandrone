@@ -39,7 +39,7 @@ Sandrone 有三类产物和一类运行时观测：
 | `internal/inidoc` | 保留格式的 INI 文档与 override 运算 |
 | `internal/processor` | nodes/file 两阶段 registry、顺序执行和内建处理器 |
 | `internal/probe` | 探测后端 registry、TCP 后端和可选核心后端 |
-| `internal/fetcher`、`internal/cache` | 受控远程输入与基于 Store 的内部 TTL 缓存 |
+| `internal/fetcher`、`internal/cache` | 受控远程输入与独立的非权威 TTL Cache 边界；当前提供 Store-backed 实现 |
 | `internal/store` | Store、MetaStore、Coordinator 和文件系统实现 |
 
 `internal/service` 是业务编排边界，不是通用工具包。跨 adapter、processor、probe、fetcher 和 store 的业务顺序只在这一层出现。

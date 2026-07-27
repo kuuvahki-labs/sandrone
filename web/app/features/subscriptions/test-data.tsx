@@ -38,7 +38,9 @@ export const remoteSubscriptionDefinition: SubscriptionDefinition = {
     user_agent: "Sandrone Test",
     proxy: "http://127.0.0.1:7890",
     timeout_ms: 10000,
+    cache_ttl_seconds: 45,
   },
+  renderCacheTTLSeconds: 0,
   processors: [
     {
       name: "入口重命名",

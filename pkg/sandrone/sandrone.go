@@ -31,6 +31,7 @@ type (
 	SubscriptionPreviewNodeDiff = domain.SubscriptionPreviewNodeDiff
 	SubscriptionTrafficRequest  = domain.SubscriptionTrafficRequest
 	SubscriptionTrafficResult   = domain.SubscriptionTrafficResult
+	SubscriptionRenderRequest   = domain.SubscriptionRenderRequest
 	ResourceRef                 = domain.ResourceRef
 	Report                      = domain.Report
 	RenderReport                = domain.RenderReport
@@ -223,6 +224,10 @@ func (e *Engine) PreviewSubscription(ctx context.Context, name string) (*Subscri
 
 func (e *Engine) SubscriptionTraffic(ctx context.Context, req SubscriptionTrafficRequest) (*SubscriptionTrafficResult, error) {
 	return e.service.SubscriptionTraffic(ctx, req)
+}
+
+func (e *Engine) RenderSubscription(ctx context.Context, req SubscriptionRenderRequest) (*RenderResult, error) {
+	return e.service.RenderSubscriptionRequest(ctx, req)
 }
 
 func (e *Engine) PutFile(ctx context.Context, file FileSpec) error {

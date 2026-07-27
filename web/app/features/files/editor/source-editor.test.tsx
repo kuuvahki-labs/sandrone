@@ -16,6 +16,7 @@ describe("FileSourceEditor", () => {
             user_agent: "Sandrone Tests",
             proxy: "http://127.0.0.1:7890",
             timeout_ms: 2500,
+            cache_ttl_seconds: 45,
           },
         }}
       />,
@@ -28,6 +29,7 @@ describe("FileSourceEditor", () => {
         user_agent: "Sandrone Tests",
         proxy: "http://127.0.0.1:7890",
         timeout_ms: 2500,
+        cache_ttl_seconds: 45,
       },
     });
 

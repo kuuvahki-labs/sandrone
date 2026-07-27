@@ -12,6 +12,11 @@ source -> parse -> normalize -> process(nodes) -> render -> serve
 
 `serve` 表示调用方或入口交付本次结果，不表示生成内容会被持久化。完整 Mihomo、sing-box 或 Shadowrocket 配置属于[文件管线](file-pipeline.md)，不是节点 renderer 的输出职责。
 
+已保存 Subscription 的最终 render 可以按资源三态 TTL 使用
+`subscription_render` 内部结果缓存；它仍是可重建加速数据，不会改写
+Subscription 或形成可列举产物。直接 render/convert 与 preview 不使用该层。
+完整缓存层、key、刷新和失效契约见[存储架构](storage.md#cache)。
+
 ## 1. Source：解析输入来源
 
 节点来源可以由请求正文、`NodeInput` 或保存的 `Subscription` 声明。service 负责把来源解析成内容或直接的节点集合：

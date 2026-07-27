@@ -184,19 +184,19 @@ func (s *Service) renderProbePayloads(ctx context.Context, req *domain.ProbeRequ
 }
 
 func (s *Service) readProbeCache(ctx context.Context, req domain.ProbeRequest, nodes []domain.NodeIR) *domain.ProbeResult {
-	if req.CacheTTLSeconds <= 0 || s.store == nil {
+	if req.CacheTTLSeconds <= 0 || s.cache == nil || cacheReadBypass(ctx) {
 		return nil
 	}
 	key, err := probeCacheKey(req, nodes)
 	if err != nil {
 		return nil
 	}
-	c := s.cache()
+	c := s.cache
 	if c == nil {
 		return nil
 	}
 	var cached domain.ProbeResult
-	if !c.GetJSON(ctx, key, time.Duration(req.CacheTTLSeconds)*time.Second, &cached) {
+	if !c.GetJSON(ctx, key, &cached) {
 		return nil
 	}
 	result := cloneProbeResult(cached)
@@ -218,18 +218,18 @@ func (s *Service) readProbeCache(ctx context.Context, req domain.ProbeRequest, n
 }
 
 func (s *Service) writeProbeCache(ctx context.Context, req domain.ProbeRequest, nodes []domain.NodeIR, result *domain.ProbeResult) error {
-	if req.CacheTTLSeconds <= 0 || s.store == nil || result == nil {
+	if req.CacheTTLSeconds <= 0 || s.cache == nil || result == nil {
 		return nil
 	}
 	key, err := probeCacheKey(req, nodes)
 	if err != nil {
 		return err
 	}
-	c := s.cache()
+	c := s.cache
 	if c == nil {
 		return nil
 	}
-	return c.PutJSON(ctx, key, *result)
+	return c.PutJSON(ctx, key, time.Duration(req.CacheTTLSeconds)*time.Second, *result)
 }
 
 func probeCacheKey(req domain.ProbeRequest, nodes []domain.NodeIR) (string, error) {

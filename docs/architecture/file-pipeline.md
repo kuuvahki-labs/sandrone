@@ -55,6 +55,21 @@ source 读取不会让 processor 获得任意宿主路径；remote 内容受 fet
 
 Store key 布局和持久化一致性见[存储架构](storage.md)。
 
+## 最终结果缓存
+
+只有通过名称读取的已保存 FileSpec 可以使用 `file_render` 结果缓存。顶层
+`render_cache_ttl_seconds` 省略时继承 runtime 的
+`cache_defaults.file_render_ttl_seconds`，显式 `0` 关闭，正数覆盖；默认全局值
+为 `0`。key 区分完整定义、构建身份、target、请求 args 与 metadata，因此不同
+执行输入不会共用结果。
+
+命中时返回完整 `FileResult` 并标记 `cached: true`。`refresh=true` 跳过最终
+结果以及本次内部 remote-fetch/probe 读取，成功后重新填充；`ValidateFile`
+始终重新执行文件管线，不使用旧的最终结果。inline spec 和超过 16 MiB 的正文
+不写入该层。变更任一 file、subscription 或 runtime settings 会广泛清空相关
+结果层，以覆盖 typed config、脚本和间接引用。缓存 key、失效和后端边界的
+canonical 说明见[存储架构](storage.md#cache)。
+
 ## Static 路径
 
 static 文件适合原样交付或在文件阶段做有限改写。service 的职责依次是：
@@ -152,7 +167,9 @@ typed `config.subscriptions` 是声明式依赖；脚本读取是动态依赖。
 
 文件生成按请求在内存中构造下一份 `FileDocument`。driver compile 或任一 processor 失败时，`GetFile` 和 `ValidateFile` 返回错误，不发布部分 `FileResult`，也不把已经执行的中间正文作为成功响应。
 
-生成的正文和 report 本来就不持久化，因此失败不会覆盖已保存的 `FileSpec` 或 source。远程读取等辅助缓存仍遵守各自缓存策略，不属于生成产物的提交。
+生成的正文和 report 不是权威资源；启用结果缓存时只会在完整成功后写入可重建
+cache，因此失败不会覆盖已保存的 `FileSpec` 或 source。远程读取等辅助缓存仍
+遵守各自缓存策略，不属于生成产物的提交。
 
 这是“单次生成结果只在完整成功后发布”的边界，不是 Store 事务承诺：
 

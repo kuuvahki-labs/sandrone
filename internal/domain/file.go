@@ -11,15 +11,16 @@ import (
 )
 
 type FileSpec struct {
-	Name        string            `json:"name" yaml:"name"`
-	DisplayName string            `json:"display_name,omitempty" yaml:"display_name,omitempty"`
-	Kind        FileKind          `json:"kind" yaml:"kind"`
-	Source      FileSource        `json:"source" yaml:"source"`
-	Config      *FileConfig       `json:"config,omitempty" yaml:"config,omitempty"`
-	Processors  []ProcessorSpec   `json:"processors,omitempty" yaml:"processors,omitempty"`
-	CreatedAt   time.Time         `json:"created_at,omitempty" yaml:"created_at,omitempty"`
-	UpdatedAt   time.Time         `json:"updated_at,omitempty" yaml:"updated_at,omitempty"`
-	Meta        map[string]string `json:"meta,omitempty" yaml:"meta,omitempty"`
+	Name                  string            `json:"name" yaml:"name"`
+	DisplayName           string            `json:"display_name,omitempty" yaml:"display_name,omitempty"`
+	Kind                  FileKind          `json:"kind" yaml:"kind"`
+	Source                FileSource        `json:"source" yaml:"source"`
+	Config                *FileConfig       `json:"config,omitempty" yaml:"config,omitempty"`
+	Processors            []ProcessorSpec   `json:"processors,omitempty" yaml:"processors,omitempty"`
+	RenderCacheTTLSeconds *int              `json:"render_cache_ttl_seconds,omitempty" yaml:"render_cache_ttl_seconds,omitempty"`
+	CreatedAt             time.Time         `json:"created_at,omitempty" yaml:"created_at,omitempty"`
+	UpdatedAt             time.Time         `json:"updated_at,omitempty" yaml:"updated_at,omitempty"`
+	Meta                  map[string]string `json:"meta,omitempty" yaml:"meta,omitempty"`
 }
 
 type FileKind string

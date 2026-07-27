@@ -87,12 +87,12 @@ func (s *Server) subscriptionAction(w http.ResponseWriter, r *http.Request) {
 			writeError(w, domain.NewError(domain.CodeInvalidArgument, "subscription render format is required"), http.StatusBadRequest)
 			return
 		}
-		result, err := s.rt.Service.RenderSubscription(
-			r.Context(),
-			name,
-			req.Format,
-			domain.RequestInfo{Args: requestArgs(r, req.Args)},
-		)
+		result, err := s.rt.Service.RenderSubscriptionRequest(r.Context(), domain.SubscriptionRenderRequest{
+			Name:    name,
+			Format:  req.Format,
+			Request: domain.RequestInfo{Args: requestArgs(r, req.Args)},
+			Refresh: req.Refresh,
+		})
 		writeAgentRenderResult(w, result, err)
 		return
 	default:

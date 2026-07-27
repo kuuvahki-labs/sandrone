@@ -3,6 +3,7 @@ import type { NavigateFunction } from "react-router";
 import type { SubscriptionDefinition, SubscriptionItem } from "~/features/subscriptions/model/types";
 import type { ApiClient, SubscriptionInput } from "~/shared/api/client";
 import { defaultTranslator, type Translator } from "~/shared/i18n/context";
+import { renderCacheTTLFromForm } from "~/shared/resources/render-cache-policy";
 import { sourceNameFromUrl, subscriptionEditPath } from "~/shared/routing/paths";
 
 type SubscriptionNotice = (
@@ -98,6 +99,10 @@ function subscriptionInputFromForm(
     return null;
   }
   const description = String(form.get("description") ?? "").trim();
+  const renderCacheTTLSeconds = renderCacheTTLFromForm(form);
+  const renderCachePolicy = renderCacheTTLSeconds === undefined
+    ? {}
+    : { render_cache_ttl_seconds: renderCacheTTLSeconds };
   if (description) {
     meta.description = description;
   }
@@ -116,6 +121,7 @@ function subscriptionInputFromForm(
       type,
       format,
       ...timestamps,
+      ...renderCachePolicy,
       remote,
       processors: processors.length ? processors : undefined,
       meta,
@@ -135,6 +141,7 @@ function subscriptionInputFromForm(
       format,
       content,
       ...timestamps,
+      ...renderCachePolicy,
       processors: processors.length ? processors : undefined,
       meta,
     };
@@ -150,6 +157,7 @@ function subscriptionInputFromForm(
     display_name: displayName || undefined,
     type,
     ...timestamps,
+    ...renderCachePolicy,
     inputs: refs.map((ref) => ({ name: ref, type: "subscription", ref: { kind: "subscription", name: ref } })),
     processors: processors.length ? processors : undefined,
     meta,
@@ -205,11 +213,13 @@ function sourceRemoteFromInput(form: FormData, sourceInput: string) {
     return undefined;
   }
   const timeout = optionalNumber(String(form.get("timeout_ms") ?? "").trim());
+  const cacheTTLSeconds = optionalNumber(String(form.get("cache_ttl_seconds") ?? "").trim());
   return {
     url: sourceInput,
     user_agent: optionalString(form, "user_agent"),
     proxy: optionalString(form, "proxy"),
     timeout_ms: timeout,
+    ...(cacheTTLSeconds === undefined ? {} : { cache_ttl_seconds: cacheTTLSeconds }),
   };
 }
 

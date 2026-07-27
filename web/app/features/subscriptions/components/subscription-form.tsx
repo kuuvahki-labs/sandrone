@@ -19,6 +19,7 @@ import { useI18n } from "~/shared/i18n/context";
 import type { ResourceOption } from "~/shared/resources/types";
 import type { SubscriptionCreateType } from "~/shared/routing/paths";
 import { HighlightedTextarea } from "~/shared/ui/code-editor";
+import { RenderCachePolicyField } from "~/shared/ui/render-cache-policy-field";
 
 import { ProcessorBuilder } from "./processor-builder";
 import { SourceMultiSelect } from "./source-multi-select";
@@ -114,6 +115,7 @@ export function SubscriptionFormFields({ definition, item, mode, onCopySource, o
               <TextField fullWidth defaultValue={remote?.user_agent ?? ""} label="User-Agent" name="user_agent" />
               <TextField fullWidth defaultValue={remote?.proxy ?? ""} label={t("subscriptions.form.proxy")} name="proxy" placeholder="http://127.0.0.1:7890" />
               <TextField fullWidth defaultValue={remote?.timeout_ms ?? ""} label={t("subscriptions.form.timeoutMs")} name="timeout_ms" type="number" />
+              <TextField fullWidth defaultValue={remote?.cache_ttl_seconds ?? ""} label={t("cache.remoteFetchTTLSeconds")} name="cache_ttl_seconds" type="number" />
               {mode === "edit" ? <input name="meta" type="hidden" defaultValue={formatJSONForForm(meta)} /> : null}
             </>
           ) : null}
@@ -153,6 +155,7 @@ export function SubscriptionFormFields({ definition, item, mode, onCopySource, o
               <SourceMultiSelect defaultValue={collectionDefaultValue} excludeName={collectionName} subscriptions={sources} />
             </div>
           ) : null}
+          <RenderCachePolicyField defaultValue={definition?.renderCacheTTLSeconds} />
         </div>
       </Paper>
       <Paper className="m-0 min-w-0 p-4" component="fieldset" variant="outlined">

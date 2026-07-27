@@ -77,9 +77,9 @@ schema 为准；未知字段会被拒绝。与 Go/持久化表示不同，MCP wi
 | `sandrone_convert` | `to_format`，以及 inline `content` + `from_format` 或受控 `remote`；可带 parse/render processors、render options 和 metadata。 | `content_type`、可选 `body` 与 `report`。 |
 | `sandrone_probe_nodes` | 一个 `NodeInput`，以及 method、core、目标、timeout、attempts、concurrency 和 cache TTL 等探测参数。method 为 `tcp_connect`、`udp_ntp` 或 `url_test`。 | 节点级 `results` 与汇总 `report`。 |
 | `sandrone_preview_subscription` | 已保存的 subscription `name` 与可选字符串 `args`。 | processor 前后的节点、数量与 `report`。 |
-| `sandrone_render_subscription` | 已保存的 subscription `name`、目标 `format` 与可选字符串 `args`。 | `content_type`、可选 `body` 与 `report`。 |
+| `sandrone_render_subscription` | 已保存的 subscription `name`、目标 `format`、可选字符串 `args` 与 `refresh`。 | `content_type`、可选 `body`、`cached` 与 `report`。 |
 | `sandrone_get_subscription_traffic` | 已保存的 remote subscription `name`；可用 `refresh` 强制刷新。 | 流量 metadata 与 `report`。 |
-| `sandrone_get_file` | 已保存的 `file` 名称、可选 `target`/字符串 `args`；`mode` 为 `render`、`source` 或 `spec`，省略时默认 `render`。 | render 返回正文与 report；source 返回 `FileDocument`；spec 返回完整定义与 `resource_uri`。 |
+| `sandrone_get_file` | 已保存的 `file` 名称、可选 `target`/字符串 `args`/`refresh`；`mode` 为 `render`、`source` 或 `spec`，省略时默认 `render`。 | render 返回正文、`cached` 与 report；source 返回 `FileDocument`；spec 返回完整定义与 `resource_uri`。 |
 | `sandrone_validate_file` | 已保存的 `file` 名称或 inline `spec`，以及可选 `target`/字符串 `args`。 | `ok` 与完整 `report`，不发布最终文件正文。 |
 
 `sandrone_convert` 的格式与有损边界见[格式与能力参考](capabilities.md)；

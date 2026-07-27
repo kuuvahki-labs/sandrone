@@ -4,6 +4,7 @@ import { fileDriver } from "~/features/files/drivers/registry";
 import type { FileDetail, FileItem } from "~/features/files/model/types";
 import type { ApiClient, FileSpecInput } from "~/shared/api/client";
 import { defaultTranslator, type Translator } from "~/shared/i18n/context";
+import { renderCacheTTLFromForm } from "~/shared/resources/render-cache-policy";
 import { fileEditPath } from "~/shared/routing/paths";
 
 type FileNotice = (message: string, severity?: "success" | "error" | "warning") => void;
@@ -31,6 +32,7 @@ export function createFileActions({
     const description = String(form.get("description") ?? "").trim();
     const timestamps = fileTimestamps(undefined);
     const config = parseOptionalObjectField(form, "config");
+    const renderCacheTTLSeconds = renderCacheTTLFromForm(form);
     assertSingleSubscription(config);
     await client.createFile({
       name,
@@ -40,6 +42,7 @@ export function createFileActions({
       source: parseObjectField(form, "source", { type: "inline", content: "" }),
       config,
       processors: parseArrayField(form, "processors"),
+      ...(renderCacheTTLSeconds === undefined ? {} : { render_cache_ttl_seconds: renderCacheTTLSeconds }),
       meta: {
         ...(description ? { description } : {}),
         ui: "web",
@@ -60,6 +63,7 @@ export function createFileActions({
     const description = String(form.get("description") ?? "").trim();
     const timestamps = fileTimestamps(detail);
     const config = parseOptionalObjectField(form, "config");
+    const renderCacheTTLSeconds = renderCacheTTLFromForm(form);
     assertSingleSubscription(config);
     await client.createFile({
       name,
@@ -69,6 +73,7 @@ export function createFileActions({
       source: parseObjectField(form, "source", { type: "inline", content: "" }),
       config,
       processors: parseArrayField(form, "processors"),
+      ...(renderCacheTTLSeconds === undefined ? {} : { render_cache_ttl_seconds: renderCacheTTLSeconds }),
       meta: {
         ...(description ? { description } : {}),
         ui: "web",

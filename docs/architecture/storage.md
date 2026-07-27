@@ -82,6 +82,46 @@ service 对资源名和备份条目重复应用同一 `CleanKey` 语义。Store 
 
 `Report`、`FileResult`、`ProbeResult` 和编译后的客户端文件不是 MetaStore 管理资源。内部 cache 可以暂存请求结果，但它有独立前缀和 TTL 语义。
 
+## `Cache`
+
+`internal/cache.Cache` 是 service 使用的非权威缓存边界，只提供三个能力：
+
+| 操作 | 契约 |
+| --- | --- |
+| `GetJSON` | 读取仍在有效期内的 JSON 值；缺失、过期、损坏或后端失败都按 miss 处理 |
+| `PutJSON` | 写入值并在写入时确定到期时间；TTL 非正时不写入 |
+| `DeleteLayer` | 清空一个由 service 选择的 canonical 层，用于资源变更后的广泛失效 |
+
+service 分别持有权威 `Store` 与非权威 `Cache`，因此自定义 Cache 不需要充当
+资源 Store。当前仓库只内建 Store-backed 实现：它把 envelope 写到
+`cache/<layer>/`，读取过期 entry 时 best-effort 删除。没有运行时 backend
+registry、第三方 cache 依赖或缓存管理 HTTP API；以后更换为内存或远程实现时，
+应保持相同的 miss/failure 语义，而不是让 cache 可用性影响业务结果。
+
+持久 TTL 层共有五个：
+
+| canonical 层 | 缓存值 | TTL 来源 |
+| --- | --- | --- |
+| `remote_fetch` | 受控 HTTP(S) 响应 | `RemoteInput.cache_ttl_seconds`，零值继承 runtime 默认 |
+| `probe` | 完整批次 `ProbeResult` | probe 请求，零值继承 runtime probe 默认 |
+| `subscription_traffic` | 远程订阅用量 | runtime 默认 |
+| `subscription_render` | 已保存订阅的完整 `RenderResult` | Subscription 三态覆盖或 runtime 默认 |
+| `file_render` | 已保存文件的完整 `FileResult` | FileSpec 三态覆盖或 runtime 默认 |
+
+Subscription/FileSpec 的 `render_cache_ttl_seconds` 是 nullable 三态字段：省略时
+继承对应 runtime 默认，显式 `0` 关闭，正数覆盖。两个 runtime 结果缓存默认值
+均为 `0`，所以升级不会自动缓存生成结果。inline FileSpec、直接 parse/render/
+convert、preview 不使用结果缓存；share 没有独立缓存层，但生成已保存目标时可以
+复用目标自身的结果缓存。超过 16 MiB 的最终正文不会写入结果缓存。
+
+结果 key 包含 cache schema、构建版本/revision、完整资源定义、目标格式和影响
+执行的请求参数。订阅、文件或 runtime settings 变更后，service 会清空可能受
+影响的结果层；订阅变更还会清空 traffic 层。`refresh` 请求跳过结果、
+remote-fetch 和 probe 的缓存读取，成功执行后仍按当前 TTL 重新填充。
+`ValidateFile` 不读取 file-result cache。除此之外，订阅解析和文件递归各有一次
+请求内 memo，用于去重同一调用中的重复依赖；它们不持久化、没有 TTL，也不是
+可配置 cache 层。
+
 ## Key 布局
 
 当前 service 使用的主要 keys 是：
@@ -94,6 +134,8 @@ shares/<id>.json
 cache/probe/<hash>.json
 cache/remote_fetch/<hash>.json
 cache/subscription_traffic/<hash>.json
+cache/subscription_render/<hash>.json
+cache/file_render/<hash>.json
 ```
 
 其中：

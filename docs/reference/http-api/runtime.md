@@ -59,7 +59,9 @@ JSON merge patch：未提供的字段会回到内建默认值，不会沿用上�
   },
   "cache_defaults": {
     "remote_fetch_ttl_seconds": 120,
-    "subscription_traffic_ttl_seconds": 60
+    "subscription_traffic_ttl_seconds": 60,
+    "subscription_render_ttl_seconds": 300,
+    "file_render_ttl_seconds": 300
   }
 }
 ```
@@ -79,9 +81,12 @@ JSON merge patch：未提供的字段会回到内建默认值，不会沿用上�
 | `probe_defaults.cache_ttl_seconds` | 非负秒数；`0` 表示不使用 probe cache |
 | `cache_defaults.remote_fetch_ttl_seconds` | 非负秒数；`0` 表示不使用远程抓取 cache |
 | `cache_defaults.subscription_traffic_ttl_seconds` | 非负秒数；`0` 表示不缓存订阅用量 |
+| `cache_defaults.subscription_render_ttl_seconds` | 非负秒数；`0` 表示默认不缓存已保存订阅的最终渲染结果 |
+| `cache_defaults.file_render_ttl_seconds` | 非负秒数；`0` 表示默认不缓存已保存文件的最终生成结果 |
 
 `cache_defaults` 有意区分“对象缺失”和“对象存在且字段为 `0`”：缺失时恢复整组
-内建默认值；显式提交对象则可把两个 TTL 都设为 `0`。
+内建默认值；显式提交对象则可把四个 TTL 都设为 `0`。traffic 默认值为 60 秒，
+其余三项默认值为 `0`。修改 runtime settings 会失效订阅和文件结果缓存。
 
 规则集目录请求示例：
 
@@ -229,7 +234,7 @@ curl -fsS \
 curl -fsS -X PUT \
   -H "Authorization: Bearer ${SANDRONE_TOKEN}" \
   -H "Content-Type: application/json" \
-  --data '{"cache_defaults":{"remote_fetch_ttl_seconds":0,"subscription_traffic_ttl_seconds":0}}' \
+  --data '{"cache_defaults":{"remote_fetch_ttl_seconds":0,"subscription_traffic_ttl_seconds":0,"subscription_render_ttl_seconds":0,"file_render_ttl_seconds":0}}' \
   http://127.0.0.1:1137/v1/settings/runtime
 ```
 

@@ -9,7 +9,11 @@ import (
 )
 
 func (s *Service) ValidateFile(ctx context.Context, req domain.FileRequest) (*domain.ValidateResult, error) {
-	result, err := s.GetFile(ctx, req)
+	state := &fileResolveState{
+		stack: map[string]bool{},
+		memo:  map[string]*domain.FileResult{},
+	}
+	result, err := s.getFile(ctx, req, state)
 	if err != nil {
 		return nil, err
 	}
@@ -23,11 +27,44 @@ func (s *Service) ValidateFile(ctx context.Context, req domain.FileRequest) (*do
 //  2. Run file-stage processors in declaration order.
 //  3. Return the processed file content.
 func (s *Service) GetFile(ctx context.Context, req domain.FileRequest) (*domain.FileResult, error) {
+	if req.Refresh {
+		ctx = withCacheReadBypass(ctx)
+	}
 	state := &fileResolveState{
 		stack: map[string]bool{},
 		memo:  map[string]*domain.FileResult{},
 	}
-	return s.getFile(ctx, req, state)
+	if req.Spec != nil || strings.TrimSpace(req.Name) == "" {
+		return s.getFile(ctx, req, state)
+	}
+	spec, err := s.resolveSpec(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	ttlSeconds, err := s.fileRenderTTLSeconds(ctx, spec.RenderCacheTTLSeconds)
+	if err != nil {
+		return nil, err
+	}
+	cacheKey := ""
+	if ttlSeconds > 0 {
+		cacheKey, err = fileRenderCacheKey(spec, req)
+		if err != nil {
+			return nil, err
+		}
+		if !req.Refresh {
+			if cached := s.readFileRenderCache(ctx, cacheKey); cached != nil {
+				return cached, nil
+			}
+		}
+	}
+	req.Spec = &spec
+	result, err := s.getFile(ctx, req, state)
+	if err != nil {
+		return nil, err
+	}
+	result.Cached = false
+	s.writeFileRenderCache(ctx, cacheKey, ttlSeconds, result)
+	return result, nil
 }
 
 func (s *Service) getFile(ctx context.Context, req domain.FileRequest, state *fileResolveState) (*domain.FileResult, error) {

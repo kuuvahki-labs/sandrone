@@ -58,6 +58,7 @@ path segment，`kind` 也必须显式使用 canonical 值，包括 `static`。�
 | `mode=render` | 运行完整文件管线并返回最终正文。省略 `mode` 时与此相同。 |
 | `response=json` | 把 source 或 render 正文放入 JSON envelope；对 `mode=spec` 没有额外作用。值按大小写不敏感匹配。 |
 | `arg.<key>=<value>` | 仅为本次 render 提供字符串请求参数；不写入 `FileSpec`。空 key 忽略，同一 key 重复出现时取最后一个值。 |
+| `refresh=true` | 仅对 render 生效；跳过最终结果以及本次 remote-fetch/probe 缓存读取，成功后按当前 TTL 重新填充。 |
 
 `mode` 会去除首尾空白并按大小写不敏感匹配；其他值会失败。
 
@@ -103,13 +104,16 @@ JSON envelope：
   "content_type": "text/plain; charset=utf-8",
   "body": "hello demo",
   "response": {},
-  "warnings": []
+  "warnings": [],
+  "cached": false
 }
 ```
 
 `response` 是保留的响应元数据，当前内建文件流程通常返回 `{}`；`warnings`
-汇总本次编译、渲染及处理链诊断，无 warning 时仍为 `[]`。直接正文模式不另行
-附带 warning envelope。warning 结构见[错误与诊断参考](../errors.md)。
+汇总本次编译、渲染及处理链诊断，无 warning 时仍为 `[]`；`cached` 表示是否
+直接命中 `file_render`。直接正文模式不另行附带 warning envelope，并通过
+`X-Sandrone-Cache: hit|miss|bypass` 表示命中、执行后未命中或显式刷新。
+warning 结构见[错误与诊断参考](../errors.md)。
 
 三个 mode 的边界是固定的：
 
@@ -129,9 +133,9 @@ typed render 的完整阶段顺序见[文件管线](../../architecture/file-pipe
   [FileSpec 参考](../file-spec.md)。
 - source 可能包含凭据、脚本或未处理配置；`mode=source` 与 `mode=spec`
   响应应按敏感数据处理。
-- render 是实时生成操作。引用缺失、远程抓取失败、typed 配置无效或 processor
-  失败都会使本次请求失败，不会保存部分生成结果。
-- 文件生成结果只随本次读取返回，不创建独立的持久化下载资源。
+- render 在未命中结果缓存时执行完整生成。引用缺失、远程抓取失败、typed
+  配置无效或 processor 失败都会使本次请求失败，不会保存部分生成结果。
+- 文件生成结果只随本次读取返回；可选内部缓存不是独立的持久化下载资源。
 - handler 级错误码、状态映射和 warning 字段见[错误与诊断参考](../errors.md)；
   router 的 plain-text `404`/`405` 边界见[通用约定](README.md#响应与失败)。
 

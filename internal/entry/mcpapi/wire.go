@@ -72,13 +72,14 @@ func (config fileConfig) domain() (*domain.FileConfig, error) {
 }
 
 type fileSpec struct {
-	Name        string            `json:"name"`
-	DisplayName string            `json:"display_name,omitempty"`
-	Kind        domain.FileKind   `json:"kind"`
-	Source      domain.FileSource `json:"source"`
-	Config      *fileConfig       `json:"config,omitempty"`
-	Processors  []processorSpec   `json:"processors,omitempty"`
-	Meta        map[string]string `json:"meta,omitempty"`
+	Name                  string            `json:"name"`
+	DisplayName           string            `json:"display_name,omitempty"`
+	Kind                  domain.FileKind   `json:"kind"`
+	Source                domain.FileSource `json:"source"`
+	Config                *fileConfig       `json:"config,omitempty"`
+	Processors            []processorSpec   `json:"processors,omitempty"`
+	RenderCacheTTLSeconds *int              `json:"render_cache_ttl_seconds,omitempty"`
+	Meta                  map[string]string `json:"meta,omitempty"`
 }
 
 func (spec fileSpec) domain() (domain.FileSpec, error) {
@@ -94,27 +95,29 @@ func (spec fileSpec) domain() (domain.FileSpec, error) {
 		}
 	}
 	return domain.FileSpec{
-		Name:        spec.Name,
-		DisplayName: spec.DisplayName,
-		Kind:        spec.Kind,
-		Source:      spec.Source,
-		Config:      config,
-		Processors:  processors,
-		Meta:        spec.Meta,
+		Name:                  spec.Name,
+		DisplayName:           spec.DisplayName,
+		Kind:                  spec.Kind,
+		Source:                spec.Source,
+		Config:                config,
+		Processors:            processors,
+		RenderCacheTTLSeconds: spec.RenderCacheTTLSeconds,
+		Meta:                  spec.Meta,
 	}, nil
 }
 
 type subscription struct {
-	Name        string                  `json:"name"`
-	DisplayName string                  `json:"display_name,omitempty"`
-	Type        domain.SubscriptionType `json:"type"`
-	Format      string                  `json:"format,omitempty"`
-	Content     string                  `json:"content,omitempty"`
-	Remote      *domain.RemoteInput     `json:"remote,omitempty"`
-	Inputs      []domain.NodeInput      `json:"inputs,omitempty"`
-	Processors  []processorSpec         `json:"processors,omitempty"`
-	Nodes       []domain.NodeIR         `json:"nodes,omitempty"`
-	Meta        map[string]string       `json:"meta,omitempty"`
+	Name                  string                  `json:"name"`
+	DisplayName           string                  `json:"display_name,omitempty"`
+	Type                  domain.SubscriptionType `json:"type"`
+	Format                string                  `json:"format,omitempty"`
+	Content               string                  `json:"content,omitempty"`
+	Remote                *domain.RemoteInput     `json:"remote,omitempty"`
+	Inputs                []domain.NodeInput      `json:"inputs,omitempty"`
+	Processors            []processorSpec         `json:"processors,omitempty"`
+	Nodes                 []domain.NodeIR         `json:"nodes,omitempty"`
+	RenderCacheTTLSeconds *int                    `json:"render_cache_ttl_seconds,omitempty"`
+	Meta                  map[string]string       `json:"meta,omitempty"`
 }
 
 func (sub subscription) domain() (domain.Subscription, error) {
@@ -123,16 +126,17 @@ func (sub subscription) domain() (domain.Subscription, error) {
 		return domain.Subscription{}, err
 	}
 	return domain.Subscription{
-		Name:        sub.Name,
-		DisplayName: sub.DisplayName,
-		Type:        sub.Type,
-		Format:      sub.Format,
-		Content:     sub.Content,
-		Remote:      sub.Remote,
-		Inputs:      sub.Inputs,
-		Processors:  processors,
-		Nodes:       sub.Nodes,
-		Meta:        sub.Meta,
+		Name:                  sub.Name,
+		DisplayName:           sub.DisplayName,
+		Type:                  sub.Type,
+		Format:                sub.Format,
+		Content:               sub.Content,
+		Remote:                sub.Remote,
+		Inputs:                sub.Inputs,
+		Processors:            processors,
+		Nodes:                 sub.Nodes,
+		RenderCacheTTLSeconds: sub.RenderCacheTTLSeconds,
+		Meta:                  sub.Meta,
 	}, nil
 }
 
@@ -148,10 +152,11 @@ type convertInput struct {
 }
 
 type getFileInput struct {
-	File   string            `json:"file"`
-	Mode   string            `json:"mode,omitempty"`
-	Target string            `json:"target,omitempty"`
-	Args   map[string]string `json:"args,omitempty"`
+	File    string            `json:"file"`
+	Mode    string            `json:"mode,omitempty"`
+	Target  string            `json:"target,omitempty"`
+	Args    map[string]string `json:"args,omitempty"`
+	Refresh bool              `json:"refresh,omitempty"`
 }
 
 type validateFileInput struct {

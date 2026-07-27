@@ -8,6 +8,9 @@ import (
 )
 
 func (s *Service) validateFileSpecStructure(spec domain.FileSpec) error {
+	if spec.RenderCacheTTLSeconds != nil && *spec.RenderCacheTTLSeconds < 0 {
+		return domain.NewError(domain.CodeInvalidArgument, "file render_cache_ttl_seconds must be non-negative")
+	}
 	if spec.Kind == "" {
 		return domain.NewError(domain.CodeInvalidArgument, "file kind is required")
 	}

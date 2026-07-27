@@ -37,6 +37,7 @@ describe("subscription model codec", () => {
       type: "collection",
       created_at: "2026-06-27T01:02:03.000Z",
       updated_at: "2026-06-27T04:05:06.000Z",
+      render_cache_ttl_seconds: 0,
       inputs: [
         { name: "provider", type: "subscription", ref: { kind: "subscription", name: "provider" } },
         { name: "ignored-file", type: "ref", ref: { kind: "file", name: "default.yaml" } },
@@ -50,6 +51,7 @@ describe("subscription model codec", () => {
       kind: "collection",
       createdAt: "2026-06-27T01:02:03.000Z",
       updatedAt: "2026-06-27T04:05:06.000Z",
+      renderCacheTTLSeconds: 0,
       sourceRefs: ["provider", "warn"],
       processors: [{ name: "only hk", type: "filter", stage: "nodes", params: { action: "keep", field: "name", match: "regex", pattern: "HK" } }],
       meta: { description: "main group" },

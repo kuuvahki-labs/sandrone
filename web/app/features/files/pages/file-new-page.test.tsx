@@ -26,7 +26,9 @@ describe("FileNewPage", () => {
     const remoteName = screen.getByRole("textbox", { name: "名称" });
     expect(remoteName).toHaveValue("");
     expect(remoteName).toBeRequired();
-    expect(screen.getByText("预览时会重新读取。")).toBeInTheDocument();
+    expect(
+      screen.getByText("生成和预览时按远程请求缓存策略读取。"),
+    ).toBeInTheDocument();
   });
 
   it("blocks a new sing-box file until preview, then submits its resolved driver", async () => {

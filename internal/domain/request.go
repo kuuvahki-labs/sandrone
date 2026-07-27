@@ -70,6 +70,14 @@ type RenderResult struct {
 	ContentType string `json:"content_type,omitempty" yaml:"content_type,omitempty"`
 	Body        []byte `json:"body,omitempty" yaml:"body,omitempty"`
 	Report      Report `json:"report,omitempty" yaml:"report,omitempty"`
+	Cached      bool   `json:"cached,omitempty" yaml:"cached,omitempty"`
+}
+
+type SubscriptionRenderRequest struct {
+	Name    string      `json:"name" yaml:"name"`
+	Format  string      `json:"format,omitempty" yaml:"format,omitempty"`
+	Request RequestInfo `json:"request,omitempty" yaml:"request,omitempty"`
+	Refresh bool        `json:"refresh,omitempty" yaml:"refresh,omitempty"`
 }
 
 // ConvertRequest describes a direct parse-then-render invocation.
@@ -92,6 +100,7 @@ type FileRequest struct {
 	Target  string            `json:"target,omitempty" yaml:"target,omitempty"`
 	Request RequestInfo       `json:"request,omitempty" yaml:"request,omitempty"`
 	Meta    map[string]string `json:"meta,omitempty" yaml:"meta,omitempty"`
+	Refresh bool              `json:"refresh,omitempty" yaml:"refresh,omitempty"`
 }
 
 type FileResult struct {
@@ -100,4 +109,5 @@ type FileResult struct {
 	ContentType string       `json:"content_type,omitempty" yaml:"content_type,omitempty"`
 	Response    ResponseInfo `json:"response,omitempty" yaml:"response,omitempty"`
 	Report      Report       `json:"report,omitempty" yaml:"report,omitempty"`
+	Cached      bool         `json:"cached,omitempty" yaml:"cached,omitempty"`
 }

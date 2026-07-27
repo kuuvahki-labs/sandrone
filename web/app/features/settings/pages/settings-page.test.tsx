@@ -85,6 +85,8 @@ describe("settings page", () => {
           cache_defaults: {
             remote_fetch_ttl_seconds: 0,
             subscription_traffic_ttl_seconds: 60,
+            subscription_render_ttl_seconds: 0,
+            file_render_ttl_seconds: 0,
           },
         }}
         themeMode="system"
@@ -121,6 +123,12 @@ describe("settings page", () => {
     fireEvent.change(within(cacheGroup).getByRole("spinbutton", { name: "订阅流量缓存（秒）" }), {
       target: { value: "15" },
     });
+    fireEvent.change(within(cacheGroup).getByRole("spinbutton", { name: "订阅渲染缓存（秒）" }), {
+      target: { value: "180" },
+    });
+    fireEvent.change(within(cacheGroup).getByRole("spinbutton", { name: "文件渲染缓存（秒）" }), {
+      target: { value: "240" },
+    });
     fireEvent.change(within(probeGroup).getByRole("spinbutton", { name: "缓存（秒）" }), {
       target: { value: "300" },
     });
@@ -141,6 +149,8 @@ describe("settings page", () => {
       cache_defaults: expect.objectContaining({
         remote_fetch_ttl_seconds: 120,
         subscription_traffic_ttl_seconds: 15,
+        subscription_render_ttl_seconds: 180,
+        file_render_ttl_seconds: 240,
       }),
     }));
   });

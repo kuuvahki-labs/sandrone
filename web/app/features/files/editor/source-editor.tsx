@@ -43,7 +43,7 @@ export function FileSourceEditor({
   const [userAgent, setUserAgent] = useState(initial?.remote?.user_agent ?? "");
   const [proxy, setProxy] = useState(initial?.remote?.proxy ?? "");
   const [timeoutMS, setTimeoutMS] = useState(numberInputValue(initial?.remote?.timeout_ms));
-  const [cacheTTLSeconds] = useState(initial?.remote?.cache_ttl_seconds);
+  const [cacheTTLSeconds, setCacheTTLSeconds] = useState(numberInputValue(initial?.remote?.cache_ttl_seconds));
   const serialized = useMemo(
     () => JSON.stringify(preserveImplicitSource ? {} : serializeSource({ cacheTTLSeconds, content, proxy, sourceType, timeoutMS, url, userAgent })),
     [cacheTTLSeconds, content, preserveImplicitSource, proxy, sourceType, timeoutMS, url, userAgent],
@@ -106,6 +106,7 @@ export function FileSourceEditor({
             <TextField fullWidth label="User-Agent" value={userAgent} onChange={(event) => setUserAgent(event.target.value)} />
             <TextField fullWidth label={t("files.form.proxy")} placeholder="http://127.0.0.1:7890" value={proxy} onChange={(event) => setProxy(event.target.value)} />
             <TextField fullWidth label={t("files.form.timeoutMs")} type="number" value={timeoutMS} onChange={(event) => setTimeoutMS(event.target.value)} />
+            <TextField fullWidth label={t("cache.remoteFetchTTLSeconds")} type="number" value={cacheTTLSeconds} onChange={(event) => setCacheTTLSeconds(event.target.value)} />
           </div>
           <Typography color="text.secondary" variant="body2">
             {t("files.form.remoteDescription")}
@@ -125,7 +126,7 @@ function sourceValidationMessage(error: FileInputValidationCode, t: Translator):
 }
 
 type SourceDraft = {
-  cacheTTLSeconds?: number;
+  cacheTTLSeconds: string;
   content: string;
   proxy: string;
   sourceType: SourceType;
@@ -154,7 +155,7 @@ function serializeSource(draft: SourceDraft): Record<string, unknown> {
       user_agent: draft.userAgent,
       proxy: draft.proxy,
       timeout_ms: numberOrUndefined(draft.timeoutMS),
-      cache_ttl_seconds: draft.cacheTTLSeconds,
+      cache_ttl_seconds: numberOrUndefined(draft.cacheTTLSeconds),
     }),
   });
 }
