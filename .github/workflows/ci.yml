@@ -134,19 +134,21 @@ jobs:
       - name: Build container image
         shell: bash
         run: |
-          short_sha="${GITHUB_SHA::12}"
-          make image SANDRONE_IMAGE="${IMAGE}:sha-${short_sha}" REVISION="${GITHUB_SHA}"
+          image_tag=ci
+          if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            image_tag="${GITHUB_REF_NAME}"
+          fi
+          make image SANDRONE_IMAGE="${IMAGE}:${image_tag}" REVISION="${GITHUB_SHA}"
 
       - name: Log in to GHCR
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && github.ref_type == 'tag'
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Push container image
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && github.ref_type == 'tag'
         shell: bash
         run: |
-          short_sha="${GITHUB_SHA::12}"
-          source_image="${IMAGE}:sha-${short_sha}"
+          source_image="${IMAGE}:${GITHUB_REF_NAME}"
           git fetch --force --tags origin
           publish_tags="$(./scripts/container-image-tags.sh)"
           while IFS= read -r tag; do

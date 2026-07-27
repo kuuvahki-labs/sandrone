@@ -6,17 +6,8 @@ LC_ALL=C
 export LC_ALL
 
 : "${IMAGE:?IMAGE is required}"
-: "${GITHUB_SHA:?GITHUB_SHA is required}"
 
-if [ "${GITHUB_EVENT_NAME-}" != "push" ]; then
-  exit 0
-fi
-
-short_revision=$(printf '%.12s' "$GITHUB_SHA")
-revision_tag="${IMAGE}:sha-${short_revision}"
-
-if [ "${GITHUB_REF_TYPE-}" != "tag" ]; then
-  printf '%s\n' "$revision_tag"
+if [ "${GITHUB_EVENT_NAME-}" != "push" ] || [ "${GITHUB_REF_TYPE-}" != "tag" ]; then
   exit 0
 fi
 
@@ -43,7 +34,7 @@ latest_tag=$(
     || true
 )
 
-printf '%s\n' "$revision_tag" "${IMAGE}:${version}"
+printf '%s\n' "${IMAGE}:${GITHUB_REF_NAME}"
 if [ -n "$latest_tag" ] && [ "${GITHUB_REF_NAME-}" = "$latest_tag" ]; then
   printf '%s\n' "${IMAGE}:latest"
 fi

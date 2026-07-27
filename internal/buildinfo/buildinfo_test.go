@@ -359,6 +359,37 @@ func TestMakeBuildWithoutRevisionForcesDevVersion(t *testing.T) {
 	}
 }
 
+func workflowTriggerBlock(t *testing.T, workflow string) string {
+	t.Helper()
+
+	const startMarker = "on:\n"
+	const endMarker = "\npermissions:\n"
+	if count := strings.Count(workflow, startMarker); count != 1 {
+		t.Fatalf("workflow contains %d top-level on blocks, want 1", count)
+	}
+	start := strings.Index(workflow, startMarker)
+	end := strings.Index(workflow[start+len(startMarker):], endMarker)
+	if end < 0 {
+		t.Fatal("workflow on block is not followed by permissions")
+	}
+	return strings.TrimRight(workflow[start:start+len(startMarker)+end], "\n")
+}
+
+func workflowNamedStep(t *testing.T, workflow, name string) string {
+	t.Helper()
+
+	marker := "      - name: " + name + "\n"
+	if count := strings.Count(workflow, marker); count != 1 {
+		t.Fatalf("workflow contains %d %q steps, want 1", count, name)
+	}
+	start := strings.Index(workflow, marker)
+	body := workflow[start+len(marker):]
+	if end := strings.Index(body, "\n      - name: "); end >= 0 {
+		body = body[:end]
+	}
+	return strings.TrimRight(marker+body, "\n")
+}
+
 func TestContainerWorkflowWiresBuildIdentityAndReleasePolicy(t *testing.T) {
 	root := filepath.Join("..", "..")
 	dockerfile, err := os.ReadFile(filepath.Join(root, "Dockerfile"))
@@ -383,24 +414,64 @@ func TestContainerWorkflowWiresBuildIdentityAndReleasePolicy(t *testing.T) {
 	if labelAt, copyAt := strings.LastIndex(string(dockerfile), "LABEL "), strings.LastIndex(string(dockerfile), "COPY --from=web"); labelAt < copyAt {
 		t.Error("Dockerfile OCI labels must follow runtime package and asset layers")
 	}
-	if want := `make image SANDRONE_IMAGE="${IMAGE}:sha-${short_sha}" REVISION="${GITHUB_SHA}"`; !strings.Contains(string(workflow), want) {
-		t.Errorf("container workflow does not contain %q", want)
+
+	workflowText := string(workflow)
+	if got, want := workflowTriggerBlock(t, workflowText), `on:
+  pull_request:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  workflow_dispatch:`; got != want {
+		t.Errorf("workflow trigger block =\n%s\nwant:\n%s", got, want)
+	}
+	if got, want := workflowNamedStep(t, workflowText, "Build container image"), `      - name: Build container image
+        shell: bash
+        run: |
+          image_tag=ci
+          if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            image_tag="${GITHUB_REF_NAME}"
+          fi
+          make image SANDRONE_IMAGE="${IMAGE}:${image_tag}" REVISION="${GITHUB_SHA}"`; got != want {
+		t.Errorf("Build container image step =\n%s\nwant:\n%s", got, want)
+	}
+	if got, want := workflowNamedStep(t, workflowText, "Log in to GHCR"), `      - name: Log in to GHCR
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin`; got != want {
+		t.Errorf("Log in to GHCR step =\n%s\nwant:\n%s", got, want)
+	}
+	if got, want := workflowNamedStep(t, workflowText, "Push container image"), `      - name: Push container image
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        shell: bash
+        run: |
+          source_image="${IMAGE}:${GITHUB_REF_NAME}"
+          git fetch --force --tags origin
+          publish_tags="$(./scripts/container-image-tags.sh)"
+          while IFS= read -r tag; do
+            [[ -n "${tag}" ]] || continue
+            if [[ "${tag}" != "${source_image}" ]]; then
+              docker tag "${source_image}" "${tag}"
+            fi
+            docker push "${tag}"
+          done <<< "${publish_tags}"`; got != want {
+		t.Errorf("Push container image step =\n%s\nwant:\n%s", got, want)
+	}
+	if strings.Contains(workflowText, "sha-") {
+		t.Error("container workflow must not create or publish sha-* image tags")
 	}
 	for _, want := range []string{
-		`tags:`,
-		`- "v*"`,
+		`needs:`,
+		`- go`,
+		`- web`,
+		`- build-webui`,
 		`fetch-depth: 0`,
 		`group: container-image-${{ github.event_name == 'push' && 'publish' || github.run_id }}`,
 		`queue: max`,
-		`git fetch --force --tags origin`,
-		`./scripts/container-image-tags.sh`,
 	} {
-		if !strings.Contains(string(workflow), want) {
+		if !strings.Contains(workflowText, want) {
 			t.Errorf("container workflow does not contain %q", want)
 		}
-	}
-	if strings.Contains(string(workflow), `docker tag "${IMAGE}:sha-${short_sha}" "${IMAGE}:latest"`) {
-		t.Error("container workflow must derive latest from the release tag policy")
 	}
 }
 
@@ -495,14 +566,13 @@ func TestContainerImageTagsFollowReleasePolicy(t *testing.T) {
 		}, "sh", script)
 	}
 
-	t.Run("main publishes only immutable revision tag", func(t *testing.T) {
+	t.Run("main publishes nothing", func(t *testing.T) {
 		output, err := run(t, "push", "branch", "main", "0.2.0")
 		if err != nil {
 			t.Fatalf("plan main tags: %v\n%s", err, output)
 		}
-		want := "example.test/sandrone:sha-" + revision[:12] + "\n"
-		if got := string(output); got != want {
-			t.Fatalf("main tags = %q, want %q", got, want)
+		if got := string(output); got != "" {
+			t.Fatalf("main tags = %q, want empty", got)
 		}
 	})
 
@@ -512,8 +582,7 @@ func TestContainerImageTagsFollowReleasePolicy(t *testing.T) {
 			t.Fatalf("plan newest release tags: %v\n%s", err, output)
 		}
 		want := strings.Join([]string{
-			"example.test/sandrone:sha-" + revision[:12],
-			"example.test/sandrone:0.2.0",
+			"example.test/sandrone:v0.2.0",
 			"example.test/sandrone:latest",
 			"",
 		}, "\n")
@@ -527,11 +596,7 @@ func TestContainerImageTagsFollowReleasePolicy(t *testing.T) {
 		if err != nil {
 			t.Fatalf("plan older release tags: %v\n%s", err, output)
 		}
-		want := strings.Join([]string{
-			"example.test/sandrone:sha-" + revision[:12],
-			"example.test/sandrone:0.1.0",
-			"",
-		}, "\n")
+		want := "example.test/sandrone:v0.1.0\n"
 		if got := string(output); got != want {
 			t.Fatalf("older release tags = %q, want %q", got, want)
 		}
@@ -542,11 +607,7 @@ func TestContainerImageTagsFollowReleasePolicy(t *testing.T) {
 		if err != nil {
 			t.Fatalf("plan prerelease tags: %v\n%s", err, output)
 		}
-		want := strings.Join([]string{
-			"example.test/sandrone:sha-" + revision[:12],
-			"example.test/sandrone:0.3.0-rc.1",
-			"",
-		}, "\n")
+		want := "example.test/sandrone:v0.3.0-rc.1\n"
 		if got := string(output); got != want {
 			t.Fatalf("prerelease tags = %q, want %q", got, want)
 		}
