@@ -371,35 +371,45 @@ describe("ApiClient", () => {
   });
 
   it("bypasses a pending runtime settings request when a fresh read is requested", async () => {
-    let releaseInitial: (() => void) | undefined;
-    const initialReady = new Promise<void>((resolve) => {
-      releaseInitial = resolve;
+    let resolveStale: ((response: Response) => void) | undefined;
+    let resolveFresh: ((response: Response) => void) | undefined;
+    const staleResponse = new Promise<Response>((resolve) => {
+      resolveStale = resolve;
     });
-    const initialSettings = { remote_defaults: { user_agent: "stale-agent" } };
-    const freshSettings = { remote_defaults: { user_agent: "restored-agent" } };
+    const freshResponse = new Promise<Response>((resolve) => {
+      resolveFresh = resolve;
+    });
+    const staleSettings = { remote_defaults: { user_agent: "stale-agent" } };
+    const restoredSettings = { remote_defaults: { user_agent: "restored-agent" } };
     const fetcher = vi.fn()
-      .mockImplementationOnce(async () => {
-        await initialReady;
-        return new Response(JSON.stringify(initialSettings), {
-          headers: { "content-type": "application/json" },
-        });
-      })
-      .mockResolvedValueOnce(new Response(JSON.stringify(freshSettings), {
+      .mockImplementationOnce(() => staleResponse)
+      .mockImplementationOnce(() => freshResponse)
+      .mockResolvedValueOnce(new Response(JSON.stringify(restoredSettings), {
         headers: { "content-type": "application/json" },
       }));
     const client = new ApiClient({ fetcher });
 
-    const initial = client.getRuntimeSettings();
-    const duplicate = client.getRuntimeSettings();
+    const stale = client.getRuntimeSettings();
     const fresh = client.getRuntimeSettings({ fresh: true });
-    const requestCountWhileInitialWasPending = fetcher.mock.calls.length;
-    releaseInitial?.();
 
-    const [initialResult, duplicateResult, freshResult] = await Promise.all([initial, duplicate, fresh]);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    resolveStale?.(new Response(JSON.stringify(staleSettings), {
+      headers: { "content-type": "application/json" },
+    }));
+    await expect(stale).resolves.toEqual(staleSettings);
 
-    expect(requestCountWhileInitialWasPending).toBe(2);
-    expect(duplicateResult).toEqual(initialResult);
-    expect(freshResult).toEqual(freshSettings);
+    const afterStale = client.getRuntimeSettings();
+    expect(fetcher).toHaveBeenCalledTimes(2);
+
+    resolveFresh?.(new Response(JSON.stringify(restoredSettings), {
+      headers: { "content-type": "application/json" },
+    }));
+    await expect(fresh).resolves.toEqual(restoredSettings);
+    await expect(afterStale).resolves.toEqual(restoredSettings);
+
+    const next = client.getRuntimeSettings();
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    await expect(next).resolves.toEqual(restoredSettings);
   });
 
   it("requests subscription previews with encoded resource names", async () => {

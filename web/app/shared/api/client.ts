@@ -164,7 +164,7 @@ export class ApiClient {
 
   getRuntimeSettings(options: { fresh?: boolean } = {}): Promise<RuntimeSettingsInput> {
     if (options.fresh) {
-      return this.request("/v1/settings/runtime");
+      return this.replaceDedupedRequest("GET", "/v1/settings/runtime");
     }
     return this.dedupedRequest("GET", "/v1/settings/runtime");
   }
@@ -287,7 +287,24 @@ export class ApiClient {
       return existing as Promise<T>;
     }
     const request = this.request<T>(path, options).finally(() => {
-      inFlightRequests.delete(key);
+      if (inFlightRequests.get(key) === request) {
+        inFlightRequests.delete(key);
+      }
+    });
+    inFlightRequests.set(key, request);
+    return request;
+  }
+
+  private replaceDedupedRequest<T = unknown>(
+    method: string,
+    path: string,
+    options: { method?: string; body?: unknown; auth?: boolean } = {},
+  ): Promise<T> {
+    const key = this.requestKey(method, path, options);
+    const request = this.request<T>(path, options).finally(() => {
+      if (inFlightRequests.get(key) === request) {
+        inFlightRequests.delete(key);
+      }
     });
     inFlightRequests.set(key, request);
     return request;
