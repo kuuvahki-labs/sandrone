@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -229,8 +229,10 @@ describe("React Router app share and delete workflows", () => {
     expect(within(sheet).getByRole("textbox", { name: "名称" })).toHaveValue("provider");
     expect(within(sheet).getByRole("textbox", { name: "分享目标" })).toHaveValue("provider");
     expect(within(sheet).getByText("目标", { selector: "label" })).toBeInTheDocument();
-	await user.type(within(sheet).getByRole("textbox", { name: "age X25519 加密公钥" }), "age1example");
-	await user.type(within(sheet).getByRole("spinbutton", { name: "最大访问次数（0 为不限）" }), "2");
+    const ageRecipientInput = within(sheet).getByRole("textbox", { name: "age X25519 加密公钥" });
+    fireEvent.change(ageRecipientInput, { target: { value: "age1example" } });
+    const maxVisitsInput = within(sheet).getByRole("spinbutton", { name: "最大访问次数（0 为不限）" });
+    fireEvent.change(maxVisitsInput, { target: { value: "2" } });
 
     expect(within(sheet).getByText("默认输出格式", { selector: "label" })).toBeInTheDocument();
     expect(within(sheet).getByText("此分享支持多种格式，这里只设置默认格式。")).toBeInTheDocument();

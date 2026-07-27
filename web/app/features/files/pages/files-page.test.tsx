@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -48,10 +48,10 @@ describe("FilesPage", () => {
 
     const searchbox = screen.getByRole("searchbox", { name: "搜索文件" });
     expect(screen.getByText("搜索", { selector: "label" })).toBeInTheDocument();
-    await user.type(searchbox, "移动端");
+    fireEvent.change(searchbox, { target: { value: "移动端" } });
     expect(screen.getByText("移动端配置")).toBeInTheDocument();
     expect(screen.queryByText("inline.yaml")).not.toBeInTheDocument();
-    await user.clear(searchbox);
+    fireEvent.change(searchbox, { target: { value: "" } });
 
     await user.click(screen.getByRole("button", { name: "新建文件" }));
     await user.click(await screen.findByRole("menuitem", { name: "远程" }));

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
@@ -30,7 +30,8 @@ describe("config reference fields", () => {
     await user.click(screen.getByRole("button", { name: "添加成员" }));
 
     const added = screen.getByRole("combobox", { name: "成员 3" });
-    await user.type(added, "Custom Node");
+    await user.click(added);
+    fireEvent.change(added, { target: { value: "Custom Node" } });
     await user.keyboard("{Enter}");
     expect(referenceValues()).toEqual(["DIRECT", "$nodes", "Custom Node"]);
   });

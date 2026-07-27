@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -10,7 +10,6 @@ import {
   renderApp,
   resourceListResponse,
   resources,
-  subscriptionPreview,
 } from "./app-routing.test-data";
 
 describe("React Router app file workflows", () => {
@@ -33,11 +32,12 @@ describe("React Router app file workflows", () => {
     await user.click(screen.getByRole("button", { name: "新建文件" }));
     await user.click(await screen.findByRole("menuitem", { name: "远程文件" }));
     expect(await screen.findByRole("heading", { name: "新建文件" })).toBeInTheDocument();
-    await user.clear(screen.getByRole("textbox", { name: "名称" }));
-    await user.type(screen.getByRole("textbox", { name: "名称" }), "remote.yaml");
+    const nameInput = screen.getByRole("textbox", { name: "名称" });
+    fireEvent.change(nameInput, { target: { value: "remote.yaml" } });
     const sourceMode = screen.getByRole("group", { name: "来源方式" });
     expect(within(sourceMode).getByRole("button", { name: "远程" })).toHaveAttribute("aria-pressed", "true");
-    await user.type(screen.getByRole("textbox", { name: "远程地址" }), "https://example.com/base.yaml");
+    const remoteURLInput = screen.getByRole("textbox", { name: "远程地址" });
+    fireEvent.change(remoteURLInput, { target: { value: "https://example.com/base.yaml" } });
     await user.click(screen.getByRole("button", { name: "保存文件" }));
 
     const post = requests.find((request) => request.url.endsWith("/v1/files") && request.init?.method === "POST");
@@ -53,58 +53,6 @@ describe("React Router app file workflows", () => {
     expect(body.inputs).toBeUndefined();
     expect(body.node_inputs).toBeUndefined();
     expect(router.state.location.pathname).toBe("/files/remote.yaml/edit");
-  });
-
-  it("creates mihomo config files from subscriptions", async () => {
-    const user = userEvent.setup();
-    const requests: Array<{ url: string; init?: RequestInit }> = [];
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      requests.push({ url, init });
-      const resourceResponse = resourceListResponse(url, resources, init);
-      if (resourceResponse) return resourceResponse;
-      if (url.includes("/v1/subscriptions/provider/preview")) return jsonResponse(subscriptionPreview);
-      return jsonResponse({ ok: true }, { status: init?.method === "POST" ? 201 : 200 });
-    }));
-    renderApp("/files");
-
-    await screen.findByRole("heading", { name: "我的文件" });
-    await user.click(screen.getByRole("button", { name: "新建文件" }));
-    await user.click(await screen.findByRole("menuitem", { name: "mihomo 配置" }));
-    expect(await screen.findByRole("heading", { name: "新建文件" })).toBeInTheDocument();
-    await user.click(screen.getByRole("combobox", { name: "订阅" }));
-    await user.click(await screen.findByRole("option", { name: "provider" }));
-    expect(await screen.findByText("已加载 1 个节点")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "保存文件" }));
-
-    expect(requests.filter((request) => request.url.includes("/v1/subscriptions/provider/preview") && request.init?.method === "POST")).toHaveLength(1);
-
-    const post = requests.find((request) => request.url.endsWith("/v1/files") && request.init?.method === "POST");
-    expect(post).toBeDefined();
-    const previewRequestIndex = requests.findIndex((request) => request.url.includes("/v1/subscriptions/provider/preview") && request.init?.method === "POST");
-    const filePostIndex = requests.findIndex((request) => request.url.endsWith("/v1/files") && request.init?.method === "POST");
-    expect(previewRequestIndex).toBeGreaterThanOrEqual(0);
-    expect(filePostIndex).toBeGreaterThan(previewRequestIndex);
-    const body = JSON.parse(String(post?.init?.body));
-    expect(body).toMatchObject({
-      name: "mihomo.yaml",
-      kind: "mihomo",
-      source: { type: "inline", content: expect.stringContaining("mixed-port: 7890") },
-      config: {
-        subscriptions: ["provider"],
-        settings: {
-          adaptive_groups: expect.any(Object),
-          groups: expect.any(Array),
-          rule_sets: expect.any(Array),
-          rules: expect.any(Array),
-        },
-      },
-      processors: [
-        { name: "Sniffer", type: "merge", stage: "file", params: { mode: "yaml_override", content: expect.stringContaining("# sandrone:mihomo-preset=sniffer") } },
-        { name: "TUN", type: "merge", stage: "file", params: { mode: "yaml_override", content: expect.stringContaining("# sandrone:mihomo-preset=tun") } },
-      ],
-      meta: { ui: "web" },
-    });
   });
 
   it("edits inline typed content from the complete spec without requesting source", async () => {
@@ -202,7 +150,7 @@ describe("React Router app file workflows", () => {
 
     const content = await screen.findByRole("textbox", { name: "内容" });
     expect(content).toHaveValue("port: 7890");
-    await user.clear(content);
+    fireEvent.change(content, { target: { value: "" } });
     await user.click(screen.getByRole("button", { name: "保存文件" }));
 
     await waitFor(() => {

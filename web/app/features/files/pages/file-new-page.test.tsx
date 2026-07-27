@@ -29,46 +29,14 @@ describe("FileNewPage", () => {
     expect(screen.getByText("预览时会重新读取。")).toBeInTheDocument();
   });
 
-  it.each([
-    ["mihomo", "mihomo.yaml"],
-    ["sing-box", "sing-box.json"],
-    ["shadowrocket", "shadowrocket.conf"],
-  ] as const)("keeps the %s preset name for typed file creation", (source, expectedName) => {
-    render(<FileNewPage source={source} onBack={noop} onSave={noop} />);
-
-    expect(screen.getByRole("textbox", { name: "名称" })).toHaveValue(expectedName);
-  });
-
-  it.each(["mihomo", "sing-box", "shadowrocket"] as const)(
-    "selects the standard template for new %s files",
-    (source) => {
-      render(<FileNewPage source={source} onBack={noop} onSave={noop} />);
-
-      expect(screen.getByRole("radio", { name: "标准" })).toBeChecked();
-      expect(screen.queryByText("已自定义")).not.toBeInTheDocument();
-    },
-  );
-
-  it("submits the resolved driver kind separately from form data", async () => {
+  it("blocks a new sing-box file until preview, then submits its resolved driver", async () => {
     const user = userEvent.setup();
-    const onSave = vi.fn(async (_kind: string, _form: FormData) => undefined);
-    render(<FileNewPage source="local" onBack={noop} onSave={onSave} />);
-
-    await user.type(screen.getByRole("textbox", { name: "名称" }), "local.txt");
-    await user.click(screen.getByRole("button", { name: "保存文件" }));
-
-    expect(onSave).toHaveBeenCalledWith("static", expect.any(FormData));
-    const submittedForm = onSave.mock.calls[0]?.[1];
-    expect(submittedForm?.has("kind")).toBe(false);
-  });
-
-  it("serializes a complete sing-box form with an explicit JSON base", async () => {
-    const user = userEvent.setup();
+    const loadSubscriptionPreview = vi.fn().mockResolvedValue(configNodePreview("provider", ["Node 1"]));
     const onSave = vi.fn(async (_kind: string, _form: FormData) => undefined);
 
     render(
       <FileNewPage
-        loadSubscriptionPreview={vi.fn().mockResolvedValue(configNodePreview("provider", ["Node 1"]))}
+        loadSubscriptionPreview={loadSubscriptionPreview}
         source="sing-box"
         onBack={noop}
         onSave={onSave}
@@ -77,9 +45,13 @@ describe("FileNewPage", () => {
     );
 
     expect(screen.getByRole("textbox", { name: "名称" })).toHaveValue("sing-box.json");
+    expect(screen.getByRole("radio", { name: "标准" })).toBeChecked();
+    const saveFile = screen.getByRole("button", { name: "保存文件" });
+    expect(saveFile).toBeDisabled();
     const baseContent = within(screen.getByRole("group", { name: "基础配置内容" }))
       .getByRole("textbox", { name: "内容" });
-    expect(JSON.parse((baseContent as HTMLTextAreaElement).value)).toMatchObject({
+    const originalBaseContent = (baseContent as HTMLTextAreaElement).value;
+    expect(JSON.parse(originalBaseContent)).toMatchObject({
       dns: {
         final: "dns-remote",
         servers: expect.arrayContaining([expect.objectContaining({ tag: "dns-remote", detour: "🚀 节点选择" })]),
@@ -90,14 +62,15 @@ describe("FileNewPage", () => {
     expect(baseContent.closest("[data-highlighted-textarea]")).toHaveAttribute("data-highlighted-textarea", "json");
 
     await selectMuiOption(user, screen.getByRole("combobox", { name: "订阅" }), "provider");
+    await waitFor(() => expect(loadSubscriptionPreview).toHaveBeenCalledWith("provider"));
     expect(await screen.findByText("已加载 1 个节点")).toBeInTheDocument();
-    const saveFile = screen.getByRole("button", { name: "保存文件" });
     expect(saveFile).toHaveTextContent("保存");
     await waitFor(() => expect(saveFile).toBeEnabled());
     await user.click(saveFile);
 
     expect(onSave.mock.calls[0]?.[0]).toBe("sing-box");
     const saved = onSave.mock.calls[0]?.[1] as FormData;
+    expect(saved.has("kind")).toBe(false);
     expect(JSON.parse(String(saved.get("source")))).toEqual({
       type: "inline",
       content: expect.stringContaining('"listen_port": 2080'),

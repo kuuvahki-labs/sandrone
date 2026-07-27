@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
@@ -32,7 +32,7 @@ describe("FileSourceEditor", () => {
     });
 
     await user.click(screen.getByRole("button", { name: "本地" }));
-    await user.type(screen.getByRole("textbox", { name: "内容" }), "port: 7890");
+    fireEvent.change(screen.getByRole("textbox", { name: "内容" }), { target: { value: "port: 7890" } });
 
     expect(currentSource()).toEqual({ type: "inline", content: "port: 7890" });
   });

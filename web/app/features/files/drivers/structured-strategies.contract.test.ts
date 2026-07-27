@@ -163,6 +163,32 @@ describe("structured file driver orchestration strategies", () => {
       .toBe(expectedValid);
  });
 
+  it.each([
+    { name: "unique named node", names: ["Node 1"], selected: true, expectedValid: true },
+    { name: "duplicate node tags", names: ["Node 1", "Node 1"], selected: true, expectedValid: false },
+    { name: "unnamed node", names: ["Node 1", ""], selected: true, expectedValid: false },
+    { name: "empty preview", names: [], selected: true, expectedValid: false },
+    { name: "unselected subscription", names: ["Node 1"], selected: false, expectedValid: false },
+  ])("uses conservative sing-box readiness for $name", ({ names, selected, expectedValid }) => {
+    const adapter = task3Adapter("sing-box");
+    const preview = configNodePreviewFromSubscription({
+      subscriptionName: "provider",
+      nodes: names.map((name, index) => ({
+        identity: `sha256:${index}`,
+        after: { name, type: "ss", endpoint: `node-${index}.example:8388` },
+      })),
+      warnings: [],
+    });
+    const projectedNodes = adapter.preview.projectNodes(preview);
+
+    expect(adapter.preview.validate({
+      formMode: "create",
+      preview,
+      projectedNodes,
+      selected,
+    }).valid).toBe(expectedValid);
+  });
+
   it("keeps registered client selection and native keys out of shared Task 3 orchestration", () => {
     const sharedFiles = [
       "../config/components/editor.tsx",

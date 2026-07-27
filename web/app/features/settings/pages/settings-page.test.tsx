@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -33,8 +33,9 @@ describe("settings page", () => {
 
     await user.click(screen.getByRole("combobox", { name: "主题模式" }));
     await user.click(screen.getByRole("option", { name: "浅色" }));
-    await user.clear(screen.getByRole("textbox", { name: "Public Base URL" }));
-    await user.type(screen.getByRole("textbox", { name: "Public Base URL" }), "https://public.example.test");
+    fireEvent.change(screen.getByRole("textbox", { name: "Public Base URL" }), {
+      target: { value: "https://public.example.test" },
+    });
     await user.click(saveBaseUrl);
 
     expect(onThemeMode).toHaveBeenCalledWith("light");
@@ -111,14 +112,18 @@ describe("settings page", () => {
     await user.click(await screen.findByRole("option", {
       name: "Cloudflare http://cp.cloudflare.com/generate_204",
     }));
-    await user.clear(within(remoteGroup).getByRole("textbox", { name: "User-Agent" }));
-    await user.type(within(remoteGroup).getByRole("textbox", { name: "User-Agent" }), "Sandrone Global");
-    await user.clear(within(cacheGroup).getByRole("spinbutton", { name: "远程请求缓存（秒）" }));
-    await user.type(within(cacheGroup).getByRole("spinbutton", { name: "远程请求缓存（秒）" }), "120");
-    await user.clear(within(cacheGroup).getByRole("spinbutton", { name: "订阅流量缓存（秒）" }));
-    await user.type(within(cacheGroup).getByRole("spinbutton", { name: "订阅流量缓存（秒）" }), "15");
-    await user.clear(within(probeGroup).getByRole("spinbutton", { name: "缓存（秒）" }));
-    await user.type(within(probeGroup).getByRole("spinbutton", { name: "缓存（秒）" }), "300");
+    fireEvent.change(within(remoteGroup).getByRole("textbox", { name: "User-Agent" }), {
+      target: { value: "Sandrone Global" },
+    });
+    fireEvent.change(within(cacheGroup).getByRole("spinbutton", { name: "远程请求缓存（秒）" }), {
+      target: { value: "120" },
+    });
+    fireEvent.change(within(cacheGroup).getByRole("spinbutton", { name: "订阅流量缓存（秒）" }), {
+      target: { value: "15" },
+    });
+    fireEvent.change(within(probeGroup).getByRole("spinbutton", { name: "缓存（秒）" }), {
+      target: { value: "300" },
+    });
     const saveRuntimeDefaults = screen.getByRole("button", { name: "保存运行默认值" });
     expect(saveRuntimeDefaults).toHaveTextContent("保存");
     await user.click(saveRuntimeDefaults);

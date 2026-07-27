@@ -1,5 +1,5 @@
 import type { SyntheticEvent } from "react";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -60,7 +60,7 @@ describe("SourceMultiSelect", () => {
     expect(sourceSearch).toBeInTheDocument();
     expect(sourcePicker.querySelector(".source-choice-scroll, .field-helper, .secondary-action, .ghost-action")).not.toBeInTheDocument();
 
-    await user.type(screen.getByRole("searchbox", { name: "搜索包含订阅" }), "source-12");
+    fireEvent.change(sourceSearch, { target: { value: "source-12" } });
 
     expect(within(sourcePicker).getByRole("checkbox", { name: "source-12 远程订阅 · uri-list" })).toBeChecked();
     expect(within(sourcePicker).queryByRole("checkbox", { name: "source-01 远程订阅 · uri-list" })).not.toBeInTheDocument();

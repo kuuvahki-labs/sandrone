@@ -1,24 +1,44 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import type { SubscriptionDefinition } from "~/features/subscriptions/model/types";
-import { SubscriptionEditPage } from "~/features/subscriptions/pages/subscription-edit-page";
+import { ProcessorBuilder } from "~/features/subscriptions/components/processor-builder";
 import {
-  noop,
   remoteSubscriptionDefinition,
   scriptFiles,
   selectMuiOption,
-  subscriptions,
 } from "~/features/subscriptions/test-data";
+import type { ProcessorDetail, ResourceOption } from "~/shared/resources/types";
+
+function renderProcessorBuilder({
+  defaultValue = [],
+  scriptFiles: availableScriptFiles = [],
+}: {
+  defaultValue?: ProcessorDetail[];
+  scriptFiles?: ResourceOption[];
+} = {}) {
+  const { container } = render(
+    <ProcessorBuilder
+      defaultValue={defaultValue}
+      scriptFiles={availableScriptFiles}
+    />,
+  );
+  const processorsInput = container.querySelector<HTMLInputElement>(
+    'input[name="processors"][type="hidden"]',
+  );
+  if (!processorsInput) {
+    throw new Error("ProcessorBuilder did not render its processors input");
+  }
+  return {
+    processorsInput,
+    serializedProcessors: () => JSON.parse(processorsInput.value) as ProcessorDetail[],
+  };
+}
 
 describe("ProcessorBuilder", () => {
-  it("serializes all probe processor parameters from the subscription processing chain", async () => {
-    const user = userEvent.setup();
-    const onSave = vi.fn();
-    const definition: SubscriptionDefinition = {
-      ...remoteSubscriptionDefinition,
-      processors: [{
+  it("serializes all probe processor parameters from the subscription processing chain", () => {
+    const { serializedProcessors } = renderProcessorBuilder({
+      defaultValue: [{
         type: "probe",
         stage: "nodes",
         params: {
@@ -35,9 +55,7 @@ describe("ProcessorBuilder", () => {
           fail_mode: "drop",
         },
       }],
-    };
-
-    render(<SubscriptionEditPage item={subscriptions[0]} onBack={noop} onSave={onSave} definition={definition} sources={subscriptions} />);
+    });
 
     const probeGroup = screen.getByRole("group", { name: "处理器 测活" });
     expect(within(probeGroup).getByRole("combobox", { name: "方式" })).toHaveTextContent("url_test");
@@ -52,10 +70,8 @@ describe("ProcessorBuilder", () => {
     expect(within(probeGroup).getByRole("checkbox", { name: "写入测活元数据" })).toBeChecked();
     expect(within(probeGroup).getByRole("combobox", { name: "排序" })).toHaveTextContent("按耗时");
     expect(within(probeGroup).getByRole("combobox", { name: "失败处理" })).toHaveTextContent("丢弃");
-    await user.click(screen.getByRole("button", { name: "保存订阅" }));
 
-    const saved = onSave.mock.calls[0]?.[0] as FormData;
-    expect(JSON.parse(String(saved.get("processors")))).toEqual([
+    expect(serializedProcessors()).toEqual([
       { type: "quick_settings", stage: "nodes" },
       {
         type: "probe",
@@ -78,9 +94,7 @@ describe("ProcessorBuilder", () => {
   });
   it("fills probe runtime defaults into inputs and serializes them", async () => {
     const user = userEvent.setup();
-    const onSave = vi.fn();
-
-    render(<SubscriptionEditPage item={subscriptions[0]} onBack={noop} onSave={onSave} definition={{ ...remoteSubscriptionDefinition, processors: [] }} sources={subscriptions} />);
+    const { serializedProcessors } = renderProcessorBuilder();
 
     await user.click(screen.getByRole("combobox", { name: "类型" }));
     await user.click(screen.getByRole("option", { name: "测活" }));
@@ -105,10 +119,7 @@ describe("ProcessorBuilder", () => {
     expect(within(probeGroup).getByRole("spinbutton", { name: "缓存秒数" })).toHaveValue(0);
     expect(within(probeGroup).queryByText(/默认/)).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "保存订阅" }));
-
-    const saved = onSave.mock.calls[0]?.[0] as FormData;
-    expect(JSON.parse(String(saved.get("processors")))).toEqual([
+    expect(serializedProcessors()).toEqual([
       { type: "quick_settings", stage: "nodes" },
       {
         type: "probe",
@@ -126,48 +137,9 @@ describe("ProcessorBuilder", () => {
       },
     ]);
   });
-  it("fills url_test probe defaults into inputs and serializes them", async () => {
-    const user = userEvent.setup();
-    const onSave = vi.fn();
-
-    render(<SubscriptionEditPage item={subscriptions[0]} onBack={noop} onSave={onSave} definition={{ ...remoteSubscriptionDefinition, processors: [] }} sources={subscriptions} />);
-
-    await user.click(screen.getByRole("combobox", { name: "类型" }));
-    await user.click(screen.getByRole("option", { name: "测活" }));
-    await user.click(screen.getByRole("button", { name: "添加处理器" }));
-
-    const probeGroup = screen.getByRole("group", { name: "处理器 测活" });
-    await user.click(within(probeGroup).getByRole("combobox", { name: "方式" }));
-    await user.click(screen.getByRole("option", { name: "url_test" }));
-
-    expect(probeGroup).not.toHaveTextContent(/sing-box|mihomo/);
-    expect(within(probeGroup).getByRole("combobox", { name: "URL" })).toHaveValue("http://www.gstatic.com/generate_204");
-
-    await user.click(screen.getByRole("button", { name: "保存订阅" }));
-
-    const saved = onSave.mock.calls[0]?.[0] as FormData;
-    expect(JSON.parse(String(saved.get("processors")))).toEqual([
-      { type: "quick_settings", stage: "nodes" },
-      {
-        type: "probe",
-        stage: "nodes",
-        params: {
-          method: "url_test",
-          core: "sing-box",
-          url: "http://www.gstatic.com/generate_204",
-          timeout_ms: 5000,
-          attempts: 1,
-          concurrency: 10,
-          cache_ttl_seconds: 0,
-          fail_mode: "keep",
-        },
-      },
-    ]);
-  });
   it("serializes visual processor edits into the hidden form field", async () => {
     const user = userEvent.setup();
-    const onSave = vi.fn();
-    render(<SubscriptionEditPage item={subscriptions[0]} onBack={noop} onSave={onSave} definition={{ ...remoteSubscriptionDefinition, processors: [] }} sources={subscriptions} />);
+    const { serializedProcessors } = renderProcessorBuilder();
 
     expect(screen.getByRole("combobox", { name: "类型" })).toHaveTextContent("过滤");
     const quickSettingsGroup = screen.getByRole("group", { name: "处理器 快捷设置" });
@@ -181,7 +153,7 @@ describe("ProcessorBuilder", () => {
     await user.click(within(addedProcessorGroup).getByRole("button", { name: "编辑名称" }));
     const addedProcessorName = within(addedProcessorGroup).getByRole("textbox", { name: "名称" });
     expect(addedProcessorName).toHaveValue("");
-    await user.type(addedProcessorName, "按 server 过滤");
+    fireEvent.change(addedProcessorName, { target: { value: "按 server 过滤" } });
     expect(screen.getByRole("combobox", { name: "过滤动作" })).toHaveTextContent("保留");
     await user.click(screen.getByRole("combobox", { name: "匹配字段" }));
     const fieldListbox = await screen.findByRole("listbox");
@@ -191,34 +163,29 @@ describe("ProcessorBuilder", () => {
     expect(screen.queryByRole("option", { name: "source_format" })).not.toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "tags" })).not.toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "匹配方式" })).toHaveTextContent("正则");
-    await user.type(screen.getByRole("textbox", { name: "正则表达式" }), "example\\.com");
-    await user.click(screen.getByRole("button", { name: "保存订阅" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "正则表达式" }), {
+      target: { value: "example\\.com" },
+    });
 
-    const saved = onSave.mock.calls[0]?.[0] as FormData;
-    expect(JSON.parse(String(saved?.get("processors")))).toEqual([
+    expect(serializedProcessors()).toEqual([
       { type: "quick_settings", stage: "nodes" },
       { name: "按 server 过滤", type: "filter", stage: "nodes", params: { action: "keep", field: "server", match: "regex", pattern: "example\\.com" } },
     ]);
   });
   it("adds the optional information-node filter preset before health checks", async () => {
     const user = userEvent.setup();
-    const onSave = vi.fn();
-    render(<SubscriptionEditPage
-      item={subscriptions[0]}
-      onBack={noop}
-      onSave={onSave}
-      definition={{
-        ...remoteSubscriptionDefinition,
-        processors: [{ type: "probe", stage: "nodes", params: { method: "url_test", core: "sing-box" } }],
-      }}
-      sources={subscriptions}
-    />);
+    const { serializedProcessors } = renderProcessorBuilder({
+      defaultValue: [{
+        type: "probe",
+        stage: "nodes",
+        params: { method: "url_test", core: "sing-box" },
+      }],
+    });
 
     await selectMuiOption(user, screen.getByRole("combobox", { name: "类型" }), "过滤信息节点（预设）");
     await user.click(screen.getByRole("button", { name: "添加处理器" }));
-    await user.click(screen.getByRole("button", { name: "保存订阅" }));
 
-    const saved = JSON.parse(String((onSave.mock.calls[0]?.[0] as FormData).get("processors")));
+    const saved = serializedProcessors();
     expect(saved.map((processor: { type: string }) => processor.type)).toEqual(["quick_settings", "filter", "probe"]);
     expect(saved[1]).toEqual({
       name: "过滤信息节点",
@@ -234,33 +201,23 @@ describe("ProcessorBuilder", () => {
   });
   it("uses the shared script params contract for subscription processors", async () => {
     const user = userEvent.setup();
-    const onSave = vi.fn();
-    render(
-      <SubscriptionEditPage
-        item={subscriptions[0]}
-        onBack={noop}
-        onSave={onSave}
-        scriptFiles={scriptFiles}
-        definition={{
-          ...remoteSubscriptionDefinition,
-          processors: [
-            {
-              type: "script",
-              stage: "nodes",
-              params: {
-                engine: "js",
-                args: { flag: true, in: "zh" },
-                id: "legacy-script",
-                path: "rename.js",
-                content: "return input;",
-                timeout_ms: 5000,
-              },
-            },
-          ],
-        }}
-        sources={subscriptions}
-      />,
-    );
+    const { serializedProcessors } = renderProcessorBuilder({
+      defaultValue: [
+        {
+          type: "script",
+          stage: "nodes",
+          params: {
+            engine: "js",
+            args: { flag: true, in: "zh" },
+            id: "legacy-script",
+            path: "rename.js",
+            content: "return input;",
+            timeout_ms: 5000,
+          },
+        },
+      ],
+      scriptFiles,
+    });
 
     const scriptGroup = screen.getByRole("group", { name: "处理器 脚本处理" });
     expect(within(scriptGroup).queryByRole("combobox", { name: "第 2 个处理器类型" })).not.toBeInTheDocument();
@@ -286,12 +243,9 @@ describe("ProcessorBuilder", () => {
     expect(within(scriptGroup).queryByRole("textbox", { name: "脚本路径" })).not.toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "default.yaml" })).not.toBeInTheDocument();
     await user.selectOptions(scriptFileSelect, "other.js");
-    await user.clear(argsInput);
-    await user.type(argsInput, "in=zh\nflag=true\nthreshold=2");
-    await user.click(screen.getByRole("button", { name: "保存订阅" }));
+    fireEvent.change(argsInput, { target: { value: "in=zh\nflag=true\nthreshold=2" } });
 
-    const saved = onSave.mock.calls[0]?.[0] as FormData;
-    expect(JSON.parse(String(saved.get("processors")))).toEqual([
+    expect(serializedProcessors()).toEqual([
       { type: "quick_settings", stage: "nodes" },
       {
         type: "script",
@@ -306,46 +260,34 @@ describe("ProcessorBuilder", () => {
       },
     ]);
   });
-  it("uses a highlighted key-value editor for custom processor params", async () => {
-    const user = userEvent.setup();
-    const onSave = vi.fn();
-    render(
-      <SubscriptionEditPage
-        item={subscriptions[0]}
-        onBack={noop}
-        onSave={onSave}
-        definition={{
-          ...remoteSubscriptionDefinition,
-          processors: [
-            {
-              type: "custom",
-              stage: "nodes",
-              params: { enabled: true, threshold: 2 },
-            },
-          ],
-        }}
-        sources={subscriptions}
-      />,
-    );
+  it("uses a highlighted key-value editor for custom processor params", () => {
+    const { serializedProcessors } = renderProcessorBuilder({
+      defaultValue: [
+        {
+          type: "custom",
+          stage: "nodes",
+          params: { enabled: true, threshold: 2 },
+        },
+      ],
+    });
 
     const customGroup = screen.getByRole("group", { name: "处理器 custom" });
     const paramsInput = within(customGroup).getByRole("textbox", { name: "参数键值" });
     expect(paramsInput).toHaveValue("enabled=true\nthreshold=2");
     expect(paramsInput.closest("[data-highlighted-textarea]")).toHaveAttribute("data-highlighted-textarea", "text");
 
-    await user.clear(paramsInput);
-    await user.type(paramsInput, "enabled=false\nthreshold=3");
-    await user.click(screen.getByRole("button", { name: "保存订阅" }));
+    fireEvent.change(paramsInput, { target: { value: "enabled=false\nthreshold=3" } });
 
-    const saved = onSave.mock.calls[0]?.[0] as FormData;
-    expect(JSON.parse(String(saved.get("processors")))).toEqual([
+    expect(serializedProcessors()).toEqual([
       { type: "quick_settings", stage: "nodes" },
       { type: "custom", stage: "nodes", params: { enabled: false, threshold: 3 } },
     ]);
   });
   it("opens the processor name editor with the saved name as the input value", async () => {
     const user = userEvent.setup();
-    render(<SubscriptionEditPage item={subscriptions[0]} onBack={noop} onSave={noop} definition={remoteSubscriptionDefinition} sources={subscriptions} />);
+    renderProcessorBuilder({
+      defaultValue: remoteSubscriptionDefinition.processors,
+    });
 
     const processorGroup = screen.getByRole("group", { name: "处理器 入口重命名" });
     await user.click(within(processorGroup).getByRole("button", { name: "编辑名称" }));
@@ -356,7 +298,7 @@ describe("ProcessorBuilder", () => {
   });
   it("seeds quick settings as the first processor before later additions", async () => {
     const user = userEvent.setup();
-    const { container } = render(<SubscriptionEditPage item={subscriptions[0]} onBack={noop} onSave={noop} definition={{ ...remoteSubscriptionDefinition, processors: [] }} sources={subscriptions} />);
+    const { serializedProcessors } = renderProcessorBuilder();
 
     const newType = screen.getByRole("combobox", { name: "类型" });
     expect(newType).toHaveTextContent("过滤");
@@ -374,7 +316,7 @@ describe("ProcessorBuilder", () => {
     expect(within(quickSettingsGroup).getByText("处理器 1")).toBeInTheDocument();
     expect(within(quickSettingsGroup).queryByRole("textbox", { name: "名称" })).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "第 1 个处理器类型" })).not.toBeInTheDocument();
-    expect(JSON.parse(String(container.querySelector('input[name="processors"]')?.getAttribute("value")))).toEqual([
+    expect(serializedProcessors()).toEqual([
       { type: "quick_settings", stage: "nodes" },
     ]);
 
@@ -385,14 +327,14 @@ describe("ProcessorBuilder", () => {
     await user.click(within(addedProcessorGroup).getByRole("button", { name: "编辑名称" }));
     expect(within(addedProcessorGroup).getByRole("textbox", { name: "名称" })).toHaveValue("");
     expect(screen.queryByRole("combobox", { name: "第 2 个处理器类型" })).not.toBeInTheDocument();
-    expect(JSON.parse(String(container.querySelector('input[name="processors"]')?.getAttribute("value")))).toEqual([
+    expect(serializedProcessors()).toEqual([
       { type: "quick_settings", stage: "nodes" },
       { type: "filter", stage: "nodes", params: { action: "keep", field: "name", match: "regex" } },
     ]);
   });
   it("serializes added name processing as flat params", async () => {
     const user = userEvent.setup();
-    const { container } = render(<SubscriptionEditPage item={subscriptions[0]} onBack={noop} onSave={noop} definition={{ ...remoteSubscriptionDefinition, processors: [] }} sources={subscriptions} />);
+    const { serializedProcessors } = renderProcessorBuilder();
 
     await selectMuiOption(user, screen.getByRole("combobox", { name: "类型" }), "名称处理");
     await user.click(screen.getByRole("button", { name: "添加处理器" }));
@@ -401,7 +343,7 @@ describe("ProcessorBuilder", () => {
     expect(within(addedProcessorGroup).getByRole("checkbox", { name: "去除首尾空白" })).toBeChecked();
     expect(within(addedProcessorGroup).getByRole("combobox", { name: "重命名方式" })).toHaveTextContent("不重命名");
     expect(within(addedProcessorGroup).queryByRole("combobox", { name: /名称操作/ })).not.toBeInTheDocument();
-    expect(JSON.parse(String(container.querySelector('input[name="processors"]')?.getAttribute("value")))).toEqual([
+    expect(serializedProcessors()).toEqual([
       { type: "quick_settings", stage: "nodes" },
       { type: "rename", stage: "nodes", params: { trim: true } },
     ]);

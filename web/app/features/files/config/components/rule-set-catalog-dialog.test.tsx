@@ -1,4 +1,4 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 
@@ -32,7 +32,7 @@ it("loads a target once, searches locally, and renders at most 100 matches", asy
 
   const search = screen.getByRole("textbox", { name: "Search rule sets" });
   expect(screen.getByText("Search", { selector: "label" })).toBeInTheDocument();
-  await user.type(search, "special");
+  fireEvent.change(search, { target: { value: "special" } });
   const row = await screen.findByRole("listitem");
   expect(within(row).getByText(special.name)).toBeInTheDocument();
   expect(within(row).getByText(special.url)).toBeInTheDocument();
@@ -58,7 +58,7 @@ it("reuses the loaded target after closing and reopening", async () => {
   const { rerender } = render(<RuleSetCatalogDialog {...props} open />);
 
   expect(await screen.findByText("geosite-cn")).toBeInTheDocument();
-  await user.type(screen.getByRole("textbox", { name: "Search rule sets" }), "cn");
+  fireEvent.change(screen.getByRole("textbox", { name: "Search rule sets" }), { target: { value: "cn" } });
   await user.click(screen.getByRole("button", { name: "Add rule set “geosite-cn”" }));
   expect(screen.getByText(/already used by another URL/)).toBeInTheDocument();
   rerender(<RuleSetCatalogDialog {...props} open={false} />);
@@ -101,7 +101,7 @@ it("shows local empty and conflict states without closing", async () => {
   expect(screen.getByText("The name “existing-name” is already used by another URL.")).toBeInTheDocument();
   expect(onClose).not.toHaveBeenCalled();
 
-  await user.type(screen.getByRole("textbox", { name: "Search rule sets" }), "missing");
+  fireEvent.change(screen.getByRole("textbox", { name: "Search rule sets" }), { target: { value: "missing" } });
   expect(await screen.findByText("No matching rule sets.")).toBeInTheDocument();
 });
 

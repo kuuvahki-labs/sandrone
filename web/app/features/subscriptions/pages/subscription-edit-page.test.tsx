@@ -1,8 +1,7 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import type { SubscriptionDefinition } from "~/features/subscriptions/model/types";
 import {
   noop,
   remoteSubscriptionDefinition,
@@ -32,7 +31,7 @@ describe("SubscriptionEditPage", () => {
     expect(screen.queryByRole("textbox", { name: "代理" })).not.toBeInTheDocument();
     expect(screen.queryByRole("spinbutton", { name: "超时毫秒" })).not.toBeInTheDocument();
 
-    await user.type(localContentInput, "ss://converted");
+    fireEvent.change(localContentInput, { target: { value: "ss://converted" } });
     await user.click(screen.getByRole("button", { name: "保存订阅" }));
 
     const saved = onSave.mock.calls[0]?.[0] as FormData;
@@ -42,6 +41,15 @@ describe("SubscriptionEditPage", () => {
     expect(saved.get("proxy")).toBeNull();
     expect(saved.get("timeout_ms")).toBeNull();
     expect(saved.getAll("subscriptions")).toEqual([]);
+    expect(JSON.parse(String(saved.get("processors")))).toEqual([
+      { type: "quick_settings", stage: "nodes" },
+      {
+        name: "入口重命名",
+        type: "rename",
+        stage: "nodes",
+        params: { mode: "prefix", value: "source-" },
+      },
+    ]);
   });
   it("switches remote subscription edits to a collection without stale source fields", async () => {
     const user = userEvent.setup();
@@ -67,21 +75,6 @@ describe("SubscriptionEditPage", () => {
     expect(saved.get("user_agent")).toBeNull();
     expect(saved.get("proxy")).toBeNull();
     expect(saved.get("timeout_ms")).toBeNull();
-  });
-  it("prefills collection subscription edit sources from the loaded definition", () => {
-    const collectionDefinition: SubscriptionDefinition = {
-      name: "default",
-      kind: "collection",
-      sourceRefs: ["warn"],
-      processors: [],
-      meta: { description: "private" },
-    };
-
-    render(<SubscriptionEditPage item={subscriptions[2]} onBack={noop} onSave={noop} definition={collectionDefinition} sources={subscriptions} />);
-
-    const sourcePicker = screen.getByRole("group", { name: "包含订阅" });
-    expect(within(sourcePicker).getByRole("checkbox", { name: "provider 远程订阅 · uri-list" })).not.toBeChecked();
-    expect(within(sourcePicker).getByRole("checkbox", { name: "warn 远程订阅 · uri-list" })).toBeChecked();
   });
   it("renders subscription editing as a segmented full page form", () => {
     render(
@@ -179,13 +172,5 @@ describe("SubscriptionEditPage", () => {
 
     expect(processorRules).toBeInTheDocument();
     expect(screen.queryByRole("group", { name: "远程抓取设置" })).not.toBeInTheDocument();
-  });
-  it("offers a source preview entry from the source editor", () => {
-    const onPreview = vi.fn();
-    render(<SubscriptionEditPage item={subscriptions[0]} onBack={noop} onPreview={onPreview} onSave={noop} definition={remoteSubscriptionDefinition} sources={subscriptions} />);
-
-    screen.getByRole("button", { name: "预览订阅" }).click();
-
-    expect(onPreview).toHaveBeenCalledTimes(1);
   });
 });

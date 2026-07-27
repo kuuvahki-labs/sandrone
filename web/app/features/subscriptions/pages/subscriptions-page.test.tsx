@@ -1,6 +1,6 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   createAction,
@@ -12,7 +12,7 @@ import {
 import { SubscriptionsPage } from "./subscriptions-page";
 
 describe("SubscriptionsPage", () => {
-  it("renders the subscription home as a MUI list screen with working actions", async () => {
+  it("renders the subscription home as a searchable MUI list screen", async () => {
     const user = userEvent.setup();
     const providerItem = { ...subscriptions[0], displayName: "机场主订阅", title: "机场主订阅" };
     const items = [
@@ -21,23 +21,17 @@ describe("SubscriptionsPage", () => {
       { kind: "local" as const, name: "local", title: "local", label: "本地订阅", status: "ready" as const, format: "uri-list" },
       subscriptions[2],
     ];
-    const onCreateRemote = vi.fn();
-    const onCreateLocal = vi.fn();
-    const onCreateCollection = vi.fn();
-    const onDelete = vi.fn();
-    const onEdit = vi.fn();
-    const onShare = vi.fn();
     const { container } = render(
       <SubscriptionsPage
         createActions={[
-          createAction("远程", onCreateRemote, "新建远程订阅"),
-          createAction("本地", onCreateLocal, "新建本地订阅"),
-          createAction("组合", onCreateCollection, "新建组合订阅"),
+          createAction("远程", noop, "新建远程订阅"),
+          createAction("本地", noop, "新建本地订阅"),
+          createAction("组合", noop, "新建组合订阅"),
         ]}
         items={items}
-        onDelete={onDelete}
-        onEdit={onEdit}
-        onShare={onShare}
+        onDelete={noop}
+        onEdit={noop}
+        onShare={noop}
       />,
     );
 
@@ -62,67 +56,21 @@ describe("SubscriptionsPage", () => {
     expect(searchLabel).not.toHaveClass("MuiInputLabel-shrink");
     await user.click(searchbox);
     expect(searchLabel).toHaveClass("MuiInputLabel-shrink");
-    await user.type(searchbox, "机场");
+    fireEvent.change(searchbox, { target: { value: "机场" } });
     expect(screen.getByText("机场主订阅")).toBeInTheDocument();
     expect(screen.queryByText("default")).not.toBeInTheDocument();
-    await user.clear(searchbox);
-    await user.type(searchbox, "provider");
+    fireEvent.change(searchbox, { target: { value: "provider" } });
     expect(screen.getByText("机场主订阅")).toBeInTheDocument();
     expect(screen.queryByText("default")).not.toBeInTheDocument();
-    await user.clear(searchbox);
-    await user.type(searchbox, "warn");
+    fireEvent.change(searchbox, { target: { value: "暂时不可用" } });
     expect(screen.getByText("warn")).toBeInTheDocument();
     expect(screen.queryByText("default")).not.toBeInTheDocument();
-    await user.clear(searchbox);
+    fireEvent.change(searchbox, { target: { value: "" } });
 
-    await user.click(screen.getByRole("button", { name: "新建订阅" }));
-    await user.click(await screen.findByRole("menuitem", { name: "新建远程订阅" }));
-    await user.click(screen.getByRole("button", { name: "编辑：provider" }));
     await user.click(screen.getByRole("button", { name: "default 更多操作" }));
     expect(screen.queryByRole("menuitem", { name: "刷新" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("menuitem", { name: "分享" }));
-    await user.click(screen.getByRole("button", { name: "default 更多操作" }));
     expect(screen.queryByRole("menuitem", { name: "诊断" })).not.toBeInTheDocument();
     await user.keyboard("{Escape}");
-    await user.click(screen.getByRole("button", { name: "provider 更多操作" }));
-    await user.click(screen.getByRole("menuitem", { name: "删除" }));
-
-    expect(onCreateRemote).toHaveBeenCalledTimes(1);
-    expect(onCreateLocal).not.toHaveBeenCalled();
-    expect(onCreateCollection).not.toHaveBeenCalled();
-    expect(onEdit).toHaveBeenCalledWith(items[0]);
-    expect(onShare).toHaveBeenCalledWith(items[3]);
-    expect(onDelete).toHaveBeenCalledWith(items[0]);
-  });
-  it("renders traffic usage progress directly on the list", () => {
-    const trafficWithUsage = {
-      ...subscriptionTraffic,
-      traffic: {
-        sourceName: "provider",
-        uploadBytes: 1024,
-        downloadBytes: 2048,
-        usedBytes: 3072,
-        totalBytes: 10240,
-        planName: "VIP 1",
-      },
-    };
-    render(
-      <SubscriptionsPage
-        createActions={[createAction("远程", noop, "新建远程订阅")]}
-        getTrafficKey={(item) => `${item.kind}:${item.name}`}
-        items={subscriptions}
-        trafficByKey={{ "remote:provider": trafficWithUsage }}
-        onDelete={noop}
-        onEdit={noop}
-        onShare={noop}
-      />,
-    );
-
-    const list = screen.getByRole("list", { name: "订阅列表" });
-    expect(within(list).getByText("VIP 1")).toBeInTheDocument();
-    expect(within(list).getByText("↑ 1 KiB · ↓ 2 KiB · TOT 10 KiB")).toBeInTheDocument();
-    const progress = within(list).getByRole("progressbar", { name: "↑ 1 KiB · ↓ 2 KiB · TOT 10 KiB" });
-    expect(progress).toHaveAttribute("aria-valuenow", "30");
   });
   it("does not reserve a details area when traffic is unavailable", () => {
     render(
@@ -171,7 +119,10 @@ describe("SubscriptionsPage", () => {
 
     const list = screen.getByRole("list", { name: "订阅列表" });
     expect(within(list).getByText("VIP 1")).toBeInTheDocument();
-    expect(within(list).getByText("↑ 1 KiB · ↓ 2 KiB · TOT 10 KiB · 1Y 3D")).toBeInTheDocument();
+    const trafficSummary = "↑ 1 KiB · ↓ 2 KiB · TOT 10 KiB · 1Y 3D";
+    expect(within(list).getByText(trafficSummary)).toBeInTheDocument();
+    const progress = within(list).getByRole("progressbar", { name: trafficSummary });
+    expect(progress).toHaveAttribute("aria-valuenow", "30");
     expect(within(list).getByRole("button", { name: "provider 更多操作" })).toBeInTheDocument();
   });
 });

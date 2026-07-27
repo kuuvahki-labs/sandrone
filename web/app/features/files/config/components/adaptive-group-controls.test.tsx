@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -134,18 +134,18 @@ describe("ConfigAdaptiveGroupControls", () => {
     expect(screen.getByRole("checkbox", { name: /Singapore/ })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: /South Korea/ })).not.toBeChecked();
 
-    await user.click(screen.getByRole("button", { name: "清空" }));
+    fireEvent.click(screen.getByRole("button", { name: "清空" }));
     expect(screen.getByText("已选择 0 个地区")).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: /Hong Kong/ })).not.toBeChecked();
 
-    await user.click(screen.getByRole("checkbox", { name: /Hong Kong/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Hong Kong/ }));
     expect(screen.getByText("已选择 1 个地区")).toBeInTheDocument();
 
     expect(onOptionsChange).toHaveBeenLastCalledWith(expect.objectContaining({
       enabledRegionIds: ["hk"],
     }));
 
-    await user.click(screen.getByRole("button", { name: "全选" }));
+    fireEvent.click(screen.getByRole("button", { name: "全选" }));
     expect(screen.getByText("已选择 22 个地区")).toBeInTheDocument();
   });
 

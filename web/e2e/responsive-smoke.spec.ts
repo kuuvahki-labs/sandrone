@@ -180,6 +180,15 @@ test.beforeEach(async ({ page }) => {
   await page.route("**/v1/subscriptions/default", async (route) => {
     await route.fulfill({ json: collectionDetail });
   });
+  await page.route("**/version", async (route) => {
+    await route.fulfill({
+      json: {
+        name: "sandrone",
+        version: "0.1.0",
+        revision: "0123456789abcdef",
+      },
+    });
+  });
   await page.route("**/healthz", async (route) => {
     await route.fulfill({ body: "ok" });
   });
@@ -219,6 +228,9 @@ for (const route of routes) {
       localStorage.setItem("sandrone.locale", "zh-CN");
       localStorage.setItem("sandrone.publicBaseUrl", "https://example.com");
     });
+    const versionResponse = route.path === "/settings"
+      ? page.waitForResponse((response) => new URL(response.url()).pathname === "/version")
+      : null;
     await page.goto(route.path);
 
     await expect(page.getByRole("heading", { name: route.heading, level: 2 })).toBeVisible();
@@ -389,6 +401,7 @@ for (const route of routes) {
       expect(consoleIssues).toEqual([]);
     }
     if (route.path === "/settings") {
+      expect((await versionResponse)?.status()).toBe(200);
       const dataManagement = page.getByRole("heading", { name: "数据管理" }).locator("xpath=ancestor::article[1]");
       await expect(dataManagement).toBeVisible();
       await expect(dataManagement.getByRole("note")).toContainText("备份是未加密的明文");

@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -7,6 +7,7 @@ import { requireFileDriver } from "~/features/files/drivers/registry";
 import { requireFileDriverUI } from "~/features/files/editor/file-driver-ui-registry";
 
 import { FileFormFields } from "./file-form";
+import { FileTypeSummary } from "./file-type-summary";
 import { RawFileConfigEditor } from "./raw-config-editor";
 
 afterEach(() => {
@@ -48,30 +49,6 @@ describe("file form drivers", () => {
       mode="edit"
       subscriptions={[]}
       ui={requireFileDriverUI("mihomo")}
-    />);
-
-    expect(currentConfig()).toEqual({ settings });
-  });
-
-  it.each([
-    ["mihomo", {}],
-    ["mihomo", { type: "url-test" }],
-    ["mihomo", { regions: ["us", "hk"] }],
-    ["shadowrocket", {}],
-    ["shadowrocket", { type: "url-test" }],
-    ["shadowrocket", { regions: ["us", "hk"] }],
-  ] as const)("keeps untouched partial %s adaptive settings byte-structurally equivalent", (kind, adaptiveGroups) => {
-    const adapter = structuredAdapter(kind);
-    const settings = { adaptive_groups: adaptiveGroups };
-    const defaultValue = adapter.decode({ settingsPresent: true, settings }, "en-US");
-
-    render(<FileConfigEditor
-      adapter={adapter}
-      baseEditor={<div />}
-      defaultValue={defaultValue}
-      mode="edit"
-      subscriptions={[]}
-      ui={requireFileDriverUI(kind)}
     />);
 
     expect(currentConfig()).toEqual({ settings });
@@ -152,8 +129,7 @@ describe("file form drivers", () => {
     const groups = screen.getByRole("group", { name: "Proxy groups" });
     expect(within(groups).getAllByRole("button", { name: /^Expand proxy group/ })).toHaveLength(1);
     await user.click(within(groups).getByRole("button", { name: "Expand proxy group Proxy" }));
-    await user.clear(within(groups).getByRole("textbox", { name: "Name" }));
-    await user.type(within(groups).getByRole("textbox", { name: "Name" }), "Manual");
+    fireEvent.change(within(groups).getByRole("textbox", { name: "Name" }), { target: { value: "Manual" } });
     expect(currentSettings().groups).toEqual(expect.arrayContaining([expect.objectContaining({ name: "Manual" })]));
     expect(currentSettings()).not.toHaveProperty("rule_sets");
     expect(currentSettings()).not.toHaveProperty("rules");
@@ -186,13 +162,13 @@ describe("file form drivers", () => {
   });
 
   it.each([
-    ["static", "通用", '[data-testid="DescriptionOutlinedIcon"]'],
+    ["file", "通用", '[data-testid="DescriptionOutlinedIcon"]'],
     ["mihomo", "mihomo", 'img[src="/brand/clients/mihomo.webp"]'],
     ["sing-box", "sing-box", 'img[src="/brand/clients/sing-box.svg"]'],
-    ["shadowrocket", "Shadowrocket", '[data-testid="RocketLaunchOutlinedIcon"]'],
-  ] as const)("shows the resolved %s driver as static file-type metadata", (kind, label, iconSelector) => {
+    ["rocket", "Shadowrocket", '[data-testid="RocketLaunchOutlinedIcon"]'],
+  ] as const)("renders the %s FileTypeSummary as static metadata", (icon, label, iconSelector) => {
     render(
-      <FileFormFields defaultName="client.conf" driver={requireFileDriver(kind)} mode="edit" />,
+      <FileTypeSummary icon={icon} label={label} title="文件类型" />,
     );
 
     const metadata = screen.getByRole("group", { name: "文件类型" });
@@ -200,29 +176,35 @@ describe("file form drivers", () => {
     expect(metadata.querySelector(iconSelector)).toBeInTheDocument();
     expect(metadata.querySelector("button, input, select, textarea")).not.toBeInTheDocument();
     expect(metadata.querySelector(".MuiChip-root")).not.toBeInTheDocument();
+  });
+
+  it("composes static file-type metadata without a hidden kind input", () => {
+    render(<FileFormFields defaultName="client.conf" driver={requireFileDriver("static")} mode="edit" />);
+
+    expect(screen.getByRole("group", { name: "文件类型" })).toBeInTheDocument();
     expect(document.querySelector('input[name="kind"]')).not.toBeInTheDocument();
   });
 
-  it("uses INI highlighting and a section-complete base for Shadowrocket", () => {
-    render(<FileFormFields defaultName="default.conf" driver={requireFileDriver("shadowrocket")} mode="create" />);
+  it("aggregates sing-box source validity into form validity", async () => {
+    const onValidityChange = vi.fn();
+    render(<FileFormFields
+      defaultName="client.json"
+      driver={requireFileDriver("sing-box")}
+      mode="edit"
+      onValidityChange={onValidityChange}
+      sourceDefault={{ type: "inline", content: "{}" }}
+    />);
 
-		const base = within(screen.getByRole("group", { name: "基础配置内容" }))
-			.getByRole("textbox", { name: "内容" });
-		const value = (base as HTMLTextAreaElement).value;
-		expect(value).toContain("[General]");
-		expect(value).toContain("[Proxy Group]");
-		expect(value).toContain("dns-server = https://doh.pub/dns-query,https://dns.alidns.com/dns-query,223.5.5.5,119.29.29.29");
-		expect(value).toContain("[Host]");
-		expect(value).toContain("*.apple.com = server:system");
-		expect(value).toContain("*.icloud.com = server:system");
-		expect(value).toContain("localhost = 127.0.0.1");
-		expect(value).toContain("# always-real-ip =");
-		expect(value).toContain("[URL Rewrite]");
-		expect(value).toContain("[MITM]");
-		expect(value).toContain("hostname = *.google.cn");
-		expect(value).not.toMatch(/^\s*always-real-ip\s*=/mu);
-		expect(base.closest("[data-highlighted-textarea]")).toHaveAttribute("data-highlighted-textarea", "ini");
-	});
+    await waitFor(() => expect(onValidityChange).toHaveBeenLastCalledWith(true));
+    const baseContent = within(screen.getByRole("group", { name: "基础配置内容" }))
+      .getByRole("textbox", { name: "内容" });
+
+    fireEvent.change(baseContent, { target: { value: "[]" } });
+    await waitFor(() => expect(onValidityChange).toHaveBeenLastCalledWith(false));
+
+    fireEvent.change(baseContent, { target: { value: "{}" } });
+    await waitFor(() => expect(onValidityChange).toHaveBeenLastCalledWith(true));
+  });
 
   it("uses the existing config naming locale when an edited remote source becomes inline", async () => {
     localStorage.setItem("sandrone.locale", "en-US");

@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ConfigMap } from "~/features/files/config/model/editor-model";
+import type { ConfigNodeSummary } from "~/features/files/config/model/node-source";
 import { requireFileDriver } from "~/features/files/drivers/registry";
 import { requireFileDriverUI } from "~/features/files/editor/file-driver-ui-registry";
 
@@ -14,6 +15,43 @@ afterEach(() => {
 });
 
 describe("ProxyGroupEditor runtime-filtered Mihomo groups", () => {
+  it("forwards projected nodes into fixed member options", async () => {
+    const user = userEvent.setup();
+    render(<ControlledEditor
+      initialGroups={[{ name: "Proxy", type: "select", proxies: ["$nodes"] }]}
+      nodes={[{ key: "hk", name: "HK Node", type: "ss", endpoint: "hk.example:8388" }]}
+      onChange={vi.fn()}
+    />);
+
+    await user.click(screen.getByRole("button", { name: "展开代理组 Proxy" }));
+    await user.click(screen.getByRole("combobox", { name: "成员 1" }));
+
+    expect(await screen.findByRole("option", { name: /HK Node.*ss/ })).toBeInTheDocument();
+  });
+
+  it("keeps rendered identities aligned while adding, moving, and deleting groups", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<ControlledEditor
+      initialGroups={[
+        { name: "Proxy", type: "select", proxies: ["$nodes", "DIRECT"] },
+        { name: "Custom", type: "select", proxies: ["DIRECT"] },
+        { name: "Hong Kong", type: "select", proxies: ["$nodes"] },
+      ]}
+      onChange={onChange}
+    />);
+
+    await user.click(screen.getByRole("button", { name: "添加代理组" }));
+    await user.click(screen.getByRole("button", { name: "下移代理组 Hong Kong" }));
+    await user.click(screen.getAllByRole("button", { name: "删除代理组 Custom" })[0]);
+
+    const renderedNames = screen.getAllByRole("button", { name: /展开代理组/ })
+      .map((button) => button.getAttribute("aria-label")?.replace("展开代理组 ", ""));
+    const serializedGroups = onChange.mock.lastCall?.[0] as ConfigMap[] | undefined;
+    expect(serializedGroups).toBeDefined();
+    expect(renderedNames).toEqual(serializedGroups?.map((group) => group.name));
+  });
+
   it("places hidden beside the member source", async () => {
     const user = userEvent.setup();
     render(<ControlledEditor
@@ -253,9 +291,10 @@ describe("ProxyGroupEditor sing-box summaries", () => {
   });
 });
 
-function ControlledEditor({ initialGroups, kind = "mihomo", onChange }: {
+function ControlledEditor({ initialGroups, kind = "mihomo", nodes = [], onChange }: {
   initialGroups: ConfigMap[];
   kind?: string;
+  nodes?: ConfigNodeSummary[];
   onChange: (groups: ConfigMap[]) => void;
 }) {
   const configuration = requireFileDriver(kind).configuration;
@@ -270,7 +309,7 @@ function ControlledEditor({ initialGroups, kind = "mihomo", onChange }: {
       groups={groups}
       inboundReferences={{}}
       issues={[]}
-      nodes={[]}
+      nodes={nodes}
       ui={requireFileDriverUI(kind)}
       onChange={(next) => {
         setGroups(next);

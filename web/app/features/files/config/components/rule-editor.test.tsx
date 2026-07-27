@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import type { RuleDraft, RuleSetDraft } from "~/features/files/config/model/editor-model";
+import type { ConfigNodeSummary } from "~/features/files/config/model/node-source";
 import { requireFileDriver } from "~/features/files/drivers/registry";
 import { requireFileDriverUI } from "~/features/files/editor/file-driver-ui-registry";
 import type { FileConfigDraft } from "~/features/files/model/types";
@@ -11,6 +12,35 @@ import type { FileConfigDraft } from "~/features/files/model/types";
 import { RuleListEditor, RuleSetListEditor } from "./rule-editor";
 
 describe("config rule editors", () => {
+  it("forwards live rule-set, group, and node references into rule fields", async () => {
+    const user = userEvent.setup();
+    const config = initialConfig("mihomo", {
+      groups: [{ name: "Proxy", type: "select", proxies: ["$nodes", "DIRECT"] }],
+      rule_sets: [
+        { name: "private", type: "inline", behavior: "classical", payload: ["DOMAIN-SUFFIX,local"] },
+        { name: "ads", type: "inline", behavior: "domain", payload: ["DOMAIN-SUFFIX,ads.example"] },
+      ],
+      rules: ["RULE-SET,private,DIRECT"],
+    });
+    render(
+      <RuleHarness
+        initial={config.rules}
+        nodes={[{ key: "hk", name: "HK Node", type: "ss", endpoint: "hk.example:8388" }]}
+        ruleSets={config.ruleSets}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "展开规则 1" }));
+    const rule = screen.getByRole("group", { name: "规则 1" });
+    await user.click(within(rule).getByRole("combobox", { name: "匹配值" }));
+    expect(await screen.findByRole("option", { name: "ads" })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await user.click(within(rule).getByRole("combobox", { name: "策略" }));
+    expect(await screen.findByRole("option", { name: "Proxy" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /HK Node.*ss/ })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+  });
+
   it("keeps one indexed rule-set editor open and distinguishes duplicate names", async () => {
     const user = userEvent.setup();
     const drafts = initialConfig("mihomo", {
@@ -112,7 +142,12 @@ function RuleSetHarness({ initial, kind = "mihomo" }: { initial: RuleSetDraft[];
   );
 }
 
-function RuleHarness({ initial, kind = "mihomo", ruleSets }: { initial: RuleDraft[]; kind?: string; ruleSets: RuleSetDraft[] }) {
+function RuleHarness({ initial, kind = "mihomo", nodes = [], ruleSets }: {
+  initial: RuleDraft[];
+  kind?: string;
+  nodes?: ConfigNodeSummary[];
+  ruleSets: RuleSetDraft[];
+}) {
   const [rules, setRules] = useState(initial);
   const adapter = structuredAdapter(kind);
   return (
@@ -121,7 +156,7 @@ function RuleHarness({ initial, kind = "mihomo", ruleSets }: { initial: RuleDraf
       defaultExpanded
       groups={adapter.groups.project([{ name: "Proxy", type: "select", proxies: ["$nodes", "DIRECT"] }]) ?? []}
       issues={[]}
-      nodes={[]}
+      nodes={nodes}
       rules={rules}
       ruleSets={ruleSets}
       ui={requireFileDriverUI(kind)}

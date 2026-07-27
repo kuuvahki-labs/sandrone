@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -161,12 +161,14 @@ describe("React Router app subscription workflows", () => {
   it("opens the remote editor after creating a subscription", async () => {
     const user = userEvent.setup();
     let created = false;
+    let postedBody: unknown;
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.includes("/v1/subscriptions/example.com")) {
         return jsonResponse({ name: "example.com", type: "remote", remote: { url: "https://example.com/sub" }, meta: { ui: "web" } });
       }
       if (url.includes("/v1/subscriptions") && init?.method === "POST") {
+        postedBody = JSON.parse(String(init.body));
         created = true;
         return jsonResponse({ ok: true }, { status: 201 });
       }
@@ -181,9 +183,15 @@ describe("React Router app subscription workflows", () => {
     renderApp("/subscriptions/new?type=remote");
 
     await screen.findByRole("heading", { name: "新建订阅" });
-    await user.type(screen.getByRole("textbox", { name: "订阅地址" }), "https://example.com/sub");
+    fireEvent.change(screen.getByRole("textbox", { name: "订阅地址" }), {
+      target: { value: "https://example.com/sub" },
+    });
     await user.click(screen.getByRole("button", { name: "保存订阅" }));
 
+    expect(postedBody).toMatchObject({
+      type: "remote",
+      remote: { url: "https://example.com/sub" },
+    });
     expect(await screen.findByRole("heading", { name: "编辑订阅" }, { timeout: 3000 })).toBeInTheDocument();
     expect(await screen.findByRole("textbox", { name: "订阅地址" }, { timeout: 3000 })).toHaveValue("https://example.com/sub");
   });
@@ -230,8 +238,9 @@ describe("React Router app subscription workflows", () => {
     renderApp("/subscriptions/new?type=collection");
 
     await screen.findByRole("heading", { name: "新建订阅" });
-    await user.clear(screen.getByRole("textbox", { name: "名称" }));
-    await user.type(screen.getByRole("textbox", { name: "名称" }), "private");
+    fireEvent.change(screen.getByRole("textbox", { name: "名称" }), {
+      target: { value: "private" },
+    });
     await user.click(screen.getByRole("checkbox", { name: "provider 远程订阅 · uri-list" }));
     await user.click(screen.getByRole("checkbox", { name: "warn 远程订阅 · uri-list" }));
     await user.click(screen.getByRole("button", { name: "保存订阅" }));
@@ -281,7 +290,9 @@ describe("React Router app subscription workflows", () => {
     renderApp("/subscriptions/new?type=remote");
 
     await screen.findByRole("heading", { name: "新建订阅" });
-    await user.type(screen.getByRole("textbox", { name: "订阅地址" }), "https://example.com/sub");
+    fireEvent.change(screen.getByRole("textbox", { name: "订阅地址" }), {
+      target: { value: "https://example.com/sub" },
+    });
     await user.click(screen.getByRole("button", { name: "保存订阅" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("remote fetch failed");
@@ -345,7 +356,7 @@ describe("React Router app subscription workflows", () => {
     await screen.findByRole("heading", { name: "新建订阅" });
     const subscriptionInput = screen.getByRole("textbox", { name: "内容" });
     expect(subscriptionInput.tagName).toBe("TEXTAREA");
-    await user.type(subscriptionInput, content);
+    fireEvent.change(subscriptionInput, { target: { value: content } });
     await user.click(screen.getByRole("button", { name: "保存订阅" }));
 
     const post = requests.find((request) => request.url.endsWith("/v1/subscriptions") && request.init?.method === "POST");
@@ -410,7 +421,10 @@ describe("React Router app subscription workflows", () => {
 
     await screen.findByRole("textbox", { name: "订阅地址" });
     await user.click(screen.getByRole("button", { name: "本地" }));
-    await user.type(within(screen.getByRole("group", { name: "基本信息" })).getByRole("textbox", { name: "内容" }), "ss://converted");
+    fireEvent.change(
+      within(screen.getByRole("group", { name: "基本信息" })).getByRole("textbox", { name: "内容" }),
+      { target: { value: "ss://converted" } },
+    );
     await user.click(screen.getByRole("button", { name: "保存订阅" }));
 
     const post = requests.find((request) => request.url.endsWith("/v1/subscriptions") && request.init?.method === "POST");
@@ -552,13 +566,15 @@ describe("React Router app subscription workflows", () => {
 
     const sourceInput = await screen.findByRole("textbox", { name: "订阅地址" });
     expect(sourceInput).toHaveValue("https://example.com/sub");
-    await user.clear(sourceInput);
-    await user.type(sourceInput, "https://example.com/updated");
+    fireEvent.change(sourceInput, { target: { value: "https://example.com/updated" } });
     await user.click(screen.getByRole("button", { name: "保存订阅" }));
 
     await waitFor(() => {
       expect(requests.some((request) => request.url.endsWith("/v1/subscriptions") && request.init?.method === "POST")).toBe(true);
     });
+    const post = requests.find((request) => request.url.endsWith("/v1/subscriptions") && request.init?.method === "POST");
+    expect(post).toBeDefined();
+    expect(JSON.parse(String(post?.init?.body)).remote.url).toBe("https://example.com/updated");
     await user.click(screen.getByRole("button", { name: "预览订阅" }));
 
     expect(await screen.findByRole("heading", { name: "节点预览" })).toBeInTheDocument();
