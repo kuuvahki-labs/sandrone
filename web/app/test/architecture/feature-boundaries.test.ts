@@ -86,7 +86,6 @@ const featureOwnedModules = [
   "features/files/pages/file-edit-page.tsx",
   "features/files/pages/file-preview-page.tsx",
   "features/files/processors/processor-builder.tsx",
-  "features/settings/components/settings-page-heading.tsx",
   "features/settings/data/use-backup-operations.ts",
   "features/settings/data/use-runtime-settings.ts",
   "features/settings/data/use-version-info.ts",
@@ -206,6 +205,37 @@ function isProductionModule(path: string): boolean {
     && !path.includes(".dom.test.")
     && !/(?:^|\/)test-data\.tsx$/u.test(path);
 }
+
+function featurePagePaths(): string[] {
+  return [...appGraph.values()]
+    .map((module) => module.path)
+    .filter((path) => /^features\/[^/]+\/pages\/.+\.tsx$/u.test(path) && isProductionModule(path))
+    .sort();
+}
+
+describe("authenticated page layout", () => {
+  it("keeps the shell as the sole owner of the centered lg content area", () => {
+    const shellSource = readFileSync(join(appDir, "core/components/shell.tsx"), "utf8");
+
+    expect(shellSource).toContain('<Container disableGutters maxWidth="lg">');
+  });
+
+  it("does not add private maximum widths or containers to feature pages", () => {
+    const violations = featurePagePaths().flatMap((path) => {
+      const source = readFileSync(join(appDir, path), "utf8");
+      const module = appGraph.get(path);
+      const reasons = [
+        ...(/\bmax-w-/u.test(source) ? ["private max-width"] : []),
+        ...(module?.imports.some((moduleImport) => moduleImport.source === "@mui/material/Container")
+          ? ["MUI Container import"]
+          : []),
+      ];
+      return reasons.map((reason) => ({ path, reason }));
+    });
+
+    expect(violations).toEqual([]);
+  });
+});
 
 function productionImportsExcludedModules(graph: ModuleGraph): Array<{ from: string; to: string }> {
   return [...graph.values()]

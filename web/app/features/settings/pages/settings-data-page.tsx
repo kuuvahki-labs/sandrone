@@ -1,6 +1,6 @@
-import { SettingsPageHeading } from "~/features/settings/components/settings-page-heading";
 import { DataSettingsSection } from "~/features/settings/sections/data-settings-section";
 import { useI18n } from "~/shared/i18n/context";
+import { PageHeader } from "~/shared/ui/page";
 
 interface SettingsDataPageProps {
   onBack: () => void;
@@ -16,8 +16,12 @@ export function SettingsDataPage({
   const { t } = useI18n();
 
   return (
-    <section className="mx-auto grid w-full max-w-[760px] gap-4">
-      <SettingsPageHeading title={t("settings.data.title")} onBack={onBack} />
+    <section className="grid gap-6">
+      <PageHeader
+        backAction={{ label: t("actions.back"), onSelect: onBack }}
+        label=""
+        title={t("settings.data.title")}
+      />
       <DataSettingsSection
         onDownloadBackup={onDownloadBackup}
         onRestoreBackup={onRestoreBackup}

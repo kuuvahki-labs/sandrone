@@ -11,7 +11,9 @@ describe("settings data page", () => {
 
     renderDataPage({ onBack });
 
-    expect(screen.getByRole("heading", { name: "数据管理" })).toBeInTheDocument();
+    const pageHeader = screen.getByRole("heading", { name: "数据管理" }).closest("header");
+    expect(pageHeader).toHaveClass("MuiPaper-root", "MuiPaper-outlined");
+    expect(pageHeader?.parentElement).toHaveClass("grid", "gap-6");
     expect(screen.getByRole("note")).toHaveTextContent("备份是未加密的明文");
     await user.click(screen.getByRole("button", { name: "返回" }));
 

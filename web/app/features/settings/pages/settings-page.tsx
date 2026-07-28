@@ -13,11 +13,11 @@ import DialogTitle from "@mui/material/DialogTitle";
 import Link from "@mui/material/Link";
 import Typography from "@mui/material/Typography";
 
-import { SettingsPageHeading } from "~/features/settings/components/settings-page-heading";
 import { AppearanceSettingsSection } from "~/features/settings/sections/appearance-settings-section";
 import { ServiceConnectionSection } from "~/features/settings/sections/service-connection-section";
 import { useI18n } from "~/shared/i18n/context";
 import type { ThemeMode } from "~/shared/storage/preferences";
+import { PageHeader } from "~/shared/ui/page";
 
 export interface SettingsPageProps {
   publicBaseUrl: string;
@@ -47,9 +47,10 @@ export function SettingsPage({
 
   return (
     <>
-      <section className="mx-auto grid w-full max-w-[760px] gap-4">
-        <SettingsPageHeading
+      <section className="grid gap-6">
+        <PageHeader
           description={t("settings.description")}
+          label={t("nav.settings")}
           title={t("settings.title")}
         />
         <AppearanceSettingsSection

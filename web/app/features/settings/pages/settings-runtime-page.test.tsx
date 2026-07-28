@@ -42,7 +42,9 @@ describe("settings runtime page", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "运行默认值" })).toBeInTheDocument();
+    const pageHeader = screen.getByRole("heading", { name: "运行默认值" }).closest("header");
+    expect(pageHeader).toHaveClass("MuiPaper-root", "MuiPaper-outlined");
+    expect(pageHeader?.parentElement).toHaveClass("grid", "gap-6");
     expect(screen.getByRole("button", { name: "返回" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "远程请求" })).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByRole("button", { name: "缓存" })).toHaveAttribute("aria-expanded", "false");

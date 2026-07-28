@@ -9,6 +9,24 @@ import { SettingsPage } from "./settings-page";
 const noop = () => undefined;
 
 describe("settings page", () => {
+  it("uses outlined floating labels for overview fields", () => {
+    render(
+      <SettingsPage
+        publicBaseUrl="https://example.com"
+        themeMode="system"
+        onOpenData={noop}
+        onOpenRuntime={noop}
+        onSaveBaseUrl={noop}
+        onSignOut={noop}
+        onThemeMode={noop}
+      />,
+    );
+
+    expect(screen.getByText("主题模式", { selector: "label.MuiInputLabel-root" })).toBeInTheDocument();
+    expect(screen.getByText("语言", { selector: "label.MuiInputLabel-root" })).toBeInTheDocument();
+    expect(screen.getByText("Public Base URL", { selector: "label.MuiInputLabel-root" })).toBeInTheDocument();
+  });
+
   it("renders a progressive settings overview with working form and navigation actions", async () => {
     const user = userEvent.setup();
     const onOpenData = vi.fn();
@@ -34,7 +52,14 @@ describe("settings page", () => {
     expect(screen.getByRole("heading", { name: "数据与账户" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "关于 Sandrone" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "GitHub" })).toHaveAttribute("href", "https://github.com/kuuvahki-labs/sandrone");
-    expect(screen.getByRole("heading", { name: "设置" }).closest("section")).toHaveClass("max-w-[760px]");
+    const pageRoot = screen.getByRole("heading", { name: "设置" }).closest("section");
+    expect(pageRoot).toHaveClass("grid", "gap-6");
+    expect(pageRoot).not.toHaveClass("max-w-[760px]");
+    const pageHeader = screen.getByRole("heading", { name: "设置" }).closest("header");
+    expect(pageHeader).toHaveClass("MuiPaper-root", "MuiPaper-outlined");
+    expect(pageHeader?.parentElement).toBe(pageRoot);
+    expect(screen.queryByTestId("PaletteOutlinedIcon")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("StorageOutlinedIcon")).not.toBeInTheDocument();
 
     const advanced = screen.getByRole("button", { name: "打开高级设置" });
     expect(advanced).toHaveTextContent("高级设置");

@@ -416,14 +416,11 @@ for (const route of routes) {
         viewportWidth: document.documentElement.clientWidth,
       }));
       expect(settingsColumnMetrics.width, `${testInfo.project.name} settings column should fit the viewport`).toBeLessThanOrEqual(settingsColumnMetrics.viewportWidth);
-      const themeRow = page.getByRole("group", { name: "主题模式" });
-      const themeLabel = themeRow.locator("p");
+      const themeLabel = page.locator("label.MuiInputLabel-root").filter({ hasText: /^主题模式$/u });
       const themeControl = page.getByRole("combobox", { name: "主题模式" });
-      const languageRow = page.getByRole("group", { name: "语言" });
-      const languageLabel = languageRow.locator("p");
+      const languageLabel = page.locator("label.MuiInputLabel-root").filter({ hasText: /^语言$/u });
       const languageControl = page.getByRole("combobox", { name: "语言" });
-      const baseUrlRow = page.getByRole("group", { name: "Public Base URL" });
-      const baseUrlLabel = baseUrlRow.locator("p");
+      const baseUrlLabel = page.locator("label.MuiInputLabel-root").filter({ hasText: /^Public Base URL$/u });
       const baseUrlControl = page.getByRole("textbox", { name: "Public Base URL" });
       const saveBaseUrl = page.getByRole("button", { name: "保存服务地址" });
       const serviceCard = page.getByRole("heading", { name: "服务连接", level: 3 }).locator("xpath=ancestor::article[1]");
@@ -434,6 +431,16 @@ for (const route of routes) {
         expect(box).not.toBeNull();
         return box!;
       };
+      for (const [label, control, name] of [
+        [themeLabel, themeControl, "theme"],
+        [languageLabel, languageControl, "language"],
+        [baseUrlLabel, baseUrlControl, "Public Base URL"],
+      ] as const) {
+        const labelBox = await bounds(label);
+        const controlBox = await bounds(control);
+        expect(labelBox.y, `${testInfo.project.name} ${name} label should start above its field border`).toBeLessThanOrEqual(controlBox.y);
+        expect(labelBox.y + labelBox.height, `${testInfo.project.name} ${name} label should overlap its field border`).toBeGreaterThan(controlBox.y);
+      }
 
       if (testInfo.project.name === "mobile") {
         const accountBox = await bounds(accountTitle);
@@ -441,18 +448,9 @@ for (const route of routes) {
         expect(signOutBox.y, "mobile sign-out should stack below the account copy").toBeGreaterThanOrEqual(accountBox.y + accountBox.height);
         expect(Math.abs(signOutBox.x - accountBox.x), "mobile sign-out should align with the account copy").toBeLessThanOrEqual(1);
       } else {
-        for (const [label, control, name] of [
-          [themeLabel, themeControl, "theme"],
-          [languageLabel, languageControl, "language"],
-          [baseUrlLabel, baseUrlControl, "Public Base URL"],
-        ] as const) {
-          const labelBox = await bounds(label);
-          const controlBox = await bounds(control);
-          expect(controlBox.x, `${testInfo.project.name} ${name} control should sit to the right of its label`).toBeGreaterThanOrEqual(labelBox.x + labelBox.width);
-        }
         const cardBox = await bounds(serviceCard);
         const saveBox = await bounds(saveBaseUrl);
-        expect(saveBox.x, `${testInfo.project.name} save action should stay in the right control column`).toBeGreaterThan(cardBox.x + cardBox.width / 2);
+        expect(saveBox.x, `${testInfo.project.name} save action should align to the right side of its card`).toBeGreaterThan(cardBox.x + cardBox.width / 2);
         expect(saveBox.width, `${testInfo.project.name} save action should not span its card`).toBeLessThan(cardBox.width / 2);
 
         const accountBox = await bounds(accountTitle);
