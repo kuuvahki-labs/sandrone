@@ -9,6 +9,7 @@ export interface ThemePreference {
 }
 
 const adminTokenKey = "sandrone.adminToken";
+const autoLoadSubscriptionTrafficKey = "sandrone.subscriptionTraffic.autoLoad";
 const localeKey = "sandrone.locale";
 const publicBaseUrlKey = "sandrone.publicBaseUrl";
 const themeKey = "sandrone.theme";
@@ -28,6 +29,22 @@ export function getAdminToken(): string {
 
 export function clearAdminToken(): void {
   browserStorage()?.removeItem(adminTokenKey);
+}
+
+export function getAutoLoadSubscriptionTraffic(): boolean {
+  try {
+    return browserStorage()?.getItem(autoLoadSubscriptionTrafficKey) === "true";
+  } catch {
+    return false;
+  }
+}
+
+export function saveAutoLoadSubscriptionTraffic(enabled: boolean): void {
+  try {
+    browserStorage()?.setItem(autoLoadSubscriptionTrafficKey, String(enabled));
+  } catch {
+    // Ignore unavailable browser storage and retain the in-memory preference.
+  }
 }
 
 export function getLocalePreference(languages?: readonly string[]): Locale {

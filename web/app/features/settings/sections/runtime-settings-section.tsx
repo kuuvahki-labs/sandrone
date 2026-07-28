@@ -61,6 +61,9 @@ export function RuntimeSettingsSection({
     <Card component="article" variant="outlined">
       <CardContent>
         <div className="grid gap-4">
+          <Typography component="h3" variant="h6">
+            {t("settings.runtime.title")}
+          </Typography>
           <div className="grid gap-3">
             <RuntimeSettingsGroup defaultExpanded id="runtime-remote-defaults" title={t("settings.runtime.group.remote")}>
               <TextField

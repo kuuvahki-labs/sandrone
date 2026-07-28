@@ -5,9 +5,11 @@ import {
   applyThemePreference,
   clearAdminToken,
   getAdminToken,
+  getAutoLoadSubscriptionTraffic,
   getPublicBaseUrl,
   loadThemePreference,
   saveAdminToken,
+  saveAutoLoadSubscriptionTraffic,
   savePublicBaseUrl,
   saveThemePreference,
   type ThemeMode,
@@ -18,6 +20,7 @@ import type { ShowNotice } from "./types";
 export function useAppPreferences({ showNotice, t = defaultTranslator() }: { showNotice: ShowNotice; t?: Translator }) {
   const [initialSettings] = useState(loadInitialSettings);
   const [adminToken, setAdminTokenState] = useState(initialSettings.adminToken);
+  const [autoLoadSubscriptionTraffic, setAutoLoadSubscriptionTraffic] = useState(initialSettings.autoLoadSubscriptionTraffic);
   const [tokenInput, setTokenInput] = useState(initialSettings.adminToken);
   const [publicBaseUrl, setPublicBaseUrl] = useState(initialSettings.publicBaseUrl);
   const [themeMode, setThemeMode] = useState<ThemeMode>(initialSettings.theme.mode);
@@ -48,8 +51,14 @@ export function useAppPreferences({ showNotice, t = defaultTranslator() }: { sho
     saveThemePreference({ mode, preset: "ocean" });
   }, []);
 
+  const updateAutoLoadSubscriptionTraffic = useCallback((enabled: boolean) => {
+    setAutoLoadSubscriptionTraffic(enabled);
+    saveAutoLoadSubscriptionTraffic(enabled);
+  }, []);
+
   return {
     adminToken,
+    autoLoadSubscriptionTraffic,
     enterWithToken,
     publicBaseUrl: effectivePublicBaseUrl(publicBaseUrl),
     saveBaseUrl,
@@ -57,6 +66,7 @@ export function useAppPreferences({ showNotice, t = defaultTranslator() }: { sho
     signOut,
     themeMode,
     tokenInput,
+    updateAutoLoadSubscriptionTraffic,
     updateThemeMode,
   };
 }
@@ -64,6 +74,7 @@ export function useAppPreferences({ showNotice, t = defaultTranslator() }: { sho
 function loadInitialSettings() {
   return {
     adminToken: getAdminToken(),
+    autoLoadSubscriptionTraffic: getAutoLoadSubscriptionTraffic(),
     publicBaseUrl: getPublicBaseUrl(),
     theme: loadThemePreference(),
   };

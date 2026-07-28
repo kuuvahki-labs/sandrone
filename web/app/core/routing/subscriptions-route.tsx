@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import AccountTreeOutlinedIcon from "@mui/icons-material/AccountTreeOutlined";
 import CloudDownloadOutlinedIcon from "@mui/icons-material/CloudDownloadOutlined";
@@ -8,7 +7,8 @@ import { LoadingScreen } from "~/core/components/loading-screen";
 import { useSandrone } from "~/core/provider/context";
 import { useShareDialog } from "~/features/shares/components/share-dialog-context";
 import { useSubscriptionDetailsResource, useSubscriptionResources } from "~/features/subscriptions/data/use-subscription-resources";
-import type { SubscriptionItem, SubscriptionTraffic } from "~/features/subscriptions/model/types";
+import { useSubscriptionTrafficByKey } from "~/features/subscriptions/data/use-subscription-traffic";
+import type { SubscriptionItem } from "~/features/subscriptions/model/types";
 import { SubscriptionsPage } from "~/features/subscriptions/pages/subscriptions-page";
 import { useI18n } from "~/shared/i18n/context";
 import { subscriptionEditPath, subscriptionNewPath } from "~/shared/routing/paths";
@@ -21,7 +21,11 @@ export function SubscriptionsRoute() {
   const resourcePorts = { client: app.client, showNotice: app.showNotice, t };
   const subscriptions = useSubscriptionResources(resourcePorts);
   const { loadSubscriptionTraffic } = useSubscriptionDetailsResource(resourcePorts);
-  const trafficByKey = useSubscriptionTrafficByKey(subscriptions.items, loadSubscriptionTraffic);
+  const trafficByKey = useSubscriptionTrafficByKey(
+    subscriptions.items,
+    app.autoLoadSubscriptionTraffic,
+    loadSubscriptionTraffic,
+  );
 
   if (subscriptions.loading) return <LoadingScreen />;
 
@@ -49,36 +53,12 @@ export function SubscriptionsRoute() {
       ]}
       getTrafficKey={subscriptionTrafficKey}
       items={subscriptions.items}
-      trafficByKey={trafficByKey}
+      trafficByKey={app.autoLoadSubscriptionTraffic ? trafficByKey : undefined}
       onDelete={(item) => app.requestDelete({ kind: "subscriptions", name: item.name, label: t("nav.subscriptions"), onDeleted: subscriptions.reload })}
       onEdit={(item) => navigate(subscriptionEditPath(item.kind, item.name))}
       onShare={(item) => shareDialog.open({ kind: "subscription", name: item.name })}
     />
   );
-}
-
-function useSubscriptionTrafficByKey(items: SubscriptionItem[], loadSubscriptionTraffic: (name: string, options?: { refresh?: boolean }) => Promise<SubscriptionTraffic | null>) {
-  const [trafficByKey, setTrafficByKey] = useState<Record<string, SubscriptionTraffic | null>>({});
-
-  useEffect(() => {
-    let cancelled = false;
-    for (const item of items) {
-      if (item.kind !== "remote") {
-        continue;
-      }
-      const key = subscriptionTrafficKey(item);
-      void loadSubscriptionTraffic(item.name).then((traffic) => {
-        if (!cancelled) {
-          setTrafficByKey((current) => ({ ...current, [key]: traffic }));
-        }
-      });
-    }
-    return () => {
-      cancelled = true;
-    };
-  }, [items, loadSubscriptionTraffic]);
-
-  return trafficByKey;
 }
 
 function subscriptionTrafficKey(item: SubscriptionItem): string {

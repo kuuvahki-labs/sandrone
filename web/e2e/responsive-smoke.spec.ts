@@ -212,13 +212,23 @@ const routes = [
   { path: "/files/default.yaml/preview", heading: "文件预览", text: longPreviewNode, focus: true, responsive: true },
   { path: "/shares", heading: "分享", text: "https://example.com/s/sh_123/mobile.txt?format=uri-list", focus: false, responsive: true },
   { path: "/settings", heading: "设置", text: "高级设置", focus: false, responsive: true },
-  { path: "/settings/runtime", heading: "运行默认值", text: "远程请求", focus: false, responsive: true },
+  { path: "/settings/runtime", heading: "高级设置", text: "远程请求", focus: false, responsive: true },
   { path: "/settings/data", heading: "数据管理", text: "备份是未加密的明文", focus: false, responsive: true },
 ];
 
+const smokeRoutes = new Set([
+  "/subscriptions",
+  "/files",
+  "/files/new?source=mihomo",
+  "/files/default.yaml/preview",
+  "/settings/runtime",
+]);
+
 for (const route of routes) {
-  test(`${route.path} renders without horizontal overflow`, async ({ page }, testInfo) => {
-    test.skip(!route.responsive && testInfo.project.name !== "desktop", "route smoke runs once; responsive routes run at every viewport");
+  const smokeTag = smokeRoutes.has(route.path) ? "@smoke " : "";
+  test(`${smokeTag}${route.path} renders without horizontal overflow`, async ({ page }, testInfo) => {
+    const isDesktop = testInfo.project.name === "desktop" || testInfo.project.name === "smoke";
+    test.skip(!route.responsive && !isDesktop, "route smoke runs once; responsive routes run at every viewport");
 
     const consoleIssues: string[] = [];
     page.on("console", (message) => {

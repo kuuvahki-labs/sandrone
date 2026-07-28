@@ -11,6 +11,7 @@ type NoLegacyShareKeys = [Extract<keyof SandroneContextValue, LegacyShareKey>] e
 
 const contextHasNoLegacyShareKeys: NoLegacyShareKeys = true;
 const expectedContextKeys = [
+  "autoLoadSubscriptionTraffic",
   "cancelDelete",
   "client",
   "confirmDelete",
@@ -26,6 +27,7 @@ const expectedContextKeys = [
   "signOut",
   "themeMode",
   "tokenInput",
+  "updateAutoLoadSubscriptionTraffic",
   "updateThemeMode",
 ];
 

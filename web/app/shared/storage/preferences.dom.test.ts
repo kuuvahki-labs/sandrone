@@ -3,10 +3,12 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   clearAdminToken,
   getAdminToken,
+  getAutoLoadSubscriptionTraffic,
   getLocalePreference,
   getPublicBaseUrl,
   loadThemePreference,
   saveAdminToken,
+  saveAutoLoadSubscriptionTraffic,
   saveLocalePreference,
   savePublicBaseUrl,
   saveThemePreference,
@@ -26,6 +28,24 @@ describe("browser storage helpers", () => {
 
     clearAdminToken();
     expect(getAdminToken()).toBe("");
+  });
+
+  it("defaults automatic subscription traffic loading to disabled until opted in", () => {
+    expect(getAutoLoadSubscriptionTraffic()).toBe(false);
+
+    saveAutoLoadSubscriptionTraffic(true);
+
+    expect(getAutoLoadSubscriptionTraffic()).toBe(true);
+  });
+
+  it("treats non-true automatic traffic values as disabled", () => {
+    localStorage.setItem("sandrone.subscriptionTraffic.autoLoad", "enabled");
+
+    expect(getAutoLoadSubscriptionTraffic()).toBe(false);
+
+    saveAutoLoadSubscriptionTraffic(false);
+
+    expect(getAutoLoadSubscriptionTraffic()).toBe(false);
   });
 
   it("normalizes the public base URL", () => {

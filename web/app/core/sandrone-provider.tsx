@@ -35,6 +35,7 @@ export function SandroneProvider({ children }: { children: ReactNode }) {
   }
 
   const value: SandroneContextValue = {
+    autoLoadSubscriptionTraffic: settings.autoLoadSubscriptionTraffic,
     client,
     enterWithToken,
     needsToken,
@@ -45,6 +46,7 @@ export function SandroneProvider({ children }: { children: ReactNode }) {
     signOut,
     themeMode: settings.themeMode,
     tokenInput: settings.tokenInput,
+    updateAutoLoadSubscriptionTraffic: settings.updateAutoLoadSubscriptionTraffic,
     updateThemeMode: settings.updateThemeMode,
     saveBaseUrl: settings.saveBaseUrl,
     ...deleteActions,

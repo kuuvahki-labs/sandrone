@@ -23,6 +23,7 @@ export interface Notice {
 export type ShowNotice = (message: string, severity?: NoticeSeverity) => void;
 
 export interface SandroneContextValue {
+  autoLoadSubscriptionTraffic: boolean;
   cancelDelete: () => void;
   client: ApiClient;
   confirmDelete: () => Promise<void>;
@@ -38,5 +39,6 @@ export interface SandroneContextValue {
   signOut: () => void;
   themeMode: ThemeMode;
   tokenInput: string;
+  updateAutoLoadSubscriptionTraffic: (enabled: boolean) => void;
   updateThemeMode: (mode: ThemeMode) => void;
 }

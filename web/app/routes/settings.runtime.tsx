@@ -17,8 +17,10 @@ export default function SettingsRuntimeRoute() {
 
   return (
     <SettingsRuntimePage
+      autoLoadSubscriptionTraffic={app.autoLoadSubscriptionTraffic}
       runtimeSettings={settings.runtimeSettings}
       onBack={() => navigate("/settings")}
+      onAutoLoadSubscriptionTraffic={app.updateAutoLoadSubscriptionTraffic}
       onSaveRuntimeSettings={settings.saveRuntimeSettings}
     />
   );

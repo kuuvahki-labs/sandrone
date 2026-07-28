@@ -16,7 +16,7 @@ import {
 describe("React Router app subscription workflows", () => {
   beforeEach(installDefaultFetchMock);
 
-  it("loads remote subscription traffic automatically and skips local or collection items", async () => {
+  it("does not load subscription traffic automatically by default", async () => {
     const listResources = {
       ...resources,
       subscriptions: [
@@ -51,11 +51,49 @@ describe("React Router app subscription workflows", () => {
     renderApp("/subscriptions");
 
     await screen.findByRole("heading", { name: "我的订阅" });
-    await waitFor(() => {
-      expect(requests.some((request) => request.url.endsWith("/v1/subscriptions/provider/traffic"))).toBe(true);
-      expect(requests.some((request) => request.url.endsWith("/v1/subscriptions/warn/traffic"))).toBe(true);
-    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
     const list = screen.getByRole("list", { name: "订阅列表" });
+    expect(within(list).queryByText("↑ 1 KiB · ↓ 2 KiB · TOT 10 KiB")).not.toBeInTheDocument();
+    const trafficRequests = requests.filter((request) => request.url.includes("/v1/subscriptions/") && request.url.endsWith("/traffic"));
+    expect(trafficRequests).toEqual([]);
+  });
+
+  it("loads remote subscription traffic when automatic loading is enabled", async () => {
+    localStorage.setItem("sandrone.subscriptionTraffic.autoLoad", "true");
+    const listResources = {
+      ...resources,
+      subscriptions: [
+        ...resources.subscriptions,
+        { name: "local", type: "local", format: "uri-list", meta: { description: "scratch" } },
+      ],
+    };
+    const requests: Array<{ url: string; init?: RequestInit }> = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      requests.push({ url, init });
+      const resourceResponse = resourceListResponse(url, listResources, init);
+      if (resourceResponse) return resourceResponse;
+      if (url.endsWith("/v1/subscriptions/provider/traffic")) {
+        return jsonResponse({
+          subscription_name: "provider",
+          type: "remote",
+          format: "uri-list",
+          traffic: { upload_bytes: 1024, download_bytes: 2048, used_bytes: 3072, total_bytes: 10240, plan_name: "VIP 1" },
+        });
+      }
+      if (url.endsWith("/v1/subscriptions/warn/traffic")) {
+        return jsonResponse({
+          subscription_name: "warn",
+          type: "remote",
+          format: "uri-list",
+        });
+      }
+      return jsonResponse(remoteSubscriptionDefinition);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderApp("/subscriptions");
+
+    const list = await screen.findByRole("list", { name: "订阅列表" });
     expect(await within(list).findByText("↑ 1 KiB · ↓ 2 KiB · TOT 10 KiB")).toBeInTheDocument();
     const trafficRequests = requests.filter((request) => request.url.includes("/v1/subscriptions/") && request.url.endsWith("/traffic"));
     expect(trafficRequests.map((request) => request.url.split("/v1/subscriptions/")[1])).toEqual([
@@ -66,6 +104,7 @@ describe("React Router app subscription workflows", () => {
   });
 
   it("identifies subscriptions in concurrent traffic failure notices", async () => {
+    localStorage.setItem("sandrone.subscriptionTraffic.autoLoad", "true");
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const resourceResponse = resourceListResponse(url, resources, init);

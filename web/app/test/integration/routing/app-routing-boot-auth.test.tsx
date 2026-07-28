@@ -111,7 +111,7 @@ describe("React Router app boot and auth workflows", () => {
     });
   });
 
-  it("preserves root subscription requests across StrictMode alias navigation", async () => {
+  it("keeps automatic traffic requests disabled across StrictMode alias navigation", async () => {
     let resolveList: (() => void) | undefined;
     const listReady = new Promise<void>((resolve) => {
       resolveList = resolve;
@@ -135,13 +135,11 @@ describe("React Router app boot and auth workflows", () => {
     resolveList?.();
 
     expect(await screen.findByRole("heading", { name: "我的订阅" })).toBeInTheDocument();
-    await waitFor(() => {
-      expect(trafficRequestUrls(requests)).toEqual([
-        "/v1/subscriptions/provider/traffic",
-        "/v1/subscriptions/warn/traffic",
-      ]);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
     });
     expect(resourceListUrls(requests)).toEqual(["/v1/subscriptions"]);
+    expect(trafficRequestUrls(requests)).toEqual([]);
 
     await act(async () => {
       await router.navigate("/subscriptions");
@@ -151,10 +149,7 @@ describe("React Router app boot and auth workflows", () => {
     expect(router.state.location.pathname).toBe("/subscriptions");
     expect(screen.getByRole("heading", { name: "我的订阅" })).toBeInTheDocument();
     expect(resourceListUrls(requests)).toEqual(["/v1/subscriptions"]);
-    expect(trafficRequestUrls(requests)).toEqual([
-      "/v1/subscriptions/provider/traffic",
-      "/v1/subscriptions/warn/traffic",
-    ]);
+    expect(trafficRequestUrls(requests)).toEqual([]);
   });
 
   it("coalesces duplicate file list loads during one page entry", async () => {

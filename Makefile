@@ -117,6 +117,9 @@ test-webui:
 test-webui-e2e:
 	cd web && pnpm test:e2e
 
+test-webui-e2e-smoke:
+	cd web && pnpm test:e2e:smoke
+
 ruleset-catalog:
 	GO="$(GO)" GOFLAGS="-mod=readonly" ./scripts/generate-ruleset-catalog.sh "$(RULESET_CATALOG_DIR)"
 

@@ -81,9 +81,14 @@ pnpm lint
 pnpm build
 ```
 
-涉及路由流程或响应式行为时，再在仓库根目录运行构建后 SPA 的 Playwright
-smoke：
+涉及路由流程时，本地默认运行核心桌面链路的 Playwright smoke：
 
 ```sh
-make test-webui-e2e
+pnpm test:e2e:smoke
+```
+
+涉及响应式行为、跨 viewport 风险或准备合并、发版时，再运行完整 E2E：
+
+```sh
+pnpm test:e2e
 ```

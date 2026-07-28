@@ -16,7 +16,9 @@
     "test": "vitest",
     "test:run": "vitest --run",
     "pretest:e2e": "playwright install chromium-headless-shell",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test --project=mobile --project=tablet --project=desktop",
+    "pretest:e2e:smoke": "playwright install chromium-headless-shell",
+    "test:e2e:smoke": "playwright test --project=smoke",
     "test:e2e:install": "playwright install chromium-headless-shell",
     "typecheck": "react-router typegen && tsc"
   },

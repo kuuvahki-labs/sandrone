@@ -27,12 +27,14 @@ describe("SettingsRuntimeRoute", () => {
 
   it("loads and saves runtime defaults on the runtime route", async () => {
     const user = userEvent.setup();
-    const client = mockApp();
+    const { client, updateAutoLoadSubscriptionTraffic } = mockApp();
 
     renderSettingsRuntimeRoute();
 
     await waitFor(() => expect(client.getRuntimeSettings).toHaveBeenCalledTimes(1));
     expect(client.getVersion).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("switch", { name: "自动获取流量" }));
+    expect(updateAutoLoadSubscriptionTraffic).toHaveBeenCalledWith(true);
     await user.click(screen.getByRole("button", { name: "保存运行默认值" }));
     await waitFor(() => expect(client.updateRuntimeSettings).toHaveBeenCalledTimes(1));
     expect(client.downloadBackup).not.toHaveBeenCalled();
@@ -77,9 +79,12 @@ function mockApp() {
     restoreBackup: vi.fn(),
     updateRuntimeSettings: vi.fn().mockResolvedValue(undefined),
   };
+  const updateAutoLoadSubscriptionTraffic = vi.fn();
   vi.mocked(useSandrone).mockReturnValue({
+    autoLoadSubscriptionTraffic: false,
     client,
     showNotice: vi.fn(),
+    updateAutoLoadSubscriptionTraffic,
   } as unknown as SandroneContextValue);
-  return client;
+  return { client, updateAutoLoadSubscriptionTraffic };
 }

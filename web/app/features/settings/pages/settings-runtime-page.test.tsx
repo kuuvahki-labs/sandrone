@@ -32,26 +32,35 @@ const runtimeSettings: RuntimeSettingsInput = {
 describe("settings runtime page", () => {
   it("shows the focused heading, returns, and initially expands only remote requests", async () => {
     const user = userEvent.setup();
+    const onAutoLoadSubscriptionTraffic = vi.fn();
     const onBack = vi.fn();
 
     render(
       <SettingsRuntimePage
+        autoLoadSubscriptionTraffic={false}
         runtimeSettings={runtimeSettings}
+        onAutoLoadSubscriptionTraffic={onAutoLoadSubscriptionTraffic}
         onBack={onBack}
         onSaveRuntimeSettings={vi.fn()}
       />,
     );
 
-    const pageHeader = screen.getByRole("heading", { name: "运行默认值" }).closest("header");
+    const pageHeader = screen.getByRole("heading", { name: "高级设置", level: 2 }).closest("header");
     expect(pageHeader).toHaveClass("MuiPaper-root", "MuiPaper-outlined");
     expect(pageHeader?.parentElement).toHaveClass("grid", "gap-6");
+    expect(screen.getByRole("heading", { name: "订阅流量" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "运行默认值" })).toBeInTheDocument();
+    const automaticTraffic = screen.getByRole("switch", { name: "自动获取流量" });
+    expect(automaticTraffic).not.toBeChecked();
     expect(screen.getByRole("button", { name: "返回" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "远程请求" })).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByRole("button", { name: "缓存" })).toHaveAttribute("aria-expanded", "false");
     expect(screen.getByRole("button", { name: "测活" })).toHaveAttribute("aria-expanded", "false");
 
+    await user.click(automaticTraffic);
     await user.click(screen.getByRole("button", { name: "返回" }));
 
+    expect(onAutoLoadSubscriptionTraffic).toHaveBeenCalledWith(true);
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
@@ -60,7 +69,9 @@ describe("settings runtime page", () => {
     const onSaveRuntimeSettings = vi.fn();
     render(
       <SettingsRuntimePage
+        autoLoadSubscriptionTraffic={false}
         runtimeSettings={runtimeSettings}
+        onAutoLoadSubscriptionTraffic={vi.fn()}
         onBack={vi.fn()}
         onSaveRuntimeSettings={onSaveRuntimeSettings}
       />,
