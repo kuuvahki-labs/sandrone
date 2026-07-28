@@ -1,9 +1,9 @@
 import { useState } from "react";
-import AdminPanelSettingsOutlinedIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import LogoutIcon from "@mui/icons-material/Logout";
 import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
+import CardActionArea from "@mui/material/CardActionArea";
 import CardContent from "@mui/material/CardContent";
 import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
@@ -13,24 +13,20 @@ import DialogTitle from "@mui/material/DialogTitle";
 import Link from "@mui/material/Link";
 import Typography from "@mui/material/Typography";
 
-import { DataSettingsSection } from "~/features/settings/sections/data-settings-section";
-import { GeneralSettingsSection } from "~/features/settings/sections/general-settings-section";
-import { RuntimeSettingsSection } from "~/features/settings/sections/runtime-settings-section";
-import type { RuntimeSettingsInput } from "~/shared/api/client";
+import { SettingsPageHeading } from "~/features/settings/components/settings-page-heading";
+import { AppearanceSettingsSection } from "~/features/settings/sections/appearance-settings-section";
+import { ServiceConnectionSection } from "~/features/settings/sections/service-connection-section";
 import { useI18n } from "~/shared/i18n/context";
 import type { ThemeMode } from "~/shared/storage/preferences";
-import { PageHeader } from "~/shared/ui/page";
 
 export interface SettingsPageProps {
   publicBaseUrl: string;
   revision?: string;
-  runtimeSettings?: RuntimeSettingsInput;
   themeMode: ThemeMode;
   version?: string;
-  onDownloadBackup?: () => Promise<void>;
-  onRestoreBackup?: (file: Blob) => Promise<void>;
+  onOpenData: () => void;
+  onOpenRuntime: () => void;
   onSaveBaseUrl: (value: string) => void;
-  onSaveRuntimeSettings?: (value: RuntimeSettingsInput) => void;
   onSignOut: () => void;
   onThemeMode: (mode: ThemeMode) => void;
 }
@@ -38,13 +34,11 @@ export interface SettingsPageProps {
 export function SettingsPage({
   publicBaseUrl,
   revision,
-  runtimeSettings,
   themeMode,
   version,
-  onDownloadBackup,
-  onRestoreBackup,
+  onOpenData,
+  onOpenRuntime,
   onSaveBaseUrl,
-  onSaveRuntimeSettings,
   onSignOut,
   onThemeMode,
 }: SettingsPageProps) {
@@ -52,73 +46,68 @@ export function SettingsPage({
   const [confirmSignOut, setConfirmSignOut] = useState(false);
 
   return (
-    <section className="grid gap-6">
-      <PageHeader
-        label={t("nav.settings")}
-        title={t("settings.title")}
-      />
-      <div className="grid gap-4 md:grid-cols-2">
-        <GeneralSettingsSection
-          publicBaseUrl={publicBaseUrl}
+    <>
+      <section className="mx-auto grid w-full max-w-[760px] gap-4">
+        <SettingsPageHeading
+          description={t("settings.description")}
+          title={t("settings.title")}
+        />
+        <AppearanceSettingsSection
           themeMode={themeMode}
-          onSaveBaseUrl={onSaveBaseUrl}
           onThemeMode={onThemeMode}
         />
-        <RuntimeSettingsSection
-          runtimeSettings={runtimeSettings}
-          onSaveRuntimeSettings={onSaveRuntimeSettings}
-        />
-        <DataSettingsSection
-          onDownloadBackup={onDownloadBackup}
-          onRestoreBackup={onRestoreBackup}
+        <ServiceConnectionSection
+          publicBaseUrl={publicBaseUrl}
+          onSaveBaseUrl={onSaveBaseUrl}
         />
         <Card component="article" variant="outlined">
-          <CardContent>
-            <div className="grid gap-4">
-              <div className="flex items-center gap-3">
-                <AdminPanelSettingsOutlinedIcon aria-hidden color="action" />
-                <Typography component="h3" variant="h6">
-                  {t("settings.adminToken.title")}
+          <CardActionArea component="div" aria-label={t("settings.advanced.open")} onClick={onOpenRuntime}>
+            <CardContent className="flex items-center justify-between gap-4">
+              <Typography component="h3" variant="h6">{t("settings.advanced.title")}</Typography>
+              <ChevronRightIcon aria-hidden color="action" />
+            </CardContent>
+          </CardActionArea>
+        </Card>
+        <Card component="article" variant="outlined">
+          <CardContent className="grid gap-3">
+            <Typography component="h3" variant="h6">{t("settings.dataAndAccount.title")}</Typography>
+            <Button
+              aria-label={t("settings.data.open")}
+              className="justify-between"
+              endIcon={<ChevronRightIcon aria-hidden />}
+              onClick={onOpenData}
+            >
+              {t("settings.data.entry")}
+            </Button>
+            <div className="flex min-w-0 flex-col items-start gap-3 border-t border-divider pt-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+              <div className="min-w-0">
+                <Typography>{t("settings.adminToken.title")}</Typography>
+                <Typography className="break-words" color="text.secondary" variant="body2">
+                  {t("settings.adminToken.description")}
                 </Typography>
               </div>
-              <Typography color="text.secondary">{t("settings.adminToken.description")}</Typography>
-              <Button color="error" startIcon={<LogoutIcon aria-hidden />} type="button" onClick={() => setConfirmSignOut(true)}>
+              <Button className="shrink-0" color="error" startIcon={<LogoutIcon aria-hidden />} onClick={() => setConfirmSignOut(true)}>
                 {t("settings.signOut.action")}
               </Button>
             </div>
           </CardContent>
         </Card>
         <Card component="article" variant="outlined">
-          <CardContent>
-            <div className="grid gap-4">
-              <div className="flex items-center gap-3">
-                <InfoOutlinedIcon aria-hidden color="action" />
-                <Typography component="h3" variant="h6">
-                  {t("settings.about.title")}
-                </Typography>
-              </div>
-              <Typography className="break-words" color="text.secondary">
-                {t("settings.about.description")}
-              </Typography>
-              <div className="flex items-center justify-between gap-4">
-                <Typography color="text.secondary" variant="body2">
-                  {t("settings.about.version")}
-                </Typography>
-                <Typography variant="body2">
-                  {version
-                    ? `${version === "dev" ? "dev" : `v${version}`}${revision ? ` (${revision.slice(0, 12)})` : ""}`
-                    : t("settings.about.versionUnavailable")}
-                </Typography>
-              </div>
+          <CardContent className="grid gap-3">
+            <div className="flex items-center justify-between gap-4">
+              <Typography component="h3" variant="h6">{t("settings.about.title")}</Typography>
               <Typography color="text.secondary" variant="body2">
-                <Link href="https://github.com/kuuvahki-labs/sandrone" rel="noreferrer" target="_blank" underline="hover">
-                  GitHub
-                </Link>
+                {version
+                  ? `${version === "dev" ? "dev" : `v${version}`}${revision ? ` (${revision.slice(0, 12)})` : ""}`
+                  : t("settings.about.versionUnavailable")}
               </Typography>
             </div>
+            <Link href="https://github.com/kuuvahki-labs/sandrone" rel="noreferrer" target="_blank">
+              GitHub
+            </Link>
           </CardContent>
         </Card>
-      </div>
+      </section>
 
       <Dialog open={confirmSignOut} aria-labelledby="sign-out-title" onClose={() => setConfirmSignOut(false)}>
         <DialogTitle id="sign-out-title">{t("settings.signOut.confirmTitle")}</DialogTitle>
@@ -130,6 +119,6 @@ export function SettingsPage({
           <Button aria-label={t("settings.signOut.action")} color="error" type="button" variant="contained" onClick={onSignOut}>{t("actions.signOut")}</Button>
         </DialogActions>
       </Dialog>
-    </section>
+    </>
   );
 }

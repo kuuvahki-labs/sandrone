@@ -10,70 +10,54 @@ import { useRuntimeSettings } from "./use-runtime-settings";
 const t = createTranslator("zh-CN");
 
 describe("useRuntimeSettings", () => {
-  it("loads runtime and version independently and saves the server result", async () => {
+  it("loads and saves only runtime settings", async () => {
     const loaded = runtimeSettings("loaded-agent", 15000);
     const saved = runtimeSettings("saved-agent", 30000);
-    const getRuntimeSettings = vi.fn().mockResolvedValue(loaded);
-    const getVersion = vi.fn().mockResolvedValue({
-      name: "sandrone",
-      version: "0.1.0",
-      revision: "0123456789abcdef",
-    });
-    const updateRuntimeSettings = vi.fn().mockResolvedValue({ ok: true });
-    const showNotice = vi.fn();
-    const client = { getRuntimeSettings, getVersion, updateRuntimeSettings } as unknown as ApiClient;
-
-    const { result } = renderHook(() => useRuntimeSettings({ client, showNotice, t }));
-
-    expect(result.current.runtimeSettings).toEqual(defaultRuntimeSettings);
-    await waitFor(() => expect(result.current.runtimeSettings).toEqual(loaded));
-    expect(result.current.version).toBe("0.1.0");
-    expect(result.current.revision).toBe("0123456789abcdef");
-    expect(getRuntimeSettings).toHaveBeenCalledTimes(1);
-    expect(getVersion).toHaveBeenCalledTimes(1);
-
-    await act(async () => {
-      await result.current.saveRuntimeSettings(saved);
-    });
-
-    expect(updateRuntimeSettings).toHaveBeenCalledWith(saved);
-    expect(result.current.runtimeSettings).toEqual(saved);
-    expect(showNotice).toHaveBeenCalledWith("设置已保存");
-  });
-
-  it("keeps a fresh restored result when the initial request resolves later", async () => {
-    let resolveInitial: ((settings: RuntimeSettingsInput) => void) | undefined;
-    const initial = new Promise<RuntimeSettingsInput>((resolve) => {
-      resolveInitial = resolve;
-    });
-    const stale = runtimeSettings("stale-agent", 15000);
-    const restored = runtimeSettings("restored-agent", 30000);
-    const getRuntimeSettings = vi.fn()
-      .mockReturnValueOnce(initial)
-      .mockResolvedValueOnce(restored);
     const client = {
-      getRuntimeSettings,
-      getVersion: vi.fn().mockResolvedValue({ name: "sandrone", version: "0.1.0" }),
-      restoreBackup: vi.fn().mockResolvedValue(undefined),
+      getRuntimeSettings: vi.fn().mockResolvedValue(loaded),
+      updateRuntimeSettings: vi.fn().mockResolvedValue({ ok: true }),
     } as unknown as ApiClient;
     const showNotice = vi.fn();
     const { result } = renderHook(() => useRuntimeSettings({ client, showNotice, t }));
 
-    await waitFor(() => expect(getRuntimeSettings).toHaveBeenCalledTimes(1));
+    expect(result.current.runtimeSettings).toEqual(defaultRuntimeSettings);
+    await waitFor(() => expect(result.current.runtimeSettings).toEqual(loaded));
+    await act(async () => result.current.saveRuntimeSettings(saved));
+
+    expect(client.getRuntimeSettings).toHaveBeenCalledTimes(1);
+    expect(client.updateRuntimeSettings).toHaveBeenCalledWith(saved);
+    expect(result.current.runtimeSettings).toEqual(saved);
+    expect(showNotice).toHaveBeenCalledWith("设置已保存");
+  });
+
+  it("does not let an obsolete client request replace newer runtime settings", async () => {
+    let resolveObsolete: ((settings: RuntimeSettingsInput) => void) | undefined;
+    const obsoleteRequest = new Promise<RuntimeSettingsInput>((resolve) => {
+      resolveObsolete = resolve;
+    });
+    const obsoleteClient = {
+      getRuntimeSettings: vi.fn().mockReturnValue(obsoleteRequest),
+    } as unknown as ApiClient;
+    const current = runtimeSettings("current-agent", 30000);
+    const currentClient = {
+      getRuntimeSettings: vi.fn().mockResolvedValue(current),
+    } as unknown as ApiClient;
+    const showNotice = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ client }) => useRuntimeSettings({ client, showNotice, t }),
+      { initialProps: { client: obsoleteClient } },
+    );
+
+    await waitFor(() => expect(obsoleteClient.getRuntimeSettings).toHaveBeenCalledTimes(1));
+    rerender({ client: currentClient });
+    await waitFor(() => expect(result.current.runtimeSettings).toEqual(current));
+
     await act(async () => {
-      await result.current.restoreBackup(new Blob(["backup"], { type: "application/zip" }));
+      resolveObsolete?.(runtimeSettings("obsolete-agent", 15000));
+      await obsoleteRequest;
     });
 
-    expect(getRuntimeSettings.mock.calls[1]).toEqual([{ fresh: true }]);
-    expect(result.current.runtimeSettings).toEqual(restored);
-
-    await act(async () => {
-      resolveInitial?.(stale);
-      await initial;
-    });
-
-    expect(result.current.runtimeSettings).toEqual(restored);
-    expect(showNotice).not.toHaveBeenCalledWith("运行默认值加载失败", "error");
+    expect(result.current.runtimeSettings).toEqual(current);
   });
 });
 

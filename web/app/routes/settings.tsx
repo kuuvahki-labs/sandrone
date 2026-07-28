@@ -1,28 +1,23 @@
+import { useNavigate } from "react-router";
+
 import { useSandrone } from "~/core/provider/context";
-import { useRuntimeSettings } from "~/features/settings/data/use-runtime-settings";
+import { useVersionInfo } from "~/features/settings/data/use-version-info";
 import { SettingsPage } from "~/features/settings/pages/settings-page";
-import { useI18n } from "~/shared/i18n/context";
 
 export default function SettingsRoute() {
   const app = useSandrone();
-  const { t } = useI18n();
-  const settings = useRuntimeSettings({
-    client: app.client,
-    showNotice: app.showNotice,
-    t,
-  });
+  const navigate = useNavigate();
+  const version = useVersionInfo({ client: app.client });
 
   return (
     <SettingsPage
       publicBaseUrl={app.publicBaseUrl}
-      revision={settings.revision}
-      runtimeSettings={settings.runtimeSettings}
+      revision={version.revision}
       themeMode={app.themeMode}
-      version={settings.version}
-      onDownloadBackup={settings.downloadBackup}
-      onRestoreBackup={settings.restoreBackup}
+      version={version.version}
+      onOpenData={() => navigate("/settings/data")}
+      onOpenRuntime={() => navigate("/settings/runtime")}
       onSaveBaseUrl={app.saveBaseUrl}
-      onSaveRuntimeSettings={settings.saveRuntimeSettings}
       onSignOut={app.signOut}
       onThemeMode={app.updateThemeMode}
     />

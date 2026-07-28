@@ -12,8 +12,6 @@ interface UseRuntimeSettingsOptions {
 
 export function useRuntimeSettings({ client, showNotice, t }: UseRuntimeSettingsOptions) {
   const [runtimeSettings, setRuntimeSettings] = useState<RuntimeSettingsInput>(defaultRuntimeSettings);
-  const [version, setVersion] = useState<string>();
-  const [revision, setRevision] = useState<string>();
   const runtimeSettingsRequest = useRef(0);
 
   useEffect(() => {
@@ -40,78 +38,14 @@ export function useRuntimeSettings({ client, showNotice, t }: UseRuntimeSettings
     };
   }, [client, showNotice, t]);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    void client.getVersion()
-      .then((versionInfo) => {
-        if (!cancelled) {
-          setVersion(versionInfo.version);
-          setRevision(versionInfo.revision);
-        }
-      })
-      .catch(() => undefined);
-
-    return () => {
-      cancelled = true;
-    };
-  }, [client]);
-
   const saveRuntimeSettings = useCallback(async (settings: RuntimeSettingsInput) => {
     await client.updateRuntimeSettings(settings);
     setRuntimeSettings(settings);
     showNotice(t("messages.settingsSaved"));
   }, [client, showNotice, t]);
 
-  const downloadBackup = useCallback(async () => {
-    let anchor: HTMLAnchorElement | undefined;
-    let objectURL: string | undefined;
-    try {
-      const backup = await client.downloadBackup();
-      objectURL = URL.createObjectURL(backup.blob);
-      anchor = document.createElement("a");
-      anchor.download = backup.filename;
-      anchor.href = objectURL;
-      document.body.append(anchor);
-      anchor.click();
-    } catch {
-      showNotice(t("settings.data.downloadFailed"), "error");
-    } finally {
-      anchor?.remove();
-      if (objectURL) {
-        URL.revokeObjectURL(objectURL);
-      }
-    }
-  }, [client, showNotice, t]);
-
-  const restoreBackup = useCallback(async (file: Blob) => {
-    try {
-      await client.restoreBackup(file);
-    } catch (error) {
-      showNotice(error instanceof Error ? error.message : t("settings.data.restoreFailed"), "error");
-      throw error;
-    }
-
-    const request = ++runtimeSettingsRequest.current;
-    try {
-      const settings = await client.getRuntimeSettings({ fresh: true });
-      if (runtimeSettingsRequest.current === request) {
-        setRuntimeSettings(settings);
-      }
-    } catch {
-      if (runtimeSettingsRequest.current === request) {
-        showNotice(t("errors.settingsLoadFailed"), "error");
-      }
-    }
-    showNotice(t("settings.data.restoreSucceeded"));
-  }, [client, showNotice, t]);
-
   return {
     runtimeSettings,
-    version,
-    revision,
     saveRuntimeSettings,
-    downloadBackup,
-    restoreBackup,
   };
 }

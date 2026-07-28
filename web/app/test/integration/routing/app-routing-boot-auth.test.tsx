@@ -15,13 +15,16 @@ import {
 describe("React Router app boot and auth workflows", () => {
   beforeEach(installDefaultFetchMock);
 
-  it("loads only settings resources on the settings route", async () => {
+  it("loads only version information on the settings overview route", async () => {
     const requests: Array<{ url: string; init?: RequestInit }> = [];
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       requests.push({ url, init });
       const resourceResponse = resourceListResponse(url, resources, init);
       if (resourceResponse) return resourceResponse;
+      if (url === "/version") {
+        return jsonResponse({ name: "sandrone", version: "0.1.0", revision: "0123456789abcdef" });
+      }
       return jsonResponse({ ok: true });
     }));
 
@@ -29,7 +32,41 @@ describe("React Router app boot and auth workflows", () => {
 
     expect(await screen.findByRole("heading", { name: "设置" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Public Base URL" })).toHaveValue(window.location.origin);
-    expect(resourceListUrls(requests)).toEqual([]);
+    expect(settingsRequestPaths(requests)).toEqual(["/version"]);
+  });
+
+  it("loads only runtime settings on the settings runtime route", async () => {
+    const requests: Array<{ url: string; init?: RequestInit }> = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      requests.push({ url, init });
+      if (url === "/v1/settings/runtime") {
+        return jsonResponse({
+          remote_defaults: { user_agent: "sandrone/0.1.0", timeout_ms: 15000 },
+          probe_defaults: {},
+          cache_defaults: {},
+        });
+      }
+      return jsonResponse({ ok: true });
+    }));
+
+    renderApp("/settings/runtime");
+
+    expect(await screen.findByRole("heading", { name: "运行默认值" })).toBeInTheDocument();
+    await waitFor(() => expect(settingsRequestPaths(requests)).toEqual(["/v1/settings/runtime"]));
+  });
+
+  it("does not load settings resources on the settings data route before an operation", async () => {
+    const requests: Array<{ url: string; init?: RequestInit }> = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      requests.push({ url: String(input), init });
+      return jsonResponse({ ok: true });
+    }));
+
+    renderApp("/settings/data");
+
+    expect(await screen.findByRole("heading", { name: "数据管理" })).toBeInTheDocument();
+    expect(settingsRequestPaths(requests)).toEqual([]);
   });
 
   it("loads only file resources on the files route", async () => {
@@ -376,4 +413,11 @@ function trafficRequestUrls(requests: Array<{ url: string; init?: RequestInit }>
   return requests
     .filter((request) => request.init?.method === "POST" && request.url.endsWith("/traffic"))
     .map((request) => request.url);
+}
+
+function settingsRequestPaths(requests: Array<{ url: string; init?: RequestInit }>): string[] {
+  return requests
+    .filter((request) => (request.init?.method ?? "GET") === "GET")
+    .map((request) => request.url)
+    .filter((url) => ["/version", "/v1/settings/runtime"].includes(url));
 }

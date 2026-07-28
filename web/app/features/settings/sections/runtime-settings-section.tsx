@@ -1,7 +1,6 @@
 import { type ReactNode, useEffect, useId, useState } from "react";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import SaveIcon from "@mui/icons-material/Save";
-import SettingsSuggestOutlinedIcon from "@mui/icons-material/SettingsSuggestOutlined";
 import Accordion from "@mui/material/Accordion";
 import AccordionDetails from "@mui/material/AccordionDetails";
 import AccordionSummary from "@mui/material/AccordionSummary";
@@ -59,17 +58,11 @@ export function RuntimeSettingsSection({
   }
 
   return (
-    <Card className="md:col-span-2" component="article" variant="outlined">
+    <Card component="article" variant="outlined">
       <CardContent>
         <div className="grid gap-4">
-          <div className="flex items-center gap-3">
-            <SettingsSuggestOutlinedIcon aria-hidden color="action" />
-            <Typography component="h3" variant="h6">
-              {t("settings.runtime.title")}
-            </Typography>
-          </div>
           <div className="grid gap-3">
-            <RuntimeSettingsGroup id="runtime-remote-defaults" title={t("settings.runtime.group.remote")}>
+            <RuntimeSettingsGroup defaultExpanded id="runtime-remote-defaults" title={t("settings.runtime.group.remote")}>
               <TextField
                 fullWidth
                 label={t("settings.runtime.remoteUserAgent")}
@@ -177,7 +170,7 @@ export function RuntimeSettingsSection({
               />
             </RuntimeSettingsGroup>
           </div>
-          <Button aria-label={t("settings.runtime.save")} startIcon={<SaveIcon aria-hidden />} type="button" variant="contained" onClick={() => onSaveRuntimeSettings?.(runtimeDraft)}>
+          <Button aria-label={t("settings.runtime.save")} className="justify-self-end" startIcon={<SaveIcon aria-hidden />} type="button" variant="contained" onClick={() => onSaveRuntimeSettings?.(runtimeDraft)}>
             {t("actions.save")}
           </Button>
         </div>
@@ -188,13 +181,14 @@ export function RuntimeSettingsSection({
 
 interface RuntimeSettingsGroupProps {
   children: ReactNode;
+  defaultExpanded?: boolean;
   id: string;
   title: string;
 }
 
-function RuntimeSettingsGroup({ children, id, title }: RuntimeSettingsGroupProps) {
+function RuntimeSettingsGroup({ children, defaultExpanded = false, id, title }: RuntimeSettingsGroupProps) {
   return (
-    <Accordion defaultExpanded disableGutters variant="outlined">
+    <Accordion defaultExpanded={defaultExpanded} disableGutters variant="outlined">
       <AccordionSummary
         aria-controls={`${id}-content`}
         expandIcon={<ExpandMoreIcon aria-hidden />}

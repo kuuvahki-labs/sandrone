@@ -1,5 +1,4 @@
 import { useState } from "react";
-import BackupOutlinedIcon from "@mui/icons-material/BackupOutlined";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import RestoreOutlinedIcon from "@mui/icons-material/RestoreOutlined";
 import UploadFileOutlinedIcon from "@mui/icons-material/UploadFileOutlined";
@@ -73,15 +72,9 @@ export function DataSettingsSection({
 
   return (
     <>
-      <Card className="md:col-span-2" component="article" variant="outlined">
+      <Card component="article" variant="outlined">
         <CardContent>
           <div className="grid gap-4">
-            <div className="flex items-center gap-3">
-              <BackupOutlinedIcon aria-hidden color="action" />
-              <Typography component="h3" variant="h6">
-                {t("settings.data.title")}
-              </Typography>
-            </div>
             <Alert role="note" severity="warning">
               {t("settings.data.warning")}
             </Alert>

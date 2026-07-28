@@ -211,7 +211,9 @@ const routes = [
   { path: "/files/default.yaml/edit", heading: "编辑文件", text: "配置模板", focus: true, responsive: true },
   { path: "/files/default.yaml/preview", heading: "文件预览", text: longPreviewNode, focus: true, responsive: true },
   { path: "/shares", heading: "分享", text: "https://example.com/s/sh_123/mobile.txt?format=uri-list", focus: false, responsive: true },
-  { path: "/settings", heading: "设置", text: "关于 Sandrone", focus: false, responsive: false },
+  { path: "/settings", heading: "设置", text: "高级设置", focus: false, responsive: true },
+  { path: "/settings/runtime", heading: "运行默认值", text: "远程请求", focus: false, responsive: true },
+  { path: "/settings/data", heading: "数据管理", text: "备份是未加密的明文", focus: false, responsive: true },
 ];
 
 for (const route of routes) {
@@ -245,11 +247,13 @@ for (const route of routes) {
       ? page.getByRole("region", { name: "最终文件内容" })
       : route.path === "/files/default.yaml/edit"
         ? page.getByRole("group", { name: route.text })
-        : route.path === "/files/new?source=mihomo"
-          ? page.getByRole("group", { name: "节点来源" }).first()
-          : route.path === "/files/new?source=sing-box" || route.path === "/files/new?source=shadowrocket"
-            ? page.getByRole("group", { name: "基础配置" }).first()
-            : page.getByText(route.text);
+        : route.path === "/settings/runtime"
+          ? page.getByRole("button", { name: route.text })
+          : route.path === "/files/new?source=mihomo"
+            ? page.getByRole("group", { name: "节点来源" }).first()
+            : route.path === "/files/new?source=sing-box" || route.path === "/files/new?source=shadowrocket"
+              ? page.getByRole("group", { name: "基础配置" }).first()
+              : page.getByText(route.text);
     await expect(routeContent).toBeVisible();
     if (route.focus) {
       await expect(page.locator("[data-page-header-compact]")).toHaveAttribute("data-page-header-compact", "false");
@@ -402,7 +406,70 @@ for (const route of routes) {
     }
     if (route.path === "/settings") {
       expect((await versionResponse)?.status()).toBe(200);
-      const dataManagement = page.getByRole("heading", { name: "数据管理" }).locator("xpath=ancestor::article[1]");
+      await expect(page.getByRole("textbox", { name: "User-Agent" })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "下载备份" })).toHaveCount(0);
+      await expect(page.getByRole("note")).toHaveCount(0);
+      const settingsColumnMetrics = await page.getByRole("heading", { level: 2, name: "设置" })
+        .locator("xpath=ancestor::section[1]")
+        .evaluate((section) => ({
+        width: section.getBoundingClientRect().width,
+        viewportWidth: document.documentElement.clientWidth,
+      }));
+      expect(settingsColumnMetrics.width, `${testInfo.project.name} settings column should fit the viewport`).toBeLessThanOrEqual(settingsColumnMetrics.viewportWidth);
+      const themeRow = page.getByRole("group", { name: "主题模式" });
+      const themeLabel = themeRow.locator("p");
+      const themeControl = page.getByRole("combobox", { name: "主题模式" });
+      const languageRow = page.getByRole("group", { name: "语言" });
+      const languageLabel = languageRow.locator("p");
+      const languageControl = page.getByRole("combobox", { name: "语言" });
+      const baseUrlRow = page.getByRole("group", { name: "Public Base URL" });
+      const baseUrlLabel = baseUrlRow.locator("p");
+      const baseUrlControl = page.getByRole("textbox", { name: "Public Base URL" });
+      const saveBaseUrl = page.getByRole("button", { name: "保存服务地址" });
+      const serviceCard = page.getByRole("heading", { name: "服务连接", level: 3 }).locator("xpath=ancestor::article[1]");
+      const accountTitle = page.getByText("管理员 token", { exact: true });
+      const signOut = page.getByRole("button", { name: "退出登录" });
+      const bounds = async (locator: Locator) => {
+        const box = await locator.boundingBox();
+        expect(box).not.toBeNull();
+        return box!;
+      };
+
+      if (testInfo.project.name === "mobile") {
+        const accountBox = await bounds(accountTitle);
+        const signOutBox = await bounds(signOut);
+        expect(signOutBox.y, "mobile sign-out should stack below the account copy").toBeGreaterThanOrEqual(accountBox.y + accountBox.height);
+        expect(Math.abs(signOutBox.x - accountBox.x), "mobile sign-out should align with the account copy").toBeLessThanOrEqual(1);
+      } else {
+        for (const [label, control, name] of [
+          [themeLabel, themeControl, "theme"],
+          [languageLabel, languageControl, "language"],
+          [baseUrlLabel, baseUrlControl, "Public Base URL"],
+        ] as const) {
+          const labelBox = await bounds(label);
+          const controlBox = await bounds(control);
+          expect(controlBox.x, `${testInfo.project.name} ${name} control should sit to the right of its label`).toBeGreaterThanOrEqual(labelBox.x + labelBox.width);
+        }
+        const cardBox = await bounds(serviceCard);
+        const saveBox = await bounds(saveBaseUrl);
+        expect(saveBox.x, `${testInfo.project.name} save action should stay in the right control column`).toBeGreaterThan(cardBox.x + cardBox.width / 2);
+        expect(saveBox.width, `${testInfo.project.name} save action should not span its card`).toBeLessThan(cardBox.width / 2);
+
+        const accountBox = await bounds(accountTitle);
+        const signOutBox = await bounds(signOut);
+        expect(signOutBox.x, `${testInfo.project.name} sign-out should sit to the right of the account copy`).toBeGreaterThan(accountBox.x + accountBox.width);
+        expect(Math.abs(signOutBox.y - accountBox.y), `${testInfo.project.name} account row should return to horizontal alignment`).toBeLessThanOrEqual(8);
+      }
+      expect(consoleIssues).toEqual([]);
+    }
+    if (route.path === "/settings/runtime") {
+      await expect(page.getByRole("button", { name: "远程请求" })).toHaveAttribute("aria-expanded", "true");
+      await expect(page.getByRole("button", { name: "缓存" })).toHaveAttribute("aria-expanded", "false");
+      await expect(page.getByRole("button", { name: "测活" })).toHaveAttribute("aria-expanded", "false");
+      expect(consoleIssues).toEqual([]);
+    }
+    if (route.path === "/settings/data") {
+      const dataManagement = page.getByRole("note").locator("xpath=ancestor::article[1]");
       await expect(dataManagement).toBeVisible();
       await expect(dataManagement.getByRole("note")).toContainText("备份是未加密的明文");
       await expect(dataManagement.getByRole("button", { name: "下载备份" })).toBeVisible();
