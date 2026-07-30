@@ -187,7 +187,9 @@ describe("config file workbench integration", { timeout: 20_000 }, () => {
     await waitFor(() => {
       expect(onValidityChange).toHaveBeenLastCalledWith(true);
     });
-    await user.click(screen.getByRole("button", { name: /^Rules/ }));
+    const rulesSection = screen.getByRole("button", { name: "Rules" });
+    expect(rulesSection).toHaveAttribute("aria-expanded", "true");
+
     await user.click(screen.getByRole("button", { name: "Expand rule 1" }));
     const rule = screen.getByRole("group", { name: "Rule 1" });
     fireEvent.change(within(rule).getByRole("textbox", {

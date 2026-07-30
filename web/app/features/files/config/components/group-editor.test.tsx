@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -15,6 +15,39 @@ afterEach(() => {
 });
 
 describe("ProxyGroupEditor runtime-filtered Mihomo groups", () => {
+  it("puts add at the list bottom and opens and focuses the appended group", async () => {
+    const user = userEvent.setup();
+    render(<ControlledEditor initialGroups={[]} onChange={vi.fn()} />);
+
+    const section = screen.getByRole("group", { name: "代理组" });
+    const add = within(section).getByRole("button", { name: "添加代理组" });
+    expect(add).toHaveTextContent("添加代理组");
+    expect(add.closest('[data-slot="config-list-actions"]')).not.toBeNull();
+    expect(add.closest('[data-slot="section-actions"]')).toBeNull();
+
+    await user.click(add);
+
+    expect(within(section).getByRole("textbox", { name: "名称" })).toHaveFocus();
+    expect(within(section).getByRole("button", { name: /收起代理组/ }))
+      .toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("toggles a group from its summary and exposes a stable controlled region", async () => {
+    const user = userEvent.setup();
+    render(
+      <ControlledEditor
+        initialGroups={[{ name: "Proxy", type: "select", proxies: ["DIRECT"] }]}
+        onChange={vi.fn()}
+      />,
+    );
+
+    const disclosure = screen.getByRole("button", { name: "展开代理组 Proxy" });
+    await user.click(screen.getByText("Proxy", { exact: true }));
+    expect(disclosure).toHaveAttribute("aria-expanded", "true");
+    expect(disclosure).toHaveAttribute("aria-controls");
+    expect(document.getElementById(disclosure.getAttribute("aria-controls")!)).not.toBeNull();
+  });
+
   it("keeps rendered identities aligned while adding, moving, and deleting groups", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();

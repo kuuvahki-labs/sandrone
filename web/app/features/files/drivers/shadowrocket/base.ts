@@ -252,16 +252,6 @@ block-quic = all-proxy
 *.icloud.com = server:system
 localhost = 127.0.0.1
 
-[URL Rewrite]
-# Google搜索引擎防跳转的重写。
-^https?://(www.)?g.cn https://www.google.com 302
-^https?://(www.)?google.cn https://www.google.com 302
-
-[MITM]
-# Shadowrocket仅会解密hostname指定的域名的请求，可以使用通配符。也可以使用前缀 - 排除特定主机名，如 -*.example.com。iOS系统和某些应用有严格的安全策略，仅信任某些特定的证书，对这些域名启动解密可能导致问题，如 *.apple.com，*.icloud.com。
-# 自版本 2.2.81 (3096) 起支持通过 HTTP/2 协议进行中间人攻击来解密 HTTPS 流量。当在纯文本模式的 [MITM] 字段中使用 h2 = true 命令时表示启用，等同于在 UI 界面开启对应开关
-
-hostname = *.google.cn
 `;
 
 export function shadowrocketDefaultBase(): string {

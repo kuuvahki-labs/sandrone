@@ -6,7 +6,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ConfigReferenceOption } from "~/features/files/config/model/references";
 import type { RuleSetCatalogItem, RuleSetCatalogResult } from "~/features/files/model/types";
 
-import { ConfigRowSummary, RowOrderActions, SectionIssues } from "./editor-shared";
+import {
+  ConfigListActions,
+  ConfigRowDisclosure,
+  ConfigRowSummary,
+  DenseConfigRow,
+  RowOrderActions,
+  SectionIssues,
+} from "./editor-shared";
 import { OrderedReferenceList } from "./reference-fields";
 import { RuleSetCatalogDialog } from "./rule-set-catalog-dialog";
 import {
@@ -86,6 +93,28 @@ describe("shared config editor rows", () => {
 });
 
 describe("ConfigWorkbenchSection", () => {
+  it("makes the full section summary the single disclosure trigger", async () => {
+    const user = userEvent.setup();
+    render(
+      <ConfigWorkbenchSection
+        count={3}
+        id="proxy-groups"
+        label="Proxy groups"
+        summary="2 inbound references"
+      >
+        <p>Group editor</p>
+      </ConfigWorkbenchSection>,
+    );
+
+    const trigger = screen.getByRole("button", { name: "Proxy groups" });
+    expect(screen.getByText("Proxy groups").closest("button")).toBe(trigger);
+    expect(screen.getByText("2 inbound references").closest("button")).toBe(trigger);
+
+    await user.click(screen.getByText("2 inbound references"));
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(trigger).toHaveAttribute("aria-controls", "proxy-groups-content");
+  });
+
   it("is collapsed by default and wires the trigger to its stable content id", () => {
     render(
       <ConfigWorkbenchSection id="proxy-groups" label="Proxy groups">
@@ -228,11 +257,54 @@ describe("ConfigWorkbenchSection", () => {
     expect(info).toContainElement(screen.getByText("A localized status label that may become much longer"));
     expect(actions).toHaveClass("shrink-0");
     expect(actions).not.toHaveClass("w-full");
-    expect(actions?.compareDocumentPosition(trigger) ?? 0).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(trigger.compareDocumentPosition(actions as HTMLElement)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 
     await user.click(add);
     expect(onAdd).toHaveBeenCalledOnce();
     expect(trigger).toHaveAttribute("aria-expanded", "false");
+  });
+});
+
+describe("config editor disclosure primitives", () => {
+  it("keeps the row summary and arrow in one disclosure button", async () => {
+    const user = userEvent.setup();
+    const onToggle = vi.fn();
+    const onDelete = vi.fn();
+    render(
+      <DenseConfigRow>
+        <ConfigRowDisclosure
+          contentID="proxy-row-editor"
+          expanded={false}
+          label="展开代理组 Proxy"
+          onToggle={onToggle}
+        >
+          <ConfigRowSummary primary="Proxy" secondary={["select"]} />
+        </ConfigRowDisclosure>
+        <button type="button" onClick={onDelete}>Delete</button>
+      </DenseConfigRow>,
+    );
+
+    const disclosure = screen.getByRole("button", { name: "展开代理组 Proxy" });
+    expect(disclosure).toHaveAttribute("aria-controls", "proxy-row-editor");
+    expect(disclosure).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByText("Proxy").closest("button")).toBe(disclosure);
+
+    await user.click(screen.getByText("Proxy"));
+    expect(onToggle).toHaveBeenCalledOnce();
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    expect(onDelete).toHaveBeenCalledOnce();
+    expect(onToggle).toHaveBeenCalledOnce();
+  });
+
+  it("renders list actions in a stable footer slot", () => {
+    render(
+      <ConfigListActions>
+        <button type="button">Add proxy group</button>
+      </ConfigListActions>,
+    );
+
+    expect(screen.getByRole("button", { name: "Add proxy group" })
+      .closest('[data-slot="config-list-actions"]')).not.toBeNull();
   });
 });
 
@@ -520,6 +592,29 @@ it("shows loading and request error states", async () => {
   });
   expect(await screen.findByText("Catalog snapshot unavailable")).toBeInTheDocument();
   expect(screen.queryByText("No matching rule sets.")).not.toBeInTheDocument();
+});
+
+it("uses rule-set library terminology in Chinese dialog states", async () => {
+  localStorage.setItem("sandrone.locale", "zh-CN");
+  const request = deferred<RuleSetCatalogResult>();
+  render(
+    <RuleSetCatalogDialog
+      kind="mihomo"
+      open
+      loadCatalog={vi.fn().mockReturnValue(request.promise)}
+      onAdd={vi.fn()}
+      onClose={vi.fn()}
+    />,
+  );
+
+  expect(screen.getByRole("dialog", { name: "规则集库" })).toBeInTheDocument();
+  expect(screen.getByLabelText("正在加载规则集库")).toBeInTheDocument();
+
+  await act(async () => {
+    request.reject("offline");
+    await request.promise.catch(() => undefined);
+  });
+  expect(await screen.findByText("规则集库加载失败")).toBeInTheDocument();
 });
 
 it("shows local empty and conflict states without closing", async () => {

@@ -4,6 +4,8 @@ import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
 import Alert from "@mui/material/Alert";
 import IconButton from "@mui/material/IconButton";
 import Tooltip from "@mui/material/Tooltip";
@@ -89,6 +91,41 @@ export function ConfigRowSummary({ primary, secondary = [] }: { primary: ReactNo
 
 export function DenseConfigRow({ children }: { children: ReactNode }) {
   return <div className="flex min-h-10 min-w-0 items-center gap-2 px-3 py-1.5">{children}</div>;
+}
+
+export function ConfigRowDisclosure({ children, contentID, expanded, label, onToggle }: {
+  children: ReactNode;
+  contentID: string;
+  expanded: boolean;
+  label: string;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      aria-controls={contentID}
+      aria-expanded={expanded}
+      aria-label={label}
+      className="flex min-h-10 min-w-0 flex-1 cursor-pointer items-center gap-2 text-left hover:bg-action-hover focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
+      type="button"
+      onClick={onToggle}
+    >
+      {expanded
+        ? <KeyboardArrowDownIcon aria-hidden fontSize="small" />
+        : <KeyboardArrowRightIcon aria-hidden fontSize="small" />}
+      {children}
+    </button>
+  );
+}
+
+export function ConfigListActions({ children }: { children: ReactNode }) {
+  return (
+    <div
+      className="flex flex-wrap justify-end gap-2 border-t border-divider bg-action-hover px-3 py-2"
+      data-slot="config-list-actions"
+    >
+      {children}
+    </div>
+  );
 }
 
 export function RowOrderActions({ deleteLabel, downDisabled, downLabel, mobileMenuLabel, onDelete, onDown, onUp, upDisabled, upLabel }: {

@@ -614,8 +614,26 @@ for (const kind of ["mihomo", "sing-box", "shadowrocket"] as const) {
     await page.goto(`/files/new?source=${kind}`);
 
     await expect(page.getByRole("heading", { name: "新建文件", level: 2 })).toBeVisible();
-    const groups = page.getByRole("group", { name: "代理组" });
-    const ruleSets = page.getByRole("group", { name: "规则集" });
+    const groups = page.getByRole("group", { exact: true, name: "代理组" });
+    const ruleSets = page.getByRole("group", { exact: true, name: "规则集" });
+    const rules = page.getByRole("group", { exact: true, name: "规则策略" });
+
+    await expect(groups.getByRole("button", { name: "添加代理组" })).toBeVisible();
+    const fromLibrary = ruleSets.getByRole("button", { name: "从规则集库添加" });
+    await expect(fromLibrary).toHaveText("从库添加");
+    await expect(ruleSets.getByRole("button", { name: "添加规则集" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "规则策略" }))
+      .toHaveAttribute("aria-expanded", "true");
+    await expect(rules.getByRole("button", { name: "添加规则" })).toBeVisible();
+
+    for (const section of [groups, ruleSets, rules]) {
+      const metrics = await section.evaluate((element) => ({
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+      }));
+      expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth);
+    }
+
     await expect(groups.locator(".MuiChip-root")).toHaveCount(0);
     await expect(ruleSets.locator(".MuiChip-root")).toHaveCount(0);
 
@@ -678,8 +696,6 @@ for (const kind of ["mihomo", "sing-box", "shadowrocket"] as const) {
       await expect(ruleSetDelete).toBeVisible();
     }
 
-    await page.getByRole("button", { name: /^规则策略/ }).click();
-    const rules = page.getByRole("group", { name: "规则策略" });
     await expect(rules.locator(".MuiChip-root")).toHaveCount(0);
     const firstRule = page.getByRole("group", { name: /^规则 1$/ }).first();
     const ruleRowMetrics = await firstRule.evaluate((element) => ({ clientWidth: element.clientWidth, scrollWidth: element.scrollWidth }));

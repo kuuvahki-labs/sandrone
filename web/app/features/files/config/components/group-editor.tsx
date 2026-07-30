@@ -4,8 +4,6 @@ import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } 
 import { CSS } from "@dnd-kit/utilities";
 import AddIcon from "@mui/icons-material/Add";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
-import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
-import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
 import Button from "@mui/material/Button";
 import Checkbox from "@mui/material/Checkbox";
 import Collapse from "@mui/material/Collapse";
@@ -30,6 +28,8 @@ import { SelectField } from "~/shared/ui/form-fields";
 
 import {
   configEditorPanelClassName,
+  ConfigListActions,
+  ConfigRowDisclosure,
   ConfigRowSummary,
   DenseConfigRow,
   issueSummary,
@@ -56,9 +56,23 @@ export function ProxyGroupEditor({ adapter, defaultExpanded = true, groups, inbo
 }) {
   const { t } = useI18n();
   const [openGroup, setOpenGroup] = useState<number | null>(null);
+  const [focusGroupID, setFocusGroupID] = useState<string | null>(null);
   const sensors = useSortableSensors();
   const groupIDCounter = useRef(groups.length);
   const [sortableIDs, setSortableIDs] = useState(() => groups.map((_group, index) => `proxy-group-${index}`));
+
+  useEffect(() => {
+    if (focusGroupID !== null) setFocusGroupID(null);
+  }, [focusGroupID]);
+
+  function addGroup() {
+    const id = `proxy-group-${groupIDCounter.current++}`;
+    const index = groups.length;
+    setSortableIDs((current) => [...current, id]);
+    setOpenGroup(index);
+    setFocusGroupID(id);
+    onChange([...groups, adapter.groups.create(namingLocale)]);
+  }
 
   function moveGroup(index: number, direction: -1 | 1) {
     const nextIndex = index + direction;
@@ -82,7 +96,6 @@ export function ProxyGroupEditor({ adapter, defaultExpanded = true, groups, inbo
     <WorkbenchGroupSection
       count={groups.length}
       defaultExpanded={defaultExpanded}
-      headerActions={<Button aria-label={t("files.config.addGroup")} startIcon={<AddIcon aria-hidden />} type="button" variant="outlined" onClick={() => { setSortableIDs((current) => [...current, `proxy-group-${groupIDCounter.current++}`]); onChange([...groups, adapter.groups.create(namingLocale)]); }}>{t("actions.add")}</Button>}
       id="config-proxy-groups"
       label={t("files.config.proxyGroups")}
       severity={severityForIssues(issues)}
@@ -98,6 +111,7 @@ export function ProxyGroupEditor({ adapter, defaultExpanded = true, groups, inbo
                 group={group}
                 id={sortableIDs[index]}
                 adapter={adapter}
+                focusFirstField={focusGroupID === sortableIDs[index]}
                 inboundCount={inboundReferences[group.name] ?? 0}
                 index={index}
                 key={sortableIDs[index]}
@@ -114,14 +128,25 @@ export function ProxyGroupEditor({ adapter, defaultExpanded = true, groups, inbo
             ))}
           </SortableContext>
         </DndContext>
+        <ConfigListActions>
+          <Button
+            aria-label={t("files.config.addGroup")}
+            startIcon={<AddIcon aria-hidden />}
+            type="button"
+            variant="outlined"
+            onClick={addGroup}
+          >
+            {t("files.config.addGroup")}
+          </Button>
+        </ConfigListActions>
       </div>
     </WorkbenchGroupSection>
   );
 }
 
-function SortableProxyGroupRow({ adapter, group, id, inboundCount, index, nodes, onDelete, onMove, onOpenChange, onUpdate, open, peerGroups, total, ui }: {
+function SortableProxyGroupRow({ adapter, focusFirstField, group, id, inboundCount, index, nodes, onDelete, onMove, onOpenChange, onUpdate, open, peerGroups, total, ui }: {
   adapter: StructuredFileConfigurationAdapter;
-  group: GroupDraft; id: string; inboundCount: number; index: number; onDelete: () => void; onMove: (direction: -1 | 1) => void;
+  focusFirstField: boolean; group: GroupDraft; id: string; inboundCount: number; index: number; onDelete: () => void; onMove: (direction: -1 | 1) => void;
   nodes: ConfigNodeSummary[]; onOpenChange: () => void; onUpdate: (value: GroupDraft) => void; open: boolean; peerGroups: GroupDraft[]; total: number;
   ui: Readonly<StructuredConfigurationFieldSlots>;
 }) {
@@ -139,6 +164,12 @@ function SortableProxyGroupRow({ adapter, group, id, inboundCount, index, nodes,
   const typeLabel = adapter.groups.typeOptions.find((option) => option.value === type)?.label ?? type;
   const memberOptions = memberReferenceOptions(adapter.references, nodes, peerGroups, group.name);
   const patchGroup = (patch: Partial<GroupDraft>) => onUpdate({ ...group, ...patch });
+  const contentID = `${id}-editor`;
+  const nameInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (focusFirstField) nameInputRef.current?.focus();
+  }, [focusFirstField]);
 
   function updateType(value: string) {
     onUpdate(adapter.groups.transitionType(group, value));
@@ -156,25 +187,31 @@ function SortableProxyGroupRow({ adapter, group, id, inboundCount, index, nodes,
     <div className="border-b border-divider bg-background-paper last:border-b-0" ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }}>
       <DenseConfigRow>
         <Tooltip title={`${t("files.config.dragGroup")} ${name}`}><IconButton {...attributes} {...listeners} aria-label={`${t("files.config.dragGroup")} ${name}`} className="hidden sm:inline-flex" ref={setActivatorNodeRef} size="small" style={{ touchAction: "none" }} type="button"><DragIndicatorIcon aria-hidden fontSize="small" /></IconButton></Tooltip>
-        <IconButton aria-label={`${open ? t("files.config.collapseGroup") : t("files.config.expandGroup")} ${name}`} size="small" type="button" onClick={onOpenChange}>{open ? <KeyboardArrowDownIcon aria-hidden fontSize="small" /> : <KeyboardArrowRightIcon aria-hidden fontSize="small" />}</IconButton>
-        <ConfigRowSummary
-          primary={name}
-          secondary={[
-            typeLabel,
-            ...(memberMode === "runtime-filter"
-              ? [t("files.config.groupRuntimeFilterSummary")]
-              : targets.length
-                ? targets.map((target) => target === "$nodes" ? t("files.config.subscriptionNodes") : target)
-                : [t("files.config.noTargets")]),
-            t("files.config.inboundCount", { count: inboundCount }),
-          ]}
-        />
+        <ConfigRowDisclosure
+          contentID={contentID}
+          expanded={open}
+          label={`${open ? t("files.config.collapseGroup") : t("files.config.expandGroup")} ${name}`}
+          onToggle={onOpenChange}
+        >
+          <ConfigRowSummary
+            primary={name}
+            secondary={[
+              typeLabel,
+              ...(memberMode === "runtime-filter"
+                ? [t("files.config.groupRuntimeFilterSummary")]
+                : targets.length
+                  ? targets.map((target) => target === "$nodes" ? t("files.config.subscriptionNodes") : target)
+                  : [t("files.config.noTargets")]),
+              t("files.config.inboundCount", { count: inboundCount }),
+            ]}
+          />
+        </ConfigRowDisclosure>
         <RowOrderActions deleteLabel={`${t("files.config.deleteGroup")} ${name}`} downLabel={`${t("files.config.moveGroupDown")} ${name}`} downDisabled={index === total - 1} mobileMenuLabel={t("resourceList.moreActions", { title: name })} upLabel={`${t("files.config.moveGroupUp")} ${name}`} upDisabled={index === 0} onDelete={onDelete} onDown={() => onMove(1)} onUp={() => onMove(-1)} />
       </DenseConfigRow>
-      <Collapse in={open} timeout="auto" unmountOnExit>
+      <Collapse id={contentID} in={open} timeout="auto" unmountOnExit>
         <div className={configEditorPanelClassName}>
           <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,0.55fr)]">
-            <TextField fullWidth required label={t("files.config.groupNameWithIndex", { index: index + 1 })} size="small" value={group.name} onChange={(event) => patchGroup({ name: event.target.value })} />
+            <TextField fullWidth required inputRef={nameInputRef} label={t("files.config.groupNameWithIndex", { index: index + 1 })} size="small" value={group.name} onChange={(event) => patchGroup({ name: event.target.value })} />
             <SelectField label={t("files.config.groupTypeWithIndex", { index: index + 1 })} options={[...adapter.groups.typeOptions]} size="small" value={type} onChange={updateType} />
           </div>
           <div

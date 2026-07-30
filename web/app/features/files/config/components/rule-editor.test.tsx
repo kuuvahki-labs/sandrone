@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { RuleDraft, RuleSetDraft } from "~/features/files/config/model/editor-model";
 import type { ConfigNodeSummary } from "~/features/files/config/model/node-source";
@@ -12,6 +12,47 @@ import type { FileConfigDraft } from "~/features/files/model/types";
 import { RuleListEditor, RuleSetListEditor } from "./rule-editor";
 
 describe("config rule editors", () => {
+  it("adds a rule set from the footer and focuses its name", async () => {
+    const user = userEvent.setup();
+    render(<RuleSetHarness initial={[]} />);
+
+    const section = screen.getByRole("group", { name: "规则集" });
+    const add = within(section).getByRole("button", { name: "添加规则集" });
+    expect(add.closest('[data-slot="config-list-actions"]')).not.toBeNull();
+
+    await user.click(add);
+
+    expect(within(section).getByRole("textbox", { name: "名称" })).toHaveFocus();
+    expect(within(section).getByRole("button", { name: /收起规则集/ }))
+      .toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("uses short visible library copy with a complete accessible name", async () => {
+    const user = userEvent.setup();
+    const onOpenCatalog = vi.fn();
+    render(<RuleSetHarness initial={[]} onOpenCatalog={onOpenCatalog} />);
+
+    const open = screen.getByRole("button", { name: "从规则集库添加" });
+    expect(open).toHaveTextContent("从库添加");
+    await user.click(open);
+    expect(onOpenCatalog).toHaveBeenCalledOnce();
+  });
+
+  it("adds a rule from the footer and focuses its type", async () => {
+    const user = userEvent.setup();
+    render(<RuleHarness initial={[]} ruleSets={[]} />);
+
+    const section = screen.getByRole("group", { name: "规则策略" });
+    const add = within(section).getByRole("button", { name: "添加规则" });
+    expect(add.closest('[data-slot="config-list-actions"]')).not.toBeNull();
+
+    await user.click(add);
+
+    expect(within(section).getByRole("combobox", { name: "类型" })).toHaveFocus();
+    expect(within(section).getByRole("button", { name: "收起规则 1" }))
+      .toHaveAttribute("aria-expanded", "true");
+  });
+
   it("forwards live rule-set, group, and node references into rule fields", async () => {
     const user = userEvent.setup();
     const config = initialConfig("mihomo", {
@@ -54,11 +95,14 @@ describe("config rule editors", () => {
     const first = screen.getByRole("button", { name: "展开规则集 1 private" });
     const second = screen.getByRole("button", { name: "展开规则集 2 private" });
     expect(first).toHaveAttribute("aria-expanded", "false");
-    await user.click(first);
-    expect(within(screen.getByRole("group", { name: "规则集 1 private" })).getByRole("textbox", { name: "名称" })).toHaveValue("private");
-    await user.click(second);
-    expect(within(screen.getByRole("group", { name: "规则集 1 private" })).queryByRole("textbox", { name: "名称" })).not.toBeInTheDocument();
-    expect(within(screen.getByRole("group", { name: "规则集 2 private" })).getByRole("textbox", { name: "名称" })).toHaveValue("private");
+    const firstRow = screen.getByRole("group", { name: "规则集 1 private" });
+    const secondRow = screen.getByRole("group", { name: "规则集 2 private" });
+    await user.click(within(firstRow).getByText("private", { exact: true }));
+    expect(within(firstRow).getByRole("textbox", { name: "名称" })).toHaveValue("private");
+    await user.click(within(secondRow).getByText("private", { exact: true }));
+    expect(within(firstRow).queryByRole("textbox", { name: "名称" })).not.toBeInTheDocument();
+    expect(within(secondRow).getByRole("textbox", { name: "名称" })).toHaveValue("private");
+    expect(second).toHaveAttribute("aria-expanded", "true");
   });
 
   it("edits no-resolve and closes an expanded rule after reordering", async () => {
@@ -127,7 +171,11 @@ describe("config rule editors", () => {
   });
 });
 
-function RuleSetHarness({ initial, kind = "mihomo" }: { initial: RuleSetDraft[]; kind?: string }) {
+function RuleSetHarness({ initial, kind = "mihomo", onOpenCatalog }: {
+  initial: RuleSetDraft[];
+  kind?: string;
+  onOpenCatalog?: () => void;
+}) {
   const [ruleSets, setRuleSets] = useState(initial);
   const adapter = structuredAdapter(kind);
   return (
@@ -135,6 +183,7 @@ function RuleSetHarness({ initial, kind = "mihomo" }: { initial: RuleSetDraft[];
       adapter={adapter}
       inboundReferences={{ private: 2 }}
       issues={[]}
+      onOpenCatalog={onOpenCatalog}
       ruleSets={ruleSets}
       ui={requireFileDriverUI(kind)}
       onChange={setRuleSets}

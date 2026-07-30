@@ -1,12 +1,10 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { closestCenter, DndContext, type DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
-import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
-import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
 import Button from "@mui/material/Button";
 import Collapse from "@mui/material/Collapse";
 import IconButton from "@mui/material/IconButton";
@@ -36,6 +34,8 @@ import { ActionMenu } from "~/shared/ui/resource-list";
 
 import {
   configEditorPanelClassName,
+  ConfigListActions,
+  ConfigRowDisclosure,
   ConfigRowSummary,
   DenseConfigRow,
   issueSummary,
@@ -61,17 +61,24 @@ export function RuleSetListEditor({ adapter, defaultExpanded = true, inboundRefe
 }) {
   const { t } = useI18n();
   const [openRuleSetID, setOpenRuleSetID] = useState<string | null>(null);
+  const [focusRuleSetID, setFocusRuleSetID] = useState<string | null>(null);
   const update = (index: number, patch: Partial<RuleSetDraft>) => onChange(replaceAt(ruleSets, index, { ...ruleSets[index], ...patch }));
+
+  useEffect(() => {
+    if (focusRuleSetID !== null) setFocusRuleSetID(null);
+  }, [focusRuleSetID]);
+
+  function addRuleSet() {
+    const draft = adapter.ruleSets.create(ruleSets.length);
+    setOpenRuleSetID(draft.id);
+    setFocusRuleSetID(draft.id);
+    onChange([...ruleSets, draft]);
+  }
+
   return (
     <WorkbenchGroupSection
       count={ruleSets.length}
       defaultExpanded={defaultExpanded}
-      headerActions={(
-        <>
-          {onOpenCatalog ? <Button aria-label={t("files.config.catalogOpen")} type="button" variant="outlined" onClick={onOpenCatalog}>{t("files.config.catalogOpenShort")}</Button> : null}
-          <Button aria-label={t("files.config.addRuleSet")} startIcon={<AddIcon aria-hidden />} type="button" variant="outlined" onClick={() => onChange([...ruleSets, adapter.ruleSets.create(ruleSets.length)])}>{t("actions.add")}</Button>
-        </>
-      )}
       id="config-rule-sets"
       label={t("files.config.ruleSets")}
       severity={severityForIssues(issues)}
@@ -82,6 +89,7 @@ export function RuleSetListEditor({ adapter, defaultExpanded = true, inboundRefe
       <div className="overflow-hidden rounded-md border border-divider">
         {ruleSets.map((ruleSet, index) => (
           <RuleSetRow
+            focusFirstField={focusRuleSetID === ruleSet.id}
             inboundCount={inboundReferences[ruleSet.name.trim()] ?? 0}
             index={index}
             key={ruleSet.id}
@@ -97,13 +105,35 @@ export function RuleSetListEditor({ adapter, defaultExpanded = true, inboundRefe
             onUpdate={(patch) => update(index, patch)}
           />
         ))}
+        <ConfigListActions>
+          {onOpenCatalog ? (
+            <Button
+              aria-label={t("files.config.catalogOpen")}
+              type="button"
+              variant="outlined"
+              onClick={onOpenCatalog}
+            >
+              {t("files.config.catalogOpenShort")}
+            </Button>
+          ) : null}
+          <Button
+            aria-label={t("files.config.addRuleSet")}
+            startIcon={<AddIcon aria-hidden />}
+            type="button"
+            variant="outlined"
+            onClick={addRuleSet}
+          >
+            {t("files.config.addRuleSet")}
+          </Button>
+        </ConfigListActions>
       </div>
     </WorkbenchGroupSection>
   );
 }
 
-function RuleSetRow({ adapter, inboundCount, index, onDelete, onOpenChange, onUpdate, open, ruleSet, ui }: {
+function RuleSetRow({ adapter, focusFirstField, inboundCount, index, onDelete, onOpenChange, onUpdate, open, ruleSet, ui }: {
   adapter: StructuredFileConfigurationAdapter;
+  focusFirstField: boolean;
   inboundCount: number;
   index: number;
   onDelete: () => void;
@@ -121,21 +151,31 @@ function RuleSetRow({ adapter, inboundCount, index, onDelete, onOpenChange, onUp
   const behaviorLabel = behaviorOptions.find((option) => option.value === ruleSet.behavior)?.label ?? ruleSet.behavior;
   const presentation = ui.ruleSetPresentation;
   const remote = presentation.sourceMode === "remote-only" || ruleSet.source === "remote";
+  const nameInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (focusFirstField) nameInputRef.current?.focus();
+  }, [focusFirstField]);
+
   return (
     <div aria-label={`${t("files.config.ruleSet")} ${accessibleLabel}`} className="border-t border-divider bg-background-paper first:border-t-0" role="group">
       <DenseConfigRow>
-        <IconButton aria-controls={open ? contentID : undefined} aria-expanded={open} aria-label={`${open ? t("files.config.collapseRuleSet") : t("files.config.expandRuleSet")} ${accessibleLabel}`} size="small" type="button" onClick={onOpenChange}>
-          {open ? <KeyboardArrowDownIcon aria-hidden fontSize="small" /> : <KeyboardArrowRightIcon aria-hidden fontSize="small" />}
-        </IconButton>
-        <ConfigRowSummary
-          primary={name}
-          secondary={[
-            remote ? t("files.config.url") : t("files.config.ruleSetSourceInline"),
-            ...(presentation.summaryFields.includes("behavior") ? [behaviorLabel || t("files.config.behaviorClassical")] : []),
-            ...(remote && presentation.summaryFields.includes("format") ? [ruleSet.format] : []),
-            t("files.config.inboundCount", { count: inboundCount }),
-          ]}
-        />
+        <ConfigRowDisclosure
+          contentID={contentID}
+          expanded={open}
+          label={`${open ? t("files.config.collapseRuleSet") : t("files.config.expandRuleSet")} ${accessibleLabel}`}
+          onToggle={onOpenChange}
+        >
+          <ConfigRowSummary
+            primary={name}
+            secondary={[
+              remote ? t("files.config.url") : t("files.config.ruleSetSourceInline"),
+              ...(presentation.summaryFields.includes("behavior") ? [behaviorLabel || t("files.config.behaviorClassical")] : []),
+              ...(remote && presentation.summaryFields.includes("format") ? [ruleSet.format] : []),
+              t("files.config.inboundCount", { count: inboundCount }),
+            ]}
+          />
+        </ConfigRowDisclosure>
         <div className="hidden sm:block">
           <Tooltip title={t("files.config.deleteRuleSet")}><IconButton aria-label={`${t("files.config.deleteRuleSet")} ${accessibleLabel}`} size="small" type="button" onClick={onDelete}><DeleteOutlinedIcon aria-hidden /></IconButton></Tooltip>
         </div>
@@ -147,10 +187,10 @@ function RuleSetRow({ adapter, inboundCount, index, onDelete, onOpenChange, onUp
           />
         </div>
       </DenseConfigRow>
-      <Collapse in={open} timeout="auto" unmountOnExit>
-        <div className={configEditorPanelClassName} id={contentID}>
+      <Collapse id={contentID} in={open} timeout="auto" unmountOnExit>
+        <div className={configEditorPanelClassName}>
           <div className={ruleSetHeaderClassName(presentation.headerLayout)}>
-            <TextField fullWidth required label={t("labels.name")} size="small" value={ruleSet.name} onChange={(event) => onUpdate({ name: event.target.value })} />
+            <TextField fullWidth required inputRef={nameInputRef} label={t("labels.name")} size="small" value={ruleSet.name} onChange={(event) => onUpdate({ name: event.target.value })} />
             <ui.RuleSetFields
               behaviorOptions={behaviorOptions}
               draft={ruleSet}
@@ -181,11 +221,24 @@ export function RuleListEditor({ adapter, defaultExpanded = false, groups, issue
 }) {
   const { t } = useI18n();
   const [openRuleID, setOpenRuleID] = useState<string | null>(null);
+  const [focusRuleID, setFocusRuleID] = useState<string | null>(null);
   const options = adapter.rules.typeOptions(t);
   const policyOptions = policyReferenceOptions(adapter.references, nodes, groups);
   const ruleSetNames = ruleSetReferenceOptions(ruleSets);
   const sensors = useSortableSensors();
   const update = (index: number, patch: Partial<RuleDraft>) => onChange(replaceAt(rules, index, { ...rules[index], ...patch }));
+
+  useEffect(() => {
+    if (focusRuleID !== null) setFocusRuleID(null);
+  }, [focusRuleID]);
+
+  function addRule() {
+    const draft = adapter.rules.create(rules.length, namingLocale);
+    setOpenRuleID(draft.id);
+    setFocusRuleID(draft.id);
+    onChange([...rules, draft]);
+  }
+
   function moveRule(index: number, direction: -1 | 1) {
     const nextIndex = index + direction;
     if (nextIndex < 0 || nextIndex >= rules.length) return;
@@ -201,13 +254,14 @@ export function RuleListEditor({ adapter, defaultExpanded = false, groups, issue
     setOpenRuleID(null);
   }
   return (
-    <WorkbenchGroupSection count={rules.length} defaultExpanded={defaultExpanded} headerActions={<Button aria-label={t("files.config.addRule")} startIcon={<AddIcon aria-hidden />} type="button" variant="outlined" onClick={() => onChange([...rules, adapter.rules.create(rules.length, namingLocale)])}>{t("actions.add")}</Button>} id="config-routing-rules" label={t("files.config.rules")} severity={severityForIssues(issues)} severityLabel={issues.length ? t("files.config.statusNeedsAttention") : t("files.config.statusValid")} summary={issueSummary(issues, t, t("files.config.orderedRules"))}>
+    <WorkbenchGroupSection count={rules.length} defaultExpanded={defaultExpanded} id="config-routing-rules" label={t("files.config.rules")} severity={severityForIssues(issues)} severityLabel={issues.length ? t("files.config.statusNeedsAttention") : t("files.config.statusValid")} summary={issueSummary(issues, t, t("files.config.orderedRules"))}>
       <SectionIssues issues={issues} />
       <div className="overflow-hidden rounded-md border border-divider">
         <DndContext collisionDetection={closestCenter} sensors={sensors} onDragEnd={handleDragEnd}>
           <SortableContext items={rules.map((rule) => rule.id)} strategy={verticalListSortingStrategy}>
             {rules.map((rule, index) => (
               <SortableRuleRow
+                focusFirstField={focusRuleID === rule.id}
                 id={rule.id}
                 index={index}
                 key={rule.id}
@@ -230,13 +284,25 @@ export function RuleListEditor({ adapter, defaultExpanded = false, groups, issue
             ))}
           </SortableContext>
         </DndContext>
+        <ConfigListActions>
+          <Button
+            aria-label={t("files.config.addRule")}
+            startIcon={<AddIcon aria-hidden />}
+            type="button"
+            variant="outlined"
+            onClick={addRule}
+          >
+            {t("files.config.addRule")}
+          </Button>
+        </ConfigListActions>
       </div>
     </WorkbenchGroupSection>
   );
 }
 
-function SortableRuleRow({ adapter, id, index, onDelete, onMove, onOpenChange, onUpdate, open, options, policyOptions, rule, ruleSetNames, total, ui }: {
+function SortableRuleRow({ adapter, focusFirstField, id, index, onDelete, onMove, onOpenChange, onUpdate, open, options, policyOptions, rule, ruleSetNames, total, ui }: {
   adapter: StructuredFileConfigurationAdapter;
+  focusFirstField: boolean;
   id: string;
   index: number;
   onDelete: () => void;
@@ -261,19 +327,23 @@ function SortableRuleRow({ adapter, id, index, onDelete, onMove, onOpenChange, o
     <div aria-label={`${t("files.config.rule")} ${index + 1}`} className="border-t border-divider bg-background-paper first:border-t-0" ref={setNodeRef} role="group" style={{ transform: CSS.Transform.toString(transform), transition }}>
       <DenseConfigRow>
         <div className="flex items-center gap-0.5"><Tooltip title={`${t("files.config.dragRule")} ${index + 1}`}><IconButton {...attributes} {...listeners} aria-label={`${t("files.config.dragRule")} ${index + 1}`} className="hidden sm:inline-flex" ref={setActivatorNodeRef} size="small" style={{ touchAction: "none" }} type="button"><DragIndicatorIcon aria-hidden fontSize="small" /></IconButton></Tooltip><Typography className="max-sm:inline" color="text.secondary" component="span" variant="caption">{index + 1}</Typography></div>
-        <IconButton aria-controls={open ? contentID : undefined} aria-expanded={open} aria-label={`${open ? t("files.config.collapseRule") : t("files.config.expandRule")} ${index + 1}`} size="small" type="button" onClick={onOpenChange}>
-          {open ? <KeyboardArrowDownIcon aria-hidden fontSize="small" /> : <KeyboardArrowRightIcon aria-hidden fontSize="small" />}
-        </IconButton>
-        <ConfigRowSummary
-          primary={<><span>{rule.type.toUpperCase()}</span>{rule.value ? <span> {rule.value}</span> : null}<span> → </span><span>{rule.policy || t("files.config.policy")}</span></>}
-          secondary={rule.noResolve ? ["no-resolve"] : []}
-        />
+        <ConfigRowDisclosure
+          contentID={contentID}
+          expanded={open}
+          label={`${open ? t("files.config.collapseRule") : t("files.config.expandRule")} ${index + 1}`}
+          onToggle={onOpenChange}
+        >
+          <ConfigRowSummary
+            primary={<><span>{rule.type.toUpperCase()}</span>{rule.value ? <span> {rule.value}</span> : null}<span> → </span><span>{rule.policy || t("files.config.policy")}</span></>}
+            secondary={rule.noResolve ? ["no-resolve"] : []}
+          />
+        </ConfigRowDisclosure>
         <RowOrderActions deleteLabel={`${t("files.config.deleteRule")} ${index + 1}`} downLabel={`${t("files.config.moveRuleDown")} ${index + 1}`} downDisabled={index === total - 1} mobileMenuLabel={t("resourceList.moreActions", { title: `${t("files.config.rule")} ${index + 1}` })} upLabel={`${t("files.config.moveRuleUp")} ${index + 1}`} upDisabled={index === 0} onDelete={onDelete} onDown={() => onMove(1)} onUp={() => onMove(-1)} />
       </DenseConfigRow>
-      <Collapse in={open} timeout="auto" unmountOnExit>
-        <div className={configEditorPanelClassName} id={contentID}>
+      <Collapse id={contentID} in={open} timeout="auto" unmountOnExit>
+        <div className={configEditorPanelClassName}>
           <div className={hasValue ? "grid gap-3 md:grid-cols-[minmax(8rem,0.55fr)_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-center" : "grid gap-3 md:grid-cols-[minmax(8rem,0.55fr)_minmax(0,1fr)_minmax(0,1fr)] md:items-center"}>
-            <SelectField label={t("files.config.behavior")} options={options} size="small" value={rule.type} onChange={(value) => onUpdate(adapter.rules.transitionType(rule, value))} />
+            <SelectField focusOnMount={focusFirstField} label={t("files.config.behavior")} options={options} size="small" value={rule.type} onChange={(value) => onUpdate(adapter.rules.transitionType(rule, value))} />
             {hasValue ? referencesRuleSet ? (
               <SelectField label={t("files.config.ruleValue")} options={currentRuleSetNames.map((value) => ({ label: value, value }))} size="small" value={rule.value} onChange={(value) => onUpdate({ value })} />
             ) : (

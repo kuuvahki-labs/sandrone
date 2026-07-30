@@ -126,10 +126,7 @@ describe("file driver default bases", () => {
     expect(base).toContain("*.icloud.com = server:system");
     expect(base).toContain("localhost = 127.0.0.1");
     expect(base).toContain("# always-real-ip =");
-    expect(base).toMatch(/^\[Host\]$[\s\S]*^\[URL Rewrite\]$[\s\S]*^\[MITM\]$/mu);
-    expect(base).toContain("^https?://(www.)?g.cn https://www.google.com 302");
-    expect(base).toContain("^https?://(www.)?google.cn https://www.google.com 302");
-    expect(base).toContain("hostname = *.google.cn");
+    expect(base).toMatch(/^\[Host\]$/mu);
     expect(base).not.toMatch(/^\s*always-real-ip\s*=/mu);
   });
 });

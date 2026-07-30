@@ -301,7 +301,7 @@ export function FileConfigEditor({ adapter, baseEditor, createNamingLocale = "en
         <>
           <ProxyGroupEditor adapter={adapter} defaultExpanded groups={groups} inboundReferences={relationModel.groupInboundReferences} issues={groupIssues} key={`groups-${structureRevision}`} namingLocale={namingLocale} nodes={nodeOptions ?? []} ui={ui} onChange={(value) => updateEditorState({ type: "change-groups", groups: value })} />
           <RuleSetListEditor adapter={adapter} defaultExpanded={ruleSets.length <= 20} inboundReferences={relationModel.ruleSetInboundReferences} issues={ruleSetIssues} key={`rule-sets-${structureRevision}`} ruleSets={ruleSets} ui={ui} onChange={(value) => updateEditorState({ type: "change-rule-sets", ruleSets: value })} onOpenCatalog={loadRuleSetCatalog ? () => setCatalogOpen(true) : undefined} />
-          <RuleListEditor adapter={adapter} groups={groups} issues={ruleIssues} key={`rules-${structureRevision}`} namingLocale={namingLocale} nodes={nodeOptions ?? []} rules={rules} ruleSets={ruleSets} ui={ui} onChange={(value) => updateEditorState({ type: "change-rules", rules: value })} />
+          <RuleListEditor adapter={adapter} defaultExpanded groups={groups} issues={ruleIssues} key={`rules-${structureRevision}`} namingLocale={namingLocale} nodes={nodeOptions ?? []} rules={rules} ruleSets={ruleSets} ui={ui} onChange={(value) => updateEditorState({ type: "change-rules", rules: value })} />
         </>
       ) : (
         <>
