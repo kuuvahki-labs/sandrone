@@ -217,7 +217,7 @@ curl -sS "$SANDRONE_URL/v1/subscriptions/example/render?arg.environment=test" \
 - preview 会返回处理前后的节点对象，其中可能含连接凭据；应把响应按敏感数据
   处理。
 - 保存或删除任一订阅会使 subscription-traffic、subscription-render 和
-  file-render 缓存失效；文件和 runtime settings 变更也会失效相关结果缓存。
+  file-render 缓存失效；文件和项目设置变更也会失效相关结果缓存。
 - handler 级错误码、状态映射和 warning 字段见[错误与诊断参考](../errors.md)；
   router 与未知 action 的 plain-text `404`/`405` 边界见[通用约定](README.md#响应与失败)。
 

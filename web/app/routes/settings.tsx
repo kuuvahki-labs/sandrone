@@ -2,6 +2,7 @@ import { useNavigate } from "react-router";
 
 import { useSandrone } from "~/core/provider/context";
 import { useVersionInfo } from "~/features/settings/data/use-version-info";
+import { settingsUpdateFromView } from "~/features/settings/model/project-settings";
 import { SettingsPage } from "~/features/settings/pages/settings-page";
 
 export default function SettingsRoute() {
@@ -13,13 +14,21 @@ export default function SettingsRoute() {
     <SettingsPage
       publicBaseUrl={app.publicBaseUrl}
       revision={version.revision}
-      themeMode={app.themeMode}
+      localeMode={app.effectiveSettings.appearance.locale}
+      themeMode={app.effectiveSettings.appearance.theme_mode}
       version={version.version}
       onOpenData={() => navigate("/settings/data")}
       onOpenRuntime={() => navigate("/settings/runtime")}
       onSaveBaseUrl={app.saveBaseUrl}
       onSignOut={app.signOut}
-      onThemeMode={app.updateThemeMode}
+      onLocaleMode={(locale) => void app.updateSettings(settingsUpdateFromView({
+        ...app.settings,
+        appearance: { ...app.settings.appearance, locale },
+      }))}
+      onThemeMode={(themeMode) => void app.updateSettings(settingsUpdateFromView({
+        ...app.settings,
+        appearance: { ...app.settings.appearance, theme_mode: themeMode },
+      }))}
     />
   );
 }

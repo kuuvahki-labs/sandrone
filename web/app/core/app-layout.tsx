@@ -57,7 +57,7 @@ function AuthScreen() {
             className="grid gap-4"
             onSubmit={(event) => {
               event.preventDefault();
-              enterWithToken();
+              void enterWithToken();
             }}
           >
             <div aria-label={t("shell.authBrand")} className="grid justify-items-center gap-2 text-center">

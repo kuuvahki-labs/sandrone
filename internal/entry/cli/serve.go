@@ -3,7 +3,9 @@ package cli
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -31,8 +33,8 @@ func newServeCommand(cfg *config) *cobra.Command {
 		listen:         firstNonEmpty(cfg.env[EnvListen], app.DefaultListen),
 		token:          cfg.env[EnvToken],
 		webUIStaticDir: cfg.env[EnvWebUIStaticDir],
-		transport:      "stdio",
-		path:           app.DefaultMCPPath,
+		transport:      firstNonEmpty(cfg.env[EnvMCPTransport], "stdio"),
+		path:           firstNonEmpty(cfg.env[EnvMCPPath], app.DefaultMCPPath),
 		maxOutput:      1 << 20,
 		logLevel:       firstNonEmpty(cfg.env[EnvLogLevel], "info"),
 	}
@@ -58,7 +60,7 @@ func newServeHTTPCommand(cfg *config, opts *serveOptions) *cobra.Command {
 		Use:   "http",
 		Short: "Run the HTTP API",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			rt, err := newServeRuntime(cfg, *opts, "streamable-http")
+			rt, err := newServeRuntime(cmd, cfg, *opts, "streamable-http")
 			if err != nil {
 				return err
 			}
@@ -73,7 +75,7 @@ func newServeMCPCommand(cfg *config, opts *serveOptions) *cobra.Command {
 		Use:   "mcp",
 		Short: "Run the MCP server",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			rt, err := newServeRuntime(cfg, *opts, opts.transport)
+			rt, err := newServeRuntime(cmd, cfg, *opts, opts.transport)
 			if err != nil {
 				return err
 			}
@@ -94,7 +96,7 @@ func newServeAllCommand(cfg *config, opts *serveOptions) *cobra.Command {
 		Use:   "all",
 		Short: "Run HTTP API and MCP streamable HTTP on one listener",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			rt, err := newServeRuntime(cfg, *opts, "streamable-http")
+			rt, err := newServeRuntime(cmd, cfg, *opts, "streamable-http")
 			if err != nil {
 				return err
 			}
@@ -114,12 +116,38 @@ func addMCPFlags(cmd *cobra.Command, opts *serveOptions) {
 	cmd.Flags().IntVar(&opts.maxOutput, "max-output-bytes", opts.maxOutput, "maximum MCP inline output bytes")
 }
 
-func newServeRuntime(cfg *config, opts serveOptions, transport string) (*app.Runtime, error) {
+func newServeRuntime(cmd *cobra.Command, cfg *config, opts serveOptions, transport string) (*app.Runtime, error) {
+	if !flagChanged(cmd, "token-required") {
+		value, err := environmentBool(cfg.env, EnvTokenRequired, opts.tokenRequired)
+		if err != nil {
+			return nil, err
+		}
+		opts.tokenRequired = value
+	}
+	if !flagChanged(cmd, "allow-management-tools") {
+		value, err := environmentBool(cfg.env, EnvMCPAllowManagementTools, opts.management)
+		if err != nil {
+			return nil, err
+		}
+		opts.management = value
+	}
+	if !flagChanged(cmd, "max-output-bytes") {
+		value, err := environmentInt(cfg.env, EnvMCPMaxOutputBytes, opts.maxOutput)
+		if err != nil {
+			return nil, err
+		}
+		opts.maxOutput = value
+	}
 	if transport != "" {
 		opts.transport = transport
 	}
+	overrideSources := startupOverrideSources(cmd, cfg.env)
+	if transport != "" {
+		overrideSources["mcp.transport"] = "flag"
+	}
 	appCfg := app.Config{
-		DataDir: cfg.dataDir,
+		DataDir:         cfg.dataDir,
+		OverrideSources: overrideSources,
 		HTTP: app.HTTPConfig{
 			Listen:        opts.listen,
 			Token:         opts.token,
@@ -146,6 +174,62 @@ func newServeRuntime(cfg *config, opts serveOptions, transport string) (*app.Run
 		return nil, errors.New("runtime factory returned nil")
 	}
 	return rt, nil
+}
+
+func startupOverrideSources(cmd *cobra.Command, env map[string]string) map[string]string {
+	sources := map[string]string{}
+	for _, item := range []struct {
+		path   string
+		envKey string
+		flag   string
+	}{
+		{path: "http.listen", envKey: EnvListen, flag: "listen"},
+		{path: "http.token", envKey: EnvToken, flag: "token"},
+		{path: "http.token_required", envKey: EnvTokenRequired, flag: "token-required"},
+		{path: "mcp.transport", envKey: EnvMCPTransport, flag: "transport"},
+		{path: "mcp.path", envKey: EnvMCPPath, flag: "path"},
+		{path: "mcp.allow_management_tools", envKey: EnvMCPAllowManagementTools, flag: "allow-management-tools"},
+		{path: "mcp.max_output_bytes", envKey: EnvMCPMaxOutputBytes, flag: "max-output-bytes"},
+		{path: "webui.static_dir", envKey: EnvWebUIStaticDir, flag: "webui-static-dir"},
+		{path: "log.level", envKey: EnvLogLevel, flag: "log-level"},
+	} {
+		if env[item.envKey] != "" {
+			sources[item.path] = "environment"
+		}
+		if flagChanged(cmd, item.flag) {
+			sources[item.path] = "flag"
+		}
+	}
+	return sources
+}
+
+func flagChanged(cmd *cobra.Command, name string) bool {
+	flag := cmd.Flags().Lookup(name)
+	return flag != nil && flag.Changed
+}
+
+func environmentBool(env map[string]string, key string, fallback bool) (bool, error) {
+	raw := strings.TrimSpace(env[key])
+	if raw == "" {
+		return fallback, nil
+	}
+	value, err := strconv.ParseBool(raw)
+	if err != nil {
+		return false, fmt.Errorf("%s must be a boolean: %w", key, err)
+	}
+	return value, nil
+}
+
+func environmentInt(env map[string]string, key string, fallback int) (int, error) {
+	raw := strings.TrimSpace(env[key])
+	if raw == "" {
+		return fallback, nil
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, fmt.Errorf("%s must be an integer: %w", key, err)
+	}
+	return value, nil
 }
 
 func newWebUIHandler(cfg app.Config) http.Handler {

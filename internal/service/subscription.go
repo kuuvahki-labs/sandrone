@@ -306,10 +306,7 @@ func (s *Service) RenderSubscriptionRequest(ctx context.Context, request domain.
 	if err != nil {
 		return nil, err
 	}
-	ttlSeconds, err := s.subscriptionRenderTTLSeconds(ctx, sub.RenderCacheTTLSeconds)
-	if err != nil {
-		return nil, err
-	}
+	ttlSeconds := s.subscriptionRenderTTLSeconds(sub.RenderCacheTTLSeconds)
 	cacheKey := ""
 	if ttlSeconds > 0 {
 		cacheKey, err = subscriptionRenderCacheKey(sub, format, req)

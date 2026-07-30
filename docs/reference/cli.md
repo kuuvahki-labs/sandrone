@@ -31,20 +31,36 @@ revision 的来源和职责见[构建身份](build-info.md)。
 
 | flag | 环境变量 | 缺省值 | 含义 |
 | --- | --- | --- | --- |
-| `--data-dir <dir>` | `SANDRONE_DATA_DIR` | `./data` | 资源存储目录 |
+| `--data-dir <dir>` | `SANDRONE_DATA_DIR` | `./data` | 配置与资源存储目录 |
+
+`data_dir` 是唯一不进入项目设置文件的引导值，解析顺序固定为：
+
+```text
+显式 --data-dir > SANDRONE_DATA_DIR > ./data
+```
+
+目录内可选的 `settings.json` 保存其余项目设置。文件不存在时使用内建默认值。
 
 `serve` 及其子命令继承以下 flags：
 
-| flag | 环境变量 | 缺省值 | 含义 |
+| flag | 环境变量 | 内建缺省值 | 含义 |
 | --- | --- | --- | --- |
 | `--listen <host:port>` | `SANDRONE_LISTEN` | `127.0.0.1:1137` | HTTP 监听地址 |
 | `--token <token>` | `SANDRONE_TOKEN` | 空 | HTTP 与 MCP HTTP 的 bearer token |
-| `--token-required` | 无 | `false` | 即使监听本机地址也要求配置 token |
+| `--token-required` | `SANDRONE_TOKEN_REQUIRED` | `false` | 即使监听本机地址也要求配置 token |
 | `--webui-static-dir <dir>` | `SANDRONE_WEBUI_STATIC_DIR` | 空 | 覆盖 Web UI 静态资源目录 |
 | `--log-level <level>` | `SANDRONE_LOG_LEVEL` | `info` | `debug`、`info`、`warn` 或 `error` |
 
-显式 flag 覆盖环境变量，环境变量覆盖缺省值。`warning` 也会被接受为
-`warn` 日志级别。静态资源目录若非现有目录，启动失败。
+启动字段的优先级是：
+
+```text
+显式 flag > 环境变量 > <data_dir>/settings.json > 内建默认值
+```
+
+环境变量或 flag 只覆盖当前进程，不回写 `settings.json`。管理 API 保存了被
+覆盖的字段时，当前进程继续使用覆盖值。`warning` 也会被接受为 `warn`
+日志级别。静态资源目录若非现有目录，启动失败。统一文件与管理接口见
+[项目设置接口](http-api/settings.md)。
 
 ## 节点格式
 
@@ -112,7 +128,7 @@ sandrone probe [--format <format>] \
 | `--timeout` | 服务缺省 | 每节点超时，Go duration |
 | `--attempts` | `0` | 每节点尝试次数；`0` 使用服务缺省 |
 | `--concurrency` | `0` | 最大并发；`0` 使用服务缺省 |
-| `--cache-ttl` | `0` | 缓存秒数；`0` 继承 runtime 的 probe cache TTL，两者都为 `0` 时禁用缓存 |
+| `--cache-ttl` | `0` | 缓存秒数；`0` 继承项目设置的 probe cache TTL，两者都为 `0` 时禁用缓存 |
 | `--output` | 标准输出 | JSON 输出路径或 `-` |
 
 `tcp-connect` 不使用核心；`udp-ntp` 当前使用 sing-box；`url-test` 支持
@@ -184,12 +200,12 @@ sandrone file render <name-or-spec-path>
 
 启动 MCP server，并额外接受：
 
-| flag | 缺省值 | 含义 |
-| --- | --- | --- |
-| `--transport` | `stdio` | `stdio` 或 `streamable-http`；下划线写法会规范化为连字符 |
-| `--path` | `/mcp` | streamable HTTP 路径，必须以 `/` 开头 |
-| `--allow-management-tools` | `false` | 注册可覆盖或立即删除定义的管理 tools；只应在可信本机 Agent 场景启用 |
-| `--max-output-bytes` | `1048576` | MCP 内联输出上限；不能为负数 |
+| flag | 环境变量 | 内建缺省值 | 含义 |
+| --- | --- | --- | --- |
+| `--transport` | `SANDRONE_MCP_TRANSPORT` | `stdio` | `stdio` 或 `streamable-http`；下划线写法会规范化为连字符 |
+| `--path` | `SANDRONE_MCP_PATH` | `/mcp` | streamable HTTP 路径，必须以 `/` 开头 |
+| `--allow-management-tools` | `SANDRONE_MCP_ALLOW_MANAGEMENT_TOOLS` | `false` | 注册可覆盖或立即删除定义的管理 tools；只应在可信本机 Agent 场景启用 |
+| `--max-output-bytes` | `SANDRONE_MCP_MAX_OUTPUT_BYTES` | `1048576` | MCP 内联输出上限；不能为负数 |
 
 `stdio` 直接使用进程标准输入/输出；`streamable-http` 使用 `--listen` 和
 `--path` 启动 HTTP listener。

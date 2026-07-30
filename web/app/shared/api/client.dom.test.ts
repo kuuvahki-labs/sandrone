@@ -370,7 +370,7 @@ describe("ApiClient", () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
-  it("bypasses a pending runtime settings request when a fresh read is requested", async () => {
+  it("bypasses a pending project settings request when a fresh read is requested", async () => {
     let resolveStale: ((response: Response) => void) | undefined;
     let resolveFresh: ((response: Response) => void) | undefined;
     const staleResponse = new Promise<Response>((resolve) => {
@@ -389,8 +389,8 @@ describe("ApiClient", () => {
       }));
     const client = new ApiClient({ fetcher });
 
-    const stale = client.getRuntimeSettings();
-    const fresh = client.getRuntimeSettings({ fresh: true });
+    const stale = client.getSettings();
+    const fresh = client.getSettings({ fresh: true });
 
     expect(fetcher).toHaveBeenCalledTimes(2);
     resolveStale?.(new Response(JSON.stringify(staleSettings), {
@@ -398,7 +398,7 @@ describe("ApiClient", () => {
     }));
     await expect(stale).resolves.toEqual(staleSettings);
 
-    const afterStale = client.getRuntimeSettings();
+    const afterStale = client.getSettings();
     expect(fetcher).toHaveBeenCalledTimes(2);
 
     resolveFresh?.(new Response(JSON.stringify(restoredSettings), {
@@ -407,9 +407,26 @@ describe("ApiClient", () => {
     await expect(fresh).resolves.toEqual(restoredSettings);
     await expect(afterStale).resolves.toEqual(restoredSettings);
 
-    const next = client.getRuntimeSettings();
+    const next = client.getSettings();
     expect(fetcher).toHaveBeenCalledTimes(3);
     await expect(next).resolves.toEqual(restoredSettings);
+  });
+
+  it("uses the unified settings endpoint for reads and updates", async () => {
+    const envelope = { settings: {}, effective: {}, overrides: {}, restart_required: [] };
+    const fetcher = vi.fn(async () => new Response(JSON.stringify(envelope), {
+      headers: { "content-type": "application/json" },
+    }));
+    const client = new ApiClient({ fetcher });
+
+    await client.getSettings();
+    await client.updateSettings({} as never);
+
+    const calls = fetcher.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit?]>;
+    expect(calls.map(([input, init]) => [String(input), init?.method ?? "GET"])).toEqual([
+      ["/v1/settings", "GET"],
+      ["/v1/settings", "PUT"],
+    ]);
   });
 
   it("requests subscription previews with encoded resource names", async () => {

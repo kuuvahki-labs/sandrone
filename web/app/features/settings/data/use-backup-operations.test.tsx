@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { ApiClient, RuntimeSettingsInput } from "~/shared/api/client";
+import type { ApiClient } from "~/shared/api/client";
 import { createTranslator } from "~/shared/i18n/context";
 
 import { useBackupOperations } from "./use-backup-operations";
@@ -21,7 +21,7 @@ describe("useBackupOperations", () => {
     const createObjectURL = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:sandrone-backup");
     const revokeObjectURL = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
     const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
-    const { result } = renderHook(() => useBackupOperations({ client, showNotice: vi.fn(), t }));
+    const { result } = renderHook(() => useBackupOperations({ client, reloadSettings: vi.fn(), showNotice: vi.fn(), t }));
 
     await act(async () => result.current.downloadBackup());
 
@@ -46,7 +46,7 @@ describe("useBackupOperations", () => {
       throw new Error("download blocked");
     });
     const showNotice = vi.fn();
-    const { result } = renderHook(() => useBackupOperations({ client, showNotice, t }));
+    const { result } = renderHook(() => useBackupOperations({ client, reloadSettings: vi.fn(), showNotice, t }));
 
     await act(async () => result.current.downloadBackup());
 
@@ -56,19 +56,19 @@ describe("useBackupOperations", () => {
     expect(document.body).not.toContainElement(anchor);
   });
 
-  it("refreshes runtime settings after restoring a backup", async () => {
+  it("refreshes project settings after restoring a backup", async () => {
     const file = new Blob(["backup"], { type: "application/zip" });
     const client = {
       restoreBackup: vi.fn().mockResolvedValue(undefined),
-      getRuntimeSettings: vi.fn().mockResolvedValue(runtimeSettings("restored", 30000)),
     } as unknown as ApiClient;
+    const reloadSettings = vi.fn().mockResolvedValue(undefined);
     const showNotice = vi.fn();
-    const { result } = renderHook(() => useBackupOperations({ client, showNotice, t }));
+    const { result } = renderHook(() => useBackupOperations({ client, reloadSettings, showNotice, t }));
 
     await act(async () => result.current.restoreBackup(file));
 
     expect(client.restoreBackup).toHaveBeenCalledWith(file);
-    expect(client.getRuntimeSettings).toHaveBeenCalledWith({ fresh: true });
+    expect(reloadSettings).toHaveBeenCalledWith(true);
     expect(showNotice).toHaveBeenCalledWith("备份恢复成功");
   });
 
@@ -76,14 +76,14 @@ describe("useBackupOperations", () => {
     const failure = new Error("archive invalid");
     const client = {
       restoreBackup: vi.fn().mockRejectedValue(failure),
-      getRuntimeSettings: vi.fn(),
     } as unknown as ApiClient;
+    const reloadSettings = vi.fn();
     const showNotice = vi.fn();
-    const { result } = renderHook(() => useBackupOperations({ client, showNotice, t }));
+    const { result } = renderHook(() => useBackupOperations({ client, reloadSettings, showNotice, t }));
 
     await expect(act(async () => result.current.restoreBackup(new Blob(["invalid"])))).rejects.toBe(failure);
 
-    expect(client.getRuntimeSettings).not.toHaveBeenCalled();
+    expect(reloadSettings).not.toHaveBeenCalled();
     expect(showNotice).toHaveBeenCalledWith("archive invalid", "error");
     expect(showNotice).not.toHaveBeenCalledWith("备份恢复成功");
   });
@@ -91,10 +91,10 @@ describe("useBackupOperations", () => {
   it("reports a post-restore refresh failure and still completes the restore", async () => {
     const client = {
       restoreBackup: vi.fn().mockResolvedValue(undefined),
-      getRuntimeSettings: vi.fn().mockRejectedValue(new Error("reload unavailable")),
     } as unknown as ApiClient;
+    const reloadSettings = vi.fn().mockRejectedValue(new Error("reload unavailable"));
     const showNotice = vi.fn();
-    const { result } = renderHook(() => useBackupOperations({ client, showNotice, t }));
+    const { result } = renderHook(() => useBackupOperations({ client, reloadSettings, showNotice, t }));
 
     await act(async () => result.current.restoreBackup(new Blob(["backup"])));
 
@@ -102,11 +102,3 @@ describe("useBackupOperations", () => {
     expect(showNotice).toHaveBeenCalledWith("备份恢复成功");
   });
 });
-
-function runtimeSettings(userAgent: string, timeout: number): RuntimeSettingsInput {
-  return {
-    remote_defaults: { user_agent: userAgent, timeout_ms: timeout },
-    probe_defaults: {},
-    cache_defaults: {},
-  };
-}

@@ -152,12 +152,39 @@ test.beforeEach(async ({ page }) => {
     }
     await route.fulfill({ json: { shares: manifest.shares } });
   });
-  await page.route("**/v1/settings/runtime", async (route) => {
+  await page.route("**/v1/settings", async (route) => {
+    const settings = {
+      schema_version: 1,
+      http: { listen: "127.0.0.1:1137", token_configured: false, token_required: false },
+      mcp: { transport: "stdio", path: "/mcp", allow_management_tools: false, max_output_bytes: 1048576 },
+      webui: { static_dir: "" },
+      log: { level: "info" },
+      remote_defaults: { user_agent: "sandrone/0.1.0", timeout_ms: 15000 },
+      probe_defaults: {
+        method: "url_test",
+        core: "sing-box",
+        url: "http://www.gstatic.com/generate_204",
+        ntp_server: "time.apple.com",
+        timeout_ms: 5000,
+        attempts: 1,
+        concurrency: 10,
+        cache_ttl_seconds: 0,
+      },
+      cache_defaults: {
+        remote_fetch_ttl_seconds: 0,
+        subscription_traffic_ttl_seconds: 60,
+        subscription_render_ttl_seconds: 0,
+        file_render_ttl_seconds: 0,
+      },
+      appearance: { theme_mode: "dark", locale: "auto" },
+      subscriptions: { auto_load_traffic: false },
+    };
     await route.fulfill({
       json: {
-        remote_defaults: { user_agent: "sandrone/0.1.0", timeout_ms: 15000 },
-        probe_defaults: { method: "url_test", core: "sing-box", timeout_ms: 5000 },
-        cache_defaults: { remote_fetch_ttl_seconds: 0, subscription_traffic_ttl_seconds: 60 },
+        settings,
+        effective: settings,
+        overrides: {},
+        restart_required: [],
       },
     });
   });

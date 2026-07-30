@@ -14,7 +14,7 @@
 | `source` | object | `FileSource`。typed 文件可以用空对象选择内建 base；`static` 必须给出可读取的 source。 |
 | `config` | object | 仅供 typed 文件使用；`static` 出现此字段即报错。 |
 | `processors` | array | `ProcessorSpec` 列表，按声明顺序选择并执行对应 stage。 |
-| `render_cache_ttl_seconds` | nullable integer | 最终文件结果缓存策略：省略继承 runtime 默认，`0` 关闭，正数覆盖。 |
+| `render_cache_ttl_seconds` | nullable integer | 最终文件结果缓存策略：省略继承项目默认，`0` 关闭，正数覆盖。 |
 | `meta` | object<string,string> | 随文件保留的调用方元数据。 |
 | `created_at`、`updated_at` | RFC 3339 time | 可选资源时间戳，由存储层原样往返。 |
 
@@ -44,7 +44,7 @@
 - `url`：必填；
 - `user_agent`、`proxy`、`timeout_ms`：可选抓取参数；
 - `cache_ttl_seconds`：大于零时允许使用持久化抓取缓存；未启用 store 时不能
-  形成持久缓存。零值继承 runtime 的 `cache_defaults.remote_fetch_ttl_seconds`；
+  形成持久缓存。零值继承项目设置的 `cache_defaults.remote_fetch_ttl_seconds`；
   两者都为零时才会每次重新抓取。
 
 保存文件时，完整 `FileSpec` 作为单个 JSON record 写入 Store。`inline`

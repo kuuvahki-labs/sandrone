@@ -3,6 +3,7 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import { render } from "@testing-library/react";
 import { vi } from "vitest";
 
+import { defaultProjectSettings, defaultSettingsEnvelope } from "~/features/settings/model/project-settings";
 import AppRoot from "~/root";
 import IndexRoute from "~/routes/_index";
 import FilesRoute from "~/routes/files";
@@ -146,6 +147,9 @@ export function installDefaultFetchMock() {
     const url = String(input);
     const resourceResponse = resourceListResponse(url, resources, init);
     if (resourceResponse) return resourceResponse;
+    if (url === "/v1/settings") {
+      return jsonResponse(defaultSettingsEnvelope(defaultProjectSettings));
+    }
     if (url.includes("/v1/subscriptions/provider")) {
       if (url.includes("/preview")) {
         return jsonResponse(subscriptionPreview);
@@ -183,6 +187,23 @@ export function jsonResponse(body: unknown, init: ResponseInit = {}) {
     status: init.status,
     headers: { "content-type": "application/json" },
   });
+}
+
+export function projectSettingsEnvelope(options: {
+  autoLoadTraffic?: boolean;
+  locale?: "auto" | "zh-CN" | "en-US";
+} = {}) {
+  const settings = {
+    ...defaultProjectSettings,
+    appearance: {
+      ...defaultProjectSettings.appearance,
+      locale: options.locale ?? defaultProjectSettings.appearance.locale,
+    },
+    subscriptions: {
+      auto_load_traffic: options.autoLoadTraffic ?? false,
+    },
+  };
+  return defaultSettingsEnvelope(settings);
 }
 
 export function resourceListResponse(url: string, resources: ResourceFixture, init?: RequestInit): Response | null {

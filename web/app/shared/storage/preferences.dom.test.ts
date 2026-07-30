@@ -3,12 +3,11 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   clearAdminToken,
   getAdminToken,
-  getAutoLoadSubscriptionTraffic,
+  getLocaleModePreference,
   getLocalePreference,
   getPublicBaseUrl,
   loadThemePreference,
   saveAdminToken,
-  saveAutoLoadSubscriptionTraffic,
   saveLocalePreference,
   savePublicBaseUrl,
   saveThemePreference,
@@ -28,24 +27,6 @@ describe("browser storage helpers", () => {
 
     clearAdminToken();
     expect(getAdminToken()).toBe("");
-  });
-
-  it("defaults automatic subscription traffic loading to disabled until opted in", () => {
-    expect(getAutoLoadSubscriptionTraffic()).toBe(false);
-
-    saveAutoLoadSubscriptionTraffic(true);
-
-    expect(getAutoLoadSubscriptionTraffic()).toBe(true);
-  });
-
-  it("treats non-true automatic traffic values as disabled", () => {
-    localStorage.setItem("sandrone.subscriptionTraffic.autoLoad", "enabled");
-
-    expect(getAutoLoadSubscriptionTraffic()).toBe(false);
-
-    saveAutoLoadSubscriptionTraffic(false);
-
-    expect(getAutoLoadSubscriptionTraffic()).toBe(false);
   });
 
   it("normalizes the public base URL", () => {
@@ -86,6 +67,14 @@ describe("browser storage helpers", () => {
 
     expect(localStorage.getItem("sandrone.locale")).toBe("en-US");
     expect(getLocalePreference()).toBe("en-US");
+  });
+
+  it("uses auto as the non-authoritative locale cache default", () => {
+    expect(getLocaleModePreference()).toBe("auto");
+
+    saveLocalePreference("auto");
+
+    expect(getLocaleModePreference()).toBe("auto");
   });
 
   it("falls back to browser locale when stored locale data is invalid", () => {

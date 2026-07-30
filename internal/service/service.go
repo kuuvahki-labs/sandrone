@@ -11,6 +11,7 @@ import (
 	"context"
 	"log/slog"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/spf13/afero"
@@ -29,6 +30,7 @@ import (
 	fileproc "github.com/kuuvahki-labs/sandrone/internal/processor/file"
 	nodeproc "github.com/kuuvahki-labs/sandrone/internal/processor/node"
 	scriptproc "github.com/kuuvahki-labs/sandrone/internal/processor/script"
+	projectsettings "github.com/kuuvahki-labs/sandrone/internal/settings"
 	"github.com/kuuvahki-labs/sandrone/internal/store"
 )
 
@@ -69,20 +71,25 @@ type probeCoreSelector interface {
 // Service is the central orchestrator. It composes adapters and the
 // processor registry; consumers receive a value via New().
 type Service struct {
-	parsers          map[string]Parser
-	renderers        map[string]Renderer
-	uriParser        *uri.Parser
-	registry         *processor.Registry
-	typedFiles       *typedFileRegistry
-	prober           ProbeEngine
-	cache            cachepkg.Cache
-	store            store.Store
-	storeCoordinator store.Coordinator
-	metaStore        *store.MetaStore
-	fetcher          *fetcher.Fetcher
-	logger           *slog.Logger
-	now              func() time.Time
-	catalog          func() (*ruleSetCatalogSnapshot, error)
+	parsers           map[string]Parser
+	renderers         map[string]Renderer
+	uriParser         *uri.Parser
+	registry          *processor.Registry
+	typedFiles        *typedFileRegistry
+	prober            ProbeEngine
+	cache             cachepkg.Cache
+	store             store.Store
+	storeCoordinator  store.Coordinator
+	metaStore         *store.MetaStore
+	settingsStore     *store.SettingsStore
+	fetcher           *fetcher.Fetcher
+	logger            *slog.Logger
+	now               func() time.Time
+	catalog           func() (*ruleSetCatalogSnapshot, error)
+	settingsMu        sync.RWMutex
+	storedSettings    domain.Settings
+	effectiveSettings domain.Settings
+	settingsOverrides map[string]string
 }
 
 // Option lets callers customise Service construction.
@@ -110,6 +117,16 @@ func WithStore(resourceStore store.Store) Option {
 		s.store = coordinator
 		s.storeCoordinator = coordinator
 		s.metaStore = store.NewMetaStore(coordinator)
+		s.settingsStore = store.NewSettingsStore(coordinator)
+	}
+}
+
+func WithProjectSettings(repository *store.SettingsStore, stored, effective domain.Settings, overrides map[string]string) Option {
+	return func(s *Service) {
+		s.settingsStore = repository
+		s.storedSettings = stored
+		s.effectiveSettings = effective
+		s.settingsOverrides = cloneStringMap(overrides)
 	}
 }
 
@@ -206,6 +223,15 @@ func New(opts ...Option) *Service {
 	scriptproc.Register(registry, scriptproc.WithProbeRunner(s), scriptproc.WithResourceResolver(s), scriptproc.WithLoader(s.loadScriptSource))
 	for _, opt := range opts {
 		opt(s)
+	}
+	if s.storedSettings.SchemaVersion == 0 {
+		s.storedSettings = projectsettings.Default()
+	}
+	if s.effectiveSettings.SchemaVersion == 0 {
+		s.effectiveSettings = s.storedSettings
+	}
+	if s.settingsOverrides == nil {
+		s.settingsOverrides = map[string]string{}
 	}
 	if s.cache == nil && s.store != nil {
 		s.cache = cachepkg.New(s.store, s.now)

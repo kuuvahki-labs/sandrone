@@ -333,12 +333,12 @@ func TestServiceScriptProcessorRemoteSourceUsesRuntimeDefaults(t *testing.T) {
 	defer server.Close()
 
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
-	require.NoError(t, svc.PutRuntimeSettings(ctx, domain.RuntimeSettings{
-		RemoteDefaults: domain.RemoteDefaults{
+	putProjectSettings(t, svc, ctx, func(update *domain.SettingsUpdate) {
+		update.RemoteDefaults = domain.RemoteDefaults{
 			UserAgent: "Sandrone Global",
 			TimeoutMS: 8000,
-		},
-	}))
+		}
+	})
 	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
 		Name:    "provider",
 		Type:    domain.SubscriptionTypeLocal,

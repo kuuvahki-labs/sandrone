@@ -67,28 +67,83 @@ export interface FileSpecInput {
   meta?: Record<string, string>;
 }
 
-export interface RuntimeSettingsInput {
-  remote_defaults: {
-    user_agent?: string;
-    proxy?: string;
-    timeout_ms?: number;
+export interface RemoteDefaultsInput {
+  user_agent?: string;
+  proxy?: string;
+  timeout_ms: number;
+}
+
+export interface ProbeDefaultsInput {
+  method: "tcp_connect" | "udp_ntp" | "url_test";
+  core: "mihomo" | "sing-box";
+  url: string;
+  ntp_server: string;
+  timeout_ms: number;
+  attempts: number;
+  concurrency: number;
+  cache_ttl_seconds: number;
+}
+
+export interface CacheDefaultsInput {
+  remote_fetch_ttl_seconds: number;
+  subscription_traffic_ttl_seconds: number;
+  subscription_render_ttl_seconds: number;
+  file_render_ttl_seconds: number;
+}
+
+export interface SettingsView {
+  schema_version: number;
+  http: {
+    listen: string;
+    token_configured: boolean;
+    token_required: boolean;
   };
-  probe_defaults: {
-    method?: "tcp_connect" | "udp_ntp" | "url_test";
-    core?: "mihomo" | "sing-box";
-    url?: string;
-    ntp_server?: string;
-    timeout_ms?: number;
-    attempts?: number;
-    concurrency?: number;
-    cache_ttl_seconds?: number;
+  mcp: {
+    transport: "stdio" | "streamable-http";
+    path: string;
+    allow_management_tools: boolean;
+    max_output_bytes: number;
   };
-  cache_defaults: {
-    remote_fetch_ttl_seconds?: number;
-    subscription_traffic_ttl_seconds?: number;
-    subscription_render_ttl_seconds?: number;
-    file_render_ttl_seconds?: number;
+  webui: {
+    static_dir: string;
   };
+  log: {
+    level: "debug" | "info" | "warn" | "error";
+  };
+  remote_defaults: RemoteDefaultsInput;
+  probe_defaults: ProbeDefaultsInput;
+  cache_defaults: CacheDefaultsInput;
+  appearance: {
+    theme_mode: "system" | "light" | "dark";
+    locale: "auto" | "zh-CN" | "en-US";
+  };
+  subscriptions: {
+    auto_load_traffic: boolean;
+  };
+}
+
+export interface SettingsUpdate {
+  schema_version: number;
+  http: {
+    listen: string;
+    token?: string | null;
+    token_required: boolean;
+  };
+  mcp: SettingsView["mcp"];
+  webui: SettingsView["webui"];
+  log: SettingsView["log"];
+  remote_defaults: RemoteDefaultsInput;
+  probe_defaults: ProbeDefaultsInput;
+  cache_defaults: CacheDefaultsInput;
+  appearance: SettingsView["appearance"];
+  subscriptions: SettingsView["subscriptions"];
+}
+
+export interface SettingsEnvelope {
+  settings: SettingsView;
+  effective: SettingsView;
+  overrides: Record<string, string>;
+  restart_required: string[];
 }
 
 export interface VersionInfo {
@@ -162,15 +217,15 @@ export class ApiClient {
     return this.request("/v1/files", { method: "POST", body: file });
   }
 
-  getRuntimeSettings(options: { fresh?: boolean } = {}): Promise<RuntimeSettingsInput> {
+  getSettings(options: { fresh?: boolean } = {}): Promise<SettingsEnvelope> {
     if (options.fresh) {
-      return this.replaceDedupedRequest("GET", "/v1/settings/runtime");
+      return this.replaceDedupedRequest("GET", "/v1/settings");
     }
-    return this.dedupedRequest("GET", "/v1/settings/runtime");
+    return this.dedupedRequest("GET", "/v1/settings");
   }
 
-  updateRuntimeSettings(settings: RuntimeSettingsInput): Promise<unknown> {
-    return this.request("/v1/settings/runtime", { method: "PUT", body: settings });
+  updateSettings(settings: SettingsUpdate): Promise<SettingsEnvelope> {
+    return this.request("/v1/settings", { method: "PUT", body: settings });
   }
 
   async downloadBackup(): Promise<{ blob: Blob; filename: string }> {

@@ -7,13 +7,13 @@ import Typography from "@mui/material/Typography";
 import { useI18n } from "~/shared/i18n/context";
 
 interface SubscriptionTrafficSettingsSectionProps {
-  autoLoadSubscriptionTraffic: boolean;
-  onAutoLoadSubscriptionTraffic: (enabled: boolean) => void;
+  value: boolean;
+  onChange: (enabled: boolean) => void;
 }
 
 export function SubscriptionTrafficSettingsSection({
-  autoLoadSubscriptionTraffic,
-  onAutoLoadSubscriptionTraffic,
+  value,
+  onChange,
 }: SubscriptionTrafficSettingsSectionProps) {
   const { t } = useI18n();
 
@@ -28,8 +28,8 @@ export function SubscriptionTrafficSettingsSection({
             <FormControlLabel
               control={(
                 <Switch
-                  checked={autoLoadSubscriptionTraffic}
-                  onChange={(event) => onAutoLoadSubscriptionTraffic(event.target.checked)}
+                  checked={value}
+                  onChange={(event) => onChange(event.target.checked)}
                 />
               )}
               label={t("settings.subscriptionTraffic.autoLoad.label")}

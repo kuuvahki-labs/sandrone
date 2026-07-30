@@ -2,6 +2,7 @@ import { detectPreferredLocale, isLocale, type Locale } from "~/shared/i18n/loca
 
 export type ThemeMode = "system" | "light" | "dark";
 export type ThemePreset = "ocean";
+export type LocaleMode = "auto" | Locale;
 
 export interface ThemePreference {
   mode: ThemeMode;
@@ -9,7 +10,6 @@ export interface ThemePreference {
 }
 
 const adminTokenKey = "sandrone.adminToken";
-const autoLoadSubscriptionTrafficKey = "sandrone.subscriptionTraffic.autoLoad";
 const localeKey = "sandrone.locale";
 const publicBaseUrlKey = "sandrone.publicBaseUrl";
 const themeKey = "sandrone.theme";
@@ -31,28 +31,17 @@ export function clearAdminToken(): void {
   browserStorage()?.removeItem(adminTokenKey);
 }
 
-export function getAutoLoadSubscriptionTraffic(): boolean {
-  try {
-    return browserStorage()?.getItem(autoLoadSubscriptionTrafficKey) === "true";
-  } catch {
-    return false;
-  }
-}
-
-export function saveAutoLoadSubscriptionTraffic(enabled: boolean): void {
-  try {
-    browserStorage()?.setItem(autoLoadSubscriptionTrafficKey, String(enabled));
-  } catch {
-    // Ignore unavailable browser storage and retain the in-memory preference.
-  }
-}
-
 export function getLocalePreference(languages?: readonly string[]): Locale {
-  const stored = browserStorage()?.getItem(localeKey);
-  return isLocale(stored) ? stored : detectPreferredLocale(languages);
+  const mode = getLocaleModePreference();
+  return isLocale(mode) ? mode : detectPreferredLocale(languages);
 }
 
-export function saveLocalePreference(locale: Locale): void {
+export function getLocaleModePreference(): LocaleMode {
+  const stored = browserStorage()?.getItem(localeKey);
+  return stored === "auto" || isLocale(stored) ? stored : "auto";
+}
+
+export function saveLocalePreference(locale: LocaleMode): void {
   browserStorage()?.setItem(localeKey, locale);
 }
 

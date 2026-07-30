@@ -6,6 +6,7 @@ import {
   asHeaders,
   installDefaultFetchMock,
   jsonResponse,
+  projectSettingsEnvelope,
   remoteSubscriptionDefinition,
   renderApp,
   resourceListResponse,
@@ -15,7 +16,7 @@ import {
 describe("React Router app boot and auth workflows", () => {
   beforeEach(installDefaultFetchMock);
 
-  it("loads only version information on the settings overview route", async () => {
+  it("loads global settings and version information on the settings overview route", async () => {
     const requests: Array<{ url: string; init?: RequestInit }> = [];
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -32,31 +33,24 @@ describe("React Router app boot and auth workflows", () => {
 
     expect(await screen.findByRole("heading", { name: "设置" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Public Base URL" })).toHaveValue(window.location.origin);
-    expect(settingsRequestPaths(requests)).toEqual(["/version"]);
+    expect(settingsRequestPaths(requests)).toEqual(expect.arrayContaining(["/v1/settings", "/version"]));
   });
 
-  it("loads only runtime settings on the settings runtime route", async () => {
+  it("uses the global project settings on the advanced route", async () => {
     const requests: Array<{ url: string; init?: RequestInit }> = [];
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       requests.push({ url, init });
-      if (url === "/v1/settings/runtime") {
-        return jsonResponse({
-          remote_defaults: { user_agent: "sandrone/0.1.0", timeout_ms: 15000 },
-          probe_defaults: {},
-          cache_defaults: {},
-        });
-      }
       return jsonResponse({ ok: true });
     }));
 
     renderApp("/settings/runtime");
 
     expect(await screen.findByRole("heading", { name: "运行默认值" })).toBeInTheDocument();
-    await waitFor(() => expect(settingsRequestPaths(requests)).toEqual(["/v1/settings/runtime"]));
+    await waitFor(() => expect(settingsRequestPaths(requests)).toEqual(["/v1/settings"]));
   });
 
-  it("does not load settings resources on the settings data route before an operation", async () => {
+  it("loads global project settings on the data route", async () => {
     const requests: Array<{ url: string; init?: RequestInit }> = [];
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       requests.push({ url: String(input), init });
@@ -66,7 +60,7 @@ describe("React Router app boot and auth workflows", () => {
     renderApp("/settings/data");
 
     expect(await screen.findByRole("heading", { name: "数据管理" })).toBeInTheDocument();
-    expect(settingsRequestPaths(requests)).toEqual([]);
+    await waitFor(() => expect(settingsRequestPaths(requests)).toEqual(["/v1/settings"]));
   });
 
   it("loads only file resources on the files route", async () => {
@@ -270,6 +264,9 @@ describe("React Router app boot and auth workflows", () => {
           { status: 401 },
         );
       }
+      if (url === "/v1/settings") {
+        return jsonResponse(projectSettingsEnvelope({ locale: "en-US" }));
+      }
       const resourceResponse = resourceListResponse(url, resources, init);
       if (resourceResponse) return resourceResponse;
       return jsonResponse({ ok: true });
@@ -414,5 +411,5 @@ function settingsRequestPaths(requests: Array<{ url: string; init?: RequestInit 
   return requests
     .filter((request) => (request.init?.method ?? "GET") === "GET")
     .map((request) => request.url)
-    .filter((url) => ["/version", "/v1/settings/runtime"].includes(url));
+    .filter((url) => ["/version", "/v1/settings"].includes(url));
 }

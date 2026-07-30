@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { defaultProjectSettings } from "~/features/settings/model/project-settings";
 import { I18nProvider } from "~/shared/i18n/context";
 
 import type { SandroneContextValue } from "./provider/types";
@@ -11,28 +12,39 @@ type NoLegacyShareKeys = [Extract<keyof SandroneContextValue, LegacyShareKey>] e
 
 const contextHasNoLegacyShareKeys: NoLegacyShareKeys = true;
 const expectedContextKeys = [
-  "autoLoadSubscriptionTraffic",
   "cancelDelete",
   "client",
   "confirmDelete",
   "deleteTarget",
+  "effectiveSettings",
   "enterWithToken",
   "needsToken",
   "notices",
   "publicBaseUrl",
+  "reloadSettings",
   "requestDelete",
+  "restartRequired",
   "saveBaseUrl",
   "setTokenInput",
+  "settings",
+  "settingsLoaded",
+  "settingsOverrides",
   "showNotice",
   "signOut",
-  "themeMode",
   "tokenInput",
-  "updateAutoLoadSubscriptionTraffic",
-  "updateThemeMode",
+  "updateSettings",
 ];
 
 describe("SandroneProvider", () => {
-  beforeEach(() => localStorage.clear());
+  beforeEach(() => {
+    localStorage.clear();
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+      settings: defaultProjectSettings,
+      effective: defaultProjectSettings,
+      overrides: {},
+      restart_required: [],
+    }), { headers: { "content-type": "application/json" } })));
+  });
 
   it("exposes only global auth, preference, notice, and delete contracts", () => {
     render(

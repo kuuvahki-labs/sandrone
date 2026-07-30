@@ -10,6 +10,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -19,6 +20,7 @@ import (
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/service"
+	projectsettings "github.com/kuuvahki-labs/sandrone/internal/settings"
 	"github.com/kuuvahki-labs/sandrone/internal/store"
 )
 
@@ -83,6 +85,66 @@ func TestBackupExportAndRestoreRoundTripRawStore(t *testing.T) {
 	require.Equal(t, first.Body, roundTripped.Body)
 }
 
+func TestBackupRestoreValidatesReloadsAndSecuresSettings(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	resourceStore := store.NewFSStore(afero.NewBasePathFs(afero.NewOsFs(), root))
+	svc := service.New(service.WithStore(resourceStore))
+
+	replacement := projectsettings.Default()
+	replacement.HTTP.Listen = "127.0.0.1:2237"
+	replacement.Appearance.ThemeMode = "light"
+	replacement.Subscriptions.AutoLoadTraffic = true
+	body, err := json.Marshal(replacement)
+	require.NoError(t, err)
+	archive := validBackupZip(t, backupZipMember{name: "data/settings.json", body: body})
+
+	require.NoError(t, svc.RestoreBackup(ctx, archive))
+	snapshot, err := svc.GetSettings(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "light", snapshot.Effective.Appearance.ThemeMode)
+	require.True(t, snapshot.Effective.Subscriptions.AutoLoadTraffic)
+	require.Equal(t, "127.0.0.1:1137", snapshot.Effective.HTTP.Listen)
+	require.Contains(t, snapshot.RestartRequired, "http.listen")
+
+	info, err := os.Stat(filepath.Join(root, "settings.json"))
+	require.NoError(t, err)
+	require.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+}
+
+func TestBackupRestoreRejectsInvalidSettingsWithoutMutation(t *testing.T) {
+	ctx := context.Background()
+	resourceStore := store.NewFSStore(afero.NewMemMapFs())
+	writeBackupTestFile(t, resourceStore, "old/keep", []byte("unchanged"))
+	before := snapshotBackupStoreFiles(t, resourceStore)
+	svc := service.New(service.WithStore(resourceStore))
+	archive := validBackupZip(t, backupZipMember{
+		name: "data/settings.json",
+		body: []byte(`{"schema_version":1,"future":true}`),
+	})
+
+	err := svc.RestoreBackup(ctx, archive)
+	require.Error(t, err)
+	require.True(t, domain.IsCode(err, domain.CodeBackupInvalid), "error = %v", err)
+	require.Equal(t, before, snapshotBackupStoreFiles(t, resourceStore))
+}
+
+func TestBackupExportRetainsStoredSettingsToken(t *testing.T) {
+	ctx := context.Background()
+	resourceStore := store.NewFSStore(afero.NewMemMapFs())
+	svc := service.New(service.WithStore(resourceStore), service.WithClock(func() time.Time { return testBackupNow }))
+	update := projectSettingsUpdate(projectsettings.Default())
+	token := "backup-secret"
+	update.HTTP.Token = &token
+	_, err := svc.PutSettings(ctx, update)
+	require.NoError(t, err)
+
+	result, err := svc.ExportBackup(ctx)
+	require.NoError(t, err)
+	archive := readBackupZip(t, result.Body)
+	require.Contains(t, string(archive.files["data/settings.json"]), token)
+}
+
 func TestBackupExportExcludesExactAndNestedCacheKeys(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
@@ -106,6 +168,21 @@ func TestBackupExportExcludesExactAndNestedCacheKeys(t *testing.T) {
 	}
 }
 
+func projectSettingsUpdate(value domain.Settings) domain.SettingsUpdate {
+	return domain.SettingsUpdate{
+		SchemaVersion:  value.SchemaVersion,
+		HTTP:           domain.HTTPSettingsUpdate{Listen: value.HTTP.Listen, TokenRequired: value.HTTP.TokenRequired},
+		MCP:            value.MCP,
+		WebUI:          value.WebUI,
+		Log:            value.Log,
+		RemoteDefaults: value.RemoteDefaults,
+		ProbeDefaults:  value.ProbeDefaults,
+		CacheDefaults:  value.CacheDefaults,
+		Appearance:     value.Appearance,
+		Subscriptions:  value.Subscriptions,
+	}
+}
+
 func TestBackupEmptyStoreArchiveRestoresByClearingAllFiles(t *testing.T) {
 	ctx := context.Background()
 	empty := store.NewFSStore(afero.NewMemMapFs())
@@ -115,7 +192,7 @@ func TestBackupEmptyStoreArchiveRestoresByClearingAllFiles(t *testing.T) {
 	require.Equal(t, []string{"manifest.json"}, readBackupZip(t, result.Body).names)
 
 	target := store.NewFSStore(afero.NewMemMapFs())
-	writeBackupTestFile(t, target, "settings/runtime.json", []byte("old"))
+	writeBackupTestFile(t, target, "settings.json", []byte("old"))
 	writeBackupTestFile(t, target, "cache/remote/value", []byte("cached"))
 	restorer := service.New(service.WithStore(target))
 	require.NoError(t, restorer.RestoreBackup(ctx, result.Body))

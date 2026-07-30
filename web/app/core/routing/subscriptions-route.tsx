@@ -21,9 +21,10 @@ export function SubscriptionsRoute() {
   const resourcePorts = { client: app.client, showNotice: app.showNotice, t };
   const subscriptions = useSubscriptionResources(resourcePorts);
   const { loadSubscriptionTraffic } = useSubscriptionDetailsResource(resourcePorts);
+  const autoLoadTraffic = app.settingsLoaded && app.effectiveSettings.subscriptions.auto_load_traffic;
   const trafficByKey = useSubscriptionTrafficByKey(
     subscriptions.items,
-    app.autoLoadSubscriptionTraffic,
+    autoLoadTraffic,
     loadSubscriptionTraffic,
   );
 
@@ -53,7 +54,7 @@ export function SubscriptionsRoute() {
       ]}
       getTrafficKey={subscriptionTrafficKey}
       items={subscriptions.items}
-      trafficByKey={app.autoLoadSubscriptionTraffic ? trafficByKey : undefined}
+      trafficByKey={autoLoadTraffic ? trafficByKey : undefined}
       onDelete={(item) => app.requestDelete({ kind: "subscriptions", name: item.name, label: t("nav.subscriptions"), onDeleted: subscriptions.reload })}
       onEdit={(item) => navigate(subscriptionEditPath(item.kind, item.name))}
       onShare={(item) => shareDialog.open({ kind: "subscription", name: item.name })}

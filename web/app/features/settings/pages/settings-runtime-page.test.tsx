@@ -2,46 +2,23 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import type { RuntimeSettingsInput } from "~/shared/api/client";
+import { defaultProjectSettings } from "~/features/settings/model/project-settings";
 
 import { SettingsRuntimePage } from "./settings-runtime-page";
-
-const runtimeSettings: RuntimeSettingsInput = {
-  remote_defaults: {
-    user_agent: "sandrone/0.1.0",
-    timeout_ms: 15000,
-  },
-  probe_defaults: {
-    method: "url_test",
-    core: "sing-box",
-    url: "http://www.gstatic.com/generate_204",
-    ntp_server: "time.apple.com",
-    timeout_ms: 5000,
-    attempts: 1,
-    concurrency: 10,
-    cache_ttl_seconds: 0,
-  },
-  cache_defaults: {
-    remote_fetch_ttl_seconds: 0,
-    subscription_traffic_ttl_seconds: 60,
-    subscription_render_ttl_seconds: 0,
-    file_render_ttl_seconds: 0,
-  },
-};
 
 describe("settings runtime page", () => {
   it("shows the focused heading, returns, and initially expands only remote requests", async () => {
     const user = userEvent.setup();
-    const onAutoLoadSubscriptionTraffic = vi.fn();
+    const onSave = vi.fn();
     const onBack = vi.fn();
 
     render(
       <SettingsRuntimePage
-        autoLoadSubscriptionTraffic={false}
-        runtimeSettings={runtimeSettings}
-        onAutoLoadSubscriptionTraffic={onAutoLoadSubscriptionTraffic}
+        overrides={{}}
+        restartRequired={[]}
+        settings={defaultProjectSettings}
         onBack={onBack}
-        onSaveRuntimeSettings={vi.fn()}
+        onSave={onSave}
       />,
     );
 
@@ -58,22 +35,25 @@ describe("settings runtime page", () => {
     expect(screen.getByRole("button", { name: "测活" })).toHaveAttribute("aria-expanded", "false");
 
     await user.click(automaticTraffic);
+    await user.click(screen.getByRole("button", { name: "保存设置" }));
     await user.click(screen.getByRole("button", { name: "返回" }));
 
-    expect(onAutoLoadSubscriptionTraffic).toHaveBeenCalledWith(true);
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      subscriptions: { auto_load_traffic: true },
+    }));
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
   it("edits and saves runtime defaults", async () => {
     const user = userEvent.setup();
-    const onSaveRuntimeSettings = vi.fn();
+    const onSave = vi.fn();
     render(
       <SettingsRuntimePage
-        autoLoadSubscriptionTraffic={false}
-        runtimeSettings={runtimeSettings}
-        onAutoLoadSubscriptionTraffic={vi.fn()}
+        overrides={{}}
+        restartRequired={[]}
+        settings={defaultProjectSettings}
         onBack={vi.fn()}
-        onSaveRuntimeSettings={onSaveRuntimeSettings}
+        onSave={onSave}
       />,
     );
 
@@ -112,11 +92,11 @@ describe("settings runtime page", () => {
       target: { value: "300" },
     });
 
-    const saveRuntimeDefaults = screen.getByRole("button", { name: "保存运行默认值" });
+    const saveRuntimeDefaults = screen.getByRole("button", { name: "保存设置" });
     expect(saveRuntimeDefaults).toHaveTextContent("保存");
     await user.click(saveRuntimeDefaults);
 
-    expect(onSaveRuntimeSettings).toHaveBeenCalledWith(expect.objectContaining({
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
       remote_defaults: expect.objectContaining({
         user_agent: "Sandrone Global",
         timeout_ms: 15000,

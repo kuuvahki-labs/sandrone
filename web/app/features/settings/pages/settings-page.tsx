@@ -16,30 +16,34 @@ import Typography from "@mui/material/Typography";
 import { AppearanceSettingsSection } from "~/features/settings/sections/appearance-settings-section";
 import { ServiceConnectionSection } from "~/features/settings/sections/service-connection-section";
 import { useI18n } from "~/shared/i18n/context";
-import type { ThemeMode } from "~/shared/storage/preferences";
+import type { LocaleMode, ThemeMode } from "~/shared/storage/preferences";
 import { PageHeader } from "~/shared/ui/page";
 
 export interface SettingsPageProps {
   publicBaseUrl: string;
   revision?: string;
+  localeMode: LocaleMode;
   themeMode: ThemeMode;
   version?: string;
   onOpenData: () => void;
   onOpenRuntime: () => void;
   onSaveBaseUrl: (value: string) => void;
   onSignOut: () => void;
+  onLocaleMode: (mode: LocaleMode) => void;
   onThemeMode: (mode: ThemeMode) => void;
 }
 
 export function SettingsPage({
   publicBaseUrl,
   revision,
+  localeMode,
   themeMode,
   version,
   onOpenData,
   onOpenRuntime,
   onSaveBaseUrl,
   onSignOut,
+  onLocaleMode,
   onThemeMode,
 }: SettingsPageProps) {
   const { t } = useI18n();
@@ -54,7 +58,9 @@ export function SettingsPage({
           title={t("settings.title")}
         />
         <AppearanceSettingsSection
+          localeMode={localeMode}
           themeMode={themeMode}
+          onLocaleMode={onLocaleMode}
           onThemeMode={onThemeMode}
         />
         <ServiceConnectionSection

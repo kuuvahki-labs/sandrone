@@ -17,10 +17,7 @@ func (s *Service) SubscriptionTraffic(ctx context.Context, req domain.Subscripti
 	if name == "" {
 		return nil, domain.NewError(domain.CodeInvalidArgument, "subscription name is required")
 	}
-	ttlSeconds, err := s.subscriptionTrafficTTLSeconds(ctx)
-	if err != nil {
-		return nil, err
-	}
+	ttlSeconds := s.subscriptionTrafficTTLSeconds()
 	if !req.Refresh {
 		if cached := s.readSubscriptionTrafficCache(ctx, name, ttlSeconds); cached != nil {
 			cached.Cached = true
@@ -57,12 +54,9 @@ func (s *Service) SubscriptionTraffic(ctx context.Context, req domain.Subscripti
 	return cloneSubscriptionTrafficResult(result), nil
 }
 
-func (s *Service) subscriptionTrafficTTLSeconds(ctx context.Context) (int, error) {
-	settings, err := s.EffectiveRuntimeSettings(ctx)
-	if err != nil {
-		return 0, err
-	}
-	return settings.CacheDefaults.SubscriptionTrafficTTLSeconds, nil
+func (s *Service) subscriptionTrafficTTLSeconds() int {
+	settings := s.currentSettings()
+	return settings.CacheDefaults.SubscriptionTrafficTTLSeconds
 }
 
 func (s *Service) readSubscriptionTrafficCache(ctx context.Context, name string, ttlSeconds int) *domain.SubscriptionTrafficResult {

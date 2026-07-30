@@ -14,6 +14,8 @@ import (
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/service"
+	projectsettings "github.com/kuuvahki-labs/sandrone/internal/settings"
+	"github.com/kuuvahki-labs/sandrone/internal/store"
 	"github.com/kuuvahki-labs/sandrone/pkg/sandrone"
 )
 
@@ -24,11 +26,14 @@ const (
 )
 
 type Config struct {
-	DataDir string
-	HTTP    HTTPConfig
-	MCP     MCPConfig
-	WebUI   WebUIConfig
-	Log     LogConfig
+	DataDir           string
+	HTTP              HTTPConfig
+	MCP               MCPConfig
+	WebUI             WebUIConfig
+	Log               LogConfig
+	StoredSettings    domain.Settings
+	EffectiveSettings domain.Settings
+	OverrideSources   map[string]string
 }
 
 type HTTPConfig struct {
@@ -65,7 +70,18 @@ type Entrypoint interface {
 }
 
 func NewRuntime(cfg Config, logger *slog.Logger) (*Runtime, error) {
-	cfg = Defaults(cfg)
+	if cfg.DataDir == "" {
+		cfg.DataDir = DefaultDataDir
+	}
+	cfg = withProgrammaticOverrideSources(cfg)
+	fs := afero.NewBasePathFs(afero.NewOsFs(), cfg.DataDir)
+	coordinator := store.Coordinate(store.NewFSStore(fs))
+	settingsStore := store.NewSettingsStore(coordinator)
+	var err error
+	cfg, err = ResolveSettings(context.Background(), cfg, settingsStore)
+	if err != nil {
+		return nil, err
+	}
 	if err := Validate(cfg); err != nil {
 		return nil, err
 	}
@@ -76,8 +92,11 @@ func NewRuntime(cfg Config, logger *slog.Logger) (*Runtime, error) {
 			return nil, err
 		}
 	}
-	fs := afero.NewBasePathFs(afero.NewOsFs(), cfg.DataDir)
-	svc := service.New(service.WithFS(fs), service.WithLogger(logger))
+	svc := service.New(
+		service.WithStore(coordinator),
+		service.WithProjectSettings(settingsStore, cfg.StoredSettings, cfg.EffectiveSettings, cfg.OverrideSources),
+		service.WithLogger(logger),
+	)
 	return &Runtime{
 		Service: svc,
 		Engine:  sandrone.NewWithFS(fs),
@@ -87,23 +106,24 @@ func NewRuntime(cfg Config, logger *slog.Logger) (*Runtime, error) {
 }
 
 func Defaults(cfg Config) Config {
+	defaults := projectsettings.Default()
 	if cfg.DataDir == "" {
 		cfg.DataDir = DefaultDataDir
 	}
 	if cfg.HTTP.Listen == "" {
-		cfg.HTTP.Listen = DefaultListen
+		cfg.HTTP.Listen = defaults.HTTP.Listen
 	}
 	if cfg.MCP.Transport == "" {
-		cfg.MCP.Transport = "stdio"
+		cfg.MCP.Transport = defaults.MCP.Transport
 	}
 	if cfg.MCP.Path == "" {
-		cfg.MCP.Path = DefaultMCPPath
+		cfg.MCP.Path = defaults.MCP.Path
 	}
 	if cfg.MCP.MaxOutputBytes == 0 {
-		cfg.MCP.MaxOutputBytes = 1 << 20
+		cfg.MCP.MaxOutputBytes = defaults.MCP.MaxOutputBytes
 	}
 	if cfg.Log.Level == "" {
-		cfg.Log.Level = "info"
+		cfg.Log.Level = defaults.Log.Level
 	}
 	return cfg
 }

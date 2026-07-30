@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useSandrone } from "~/core/provider/context";
 import type { SandroneContextValue } from "~/core/provider/types";
-import type { RuntimeSettingsInput } from "~/shared/api/client";
+import { defaultProjectSettings } from "~/features/settings/model/project-settings";
 import { I18nProvider } from "~/shared/i18n/context";
 
 import SettingsRuntimeRoute from "./settings.runtime";
@@ -14,29 +14,23 @@ vi.mock("~/core/provider/context", () => ({
   useSandrone: vi.fn(),
 }));
 
-const runtimeSettings: RuntimeSettingsInput = {
-  remote_defaults: { user_agent: "sandrone/0.1.0", timeout_ms: 15000 },
-  probe_defaults: {},
-  cache_defaults: {},
-};
-
 describe("SettingsRuntimeRoute", () => {
   beforeEach(() => {
     vi.mocked(useSandrone).mockReset();
   });
 
-  it("loads and saves runtime defaults on the runtime route", async () => {
+  it("saves unified settings on the advanced route", async () => {
     const user = userEvent.setup();
-    const { client, updateAutoLoadSubscriptionTraffic } = mockApp();
+    const { client, updateSettings } = mockApp();
 
     renderSettingsRuntimeRoute();
 
-    await waitFor(() => expect(client.getRuntimeSettings).toHaveBeenCalledTimes(1));
     expect(client.getVersion).not.toHaveBeenCalled();
     await user.click(screen.getByRole("switch", { name: "自动获取流量" }));
-    expect(updateAutoLoadSubscriptionTraffic).toHaveBeenCalledWith(true);
-    await user.click(screen.getByRole("button", { name: "保存运行默认值" }));
-    await waitFor(() => expect(client.updateRuntimeSettings).toHaveBeenCalledTimes(1));
+    await user.click(screen.getByRole("button", { name: "保存设置" }));
+    await waitFor(() => expect(updateSettings).toHaveBeenCalledWith(expect.objectContaining({
+      subscriptions: { auto_load_traffic: true },
+    })));
     expect(client.downloadBackup).not.toHaveBeenCalled();
   });
 
@@ -74,17 +68,17 @@ function renderSettingsRuntimeRoute() {
 function mockApp() {
   const client = {
     downloadBackup: vi.fn(),
-    getRuntimeSettings: vi.fn().mockResolvedValue(runtimeSettings),
     getVersion: vi.fn(),
     restoreBackup: vi.fn(),
-    updateRuntimeSettings: vi.fn().mockResolvedValue(undefined),
   };
-  const updateAutoLoadSubscriptionTraffic = vi.fn();
+  const updateSettings = vi.fn().mockResolvedValue(undefined);
   vi.mocked(useSandrone).mockReturnValue({
-    autoLoadSubscriptionTraffic: false,
     client,
+    restartRequired: [],
+    settings: defaultProjectSettings,
+    settingsOverrides: {},
     showNotice: vi.fn(),
-    updateAutoLoadSubscriptionTraffic,
+    updateSettings,
   } as unknown as SandroneContextValue);
-  return { client, updateAutoLoadSubscriptionTraffic };
+  return { client, updateSettings };
 }

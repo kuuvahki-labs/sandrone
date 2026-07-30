@@ -2,7 +2,7 @@
 
 ## 目标与范围
 
-Sandrone 不要求数据库。持久化层保存命名资源和运行设置，并为内部缓存提供统一 key 空间；转换、文件生成和探测仍是 service 的请求级编排。
+Sandrone 不要求数据库。持久化层保存命名资源和统一项目设置，并为内部缓存提供统一 key 空间；转换、文件生成和探测仍是 service 的请求级编排。
 
 稳定目标是：
 
@@ -72,7 +72,7 @@ service 对资源名和备份条目重复应用同一 `CleanKey` 语义。Store 
 
 它负责：
 
-- subscription、file、runtime settings 和 share 的 JSON 编解码。
+- subscription、file 和 share 的 JSON 编解码。
 - 资源摘要列举。
 - share 创建和消费的 CAS 更新。
 
@@ -80,7 +80,10 @@ service 对资源名和备份条目重复应用同一 `CleanKey` 语义。Store 
 正文留在 `source.content`，不会拆成相邻 raw key，也不会在保存时改写 source
 类型。覆盖和删除 file 因此都是单个资源 key 操作。
 
-`Report`、`FileResult`、`ProbeResult` 和编译后的客户端文件不是 MetaStore 管理资源。内部 cache 可以暂存请求结果，但它有独立前缀和 TTL 语义。
+项目设置由独立的 `SettingsStore` 严格解码，并通过 `AtomicWriter` 在 Store 根部
+原子写入 `settings.json`。`Report`、`FileResult`、`ProbeResult` 和编译后的
+客户端文件不是 MetaStore 管理资源。内部 cache 可以暂存请求结果，但它有独立
+前缀和 TTL 语义。
 
 ## `Cache`
 
@@ -102,20 +105,20 @@ registry、第三方 cache 依赖或缓存管理 HTTP API；以后更换为内�
 
 | canonical 层 | 缓存值 | TTL 来源 |
 | --- | --- | --- |
-| `remote_fetch` | 受控 HTTP(S) 响应 | `RemoteInput.cache_ttl_seconds`，零值继承 runtime 默认 |
-| `probe` | 完整批次 `ProbeResult` | probe 请求，零值继承 runtime probe 默认 |
-| `subscription_traffic` | 远程订阅用量 | runtime 默认 |
-| `subscription_render` | 已保存订阅的完整 `RenderResult` | Subscription 三态覆盖或 runtime 默认 |
-| `file_render` | 已保存文件的完整 `FileResult` | FileSpec 三态覆盖或 runtime 默认 |
+| `remote_fetch` | 受控 HTTP(S) 响应 | `RemoteInput.cache_ttl_seconds`，零值继承项目默认 |
+| `probe` | 完整批次 `ProbeResult` | probe 请求，零值继承项目 probe 默认 |
+| `subscription_traffic` | 远程订阅用量 | 项目设置默认 |
+| `subscription_render` | 已保存订阅的完整 `RenderResult` | Subscription 三态覆盖或项目默认 |
+| `file_render` | 已保存文件的完整 `FileResult` | FileSpec 三态覆盖或项目默认 |
 
 Subscription/FileSpec 的 `render_cache_ttl_seconds` 是 nullable 三态字段：省略时
-继承对应 runtime 默认，显式 `0` 关闭，正数覆盖。两个 runtime 结果缓存默认值
+继承对应项目默认，显式 `0` 关闭，正数覆盖。两个结果缓存的项目默认值
 均为 `0`，所以升级不会自动缓存生成结果。inline FileSpec、直接 parse/render/
 convert、preview 不使用结果缓存；share 没有独立缓存层，但生成已保存目标时可以
 复用目标自身的结果缓存。超过 16 MiB 的最终正文不会写入结果缓存。
 
 结果 key 包含 cache schema、构建版本/revision、完整资源定义、目标格式和影响
-执行的请求参数。订阅、文件或 runtime settings 变更后，service 会清空可能受
+执行的请求参数。订阅、文件或项目设置变更后，service 会清空可能受
 影响的结果层；订阅变更还会清空 traffic 层。`refresh` 请求跳过结果、
 remote-fetch 和 probe 的缓存读取，成功执行后仍按当前 TTL 重新填充。
 `ValidateFile` 不读取 file-result cache。除此之外，订阅解析和文件递归各有一次
@@ -129,7 +132,7 @@ remote-fetch 和 probe 的缓存读取，成功执行后仍按当前 TTL 重新�
 ```text
 subscriptions/<name>.json
 files/<name>.json
-settings/runtime.json
+settings.json
 shares/<id>.json
 cache/probe/<hash>.json
 cache/remote_fetch/<hash>.json
@@ -140,7 +143,8 @@ cache/file_render/<hash>.json
 
 其中：
 
-- `subscriptions/`、`files/`、`settings/` 和 `shares/` 是领域资源。
+- `subscriptions/`、`files/` 和 `shares/` 是领域资源；根部
+  `settings.json` 是统一项目设置。
 - `cache/` 只用于可重建的内部加速，不是权威资源。
 - 未知安全 key 可以由自定义集成保存；raw Store 备份会保留非 cache key。
 
@@ -188,11 +192,14 @@ cache 被排除，因为它可重建、可能过期，也不应决定恢复后�
 
 恢复遵守以下顺序：
 
-1. 在修改 Store 前完整解码并校验归档、schema 和 key tree。
+1. 在修改 Store 前完整解码并校验归档、schema、key tree，以及可选
+   `settings.json` 的严格设置契约。
 2. 进入 Coordinator 独占 update。
 3. 快照旧的非 cache bytes。
-4. 删除现有文件，包括 cache，再写入备份内容。
+4. 删除现有文件，包括 cache，再写入备份内容；`settings.json` 使用原子
+   `0600` 写入。
 5. 普通写入失败时，尝试恢复旧的非 cache bytes；cache 保持为空。
+6. 替换成功后重新载入动态项目设置；若载入意外失败，则回滚 Store 和内存设置。
 
 这是 best-effort rollback，不是 crash-atomic restore：
 
@@ -206,9 +213,13 @@ cache 被排除，因为它可重建、可能过期，也不应决定恢复后�
 本身是包含 inline 正文或 remote 描述的完整 `FileSpec`，不会从其它 raw key
 补齐或迁移定义。
 
-备份包含 Store 原始 bytes，可能包括订阅 URL、节点凭据、脚本和运行设置。归档不提供加密或签名保证，必须由部署方保护传输、访问和静态存储，并在恢复前确认来源可信。
+备份包含 Store 原始 bytes，可能包括订阅 URL、节点凭据、脚本和项目设置。
+归档不提供加密或签名保证，必须由部署方保护传输、访问和静态存储，并在恢复前
+确认来源可信。
 
-归档 wire、大小限制、HTTP 鉴权和错误响应属于运行时接口契约，见 [运行时与备份接口](../reference/http-api/runtime.md)；本页只定义存储一致性与恢复后果。
+归档 wire、大小限制、HTTP 鉴权和错误响应属于管理接口契约，见
+[项目设置与备份接口](../reference/http-api/settings.md)；本页只定义存储一致性
+与恢复后果。
 
 ## 部署不变量
 

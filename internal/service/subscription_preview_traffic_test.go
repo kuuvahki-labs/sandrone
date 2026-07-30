@@ -123,13 +123,13 @@ func TestServiceProbeProcessorAllowsRuntimeProbeDefaults(t *testing.T) {
 			}, nil
 		}}),
 	)
-	require.NoError(t, svc.PutRuntimeSettings(context.Background(), domain.RuntimeSettings{
-		ProbeDefaults: domain.ProbeDefaults{
+	putProjectSettings(t, svc, context.Background(), func(update *domain.SettingsUpdate) {
+		update.ProbeDefaults = domain.ProbeDefaults{
 			Core:      "mihomo",
 			URL:       "https://probe.example/generate_204",
 			TimeoutMS: 8000,
-		},
-	}))
+		}
+	})
 	require.NoError(t, svc.PutSubscription(context.Background(), domain.Subscription{
 		Name:    "provider",
 		Type:    domain.SubscriptionTypeLocal,
@@ -729,12 +729,12 @@ func TestServiceSubscriptionTrafficCachesUntilForcedRefresh(t *testing.T) {
 	defer subServer.Close()
 
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
-	require.NoError(t, svc.PutRuntimeSettings(ctx, domain.RuntimeSettings{
-		CacheDefaults: domain.CacheDefaults{
+	putProjectSettings(t, svc, ctx, func(update *domain.SettingsUpdate) {
+		update.CacheDefaults = domain.CacheDefaults{
 			RemoteFetchTTLSeconds:         3600,
 			SubscriptionTrafficTTLSeconds: 60,
-		},
-	}))
+		}
+	})
 	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
 		Name:   "remote/live",
 		Type:   domain.SubscriptionTypeRemote,
@@ -775,11 +775,11 @@ func TestServiceSubscriptionTrafficRuntimeTTLExpiresCache(t *testing.T) {
 
 	now := time.Date(2026, 6, 30, 12, 0, 0, 0, time.UTC)
 	svc := service.New(service.WithFS(afero.NewMemMapFs()), service.WithClock(func() time.Time { return now }))
-	require.NoError(t, svc.PutRuntimeSettings(ctx, domain.RuntimeSettings{
-		CacheDefaults: domain.CacheDefaults{
+	putProjectSettings(t, svc, ctx, func(update *domain.SettingsUpdate) {
+		update.CacheDefaults = domain.CacheDefaults{
 			SubscriptionTrafficTTLSeconds: 1,
-		},
-	}))
+		}
+	})
 	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
 		Name:   "remote/live",
 		Type:   domain.SubscriptionTypeRemote,

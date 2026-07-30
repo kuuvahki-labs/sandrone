@@ -8,19 +8,23 @@ import Select, { type SelectChangeEvent } from "@mui/material/Select";
 import Typography from "@mui/material/Typography";
 
 import { useI18n } from "~/shared/i18n/context";
-import { type Locale, supportedLocales } from "~/shared/i18n/locales";
-import type { ThemeMode } from "~/shared/storage/preferences";
+import { supportedLocales } from "~/shared/i18n/locales";
+import type { LocaleMode, ThemeMode } from "~/shared/storage/preferences";
 
 interface AppearanceSettingsSectionProps {
+  localeMode: LocaleMode;
   themeMode: ThemeMode;
+  onLocaleMode: (mode: LocaleMode) => void;
   onThemeMode: (mode: ThemeMode) => void;
 }
 
 export function AppearanceSettingsSection({
+  localeMode,
   themeMode,
+  onLocaleMode,
   onThemeMode,
 }: AppearanceSettingsSectionProps) {
-  const { locale, setLocale, t } = useI18n();
+  const { t } = useI18n();
   const localeLabelId = useId();
   const themeModeLabelId = useId();
 
@@ -46,12 +50,13 @@ export function AppearanceSettingsSection({
           </FormControl>
           <FormControl fullWidth>
             <InputLabel id={localeLabelId}>{t("settings.language.label")}</InputLabel>
-            <Select<Locale>
+            <Select<LocaleMode>
               label={t("settings.language.label")}
               labelId={localeLabelId}
-              value={locale}
-              onChange={(event: SelectChangeEvent<Locale>) => setLocale(event.target.value as Locale)}
+              value={localeMode}
+              onChange={(event: SelectChangeEvent<LocaleMode>) => onLocaleMode(event.target.value as LocaleMode)}
             >
+              <MenuItem value="auto">{t("settings.language.optionAuto")}</MenuItem>
               {supportedLocales.map((option) => (
                 <MenuItem key={option} value={option}>
                   {option === "zh-CN" ? t("settings.language.optionChinese") : t("settings.language.optionEnglish")}

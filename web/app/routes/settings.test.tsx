@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useSandrone } from "~/core/provider/context";
 import type { SandroneContextValue } from "~/core/provider/types";
+import { defaultProjectSettings } from "~/features/settings/model/project-settings";
 import { I18nProvider } from "~/shared/i18n/context";
 
 import SettingsRoute from "./settings";
@@ -24,7 +25,6 @@ describe("SettingsRoute", () => {
     renderSettingsRoute();
 
     await waitFor(() => expect(client.getVersion).toHaveBeenCalledTimes(1));
-    expect(client.getRuntimeSettings).not.toHaveBeenCalled();
     expect(client.downloadBackup).not.toHaveBeenCalled();
   });
 
@@ -65,23 +65,22 @@ function renderSettingsRoute() {
 function mockApp() {
   const client = {
     downloadBackup: vi.fn(),
-    getRuntimeSettings: vi.fn(),
     getVersion: vi.fn().mockResolvedValue({
       name: "sandrone",
       revision: "0123456789abcdef",
       version: "0.1.0",
     }),
     restoreBackup: vi.fn(),
-    updateRuntimeSettings: vi.fn(),
   };
   vi.mocked(useSandrone).mockReturnValue({
     client,
+    effectiveSettings: defaultProjectSettings,
     publicBaseUrl: "https://example.com",
     saveBaseUrl: vi.fn(),
     showNotice: vi.fn(),
     signOut: vi.fn(),
-    themeMode: "system",
-    updateThemeMode: vi.fn(),
+    settings: defaultProjectSettings,
+    updateSettings: vi.fn(),
   } as unknown as SandroneContextValue);
   return client;
 }

@@ -32,10 +32,7 @@ func (s *Service) Probe(ctx context.Context, req domain.ProbeRequest) (out *doma
 	if s.prober == nil {
 		return nil, domain.NewError(domain.CodeNotImplemented, "probe engine is not configured")
 	}
-	req, err = s.probeRequestWithDefaults(ctx, req)
-	if err != nil {
-		return nil, err
-	}
+	req = s.probeRequestWithDefaults(req)
 	req.Method = probe.NormalizeMethod(req.Method)
 	switch req.Method {
 	case domain.ProbeTCPConnect:

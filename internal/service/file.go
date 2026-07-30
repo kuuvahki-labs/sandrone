@@ -41,10 +41,7 @@ func (s *Service) GetFile(ctx context.Context, req domain.FileRequest) (*domain.
 	if err != nil {
 		return nil, err
 	}
-	ttlSeconds, err := s.fileRenderTTLSeconds(ctx, spec.RenderCacheTTLSeconds)
-	if err != nil {
-		return nil, err
-	}
+	ttlSeconds := s.fileRenderTTLSeconds(spec.RenderCacheTTLSeconds)
 	cacheKey := ""
 	if ttlSeconds > 0 {
 		cacheKey, err = fileRenderCacheKey(spec, req)

@@ -175,18 +175,26 @@ func TestNewWithStoreBacksResourcesWithCallerStore(t *testing.T) {
 	require.True(t, store.has("files/custom.yaml.json"))
 }
 
-func TestEngineRuntimeSettingsRoundTrip(t *testing.T) {
+func TestEngineSettingsRoundTrip(t *testing.T) {
 	ctx := context.Background()
 	engine := sandrone.NewWithFS(afero.NewMemMapFs())
 
-	defaults, err := engine.GetRuntimeSettings(ctx)
+	defaults, err := engine.GetSettings(ctx)
 	require.NoError(t, err)
-	require.Equal(t, "sandrone/0.1.0", defaults.RemoteDefaults.UserAgent)
-	require.Equal(t, "url_test", defaults.ProbeDefaults.Method)
-	require.Equal(t, "sing-box", defaults.ProbeDefaults.Core)
-	require.Equal(t, 60, defaults.CacheDefaults.SubscriptionTrafficTTLSeconds)
+	require.Equal(t, "sandrone/0.1.0", defaults.Settings.RemoteDefaults.UserAgent)
+	require.Equal(t, "url_test", defaults.Settings.ProbeDefaults.Method)
+	require.Equal(t, "sing-box", defaults.Settings.ProbeDefaults.Core)
+	require.Equal(t, 60, defaults.Settings.CacheDefaults.SubscriptionTrafficTTLSeconds)
 
-	settings := sandrone.RuntimeSettings{
+	update := sandrone.SettingsUpdate{
+		SchemaVersion: defaults.Settings.SchemaVersion,
+		HTTP: domain.HTTPSettingsUpdate{
+			Listen:        defaults.Settings.HTTP.Listen,
+			TokenRequired: defaults.Settings.HTTP.TokenRequired,
+		},
+		MCP:   defaults.Settings.MCP,
+		WebUI: defaults.Settings.WebUI,
+		Log:   defaults.Settings.Log,
 		RemoteDefaults: sandrone.RemoteDefaults{
 			UserAgent: "Sandrone Test",
 			Proxy:     "socks5://127.0.0.1:1080",
@@ -206,12 +214,18 @@ func TestEngineRuntimeSettingsRoundTrip(t *testing.T) {
 			RemoteFetchTTLSeconds:         120,
 			SubscriptionTrafficTTLSeconds: 15,
 		},
+		Appearance:    defaults.Settings.Appearance,
+		Subscriptions: defaults.Settings.Subscriptions,
 	}
-	require.NoError(t, engine.PutRuntimeSettings(ctx, settings))
-
-	got, err := engine.GetRuntimeSettings(ctx)
+	saved, err := engine.PutSettings(ctx, update)
 	require.NoError(t, err)
-	require.Equal(t, settings, got)
+
+	got, err := engine.GetSettings(ctx)
+	require.NoError(t, err)
+	require.Equal(t, saved.Settings, got.Settings)
+	require.Equal(t, update.RemoteDefaults, got.Settings.RemoteDefaults)
+	require.Equal(t, update.ProbeDefaults, got.Settings.ProbeDefaults)
+	require.Equal(t, update.CacheDefaults, got.Settings.CacheDefaults)
 }
 
 func TestEngineProbe(t *testing.T) {

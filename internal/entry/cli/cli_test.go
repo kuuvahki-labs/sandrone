@@ -784,6 +784,66 @@ func TestServeHTTPUsesDefaultListen(t *testing.T) {
 	require.Equal(t, "127.0.0.1:1137", got.HTTP.Listen)
 }
 
+func TestServeMarksEnvironmentAndExplicitFlagOverrideSources(t *testing.T) {
+	dataDir := t.TempDir()
+	stopErr := errors.New("stop after runtime")
+	var got app.Config
+
+	code, _, stderr := runCLI(t,
+		[]string{"--data-dir", dataDir, "serve", "--listen", "127.0.0.1:3237", "http"},
+		"",
+		WithEnv(map[string]string{
+			EnvListen:   "127.0.0.1:2237",
+			EnvLogLevel: "warn",
+		}),
+		WithRuntimeFactory(func(cfg app.Config) (*app.Runtime, error) {
+			got = cfg
+			return nil, stopErr
+		}),
+	)
+
+	require.Equal(t, 1, code)
+	require.Contains(t, stderr, stopErr.Error())
+	require.Equal(t, "127.0.0.1:3237", got.HTTP.Listen)
+	require.Equal(t, "flag", got.OverrideSources["http.listen"])
+	require.Equal(t, "warn", got.Log.Level)
+	require.Equal(t, "environment", got.OverrideSources["log.level"])
+	require.NotContains(t, got.OverrideSources, "mcp.path")
+}
+
+func TestServeReadsBooleanAndIntegerStartupEnvironmentOverrides(t *testing.T) {
+	dataDir := t.TempDir()
+	stopErr := errors.New("stop after runtime")
+	var got app.Config
+
+	code, _, stderr := runCLI(t,
+		[]string{"--data-dir", dataDir, "serve", "all"},
+		"",
+		WithEnv(map[string]string{
+			EnvToken:                   "env-secret",
+			EnvTokenRequired:           "true",
+			EnvMCPPath:                 "/agent",
+			EnvMCPAllowManagementTools: "true",
+			EnvMCPMaxOutputBytes:       "2048",
+		}),
+		WithRuntimeFactory(func(cfg app.Config) (*app.Runtime, error) {
+			got = cfg
+			return nil, stopErr
+		}),
+	)
+
+	require.Equal(t, 1, code)
+	require.Contains(t, stderr, stopErr.Error())
+	require.True(t, got.HTTP.TokenRequired)
+	require.Equal(t, "/agent", got.MCP.Path)
+	require.True(t, got.MCP.AllowManagementTools)
+	require.Equal(t, 2048, got.MCP.MaxOutputBytes)
+	require.Equal(t, "environment", got.OverrideSources["http.token_required"])
+	require.Equal(t, "environment", got.OverrideSources["mcp.path"])
+	require.Equal(t, "environment", got.OverrideSources["mcp.allow_management_tools"])
+	require.Equal(t, "environment", got.OverrideSources["mcp.max_output_bytes"])
+}
+
 func TestServePassesLogLevelToRuntime(t *testing.T) {
 	dataDir := t.TempDir()
 	stopErr := errors.New("stop after runtime")

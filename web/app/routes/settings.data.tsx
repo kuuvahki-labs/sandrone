@@ -11,6 +11,7 @@ export default function SettingsDataRoute() {
   const { t } = useI18n();
   const backup = useBackupOperations({
     client: app.client,
+    reloadSettings: app.reloadSettings,
     showNotice: app.showNotice,
     t,
   });

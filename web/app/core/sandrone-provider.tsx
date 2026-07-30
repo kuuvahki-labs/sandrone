@@ -7,6 +7,7 @@ import { SandroneContext } from "./provider/context";
 import type { SandroneContextValue } from "./provider/types";
 import { useAppPreferences } from "./provider/use-app-preferences";
 import { useNotice } from "./provider/use-notice";
+import { useProjectSettings } from "./provider/use-project-settings";
 import { useResourceDelete } from "./provider/use-resource-delete";
 
 export { useSandrone } from "./provider/context";
@@ -15,9 +16,10 @@ export type { DeleteTarget } from "./provider/types";
 export function SandroneProvider({ children }: { children: ReactNode }) {
   const [needsToken, setNeedsToken] = useState(false);
   const client = useMemo(() => new ApiClient({ onUnauthorized: () => setNeedsToken(true) }), []);
-  const { t } = useI18n();
+  const { setLocaleMode, t } = useI18n();
   const { notices, showNotice } = useNotice();
-  const settings = useAppPreferences({ showNotice, t });
+  const preferences = useAppPreferences({ showNotice, t });
+  const project = useProjectSettings({ client, setLocaleMode, showNotice, t });
   const deleteActions = useResourceDelete({
     client,
     showNotice,
@@ -25,30 +27,34 @@ export function SandroneProvider({ children }: { children: ReactNode }) {
   });
 
   function signOut() {
-    settings.signOut();
+    preferences.signOut();
     setNeedsToken(true);
   }
 
-  function enterWithToken() {
-    settings.enterWithToken();
+  async function enterWithToken() {
+    preferences.enterWithToken();
     setNeedsToken(false);
+    await project.reloadSettings(true);
   }
 
   const value: SandroneContextValue = {
-    autoLoadSubscriptionTraffic: settings.autoLoadSubscriptionTraffic,
     client,
+    effectiveSettings: project.effectiveSettings,
     enterWithToken,
     needsToken,
     notices,
-    publicBaseUrl: settings.publicBaseUrl,
-    setTokenInput: settings.setTokenInput,
+    publicBaseUrl: preferences.publicBaseUrl,
+    reloadSettings: project.reloadSettings,
+    restartRequired: project.restartRequired,
+    settings: project.settings,
+    settingsLoaded: project.settingsLoaded,
+    settingsOverrides: project.settingsOverrides,
+    setTokenInput: preferences.setTokenInput,
     showNotice,
     signOut,
-    themeMode: settings.themeMode,
-    tokenInput: settings.tokenInput,
-    updateAutoLoadSubscriptionTraffic: settings.updateAutoLoadSubscriptionTraffic,
-    updateThemeMode: settings.updateThemeMode,
-    saveBaseUrl: settings.saveBaseUrl,
+    tokenInput: preferences.tokenInput,
+    updateSettings: project.updateSettings,
+    saveBaseUrl: preferences.saveBaseUrl,
     ...deleteActions,
   };
 

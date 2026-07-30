@@ -5,11 +5,12 @@ import type { Translator } from "~/shared/i18n/context";
 
 interface UseBackupOperationsOptions {
   client: ApiClient;
+  reloadSettings: (fresh?: boolean) => Promise<unknown>;
   showNotice: (message: string, severity?: "success" | "error" | "warning") => void;
   t: Translator;
 }
 
-export function useBackupOperations({ client, showNotice, t }: UseBackupOperationsOptions) {
+export function useBackupOperations({ client, reloadSettings, showNotice, t }: UseBackupOperationsOptions) {
   const downloadBackup = useCallback(async () => {
     let anchor: HTMLAnchorElement | undefined;
     let objectURL: string | undefined;
@@ -40,12 +41,12 @@ export function useBackupOperations({ client, showNotice, t }: UseBackupOperatio
     }
 
     try {
-      await client.getRuntimeSettings({ fresh: true });
+      await reloadSettings(true);
     } catch {
       showNotice(t("errors.settingsLoadFailed"), "error");
     }
     showNotice(t("settings.data.restoreSucceeded"));
-  }, [client, showNotice, t]);
+  }, [client, reloadSettings, showNotice, t]);
 
   return { downloadBackup, restoreBackup };
 }

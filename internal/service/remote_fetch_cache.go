@@ -45,13 +45,11 @@ func (s *Service) fetchRemoteCached(ctx context.Context, input domain.RemoteInpu
 	if s.fetcher == nil {
 		return nil, domain.NewError(domain.CodeNotImplemented, "remote fetcher is not configured")
 	}
-	input, err := s.remoteInputWithDefaults(ctx, input)
-	if err != nil {
-		return nil, err
-	}
+	input = s.remoteInputWithDefaults(input)
 	ttl := time.Duration(input.CacheTTLSeconds) * time.Second
 	cacheKey := ""
 	if ttl > 0 {
+		var err error
 		cacheKey, err = remoteFetchCacheKey(input)
 		if err != nil {
 			return nil, err

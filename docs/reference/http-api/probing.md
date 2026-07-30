@@ -23,17 +23,17 @@ backend 中执行可达性检查。它不保存输入、节点或 report，但�
 | `input` | `NodeInput` | 必填；完整结构可从 [`GET /v1/schemas/subscription`](schemas.md#nodeinput-结构) 的 `inputs.items` 读取。 |
 | `method` | string | 可选 canonical method：`tcp_connect`、`udp_ntp`、`url_test`。 |
 | `core` | string | 可选：`mihomo` 或 `sing-box`；用于需要代理核心的 probe。 |
-| `url` | string | `url_test` 目标；省略时使用运行设置。 |
-| `ntp_server` | string | `udp_ntp` 服务器；省略时使用运行设置。 |
+| `url` | string | `url_test` 目标；省略时使用项目设置。 |
+| `ntp_server` | string | `udp_ntp` 服务器；省略时使用项目设置。 |
 | `expected_status` | string | URL 测试的期望状态表达式；backend 不支持时可产生 warning。 |
-| `timeout_ms` | integer | 非负；正数限制每次尝试，`0`/省略使用运行设置。 |
-| `attempts` | integer | 非负；正数限制每个节点的尝试次数，`0`/省略使用运行设置。 |
-| `concurrency` | integer | 非负；正数限制并行节点数，`0`/省略使用运行设置。 |
-| `cache_ttl_seconds` | integer | 非负；正数允许复用成功 probe 结果，`0`/省略使用运行设置。 |
+| `timeout_ms` | integer | 非负；正数限制每次尝试，`0`/省略使用项目设置。 |
+| `attempts` | integer | 非负；正数限制每个节点的尝试次数，`0`/省略使用项目设置。 |
+| `concurrency` | integer | 非负；正数限制并行节点数，`0`/省略使用项目设置。 |
+| `cache_ttl_seconds` | integer | 非负；正数允许复用成功 probe 结果，`0`/省略使用项目设置。 |
 | `meta` | object | 可选 string-to-string metadata，进入本次受控执行与 report 上下文。 |
 
-默认运行设置是 `method: "url_test"`、`core: "sing-box"`、
-`timeout_ms: 5000`、`attempts: 1`、`concurrency: 10`；管理员可通过运行设置更改
+默认项目设置是 `method: "url_test"`、`core: "sing-box"`、
+`timeout_ms: 5000`、`attempts: 1`、`concurrency: 10`；管理员可通过项目设置更改
 有效值，客户端不应把默认值当作 server capability。`tcp_connect` 不使用核心，
 `udp_ntp` 当前使用 sing-box，`url_test` 支持 sing-box 和 Mihomo。可用 backend/core 应通过
 [`GET /v1/inspect`](conversion.md#get-v1inspect) 发现。

@@ -24,7 +24,6 @@ describe("SettingsDataRoute", () => {
     renderSettingsDataRoute();
 
     expect(client.getVersion).not.toHaveBeenCalled();
-    expect(client.getRuntimeSettings).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "下载备份" })).toBeInTheDocument();
   });
 
@@ -62,13 +61,12 @@ function renderSettingsDataRoute() {
 function mockApp() {
   const client = {
     downloadBackup: vi.fn(),
-    getRuntimeSettings: vi.fn(),
     getVersion: vi.fn(),
     restoreBackup: vi.fn(),
-    updateRuntimeSettings: vi.fn(),
   };
   vi.mocked(useSandrone).mockReturnValue({
     client,
+    reloadSettings: vi.fn(),
     showNotice: vi.fn(),
   } as unknown as SandroneContextValue);
   return client;

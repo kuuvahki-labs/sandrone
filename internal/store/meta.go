@@ -64,16 +64,6 @@ func (s *MetaStore) GetFile(ctx context.Context, name string) (domain.FileSpec, 
 	return file, err
 }
 
-func (s *MetaStore) PutRuntimeSettings(ctx context.Context, settings domain.RuntimeSettings) error {
-	return s.writeJSON(ctx, "settings", "runtime", settings)
-}
-
-func (s *MetaStore) GetRuntimeSettings(ctx context.Context) (domain.RuntimeSettings, error) {
-	var settings domain.RuntimeSettings
-	err := s.readJSON(ctx, "settings", "runtime", &settings)
-	return settings, err
-}
-
 func (s *MetaStore) ListFiles(ctx context.Context) ([]domain.ResourceSummary, error) {
 	return s.list(ctx, "file", "files", func(body []byte, summary *domain.ResourceSummary) {
 		var file domain.FileSpec

@@ -53,7 +53,7 @@ canonical stage、processor、file kind、Subscription、FileSpec 和脚本 API�
 | `inputs` | `NodeInput` array，形状见下节 |
 | `processors` | processor array；每项是封闭 object，必填 `type: string`，可选 `name: string`、`stage` enum `nodes`/`file`、开放 object `params` |
 | `nodes` | 开放 node object array |
-| `render_cache_ttl_seconds` | 非负整数；省略继承 runtime 默认，`0` 关闭结果缓存 |
+| `render_cache_ttl_seconds` | 非负整数；省略继承项目默认，`0` 关闭结果缓存 |
 | `meta` | string-to-string object |
 
 这个 schema 是 Agent/HTTP 写入面；不接受未列出的顶层键。`type` 对字段组合的
@@ -88,7 +88,7 @@ properties 为：
 | `source` | 封闭 object；可选 `type` enum `inline`/`remote`、`content: string`、`remote`（与 Subscription schema 相同的封闭 remote object） |
 | `config` | 封闭 object；只允许 `subscriptions: string[]` 与开放 object `settings` |
 | `processors` | 与 Subscription schema 相同的 processor array |
-| `render_cache_ttl_seconds` | 非负整数；省略继承 runtime 默认，`0` 关闭结果缓存 |
+| `render_cache_ttl_seconds` | 非负整数；省略继承项目默认，`0` 关闭结果缓存 |
 | `meta` | string-to-string object |
 
 `kind` 必须使用上表的 canonical 值。各 kind 对 `source`、`config.settings` 和

@@ -15,6 +15,7 @@ import (
 
 	"github.com/kuuvahki-labs/sandrone/internal/buildinfo"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
+	projectsettings "github.com/kuuvahki-labs/sandrone/internal/settings"
 	"github.com/kuuvahki-labs/sandrone/internal/store"
 )
 
@@ -96,13 +97,14 @@ func (s *Service) RestoreBackup(ctx context.Context, body []byte) error {
 		return domain.NewError(domain.CodeBackupRestoreFailed, "backup Store is not configured")
 	}
 
-	return s.storeCoordinator.Update(ctx, func(resourceStore store.Store) error {
-		snapshot, err := snapshotBackupStore(ctx, resourceStore)
+	mutationCtx := context.WithoutCancel(ctx)
+	var snapshot backupSnapshot
+	err = s.storeCoordinator.Update(ctx, func(resourceStore store.Store) error {
+		snapshot, err = snapshotBackupStore(ctx, resourceStore)
 		if err != nil {
 			return domain.WrapError(domain.CodeBackupRestoreFailed, "backup restore failed", err)
 		}
 
-		mutationCtx := context.WithoutCancel(ctx)
 		if err := replaceBackupStoreFiles(mutationCtx, resourceStore, snapshot.currentPaths, files); err != nil {
 			rollbackErr := rollbackBackupStore(mutationCtx, resourceStore, snapshot.files)
 			if rollbackErr != nil {
@@ -120,6 +122,27 @@ func (s *Service) RestoreBackup(ctx context.Context, body []byte) error {
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	if err := s.ReloadSettings(mutationCtx); err != nil {
+		rollbackErr := s.storeCoordinator.Update(mutationCtx, func(resourceStore store.Store) error {
+			return rollbackBackupStore(mutationCtx, resourceStore, snapshot.files)
+		})
+		reloadErr := s.ReloadSettings(mutationCtx)
+		if rollbackErr != nil || reloadErr != nil {
+			s.log(mutationCtx, slog.LevelError, "service backup settings rollback failed",
+				"restore_cause", "reload restored settings",
+				"rollback_cause", "restore previous settings",
+			)
+		}
+		return domain.WrapError(
+			domain.CodeBackupRestoreFailed,
+			"backup restore failed",
+			errors.Join(err, rollbackErr, reloadErr),
+		)
+	}
+	return nil
 }
 
 func readBackupEntries(ctx context.Context, resourceStore store.Store) ([]backupEntry, error) {
@@ -268,6 +291,11 @@ func decodeBackupArchive(body []byte) (map[string][]byte, error) {
 	}
 	if err := validateBackupManifest(manifestBody); err != nil {
 		return nil, err
+	}
+	if body, ok := files[store.SettingsKey]; ok {
+		if _, err := projectsettings.Decode(body); err != nil {
+			return nil, domain.WrapError(domain.CodeBackupInvalid, "backup settings are invalid", err)
+		}
 	}
 	return files, nil
 }
@@ -440,11 +468,22 @@ func replaceBackupStoreFiles(ctx context.Context, resourceStore store.Store, cur
 	}
 	sort.Strings(keys)
 	for _, key := range keys {
-		if err := resourceStore.Write(ctx, key, replacement[key]); err != nil {
+		if err := writeBackupStoreFile(ctx, resourceStore, key, replacement[key]); err != nil {
 			return &backupStoreOperationError{operation: "write replacement Store files", cause: err}
 		}
 	}
 	return nil
+}
+
+func writeBackupStoreFile(ctx context.Context, resourceStore store.Store, key string, body []byte) error {
+	if key != store.SettingsKey {
+		return resourceStore.Write(ctx, key, body)
+	}
+	writer, ok := resourceStore.(store.AtomicWriter)
+	if !ok {
+		return errors.New("settings restore requires atomic file writes")
+	}
+	return writer.WriteAtomic(ctx, key, body, 0o600)
 }
 
 func rollbackBackupStore(ctx context.Context, resourceStore store.Store, snapshot map[string][]byte) error {

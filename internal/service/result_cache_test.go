@@ -121,9 +121,9 @@ func TestServiceExplicitZeroDisablesInheritedFileRenderCache(t *testing.T) {
 
 	disabled := 0
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
-	require.NoError(t, svc.PutRuntimeSettings(ctx, domain.RuntimeSettings{
-		CacheDefaults: domain.CacheDefaults{FileRenderTTLSeconds: 60},
-	}))
+	putProjectSettings(t, svc, ctx, func(update *domain.SettingsUpdate) {
+		update.CacheDefaults = domain.CacheDefaults{FileRenderTTLSeconds: 60}
+	})
 	require.NoError(t, svc.PutFile(ctx, domain.FileSpec{
 		Name:                  "remote.txt",
 		Kind:                  domain.FileKindStatic,
@@ -199,7 +199,7 @@ func TestServiceResourceMutationsInvalidateResultCacheLayers(t *testing.T) {
 	}, resultCache.deleted)
 
 	resultCache.deleted = nil
-	require.NoError(t, svc.PutRuntimeSettings(ctx, domain.RuntimeSettings{}))
+	putProjectSettings(t, svc, ctx, nil)
 	require.ElementsMatch(t, []string{
 		"subscription_render", "file_render",
 	}, resultCache.deleted)

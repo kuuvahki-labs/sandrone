@@ -4,12 +4,12 @@ import { describe, expect, it } from "vitest";
 import { I18nProvider, translate, useI18n } from "./context";
 
 function Probe({ translationKey }: { translationKey: "nav.subscriptions" | "messages.deleted" }) {
-  const { locale, setLocale, t } = useI18n();
+  const { locale, setLocaleMode, t } = useI18n();
   return (
     <div>
       <p data-testid="locale">{locale}</p>
       <p data-testid="message">{translationKey === "messages.deleted" ? t(translationKey, { label: "File" }) : t(translationKey)}</p>
-      <button type="button" onClick={() => setLocale("en-US")}>English</button>
+      <button type="button" onClick={() => setLocaleMode("en-US")}>English</button>
     </div>
   );
 }

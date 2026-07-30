@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"path"
 	"strings"
 	"time"
@@ -23,6 +24,10 @@ type Store interface {
 	Delete(ctx context.Context, key string) error
 	List(ctx context.Context, prefix string) ([]Entry, error)
 	Stat(ctx context.Context, key string) (Entry, error)
+}
+
+type AtomicWriter interface {
+	WriteAtomic(ctx context.Context, key string, value []byte, mode fs.FileMode) error
 }
 
 type Entry struct {

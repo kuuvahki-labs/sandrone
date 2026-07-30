@@ -3,6 +3,7 @@ package store
 import (
 	"bytes"
 	"context"
+	"io/fs"
 	"os"
 	"path"
 	"sort"
@@ -41,6 +42,49 @@ func (s *FSStore) Write(_ context.Context, key string, value []byte) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.write(key, value)
+}
+
+func (s *FSStore) WriteAtomic(_ context.Context, key string, value []byte, mode fs.FileMode) error {
+	key, err := CleanKey(key)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	dir := path.Dir(key)
+	if err := s.fs.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	temp, err := afero.TempFile(s.fs, dir, ".sandrone-settings-*")
+	if err != nil {
+		return err
+	}
+	tempName := temp.Name()
+	closed := false
+	defer func() {
+		if !closed {
+			_ = temp.Close()
+		}
+		_ = s.fs.Remove(tempName)
+	}()
+	if err := s.fs.Chmod(tempName, mode); err != nil {
+		return err
+	}
+	if _, err := temp.Write(value); err != nil {
+		return err
+	}
+	if err := temp.Sync(); err != nil {
+		return err
+	}
+	if err := temp.Close(); err != nil {
+		return err
+	}
+	closed = true
+	if err := s.fs.Rename(tempName, key); err != nil {
+		return err
+	}
+	return s.fs.Chmod(key, mode)
 }
 
 func (s *FSStore) write(key string, value []byte) error {

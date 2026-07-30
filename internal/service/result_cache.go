@@ -30,26 +30,20 @@ func currentResultCacheBuild() resultCacheBuild {
 	}
 }
 
-func (s *Service) subscriptionRenderTTLSeconds(ctx context.Context, override *int) (int, error) {
+func (s *Service) subscriptionRenderTTLSeconds(override *int) int {
 	if override != nil {
-		return *override, nil
+		return *override
 	}
-	settings, err := s.EffectiveRuntimeSettings(ctx)
-	if err != nil {
-		return 0, err
-	}
-	return settings.CacheDefaults.SubscriptionRenderTTLSeconds, nil
+	settings := s.currentSettings()
+	return settings.CacheDefaults.SubscriptionRenderTTLSeconds
 }
 
-func (s *Service) fileRenderTTLSeconds(ctx context.Context, override *int) (int, error) {
+func (s *Service) fileRenderTTLSeconds(override *int) int {
 	if override != nil {
-		return *override, nil
+		return *override
 	}
-	settings, err := s.EffectiveRuntimeSettings(ctx)
-	if err != nil {
-		return 0, err
-	}
-	return settings.CacheDefaults.FileRenderTTLSeconds, nil
+	settings := s.currentSettings()
+	return settings.CacheDefaults.FileRenderTTLSeconds
 }
 
 func subscriptionRenderCacheKey(sub domain.Subscription, format string, req domain.RequestInfo) (string, error) {

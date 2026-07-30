@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -21,6 +22,7 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/app"
 	"github.com/kuuvahki-labs/sandrone/internal/entry/httpapi"
 	"github.com/kuuvahki-labs/sandrone/internal/service"
+	projectsettings "github.com/kuuvahki-labs/sandrone/internal/settings"
 	"github.com/kuuvahki-labs/sandrone/internal/store"
 )
 
@@ -29,7 +31,7 @@ const backupHTTPMaxBodyBytes = 32 << 20
 var backupHTTPNow = time.Date(2026, 7, 21, 12, 34, 56, 0, time.FixedZone("test", -7*60*60))
 
 func TestBackupEndpointsRequireBearerAuthentication(t *testing.T) {
-	archive := exportHTTPBackup(t, map[string][]byte{"settings/runtime.json": []byte(`{"value":"new"}`)})
+	archive := exportHTTPBackup(t, map[string][]byte{"settings.json": defaultHTTPSettingsJSON(t)})
 	resourceStore := store.NewFSStore(afero.NewMemMapFs())
 	rt := backupHTTPRuntime(t, app.Config{HTTP: app.HTTPConfig{Token: "secret"}}, resourceStore)
 	server := httpapi.New(rt)
@@ -82,9 +84,10 @@ func TestBackupDownloadReturnsZipWithSafeHeaders(t *testing.T) {
 }
 
 func TestBackupRestoreReplacesStoreFromRawZipBody(t *testing.T) {
+	settingsBody := defaultHTTPSettingsJSON(t)
 	archive := exportHTTPBackup(t, map[string][]byte{
-		"settings/runtime.json": []byte(`{"value":"new"}`),
-		"unknown/raw.bin":       {0x00, 0xff, 0x01},
+		"settings.json":   settingsBody,
+		"unknown/raw.bin": {0x00, 0xff, 0x01},
 	})
 	resourceStore := store.NewFSStore(afero.NewMemMapFs())
 	writeHTTPBackupFile(t, resourceStore, "stale/value", []byte("remove me"))
@@ -99,8 +102,8 @@ func TestBackupRestoreReplacesStoreFromRawZipBody(t *testing.T) {
 	require.Equal(t, "no-store", w.Header().Get("Cache-Control"))
 	require.JSONEq(t, `{"ok":true}`, w.Body.String())
 	require.Equal(t, map[string][]byte{
-		"settings/runtime.json": []byte(`{"value":"new"}`),
-		"unknown/raw.bin":       {0x00, 0xff, 0x01},
+		"settings.json":   settingsBody,
+		"unknown/raw.bin": {0x00, 0xff, 0x01},
 	}, snapshotHTTPBackupStore(t, resourceStore))
 }
 
@@ -228,6 +231,13 @@ func exportHTTPBackup(t *testing.T, files map[string][]byte) []byte {
 	).ExportBackup(context.Background())
 	require.NoError(t, err)
 	return result.Body
+}
+
+func defaultHTTPSettingsJSON(t *testing.T) []byte {
+	t.Helper()
+	body, err := json.Marshal(projectsettings.Default())
+	require.NoError(t, err)
+	return body
 }
 
 func backupHTTPZip(t *testing.T, manifest []byte) []byte {

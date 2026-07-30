@@ -178,12 +178,12 @@ func TestServiceConvertRemoteInputUsesRuntimeDefaultsAndLocalOverride(t *testing
 	defer server.Close()
 
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
-	require.NoError(t, svc.PutRuntimeSettings(context.Background(), domain.RuntimeSettings{
-		RemoteDefaults: domain.RemoteDefaults{
+	putProjectSettings(t, svc, context.Background(), func(update *domain.SettingsUpdate) {
+		update.RemoteDefaults = domain.RemoteDefaults{
 			UserAgent: "Sandrone Global",
 			TimeoutMS: 8000,
-		},
-	}))
+		}
+	})
 
 	_, err := svc.Convert(context.Background(), domain.ConvertRequest{
 		ToFormat: "json-nodes",
@@ -240,16 +240,16 @@ func TestServiceRemoteFetchCacheUsesRuntimeDefaultAndRequestIdentity(t *testing.
 	defer server.Close()
 
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
-	require.NoError(t, svc.PutRuntimeSettings(context.Background(), domain.RuntimeSettings{
-		RemoteDefaults: domain.RemoteDefaults{
+	putProjectSettings(t, svc, context.Background(), func(update *domain.SettingsUpdate) {
+		update.RemoteDefaults = domain.RemoteDefaults{
 			UserAgent: "Sandrone Global",
 			TimeoutMS: 8000,
-		},
-		CacheDefaults: domain.CacheDefaults{
+		}
+		update.CacheDefaults = domain.CacheDefaults{
 			RemoteFetchTTLSeconds:         60,
 			SubscriptionTrafficTTLSeconds: 60,
-		},
-	}))
+		}
+	})
 
 	for i := 0; i < 2; i++ {
 		_, err := svc.Convert(context.Background(), domain.ConvertRequest{

@@ -18,7 +18,7 @@
 
 探测跨两个核心边界：
 
-- `internal/service` 解析 `NodeInput`，应用运行设置，校验节点，准备核心 payload，协调缓存，并汇总 report。
+- `internal/service` 解析 `NodeInput`，应用项目设置中的运行默认值，校验节点，准备核心 payload，协调缓存，并汇总 report。
 - `internal/probe` 注册和选择 backend，执行并发探测，返回节点结果和 backend report。
 
 其它层只承担窄职责：
@@ -48,7 +48,7 @@ API，不启动本地控制接口。
 
 ## Backend 选择
 
-service 先应用 runtime probe defaults，再规范化 method 和 core。归一化后的请求同时用于 backend 选择、payload 准备和 cache key，避免同一调用在不同阶段采用不同默认值。
+service 先应用项目设置的 probe defaults，再规范化 method 和 core。归一化后的请求同时用于 backend 选择、payload 准备和 cache key，避免同一调用在不同阶段采用不同默认值。
 
 method 是唯一的探测行为选择器，必须显式属于以下三种：
 

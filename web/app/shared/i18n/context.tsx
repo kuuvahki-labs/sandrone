@@ -1,8 +1,13 @@
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
 
-import { getLocalePreference, saveLocalePreference } from "~/shared/storage/preferences";
+import {
+  getLocaleModePreference,
+  getLocalePreference,
+  type LocaleMode,
+  saveLocalePreference,
+} from "~/shared/storage/preferences";
 
-import { type Locale } from "./locales";
+import { detectPreferredLocale, isLocale, type Locale } from "./locales";
 import { enUS } from "./translations/en-US";
 import { type TranslationKey, zhCN } from "./translations/zh-CN";
 
@@ -18,18 +23,20 @@ export type Translator = (key: TranslationKey, params?: TranslationParams) => st
 
 interface I18nContextValue {
   locale: Locale;
-  setLocale: (locale: Locale) => void;
+  localeMode: LocaleMode;
+  setLocaleMode: (locale: LocaleMode) => void;
   t: Translator;
 }
 
 const I18nContext = createContext<I18nContextValue | null>(null);
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(() => getLocalePreference());
+  const [localeMode, setLocaleModeState] = useState<LocaleMode>(() => getLocaleModePreference());
+  const locale = resolveLocaleMode(localeMode);
 
-  const setLocale = useMemo(() => (nextLocale: Locale) => {
+  const setLocaleMode = useMemo(() => (nextLocale: LocaleMode) => {
     saveLocalePreference(nextLocale);
-    setLocaleState(nextLocale);
+    setLocaleModeState(nextLocale);
   }, []);
 
   useEffect(() => {
@@ -39,10 +46,11 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const value = useMemo<I18nContextValue>(
     () => ({
       locale,
-      setLocale,
+      localeMode,
+      setLocaleMode,
       t: createTranslator(locale),
     }),
-    [locale, setLocale],
+    [locale, localeMode, setLocaleMode],
   );
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
@@ -51,10 +59,12 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 export function useI18n(): I18nContextValue {
   const context = useContext(I18nContext);
   if (!context) {
-    const locale = getLocalePreference();
+    const localeMode = getLocaleModePreference();
+    const locale = resolveLocaleMode(localeMode);
     return {
       locale,
-      setLocale: saveLocalePreference,
+      localeMode,
+      setLocaleMode: saveLocalePreference,
       t: createTranslator(locale),
     };
   }
@@ -67,6 +77,10 @@ export function createTranslator(locale: Locale): Translator {
 
 export function defaultTranslator(): Translator {
   return createTranslator(getLocalePreference());
+}
+
+function resolveLocaleMode(mode: LocaleMode): Locale {
+  return isLocale(mode) ? mode : detectPreferredLocale();
 }
 
 export function translate(

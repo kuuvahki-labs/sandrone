@@ -6,6 +6,7 @@ import {
   collectionDefinition,
   installDefaultFetchMock,
   jsonResponse,
+  projectSettingsEnvelope,
   remoteSubscriptionDefinition,
   renderApp,
   resourceListResponse,
@@ -59,7 +60,6 @@ describe("React Router app subscription workflows", () => {
   });
 
   it("loads remote subscription traffic when automatic loading is enabled", async () => {
-    localStorage.setItem("sandrone.subscriptionTraffic.autoLoad", "true");
     const listResources = {
       ...resources,
       subscriptions: [
@@ -73,6 +73,7 @@ describe("React Router app subscription workflows", () => {
       requests.push({ url, init });
       const resourceResponse = resourceListResponse(url, listResources, init);
       if (resourceResponse) return resourceResponse;
+      if (url === "/v1/settings") return jsonResponse(projectSettingsEnvelope({ autoLoadTraffic: true }));
       if (url.endsWith("/v1/subscriptions/provider/traffic")) {
         return jsonResponse({
           subscription_name: "provider",
@@ -104,11 +105,11 @@ describe("React Router app subscription workflows", () => {
   });
 
   it("identifies subscriptions in concurrent traffic failure notices", async () => {
-    localStorage.setItem("sandrone.subscriptionTraffic.autoLoad", "true");
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const resourceResponse = resourceListResponse(url, resources, init);
       if (resourceResponse) return resourceResponse;
+      if (url === "/v1/settings") return jsonResponse(projectSettingsEnvelope({ autoLoadTraffic: true }));
       if (url.endsWith("/traffic")) {
         return jsonResponse({
           error: {

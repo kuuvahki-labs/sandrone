@@ -43,7 +43,9 @@ type (
 	FileKind                    = domain.FileKind
 	FileConfig                  = domain.FileConfig
 	FileSource                  = domain.FileSource
-	RuntimeSettings             = domain.RuntimeSettings
+	Settings                    = domain.Settings
+	SettingsUpdate              = domain.SettingsUpdate
+	SettingsSnapshot            = domain.SettingsSnapshot
 	RemoteDefaults              = domain.RemoteDefaults
 	ProbeDefaults               = domain.ProbeDefaults
 	CacheDefaults               = domain.CacheDefaults
@@ -234,12 +236,12 @@ func (e *Engine) PutFile(ctx context.Context, file FileSpec) error {
 	return e.service.PutFile(ctx, file)
 }
 
-func (e *Engine) GetRuntimeSettings(ctx context.Context) (RuntimeSettings, error) {
-	return e.service.GetRuntimeSettings(ctx)
+func (e *Engine) GetSettings(ctx context.Context) (SettingsSnapshot, error) {
+	return e.service.GetSettings(ctx)
 }
 
-func (e *Engine) PutRuntimeSettings(ctx context.Context, settings RuntimeSettings) error {
-	return e.service.PutRuntimeSettings(ctx, settings)
+func (e *Engine) PutSettings(ctx context.Context, update SettingsUpdate) (SettingsSnapshot, error) {
+	return e.service.PutSettings(ctx, update)
 }
 
 func (e *Engine) DeleteSubscription(ctx context.Context, name string) error {

@@ -12,10 +12,12 @@ describe("settings page", () => {
   it("uses outlined floating labels for overview fields", () => {
     render(
       <SettingsPage
+        localeMode="auto"
         publicBaseUrl="https://example.com"
         themeMode="system"
         onOpenData={noop}
         onOpenRuntime={noop}
+        onLocaleMode={noop}
         onSaveBaseUrl={noop}
         onSignOut={noop}
         onThemeMode={noop}
@@ -35,10 +37,12 @@ describe("settings page", () => {
     const onThemeMode = vi.fn();
     render(
       <SettingsPage
+        localeMode="auto"
         publicBaseUrl="https://example.com"
         themeMode="system"
         onOpenData={onOpenData}
         onOpenRuntime={onOpenRuntime}
+        onLocaleMode={noop}
         onSaveBaseUrl={onSaveBaseUrl}
         onSignOut={noop}
         onThemeMode={onThemeMode}
@@ -95,12 +99,14 @@ describe("settings page", () => {
   ])("shows the project build identity for %s", (version, revision, expected) => {
     render(
       <SettingsPage
+        localeMode="auto"
         publicBaseUrl="https://example.com"
         revision={revision}
         themeMode="system"
         version={version}
         onOpenData={noop}
         onOpenRuntime={noop}
+        onLocaleMode={noop}
         onSaveBaseUrl={noop}
         onSignOut={noop}
         onThemeMode={noop}
@@ -114,10 +120,12 @@ describe("settings page", () => {
 
     render(
       <SettingsPage
+        localeMode="en-US"
         publicBaseUrl="https://example.com"
         themeMode="system"
         onOpenData={noop}
         onOpenRuntime={noop}
+        onLocaleMode={noop}
         onSaveBaseUrl={noop}
         onSignOut={noop}
         onThemeMode={noop}
@@ -130,15 +138,18 @@ describe("settings page", () => {
     expect(screen.getByRole("heading", { name: "Data and account" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Manage backup and restore" })).toBeInTheDocument();
   });
-  it("updates the settings overview immediately through the language control", async () => {
+  it("requests a locale-mode update through the language control", async () => {
     const user = userEvent.setup();
+    const onLocaleMode = vi.fn();
     render(
       <I18nProvider>
         <SettingsPage
+          localeMode="auto"
           publicBaseUrl="https://example.com"
           themeMode="system"
           onOpenData={noop}
           onOpenRuntime={noop}
+          onLocaleMode={onLocaleMode}
           onSaveBaseUrl={noop}
           onSignOut={noop}
           onThemeMode={noop}
@@ -149,19 +160,19 @@ describe("settings page", () => {
     await user.click(screen.getByRole("combobox", { name: "语言" }));
     await user.click(screen.getByRole("option", { name: "English" }));
 
-    expect(screen.getByRole("heading", { name: "Settings" })).toBeInTheDocument();
-    expect(screen.getByText("Manage interface preferences and service configuration")).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Language" })).toHaveTextContent("English");
+    expect(onLocaleMode).toHaveBeenCalledWith("en-US");
   });
   it("keeps the advanced heading outside native button content and supports keyboard activation", async () => {
     const user = userEvent.setup();
     const onOpenRuntime = vi.fn();
     render(
       <SettingsPage
+        localeMode="auto"
         publicBaseUrl="https://example.com"
         themeMode="system"
         onOpenData={noop}
         onOpenRuntime={onOpenRuntime}
+        onLocaleMode={noop}
         onSaveBaseUrl={noop}
         onSignOut={noop}
         onThemeMode={noop}
@@ -183,10 +194,12 @@ describe("settings page", () => {
     const onSignOut = vi.fn();
     render(
       <SettingsPage
+        localeMode="auto"
         publicBaseUrl="https://example.com"
         themeMode="system"
         onOpenData={noop}
         onOpenRuntime={noop}
+        onLocaleMode={noop}
         onSaveBaseUrl={noop}
         onSignOut={onSignOut}
         onThemeMode={noop}
