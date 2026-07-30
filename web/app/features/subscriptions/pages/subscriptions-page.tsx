@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import AccountTreeOutlinedIcon from "@mui/icons-material/AccountTreeOutlined";
 import CloudDownloadOutlinedIcon from "@mui/icons-material/CloudDownloadOutlined";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import LinkOutlinedIcon from "@mui/icons-material/LinkOutlined";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import SearchIcon from "@mui/icons-material/Search";
@@ -108,7 +109,7 @@ export function SubscriptionsPage({
             const traffic = trafficByKey?.[trafficKey] ?? null;
             return (
               <DestinationListItem
-                actions={subscriptionActions(item, traffic, { onDelete, onShare }, t)}
+                actions={subscriptionActions(item, traffic, { onDelete, onEdit, onShare }, t)}
                 actionTitle={item.name}
                 icon={subscriptionIcon(item.kind)}
                 key={`${item.kind}:${item.name}`}
@@ -164,12 +165,18 @@ function subscriptionActions(
   traffic: SubscriptionTraffic | null,
   handlers: {
     onDelete: (item: SubscriptionItem) => void;
+    onEdit: (item: SubscriptionItem) => void;
     onShare: (item: SubscriptionItem) => void;
   },
   t: Translator,
 ): DestinationListAction[] {
   const appUrl = subscriptionAppUrl(traffic);
   return [
+    {
+      icon: <EditOutlinedIcon aria-hidden fontSize="small" />,
+      label: t("actions.edit"),
+      onSelect: () => handlers.onEdit(item),
+    },
     ...(appUrl ? [{
       icon: <OpenInNewIcon aria-hidden fontSize="small" />,
       label: t("subscriptions.traffic.portal"),

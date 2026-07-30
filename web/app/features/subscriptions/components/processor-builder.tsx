@@ -46,7 +46,7 @@ const probeRuntimeDefaults = {
   cacheTTLSeconds: 0,
 };
 
-export function ProcessorBuilder({ defaultValue = [], scriptFiles = [] }: { defaultValue?: ProcessorDetail[]; scriptFiles?: ResourceOption[] }) {
+export function ProcessorBuilder({ defaultValue = [], onDirty, scriptFiles = [] }: { defaultValue?: ProcessorDetail[]; onDirty?: () => void; scriptFiles?: ResourceOption[] }) {
   const { t } = useI18n();
   const options = processorOptions(t);
 
@@ -66,6 +66,7 @@ export function ProcessorBuilder({ defaultValue = [], scriptFiles = [] }: { defa
       paramsEditor={ParamsEditor}
       processorOptions={options}
       serializeDraft={(draft) => serializeDraft(draft, t)}
+      onDirty={onDirty}
     />
   );
 }

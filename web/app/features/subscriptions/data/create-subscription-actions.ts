@@ -42,12 +42,13 @@ export function createSubscriptionActions({
   async function saveSubscriptionEdit(item: SubscriptionItem, form: FormData, definition?: SubscriptionDefinition | null) {
     const subscription = subscriptionInputFromForm(form, item, definition, showNotice, t);
     if (!subscription) {
-      return;
+      return false;
     }
     await client.createSubscription(subscription);
     await refreshResources();
     showNotice(t("messages.subscriptionSaved"));
     navigate(subscriptionEditPath(subscription.type, subscription.name), { replace: true });
+    return true;
   }
 
   async function copySubscriptionSource(value: string, target: "content" | "url") {

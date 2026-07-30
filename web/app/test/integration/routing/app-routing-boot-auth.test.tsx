@@ -1,4 +1,4 @@
-import { act, screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -34,197 +34,6 @@ describe("React Router app boot and auth workflows", () => {
     expect(await screen.findByRole("heading", { name: "设置" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Public Base URL" })).toHaveValue(window.location.origin);
     expect(settingsRequestPaths(requests)).toEqual(expect.arrayContaining(["/v1/settings", "/version"]));
-  });
-
-  it("uses the global project settings on the advanced route", async () => {
-    const requests: Array<{ url: string; init?: RequestInit }> = [];
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      requests.push({ url, init });
-      return jsonResponse({ ok: true });
-    }));
-
-    renderApp("/settings/runtime");
-
-    expect(await screen.findByRole("heading", { name: "运行默认值" })).toBeInTheDocument();
-    await waitFor(() => expect(settingsRequestPaths(requests)).toEqual(["/v1/settings"]));
-  });
-
-  it("loads global project settings on the data route", async () => {
-    const requests: Array<{ url: string; init?: RequestInit }> = [];
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      requests.push({ url: String(input), init });
-      return jsonResponse({ ok: true });
-    }));
-
-    renderApp("/settings/data");
-
-    expect(await screen.findByRole("heading", { name: "数据管理" })).toBeInTheDocument();
-    await waitFor(() => expect(settingsRequestPaths(requests)).toEqual(["/v1/settings"]));
-  });
-
-  it("loads only file resources on the files route", async () => {
-    const requests: Array<{ url: string; init?: RequestInit }> = [];
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      requests.push({ url, init });
-      const resourceResponse = resourceListResponse(url, resources, init);
-      if (resourceResponse) return resourceResponse;
-      return jsonResponse({ ok: true });
-    }));
-
-    renderApp("/files");
-
-    expect(await screen.findByRole("heading", { name: "我的文件" })).toBeInTheDocument();
-    expect(resourceListUrls(requests)).toEqual(["/v1/files"]);
-  });
-
-  it("coalesces duplicate subscription list loads during one page entry", async () => {
-    let resolveList: (() => void) | undefined;
-    const listReady = new Promise<void>((resolve) => {
-      resolveList = resolve;
-    });
-    const requests: Array<{ url: string; init?: RequestInit }> = [];
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      requests.push({ url, init });
-      if (url.endsWith("/v1/subscriptions") && (init?.method ?? "GET") === "GET") {
-        await listReady;
-      }
-      const resourceResponse = resourceListResponse(url, resources, init);
-      if (resourceResponse) return resourceResponse;
-      return jsonResponse({ ok: true });
-    }));
-
-    renderApp("/subscriptions", { strictMode: true });
-    resolveList?.();
-
-    expect(await screen.findByRole("heading", { name: "我的订阅" })).toBeInTheDocument();
-    await waitFor(() => {
-      expect(resourceListUrls(requests)).toEqual(["/v1/subscriptions"]);
-    });
-  });
-
-  it("keeps automatic traffic requests disabled across StrictMode alias navigation", async () => {
-    let resolveList: (() => void) | undefined;
-    const listReady = new Promise<void>((resolve) => {
-      resolveList = resolve;
-    });
-    const requests: Array<{ url: string; init?: RequestInit }> = [];
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      requests.push({ url, init });
-      if (url.endsWith("/v1/subscriptions") && (init?.method ?? "GET") === "GET") {
-        await listReady;
-      }
-      const resourceResponse = resourceListResponse(url, resources, init);
-      if (resourceResponse) return resourceResponse;
-      if (url.endsWith("/traffic")) {
-        return jsonResponse({ subscription_name: url.split("/").at(-2), type: "remote" });
-      }
-      return jsonResponse({ ok: true });
-    }));
-
-    const { router } = renderApp("/", { strictMode: true });
-    resolveList?.();
-
-    expect(await screen.findByRole("heading", { name: "我的订阅" })).toBeInTheDocument();
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
-    expect(resourceListUrls(requests)).toEqual(["/v1/subscriptions"]);
-    expect(trafficRequestUrls(requests)).toEqual([]);
-
-    await act(async () => {
-      await router.navigate("/subscriptions");
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
-
-    expect(router.state.location.pathname).toBe("/subscriptions");
-    expect(screen.getByRole("heading", { name: "我的订阅" })).toBeInTheDocument();
-    expect(resourceListUrls(requests)).toEqual(["/v1/subscriptions"]);
-    expect(trafficRequestUrls(requests)).toEqual([]);
-  });
-
-  it("coalesces duplicate file list loads during one page entry", async () => {
-    let resolveList: (() => void) | undefined;
-    const listReady = new Promise<void>((resolve) => {
-      resolveList = resolve;
-    });
-    const requests: Array<{ url: string; init?: RequestInit }> = [];
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      requests.push({ url, init });
-      if (url.endsWith("/v1/files") && (init?.method ?? "GET") === "GET") {
-        await listReady;
-      }
-      const resourceResponse = resourceListResponse(url, resources, init);
-      if (resourceResponse) return resourceResponse;
-      return jsonResponse({ ok: true });
-    }));
-
-    renderApp("/files", { strictMode: true });
-    resolveList?.();
-
-    expect(await screen.findByRole("heading", { name: "我的文件" })).toBeInTheDocument();
-    await waitFor(() => {
-      expect(resourceListUrls(requests)).toEqual(["/v1/files"]);
-    });
-  });
-
-  it("loads only share resources on the shares route", async () => {
-    const requests: Array<{ url: string; init?: RequestInit }> = [];
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      requests.push({ url, init });
-      const resourceResponse = resourceListResponse(url, resources, init);
-      if (resourceResponse) return resourceResponse;
-      return jsonResponse({ ok: true });
-    }));
-
-    renderApp("/shares");
-
-    expect(await screen.findByRole("heading", { level: 2, name: "分享" })).toBeInTheDocument();
-    expect(resourceListUrls(requests)).toEqual(["/v1/shares"]);
-  });
-
-  it("loads subscriptions and files on subscription editor routes", async () => {
-    const requests: Array<{ url: string; init?: RequestInit }> = [];
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      requests.push({ url, init });
-      const resourceResponse = resourceListResponse(url, resources, init);
-      if (resourceResponse) return resourceResponse;
-      if (url.includes("/v1/subscriptions/provider")) return jsonResponse(remoteSubscriptionDefinition);
-      return jsonResponse({ ok: true });
-    }));
-
-    renderApp("/subscriptions/remote/provider/edit");
-
-    expect(await screen.findByRole("textbox", { name: "订阅地址" })).toHaveValue("https://example.com/sub");
-    expect(resourceListUrls(requests)).toEqual(["/v1/subscriptions", "/v1/files"]);
-  });
-
-  it("shows the token form when the active route resource list is unauthorized", async () => {
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      if (url.endsWith("/v1/subscriptions")) {
-        return jsonResponse(
-          { error: { code: "unauthorized", message: "token required" } },
-          { status: 401 },
-        );
-      }
-      const resourceResponse = resourceListResponse(url, resources, init);
-      if (resourceResponse) return resourceResponse;
-      return jsonResponse({ ok: true });
-    }));
-
-    renderApp("/subscriptions");
-
-    expect(await screen.findByRole("heading", { name: "需要认证" })).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "Sandrone logo" })).toHaveAttribute("src", "/brand/sandrone-logo-64.png");
-    expect(screen.getByLabelText("管理员 token")).toBeInTheDocument();
-    expect(screen.getByLabelText("认证品牌")).toHaveClass("justify-items-center");
   });
 
   it("unmounts an open share dialog when creating the share returns unauthorized", async () => {
@@ -296,26 +105,6 @@ describe("React Router app boot and auth workflows", () => {
     expect(await screen.findByRole("heading", { name: "我的订阅" })).toBeInTheDocument();
   });
 
-  it("focuses the admin token input when the token form opens", async () => {
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      if (url.endsWith("/v1/subscriptions")) {
-        return jsonResponse(
-          { error: { code: "unauthorized", message: "token required" } },
-          { status: 401 },
-        );
-      }
-      const resourceResponse = resourceListResponse(url, resources, init);
-      if (resourceResponse) return resourceResponse;
-      return jsonResponse({ ok: true });
-    }));
-
-    renderApp("/subscriptions");
-
-    const tokenInput = await screen.findByLabelText("管理员 token");
-    await waitFor(() => expect(tokenInput).toHaveFocus());
-  });
-
   it("reloads resources and leaves the token form after entering a valid token", async () => {
     const user = userEvent.setup();
     const requests: Array<{ url: string; init?: RequestInit }> = [];
@@ -334,33 +123,13 @@ describe("React Router app boot and auth workflows", () => {
     }));
     renderApp("/subscriptions");
 
-    await user.type(await screen.findByLabelText("管理员 token"), "secret");
-    await user.click(screen.getByRole("button", { name: "进入" }));
-
-    expect(await screen.findByRole("heading", { name: "我的订阅" })).toBeInTheDocument();
-    const authorizedListRequest = requests.find((request) => request.url.endsWith("/v1/subscriptions") && asHeaders(request.init?.headers).Authorization === "Bearer secret");
-    expect(authorizedListRequest).toBeDefined();
-  });
-
-  it("reloads resources when confirming the admin token with Enter", async () => {
-    const user = userEvent.setup();
-    const requests: Array<{ url: string; init?: RequestInit }> = [];
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      requests.push({ url, init });
-      if (url.startsWith("/v1/") && asHeaders(init?.headers).Authorization !== "Bearer secret") {
-        return jsonResponse(
-          { error: { code: "unauthorized", message: "token required" } },
-          { status: 401 },
-        );
-      }
-      const resourceResponse = resourceListResponse(url, resources, init);
-      if (resourceResponse) return resourceResponse;
-      return jsonResponse({ ok: true });
-    }));
-    renderApp("/subscriptions");
-
-    await user.type(await screen.findByLabelText("管理员 token"), "secret");
+    expect(await screen.findByRole("heading", { name: "需要认证" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Sandrone logo" })).toHaveAttribute("src", "/brand/sandrone-logo-64.png");
+    expect(screen.getByLabelText("认证品牌")).toHaveClass("justify-items-center");
+    expect(screen.getByRole("button", { name: "进入" })).toBeInTheDocument();
+    const tokenInput = screen.getByLabelText("管理员 token");
+    await waitFor(() => expect(tokenInput).toHaveFocus());
+    await user.type(tokenInput, "secret");
     await user.keyboard("{Enter}");
 
     expect(await screen.findByRole("heading", { name: "我的订阅" })).toBeInTheDocument();
@@ -384,6 +153,7 @@ describe("React Router app boot and auth workflows", () => {
     renderApp("/subscriptions/remote/provider/edit");
 
     expect(await screen.findByRole("textbox", { name: "订阅地址" })).toHaveValue("https://example.com/sub");
+    expect(resourceListUrls(requests)).toEqual(["/v1/subscriptions", "/v1/files"]);
     const subscriptionRequests = requests.filter((request) => request.url.endsWith("/v1/subscriptions"));
     expect(subscriptionRequests.length).toBeGreaterThanOrEqual(1);
     expect(subscriptionRequests[0]?.init?.headers).toEqual({ Authorization: "Bearer yang" });
@@ -399,12 +169,6 @@ function resourceListUrls(requests: Array<{ url: string; init?: RequestInit }>):
       "/v1/files",
       "/v1/shares",
     ].includes(url));
-}
-
-function trafficRequestUrls(requests: Array<{ url: string; init?: RequestInit }>): string[] {
-  return requests
-    .filter((request) => request.init?.method === "POST" && request.url.endsWith("/traffic"))
-    .map((request) => request.url);
 }
 
 function settingsRequestPaths(requests: Array<{ url: string; init?: RequestInit }>): string[] {

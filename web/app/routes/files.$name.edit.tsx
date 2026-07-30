@@ -60,7 +60,10 @@ export default function FileEditRoute() {
     return () => { active = false; };
   }, [detail, item, loadFileDetail]);
 
-  if (files.loading || subscriptions.loading) return <LoadingScreen />;
+  if (
+    (files.loading && files.items.length === 0)
+    || (subscriptions.loading && subscriptions.items.length === 0)
+  ) return <LoadingScreen />;
 
   if (!item) {
     return <MissingResource title={t("files.missing")} onBack={() => navigate("/files")} />;
@@ -85,6 +88,7 @@ export default function FileEditRoute() {
       onBack={() => navigate("/files")}
       onPreview={() => navigate(filePreviewPath(item.name))}
       onSave={(form) => fileActions.saveFileEdit(item, form, detail)}
+      onShare={() => shareDialog.open({ kind: "file", name: item.name })}
       scriptFiles={files.items.map(({ name, title }) => ({ name, title }))}
       subscriptions={subscriptions.items.map(({ name, title }) => ({ name, title }))}
     />

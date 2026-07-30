@@ -63,6 +63,41 @@ describe("shared UI primitives", () => {
     expect(screen.queryByRole("button", { name: "更多操作" })).not.toBeInTheDocument();
   });
 
+  it("puts multiple secondary actions in the mobile compact overflow menu", async () => {
+    vi.stubGlobal("matchMedia", vi.fn((query: string) => ({
+      matches: query === "(max-width:819px)",
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })));
+    const user = userEvent.setup();
+
+    try {
+      render(
+        <PageHeader
+          label=""
+          primaryAction={{ label: "保存", variant: "contained" }}
+          secondaryActions={[
+            { label: "预览", onSelect: vi.fn() },
+            { label: "分享", onSelect: vi.fn() },
+          ]}
+          sticky
+          title="编辑文件"
+        />,
+      );
+
+      await user.click(screen.getByRole("button", { name: "更多操作" }));
+      expect(screen.getByRole("menuitem", { name: "预览" })).toBeInTheDocument();
+      expect(screen.getByRole("menuitem", { name: "分享" })).toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("renders metrics, empty states, and notices through MUI components", () => {
     render(
       <>

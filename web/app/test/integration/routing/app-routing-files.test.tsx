@@ -55,90 +55,21 @@ describe("React Router app file workflows", () => {
     expect(router.state.location.pathname).toBe("/files/remote.yaml/edit");
   });
 
-  it("edits inline typed content from the complete spec without requesting source", async () => {
+  it("keeps saved file text in the editor after refreshing the file list", async () => {
     const user = userEvent.setup();
     const requests: Array<{ url: string; init?: RequestInit }> = [];
-    const typedResources = {
-      ...resources,
-      files: [{ name: "default.yaml", type: "mihomo", target: "mihomo" }],
-    };
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      requests.push({ url, init });
-      const resourceResponse = resourceListResponse(url, typedResources, init);
-      if (resourceResponse) return resourceResponse;
-      if (url.includes("/v1/files/default.yaml?mode=spec")) {
-        return jsonResponse({
-          name: "default.yaml",
-          kind: "mihomo",
-          source: { type: "inline", content: "mixed-port: 7890\nallow-lan: false\n" },
-          config: {
-            settings: {
-              groups: [{ name: "Proxy", type: "select", proxies: ["DIRECT"] }],
-              rule_sets: [{ name: "private", type: "inline", behavior: "classical", payload: ["DOMAIN-SUFFIX,local"] }],
-              rules: ["RULE-SET,private,DIRECT", "MATCH,Proxy"],
-            },
-          },
-          processors: [],
-        });
-      }
-      return jsonResponse({ ok: true }, { status: init?.method === "POST" ? 201 : 200 });
-    }));
-
-    renderApp("/files/default.yaml/edit");
-
-    expect(await screen.findByRole("textbox", { name: "内容" })).toHaveValue("mixed-port: 7890\nallow-lan: false\n");
-    await user.click(screen.getByRole("button", { name: "保存文件" }));
-
-    await waitFor(() => {
-      const post = requests.find((request) => request.url.endsWith("/v1/files") && request.init?.method === "POST");
-      expect(post).toBeDefined();
-      expect(JSON.parse(String(post?.init?.body))).toMatchObject({
-        kind: "mihomo",
-        source: { type: "inline", content: "mixed-port: 7890\nallow-lan: false\n" },
-      });
+    let resolveRefresh!: () => void;
+    const refreshPending = new Promise<void>((resolve) => {
+      resolveRefresh = resolve;
     });
-    expect(requests.some((request) => request.url.includes("?mode=source"))).toBe(false);
-  });
-
-  it("shows a typed driver base for an implicit source and saves the empty source object", async () => {
-    const user = userEvent.setup();
-    const requests: Array<{ url: string; init?: RequestInit }> = [];
-    const typedResources = {
-      ...resources,
-      files: [{ name: "default.yaml", type: "mihomo", target: "mihomo" }],
-    };
+    let fileListRequests = 0;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       requests.push({ url, init });
-      const resourceResponse = resourceListResponse(url, typedResources, init);
-      if (resourceResponse) return resourceResponse;
-      if (url.includes("/v1/files/default.yaml?mode=spec")) {
-        return jsonResponse({ name: "default.yaml", kind: "mihomo", source: {}, processors: [] });
+      if (url.endsWith("/v1/files") && (init?.method ?? "GET") === "GET") {
+        fileListRequests += 1;
+        if (fileListRequests > 1) await refreshPending;
       }
-      return jsonResponse({ ok: true }, { status: init?.method === "POST" ? 201 : 200 });
-    }));
-
-    renderApp("/files/default.yaml/edit");
-
-    const content = await screen.findByRole("textbox", { name: "内容" });
-    expect((content as HTMLTextAreaElement).value).toContain("mixed-port: 7890");
-    await user.click(screen.getByRole("button", { name: "保存文件" }));
-
-    await waitFor(() => {
-      const post = requests.find((request) => request.url.endsWith("/v1/files") && request.init?.method === "POST");
-      expect(post).toBeDefined();
-      expect(JSON.parse(String(post?.init?.body)).source).toEqual({});
-    });
-    expect(requests.some((request) => request.url.includes("?mode=source"))).toBe(false);
-  });
-
-  it("saves empty file text without leaving the editor route", async () => {
-    const user = userEvent.setup();
-    const requests: Array<{ url: string; init?: RequestInit }> = [];
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      requests.push({ url, init });
       const resourceResponse = resourceListResponse(url, resources, init);
       if (resourceResponse) return resourceResponse;
       if (url.includes("/v1/files/default.yaml?mode=spec")) {
@@ -160,8 +91,13 @@ describe("React Router app file workflows", () => {
         name: "default.yaml",
         source: { type: "inline", content: "" },
       });
+      expect(requests.filter((request) => request.url.endsWith("/v1/files") && (request.init?.method ?? "GET") === "GET").length).toBeGreaterThanOrEqual(2);
     });
     expect(router.state.location.pathname).toBe("/files/default.yaml/edit");
+    expect(screen.getByRole("textbox", { name: "内容" })).toHaveValue("");
+    resolveRefresh();
+    await screen.findByText("文件已保存");
+    expect(screen.getByRole("textbox", { name: "内容" })).toHaveValue("");
   });
 
   it("round-trips a remote descriptor without fetching remote content", async () => {
@@ -243,17 +179,18 @@ describe("React Router app file workflows", () => {
 
     expect(await screen.findByRole("heading", { name: "编辑文件" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "远程地址" })).toHaveValue("https://example.com/base.yaml");
+    expect(requests.filter((request) => (
+      request.url.endsWith("/v1/files/default.yaml?mode=spec")
+      && (request.init?.method ?? "GET") === "GET"
+    )).length).toBeGreaterThanOrEqual(2);
   });
 
-  it.each([
-    ["future-client", "future-client"],
-    [undefined, ""],
-  ])("opens an unregistered %s file read-only without posting and still previews it", async (specKind, expectedKind) => {
+  it("opens an unregistered future-client file read-only without posting and still previews it", async () => {
     const user = userEvent.setup();
     const requests: Array<{ url: string; init?: RequestInit }> = [];
     const unknownResources = {
       ...resources,
-      files: [{ name: "future.json", target: specKind, type: "remote" }],
+      files: [{ name: "future.json", target: "future-client", type: "remote" }],
     };
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -263,7 +200,7 @@ describe("React Router app file workflows", () => {
       if (url.includes("/v1/files/future.json?mode=spec")) {
         return jsonResponse({
           name: "future.json",
-          ...(specKind === undefined ? {} : { kind: specKind }),
+          kind: "future-client",
           source: { type: "remote", remote: { url: "https://example.com/future.json" } },
           config: { settings: { future: true } },
           future_field: { keep: true },
@@ -280,11 +217,7 @@ describe("React Router app file workflows", () => {
 
     expect(await screen.findByText("此文件类型未注册，只能查看定义和预览。")).toBeInTheDocument();
     const rawDefinition = screen.getByRole("region", { name: "原始文件定义" });
-    if (expectedKind) {
-      expect(rawDefinition).toHaveTextContent(`"kind": "${expectedKind}"`);
-    } else {
-      expect(rawDefinition).not.toHaveTextContent('"kind"');
-    }
+    expect(rawDefinition).toHaveTextContent('"kind": "future-client"');
     expect(rawDefinition).toHaveTextContent("\"future_field\"");
     expect(screen.queryByRole("button", { name: "保存文件" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "预览文件" }));

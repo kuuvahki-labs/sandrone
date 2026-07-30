@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { ProcessorBuilder } from "~/features/subscriptions/components/processor-builder";
 import {
@@ -12,14 +12,17 @@ import type { ProcessorDetail, ResourceOption } from "~/shared/resources/types";
 
 function renderProcessorBuilder({
   defaultValue = [],
+  onDirty,
   scriptFiles: availableScriptFiles = [],
 }: {
   defaultValue?: ProcessorDetail[];
+  onDirty?: () => void;
   scriptFiles?: ResourceOption[];
 } = {}) {
   const { container } = render(
     <ProcessorBuilder
       defaultValue={defaultValue}
+      onDirty={onDirty}
       scriptFiles={availableScriptFiles}
     />,
   );
@@ -139,13 +142,15 @@ describe("ProcessorBuilder", () => {
   });
   it("serializes visual processor edits into the hidden form field", async () => {
     const user = userEvent.setup();
-    const { serializedProcessors } = renderProcessorBuilder();
+    const onDirty = vi.fn();
+    const { serializedProcessors } = renderProcessorBuilder({ onDirty });
 
     expect(screen.getByRole("combobox", { name: "类型" })).toHaveTextContent("过滤");
     const quickSettingsGroup = screen.getByRole("group", { name: "处理器 快捷设置" });
     expect(within(quickSettingsGroup).getByText("处理器 1")).toBeInTheDocument();
     expect(within(quickSettingsGroup).queryByRole("textbox", { name: "名称" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "添加处理器" }));
+    expect(onDirty).toHaveBeenCalled();
     expect(screen.queryByRole("combobox", { name: "第 1 个处理器阶段" })).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "第 2 个处理器类型" })).not.toBeInTheDocument();
     const addedProcessorGroup = screen.getByRole("group", { name: "处理器 过滤" });

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import SaveIcon from "@mui/icons-material/Save";
+import ShareOutlinedIcon from "@mui/icons-material/ShareOutlined";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import Alert from "@mui/material/Alert";
 
@@ -9,6 +10,14 @@ import { fileDriver } from "~/features/files/drivers/registry";
 import { FileFormFields } from "~/features/files/editor/file-form";
 import type { FileDetail, FileItem } from "~/features/files/model/types";
 import { useI18n } from "~/shared/i18n/context";
+import {
+  changeEditSession,
+  createEditSession,
+  finishEditSessionSave,
+  isEditSessionDirty,
+  isEditSessionSaving,
+  startEditSessionSave,
+} from "~/shared/resources/edit-session";
 import type { ResourceOption } from "~/shared/resources/types";
 import { CodeBlock } from "~/shared/ui/code-editor";
 import { DiscardChangesDialog } from "~/shared/ui/dialogs";
@@ -23,17 +32,27 @@ export interface FileEditPageProps {
   onBack: () => void;
   onPreview: () => void;
   onSave: (form: FormData) => void | Promise<void>;
+  onShare: () => void;
   scriptFiles?: ResourceOption[];
   subscriptions?: ResourceOption[];
 }
 
-export function FileEditPage({ detail, detailPending = false, item, loadRuleSetCatalog, loadSubscriptionPreview, onBack, onPreview, onSave, scriptFiles, subscriptions }: FileEditPageProps) {
+export function FileEditPage({ detail, detailPending = false, item, loadRuleSetCatalog, loadSubscriptionPreview, onBack, onPreview, onSave, onShare, scriptFiles, subscriptions }: FileEditPageProps) {
   const { t } = useI18n();
-  const [dirty, setDirty] = useState(false);
+  const [editSession, setEditSession] = useState(createEditSession);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [valid, setValid] = useState(true);
+  const editSessionRef = useRef(editSession);
+  const savingRef = useRef(false);
+  const dirty = isEditSessionDirty(editSession);
+  const saving = isEditSessionSaving(editSession);
   const meta = detail?.meta ?? (item.description ? { description: item.description } : {});
   const driver = fileDriver(detail?.kind ?? item.kind);
+  const markDirty = useCallback(() => {
+    const changed = changeEditSession(editSessionRef.current);
+    editSessionRef.current = changed;
+    setEditSession(changed);
+  }, []);
 
   function requestBack() {
     if (dirty) {
@@ -43,13 +62,34 @@ export function FileEditPage({ detail, detailPending = false, item, loadRuleSetC
     onBack();
   }
 
+  async function save(form: FormData) {
+    if (savingRef.current) return;
+    const started = startEditSessionSave(editSessionRef.current);
+    savingRef.current = true;
+    editSessionRef.current = started;
+    setEditSession(started);
+    let persisted = false;
+    try {
+      await onSave(form);
+      persisted = true;
+    } finally {
+      const finished = finishEditSessionSave(editSessionRef.current, persisted);
+      editSessionRef.current = finished;
+      savingRef.current = false;
+      setEditSession(finished);
+    }
+  }
+
   if (!driver) {
     return (
       <section className="grid gap-6">
         <PageHeader
           backAction={{ label: t("actions.back"), onSelect: onBack }}
           label=""
-          secondaryActions={[{ accessibleLabel: t("files.actions.preview"), icon: <VisibilityIcon aria-hidden fontSize="small" />, label: t("common.preview"), onSelect: onPreview }]}
+          secondaryActions={[
+            { accessibleLabel: t("files.actions.preview"), icon: <VisibilityIcon aria-hidden fontSize="small" />, label: t("common.preview"), onSelect: onPreview },
+            { accessibleLabel: t("files.actions.share"), icon: <ShareOutlinedIcon aria-hidden fontSize="small" />, label: t("actions.share"), onSelect: onShare },
+          ]}
           sticky
           title={t("files.edit.title")}
         />
@@ -65,12 +105,15 @@ export function FileEditPage({ detail, detailPending = false, item, loadRuleSetC
 
   return (
     <section className="grid gap-6">
-      <form className="grid gap-6" onChange={() => setDirty(true)} onSubmit={(event) => { event.preventDefault(); void onSave(new FormData(event.currentTarget)); }}>
+      <form className="grid gap-6" onChange={markDirty} onSubmit={(event) => { event.preventDefault(); void save(new FormData(event.currentTarget)); }}>
         <PageHeader
           backAction={{ label: t("actions.back"), onSelect: requestBack }}
           label=""
-          primaryAction={{ accessibleLabel: t("files.actions.save"), disabled: detailPending || !valid, icon: <SaveIcon aria-hidden fontSize="small" />, label: t("actions.save"), type: "submit", variant: "contained" }}
-          secondaryActions={[{ accessibleLabel: t("files.actions.preview"), disabled: detailPending, icon: <VisibilityIcon aria-hidden fontSize="small" />, label: t("common.preview"), onSelect: onPreview }]}
+          primaryAction={{ accessibleLabel: t("files.actions.save"), disabled: detailPending || saving || !valid, icon: <SaveIcon aria-hidden fontSize="small" />, label: t("actions.save"), type: "submit", variant: "contained" }}
+          secondaryActions={[
+            { accessibleLabel: t("files.actions.preview"), disabled: detailPending, icon: <VisibilityIcon aria-hidden fontSize="small" />, label: t("common.preview"), onSelect: onPreview },
+            { accessibleLabel: t("files.actions.share"), disabled: detailPending || dirty || saving, icon: <ShareOutlinedIcon aria-hidden fontSize="small" />, label: t("actions.share"), onSelect: onShare },
+          ]}
           sticky
           title={t("files.edit.title")}
         />
@@ -84,7 +127,7 @@ export function FileEditPage({ detail, detailPending = false, item, loadRuleSetC
           loadSubscriptionPreview={loadSubscriptionPreview}
           loadRuleSetCatalog={loadRuleSetCatalog}
           mode="edit"
-          onDirty={() => setDirty(true)}
+          onDirty={markDirty}
           onValidityChange={setValid}
           processorsDefault={detail?.processors}
           renderCacheTTLSeconds={detail?.renderCacheTTLSeconds}

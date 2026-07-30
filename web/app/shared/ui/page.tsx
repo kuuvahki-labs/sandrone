@@ -69,7 +69,7 @@ export function PageHeader({
   }, [sticky]);
 
   const overflowActions = secondaryActions.map(toDestinationListAction);
-  const actionMenu = compact && overflowActions.length > 1 ? (
+  const actionMenu = useCompactLayout && overflowActions.length > 1 ? (
     <div className="min-[820px]:hidden">
       <ActionMenu actions={overflowActions} buttonSize="medium" label={t("actions.more")} />
     </div>

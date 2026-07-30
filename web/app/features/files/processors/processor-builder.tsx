@@ -27,7 +27,7 @@ import type { ProcessorDetail, ResourceOption } from "~/shared/resources/types";
 
 import { FileMergeParamsEditor } from "./merge-params-editor";
 
-export function FileProcessorBuilder({ defaultValue = [], kind, onValidityChange, scriptFiles = [] }: { defaultValue?: ProcessorDetail[]; kind: FileKind; onValidityChange?: (valid: boolean) => void; scriptFiles?: ResourceOption[] }) {
+export function FileProcessorBuilder({ defaultValue = [], kind, onDirty, onValidityChange, scriptFiles = [] }: { defaultValue?: ProcessorDetail[]; kind: FileKind; onDirty?: () => void; onValidityChange?: (valid: boolean) => void; scriptFiles?: ResourceOption[] }) {
   const { t } = useI18n();
   const [validationIssueCount, setValidationIssueCount] = useState(0);
   const driver = requireFileDriver(kind);
@@ -63,6 +63,7 @@ export function FileProcessorBuilder({ defaultValue = [], kind, onValidityChange
         paramsEditor={ParamsEditor}
         processorOptions={processorOptions}
         serializeDraft={serializeProcessorDraft}
+        onDirty={onDirty}
         onValueChange={handleValueChange}
       />
       {validationIssueCount > 0 ? <Alert severity="error">{t("processor.merge.jsonInvalid")}</Alert> : null}

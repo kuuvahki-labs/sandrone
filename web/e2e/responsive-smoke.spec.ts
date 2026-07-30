@@ -176,7 +176,7 @@ test.beforeEach(async ({ page }) => {
         subscription_render_ttl_seconds: 0,
         file_render_ttl_seconds: 0,
       },
-      appearance: { theme_mode: "dark", locale: "auto" },
+      appearance: { theme_mode: "dark", locale: "zh-CN" },
       subscriptions: { auto_load_traffic: false },
     };
     await route.fulfill({
@@ -231,7 +231,7 @@ const routes = [
   { path: "/subscriptions", heading: "我的订阅", text: "default", focus: false, responsive: true },
   { path: "/subscriptions/collection/default/edit", heading: "编辑订阅", text: "组合信息", focus: true, responsive: false },
   { path: "/subscriptions/remote/provider/edit", heading: "编辑订阅", text: "基本信息", focus: true, responsive: true },
-  { path: "/files", heading: "我的文件", text: "default.yaml", focus: false, responsive: false },
+  { path: "/files", heading: "我的文件", text: "default.yaml", focus: false, responsive: true },
   { path: "/files/new?source=mihomo", heading: "新建文件", text: "节点来源", focus: true, responsive: false },
   { path: "/files/new?source=sing-box", heading: "新建文件", text: "基础配置", focus: true, responsive: false },
   { path: "/files/new?source=shadowrocket", heading: "新建文件", text: "基础配置", focus: true, responsive: false },
@@ -277,8 +277,26 @@ for (const route of routes) {
       ? await page.locator("[data-page-header-compact]").evaluate((header) => header.getBoundingClientRect().height)
       : null;
     if (testInfo.project.name === "mobile" && route.path === "/files/default.yaml/edit") {
-      await expect(page.getByRole("button", { name: "预览文件" })).toBeVisible();
-      await expect(page.getByRole("button", { exact: true, name: "更多操作" })).toBeHidden();
+      await expect(page.getByRole("button", { name: "保存文件" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "预览文件" })).toBeHidden();
+      await expect(page.getByRole("button", { name: "分享文件" })).toBeHidden();
+      const more = page.getByRole("button", { exact: true, name: "更多操作" });
+      await expect(more).toBeVisible();
+      await more.click();
+      await expect(page.getByRole("menuitem", { name: "预览文件" })).toBeVisible();
+      await expect(page.getByRole("menuitem", { name: "分享文件" })).toBeVisible();
+      await page.keyboard.press("Escape");
+    }
+    if (testInfo.project.name === "mobile" && route.path === "/subscriptions/remote/provider/edit") {
+      await expect(page.getByRole("button", { name: "保存订阅" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "预览订阅" })).toBeHidden();
+      await expect(page.getByRole("button", { name: "分享订阅" })).toBeHidden();
+      const more = page.getByRole("button", { exact: true, name: "更多操作" });
+      await expect(more).toBeVisible();
+      await more.click();
+      await expect(page.getByRole("menuitem", { name: "预览订阅" })).toBeVisible();
+      await expect(page.getByRole("menuitem", { name: "分享订阅" })).toBeVisible();
+      await page.keyboard.press("Escape");
     }
     const routeContent = route.path === "/files/default.yaml/preview"
       ? page.getByRole("region", { name: "最终文件内容" })
@@ -309,8 +327,9 @@ for (const route of routes) {
         return { icon: box(icon), label: box(label) };
       });
       expect(searchBounds.label?.x ?? 0, "subscription search label should not overlap the search icon").toBeGreaterThanOrEqual((searchBounds.icon?.x ?? 0) + (searchBounds.icon?.width ?? 0) + 4);
+      await page.getByRole("button", { name: "provider 更多操作" }).click();
+      await expect(page.getByRole("menuitem", { name: "编辑" })).toBeVisible();
       if (testInfo.project.name === "mobile") {
-        await page.getByRole("button", { name: "provider 更多操作" }).click();
         await page.getByRole("menuitem", { name: "分享" }).click();
         const create = page.getByRole("dialog", { name: "创建分享链接" });
         await create.getByRole("button", { name: "保存分享链接" }).click();
@@ -328,11 +347,14 @@ for (const route of routes) {
         await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(publicUrl);
         await result.getByRole("button", { name: "完成" }).click();
         await expect(page.getByRole("heading", { name: "我的订阅", level: 2 })).toBeVisible();
+      } else {
+        await page.keyboard.press("Escape");
       }
       expect(consoleIssues).toEqual([]);
     }
     if (route.path === "/files") {
       await page.getByRole("button", { name: "default.yaml 更多操作" }).click();
+      await expect(page.getByRole("menuitem", { name: "编辑" })).toBeVisible();
       await expect(page.getByRole("menuitem", { name: "分享" })).toBeVisible();
       await page.keyboard.press("Escape");
     }
@@ -531,9 +553,16 @@ for (const route of routes) {
     if (route.focus) {
       const pageHeader = page.locator("[data-page-header-compact]");
       if (testInfo.project.name === "mobile" && route.path === "/files/default.yaml/edit") {
-        await expect(page.getByRole("button", { name: "预览文件" })).toBeVisible();
         await expect(page.getByRole("button", { name: "保存文件" })).toBeVisible();
-        await expect(page.getByRole("button", { exact: true, name: "更多操作" })).toBeHidden();
+        await expect(page.getByRole("button", { name: "预览文件" })).toBeHidden();
+        await expect(page.getByRole("button", { name: "分享文件" })).toBeHidden();
+        await expect(page.getByRole("button", { exact: true, name: "更多操作" })).toBeVisible();
+      }
+      if (testInfo.project.name === "mobile" && route.path === "/subscriptions/remote/provider/edit") {
+        await expect(page.getByRole("button", { name: "保存订阅" })).toBeVisible();
+        await expect(page.getByRole("button", { name: "预览订阅" })).toBeHidden();
+        await expect(page.getByRole("button", { name: "分享订阅" })).toBeHidden();
+        await expect(page.getByRole("button", { exact: true, name: "更多操作" })).toBeVisible();
       }
       await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
       const crossedStickyThreshold = await pageHeader.evaluate((header) => (header.previousElementSibling?.getBoundingClientRect().bottom ?? 0) < 0);
@@ -545,22 +574,22 @@ for (const route of routes) {
       if (testInfo.project.name === "mobile" && route.path === "/files/default.yaml/edit" && crossedStickyThreshold) {
         const actionBounds = await pageHeader.evaluate((header) => {
           const buttons = Array.from(header.querySelectorAll("button"));
-          const preview = buttons.find((button) => button.textContent?.includes("预览"))?.getBoundingClientRect();
           const save = buttons.find((button) => button.textContent?.includes("保存"))?.getBoundingClientRect();
+          const more = buttons.find((button) => button.getAttribute("aria-label") === "更多操作")?.getBoundingClientRect();
           const headerBounds = header.getBoundingClientRect();
-          return preview && save ? {
+          return save && more ? {
             headerLeft: headerBounds.left,
             headerRight: headerBounds.right,
-            previewLeft: preview.left,
-            previewRight: preview.right,
             saveLeft: save.left,
             saveRight: save.right,
+            moreLeft: more.left,
+            moreRight: more.right,
           } : null;
         });
         expect(actionBounds).not.toBeNull();
-        expect(actionBounds!.previewLeft).toBeGreaterThanOrEqual(actionBounds!.headerLeft);
-        expect(actionBounds!.saveRight).toBeLessThanOrEqual(actionBounds!.headerRight);
-        expect(actionBounds!.previewRight).toBeLessThanOrEqual(actionBounds!.saveLeft);
+        expect(actionBounds!.saveLeft).toBeGreaterThanOrEqual(actionBounds!.headerLeft);
+        expect(actionBounds!.moreRight).toBeLessThanOrEqual(actionBounds!.headerRight);
+        expect(actionBounds!.saveRight).toBeLessThanOrEqual(actionBounds!.moreLeft);
       }
       await expect(page.getByRole("heading", { name: route.heading, level: 2 })).toBeVisible();
       await expect(bottomNav).toHaveCount(0);

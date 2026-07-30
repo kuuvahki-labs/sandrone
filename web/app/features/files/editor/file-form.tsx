@@ -93,7 +93,8 @@ export function FileFormFields({ configDefault, defaultName, description = "", d
 				defaultValue={mode === "create" ? { type: "inline", content: defaultBase } : sourceDefault}
 				inlineFallback={defaultBase}
                 key={`${sourceEditorKey ?? "file"}-${driver.kind}-base`}
-				language={driver.source.syntax}
+                language={driver.source.syntax}
+                onDirty={onDirty}
                 onValidityChange={setSourceValid}
                 placeholder={driver.source.basePlaceholder}
                 preserveImplicit={driver.source.strategy === "optional-base"}
@@ -115,11 +116,11 @@ export function FileFormFields({ configDefault, defaultName, description = "", d
         </section>
       ) : (
         <WorkbenchGroupSection collapsible={false} id="file-content-source" label={t("files.form.contentSource")}>
-          <FileSourceEditor defaultValue={sourceDefault} key={sourceEditorKey} />
+          <FileSourceEditor defaultValue={sourceDefault} key={sourceEditorKey} onDirty={onDirty} />
         </WorkbenchGroupSection>
       )}
       <WorkbenchGroupSection keepMounted defaultExpanded id="file-processors" label={t("files.form.processors")}>
-        <FileProcessorBuilder defaultValue={processors} key={driver.kind} kind={driver.kind} onValidityChange={setProcessorsValid} scriptFiles={scriptFiles} />
+        <FileProcessorBuilder defaultValue={processors} key={driver.kind} kind={driver.kind} onDirty={onDirty} onValidityChange={setProcessorsValid} scriptFiles={scriptFiles} />
       </WorkbenchGroupSection>
     </div>
   );

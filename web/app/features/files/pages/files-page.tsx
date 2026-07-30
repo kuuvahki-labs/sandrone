@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import SearchIcon from "@mui/icons-material/Search";
 import ShareOutlinedIcon from "@mui/icons-material/ShareOutlined";
 import Chip from "@mui/material/Chip";
@@ -98,7 +99,7 @@ export function FilesPage({ createActions, items, onDelete, onEdit, onShare }: F
         <List aria-label={t("files.list")} className="grid gap-3 p-0">
           {filtered.map((item) => (
             <DestinationListItem
-              actions={fileActions(item, { onDelete, onShare }, t)}
+              actions={fileActions(item, { onDelete, onEdit, onShare }, t)}
               actionTitle={item.name}
               icon={fileIcon(item)}
               key={item.name}
@@ -149,11 +150,17 @@ function fileActions(
   item: FileItem,
   handlers: {
     onDelete: (item: FileItem) => void;
+    onEdit: (item: FileItem) => void;
     onShare: (item: FileItem) => void;
   },
   t: Translator,
 ): DestinationListAction[] {
   return [
+    {
+      icon: <EditOutlinedIcon aria-hidden fontSize="small" />,
+      label: t("actions.edit"),
+      onSelect: () => handlers.onEdit(item),
+    },
     {
       icon: <ShareOutlinedIcon aria-hidden fontSize="small" />,
       label: t("nav.shares"),

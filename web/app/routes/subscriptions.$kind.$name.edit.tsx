@@ -7,7 +7,7 @@ import { useFileResources } from "~/features/files/data/use-file-resources";
 import { useShareDialog } from "~/features/shares/components/share-dialog-context";
 import { createSubscriptionActions } from "~/features/subscriptions/data/create-subscription-actions";
 import { useSubscriptionDetailsResource, useSubscriptionResources } from "~/features/subscriptions/data/use-subscription-resources";
-import type { SubscriptionDefinition } from "~/features/subscriptions/model/types";
+import type { SubscriptionDefinition, SubscriptionItem } from "~/features/subscriptions/model/types";
 import { SubscriptionEditPage } from "~/features/subscriptions/pages/subscription-edit-page";
 import { useI18n } from "~/shared/i18n/context";
 import { decodeResourceRouteParam, subscriptionKind, subscriptionPreviewPath } from "~/shared/routing/paths";
@@ -34,10 +34,22 @@ export default function SubscriptionEditRoute() {
   });
   const kind = subscriptionKind(params.kind);
   const name = decodeResourceRouteParam(params.name);
-  const item = kind && name ? subscriptions.items.find((candidate) => candidate.kind === kind && candidate.name === name) : undefined;
+  const listedItem = kind && name ? subscriptions.items.find((candidate) => candidate.kind === kind && candidate.name === name) : undefined;
+  const [editSession, setEditSession] = useState<{ item: SubscriptionItem; sources: SubscriptionItem[] } | null>(null);
+  const activeSession = kind && editSession?.item.name === name ? editSession : null;
+  const item = activeSession?.item ?? listedItem;
+  const sourceItems = activeSession?.sources ?? subscriptions.items;
   const [definition, setDefinition] = useState<SubscriptionDefinition | null>(null);
   const [definitionPending, setDefinitionPending] = useState(false);
   const [definitionFailed, setDefinitionFailed] = useState(false);
+
+  useEffect(() => {
+    if (!listedItem || !name) return;
+    setEditSession((current) => current?.item.name === name ? current : {
+      item: listedItem,
+      sources: subscriptions.items,
+    });
+  }, [listedItem, name, subscriptions.items]);
 
   useEffect(() => {
     if (!item) {
@@ -65,7 +77,10 @@ export default function SubscriptionEditRoute() {
     };
   }, [item, loadSubscriptionDefinition]);
 
-  if (subscriptions.loading || files.loading) return <LoadingScreen />;
+  if (
+    (subscriptions.loading && subscriptions.items.length === 0)
+    || (files.loading && files.items.length === 0)
+  ) return <LoadingScreen />;
 
   if (!item) {
     return <MissingResource title={t("subscriptions.missing")} onBack={() => navigate("/subscriptions")} />;
@@ -83,10 +98,11 @@ export default function SubscriptionEditRoute() {
       definitionPending={definitionPending}
       onBack={() => navigate("/subscriptions")}
       onCopySource={subscriptionActions.copySubscriptionSource}
-      onPreview={() => navigate(subscriptionPreviewPath(item.kind, item.name))}
+      onPreview={() => navigate(subscriptionPreviewPath(kind || item.kind, item.name))}
       onSave={(form) => subscriptionActions.saveSubscriptionEdit(item, form, definition)}
+      onShare={() => shareDialog.open({ kind: "subscription", name: item.name })}
       scriptFiles={files.items.map(({ name, title }) => ({ name, title }))}
-      sources={subscriptions.items}
+      sources={sourceItems}
     />
   );
 }

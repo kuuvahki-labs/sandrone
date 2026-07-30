@@ -33,15 +33,79 @@ describe("subscription actions", () => {
     remoteForm.set("processors", "[]");
     await createSubscription(remoteForm);
 
+    const localContent = "ss://aes-128-gcm:secret@example.com:8388#node-a\nvmess://example";
     const localForm = new FormData();
     localForm.set("subscription_type", "local");
-    localForm.set("source_input", "ss://aes-128-gcm:secret@example.com:8388#node-a");
+    localForm.set("source_input", localContent);
     localForm.set("processors", "[]");
     await createSubscription(localForm);
 
     expect(client.createSubscription).toHaveBeenNthCalledWith(1, expect.objectContaining({ name: "example.com", type: "remote" }));
     expect(client.createSubscription).toHaveBeenNthCalledWith(2, expect.objectContaining({ name: "manual", type: "local" }));
+    const localPayload = client.createSubscription.mock.calls[1]?.[0] as Record<string, unknown>;
+    expect(localPayload.content).toBe(localContent);
     expect(refreshResources).toHaveBeenCalledTimes(2);
+  });
+
+  it("creates collections without binding a target or format and navigates to the editor", async () => {
+    const { client, createSubscription, navigate } = setupActions();
+    const form = new FormData();
+    form.set("subscription_type", "collection");
+    form.set("name", "private");
+    form.set("target", "mihomo");
+    form.set("format", "base64");
+    form.append("subscriptions", "provider");
+    form.append("subscriptions", "warn");
+    form.set("processors", "[]");
+
+    await createSubscription(form);
+
+    const payload = client.createSubscription.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(payload.inputs).toEqual([
+      { name: "provider", type: "subscription", ref: { kind: "subscription", name: "provider" } },
+      { name: "warn", type: "subscription", ref: { kind: "subscription", name: "warn" } },
+    ]);
+    expect(payload).not.toHaveProperty("target");
+    expect(payload).not.toHaveProperty("format");
+    expect(navigate).toHaveBeenCalledWith("/subscriptions/collection/private/edit");
+  });
+
+  it("rejects empty remote creation without client, refresh, or navigation effects", async () => {
+    const { client, createSubscription, navigate, refreshResources } = setupActions();
+    const form = new FormData();
+    form.set("subscription_type", "remote");
+    form.set("processors", "[]");
+
+    await expect(createSubscription(form)).rejects.toThrow("请输入远程订阅 URL");
+
+    expect(client.createSubscription).not.toHaveBeenCalled();
+    expect(refreshResources).not.toHaveBeenCalled();
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it("rejects empty collection creation before in-band notices or side effects", async () => {
+    const {
+      client,
+      closeSheet,
+      createSubscription,
+      navigate,
+      refreshResources,
+      showNotice,
+    } = setupActions();
+    const form = new FormData();
+    form.set("subscription_type", "collection");
+    form.set("name", "default");
+    form.set("processors", "[]");
+
+    await expect(createSubscription(form)).rejects.toThrow(
+      "请输入组合名称并选择至少一个包含订阅",
+    );
+
+    expect(showNotice).not.toHaveBeenCalled();
+    expect(client.createSubscription).not.toHaveBeenCalled();
+    expect(refreshResources).not.toHaveBeenCalled();
+    expect(closeSheet).not.toHaveBeenCalled();
+    expect(navigate).not.toHaveBeenCalled();
   });
 
   it("omits blank remote timeout so runtime defaults can apply", async () => {
@@ -124,10 +188,70 @@ describe("subscription actions", () => {
     form.set("source_input", "https://example.com/sub");
     form.set("processors", "[]");
 
-    await saveSubscriptionEdit(subscriptions[0], form);
+    const saved = await saveSubscriptionEdit(subscriptions[0], form);
 
+    expect(saved).toBe(true);
     expect(client.createSubscription).toHaveBeenCalledWith(expect.objectContaining({ name: "provider" }));
     expect(refreshResources).toHaveBeenCalledWith();
+    expect(navigate).toHaveBeenCalledWith("/subscriptions/remote/provider/edit", { replace: true });
+  });
+
+  it("preserves the existing name, processors, and remote fields when saving remote edits", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-27T04:05:06.000Z"));
+    const { client, navigate, saveSubscriptionEdit } = setupActions();
+    const submittedProcessors = [
+      {
+        name: "入口重命名",
+        type: "rename",
+        stage: "nodes",
+        params: { mode: "prefix", value: "source-" },
+      },
+    ];
+    const form = new FormData();
+    form.set("name", "renamed");
+    form.set("format", "base64");
+    form.set("source_input", "https://example.com/updated");
+    form.set("user_agent", "Sandrone Tests");
+    form.set("proxy", "http://127.0.0.1:7890");
+    form.set("timeout_ms", "2500");
+    form.set("cache_ttl_seconds", "60");
+    form.set("processors", JSON.stringify(submittedProcessors));
+    form.set("meta", JSON.stringify({ owner: "ops" }));
+
+    const saved = await saveSubscriptionEdit(subscriptions[0], form, {
+      name: "provider",
+      kind: "remote",
+      createdAt: "2026-06-27T01:02:03.000Z",
+      updatedAt: "2026-06-27T02:03:04.000Z",
+      sourceRefs: [],
+    });
+
+    expect(saved).toBe(true);
+    expect(client.createSubscription).toHaveBeenCalledWith({
+      name: "provider",
+      display_name: undefined,
+      type: "remote",
+      format: "base64",
+      created_at: "2026-06-27T01:02:03.000Z",
+      updated_at: "2026-06-27T04:05:06.000Z",
+      remote: {
+        url: "https://example.com/updated",
+        user_agent: "Sandrone Tests",
+        proxy: "http://127.0.0.1:7890",
+        timeout_ms: 2500,
+        cache_ttl_seconds: 60,
+      },
+      processors: [
+        {
+          name: "入口重命名",
+          type: "rename",
+          stage: "nodes",
+          params: { mode: "prefix", value: "source-" },
+        },
+      ],
+      meta: { owner: "ops", ui: "web" },
+    });
     expect(navigate).toHaveBeenCalledWith("/subscriptions/remote/provider/edit", { replace: true });
   });
 
@@ -231,8 +355,9 @@ describe("subscription actions", () => {
     form.set("name", "default");
     form.set("processors", "[]");
 
-    await saveSubscriptionEdit(subscriptions[2], form);
+    const saved = await saveSubscriptionEdit(subscriptions[2], form);
 
+    expect(saved).toBe(false);
     expect(client.createSubscription).not.toHaveBeenCalled();
     expect(refreshResources).not.toHaveBeenCalled();
     expect(navigate).not.toHaveBeenCalled();

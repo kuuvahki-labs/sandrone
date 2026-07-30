@@ -192,6 +192,7 @@ describe("structured file driver orchestration strategies", () => {
   it("keeps registered client selection and native keys out of shared Task 3 orchestration", () => {
     const sharedFiles = [
       "../config/components/editor.tsx",
+      "../config/model/editor-state.ts",
       "../config/model/references.ts",
       "../config/model/templates.ts",
       "../config/model/relations.ts",

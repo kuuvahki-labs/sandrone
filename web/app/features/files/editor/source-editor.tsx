@@ -19,6 +19,7 @@ export function FileSourceEditor({
   inlineFallback = "",
   preserveImplicit = false,
   language = "yaml",
+  onDirty,
   onValidityChange,
   placeholder,
   remoteURLPlaceholder = "https://example.com/file.yaml",
@@ -29,6 +30,7 @@ export function FileSourceEditor({
   inlineFallback?: string;
   preserveImplicit?: boolean;
   language?: string;
+  onDirty?: () => void;
   onValidityChange?: (valid: boolean) => void;
   placeholder?: string;
   remoteURLPlaceholder?: string;
@@ -58,6 +60,7 @@ export function FileSourceEditor({
 
   function selectSourceType(nextType: SourceType | null) {
     if (!nextType || nextType === sourceType) return;
+    onDirty?.();
     setSourceType(nextType);
     setPreserveImplicitSource(false);
     if (nextType === "inline" && initial.content === undefined) {
@@ -92,6 +95,7 @@ export function FileSourceEditor({
             placeholder={placeholder}
             value={content}
             onChange={(event) => {
+              onDirty?.();
               setPreserveImplicitSource(false);
               setContent(event.target.value);
             }}
@@ -101,12 +105,12 @@ export function FileSourceEditor({
       ) : null}
       {sourceType === "remote" ? (
         <div className="grid gap-4">
-          <TextField error={Boolean(validationError)} fullWidth helperText={validationError ? sourceValidationMessage(validationError, t) : undefined} label={t("files.form.remoteUrl")} placeholder={remoteURLPlaceholder} value={url} onChange={(event) => setURL(event.target.value)} />
+          <TextField error={Boolean(validationError)} fullWidth helperText={validationError ? sourceValidationMessage(validationError, t) : undefined} label={t("files.form.remoteUrl")} placeholder={remoteURLPlaceholder} value={url} onChange={(event) => { onDirty?.(); setURL(event.target.value); }} />
           <div className="grid gap-4 md:grid-cols-2">
-            <TextField fullWidth label="User-Agent" value={userAgent} onChange={(event) => setUserAgent(event.target.value)} />
-            <TextField fullWidth label={t("files.form.proxy")} placeholder="http://127.0.0.1:7890" value={proxy} onChange={(event) => setProxy(event.target.value)} />
-            <TextField fullWidth label={t("files.form.timeoutMs")} type="number" value={timeoutMS} onChange={(event) => setTimeoutMS(event.target.value)} />
-            <TextField fullWidth label={t("cache.remoteFetchTTLSeconds")} type="number" value={cacheTTLSeconds} onChange={(event) => setCacheTTLSeconds(event.target.value)} />
+            <TextField fullWidth label="User-Agent" value={userAgent} onChange={(event) => { onDirty?.(); setUserAgent(event.target.value); }} />
+            <TextField fullWidth label={t("files.form.proxy")} placeholder="http://127.0.0.1:7890" value={proxy} onChange={(event) => { onDirty?.(); setProxy(event.target.value); }} />
+            <TextField fullWidth label={t("files.form.timeoutMs")} type="number" value={timeoutMS} onChange={(event) => { onDirty?.(); setTimeoutMS(event.target.value); }} />
+            <TextField fullWidth label={t("cache.remoteFetchTTLSeconds")} type="number" value={cacheTTLSeconds} onChange={(event) => { onDirty?.(); setCacheTTLSeconds(event.target.value); }} />
           </div>
           <Typography color="text.secondary" variant="body2">
             {t("files.form.remoteDescription")}

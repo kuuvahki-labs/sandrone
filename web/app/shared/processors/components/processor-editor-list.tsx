@@ -80,6 +80,7 @@ type ProcessorEditorListProps = {
   paramsEditor: (props: ProcessorParamsEditorProps) => ReactNode;
   processorOptions: SelectOption[];
   serializeDraft: (draft: ProcessorDraft) => ProcessorDetail;
+  onDirty?: () => void;
   onValueChange?: (processors: ProcessorDetail[]) => void;
 };
 
@@ -94,6 +95,7 @@ export function ProcessorEditorList({
   paramsEditor,
   processorOptions,
   serializeDraft,
+  onDirty,
   onValueChange,
 }: ProcessorEditorListProps) {
   const { t } = useI18n();
@@ -110,15 +112,15 @@ export function ProcessorEditorList({
   }
 
   function updateDraft(index: number, patch: Partial<ProcessorDraft>) {
-    setDrafts((current) => current.map((draft, i) => (i === index ? { ...draft, ...patch } : draft)));
+    commitDrafts(drafts.map((draft, i) => (i === index ? { ...draft, ...patch } : draft)));
   }
 
   function updateParams(index: number, patch: Record<string, unknown>) {
-    setDrafts((current) => current.map((draft, i) => (i === index ? { ...draft, params: cleanParams({ ...draft.params, ...patch }) } : draft)));
+    commitDrafts(drafts.map((draft, i) => (i === index ? { ...draft, params: cleanParams({ ...draft.params, ...patch }) } : draft)));
   }
 
   function addProcessor() {
-    setDrafts((current) => addProcessorDrafts ? addProcessorDrafts(newType, current) : [...current, {
+    commitDrafts(addProcessorDrafts ? addProcessorDrafts(newType, drafts) : [...drafts, {
       id: createDraftId(),
       name: "",
       type: newType,
@@ -139,22 +141,26 @@ export function ProcessorEditorList({
   }
 
   function moveProcessor(index: number, direction: -1 | 1) {
-    setDrafts((current) => {
-      const next = [...current];
-      const target = index + direction;
-      if (target < 0 || target >= next.length) return current;
-      [next[index], next[target]] = [next[target], next[index]];
-      return next;
-    });
+    const next = [...drafts];
+    const target = index + direction;
+    if (target < 0 || target >= next.length) return;
+    [next[index], next[target]] = [next[target], next[index]];
+    commitDrafts(next);
   }
 
   function removeProcessor(id: string) {
-    setDrafts((current) => current.filter((draft) => draft.id !== id));
+    commitDrafts(drafts.filter((draft) => draft.id !== id));
     setEditingIds((current) => {
       const next = new Set(current);
       next.delete(id);
       return next;
     });
+  }
+
+  function commitDrafts(next: ProcessorDraft[]) {
+    if (JSON.stringify(next.map(serializeDraft)) === serialized) return;
+    setDrafts(next);
+    onDirty?.();
   }
 
   return (

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -10,17 +10,81 @@ import {
 
 import { SubscriptionEditPage } from "./subscription-edit-page";
 
+const saveSuccess = (_form: FormData) => true;
+
 describe("SubscriptionEditPage", () => {
+  it("wires form changes, saves, and shares while rejecting duplicate submissions", async () => {
+    const user = userEvent.setup();
+    let resolveSave!: (persisted: boolean) => void;
+    const onSave = vi.fn((_form: FormData) => new Promise<boolean>((resolve) => {
+      resolveSave = resolve;
+    }));
+    const onShare = vi.fn();
+    render(
+      <SubscriptionEditPage
+        definition={remoteSubscriptionDefinition}
+        item={subscriptions[0]}
+        onBack={noop}
+        onSave={onSave}
+        onShare={onShare}
+        sources={subscriptions}
+      />,
+    );
+
+    const share = screen.getByRole("button", { name: "分享订阅" });
+    expect(share).toHaveTextContent(/^分享$/);
+    expect(share).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "远程" }));
+    expect(share).toBeEnabled();
+
+    const displayName = screen.getByRole("textbox", { name: "显示名称" });
+    fireEvent.change(displayName, { target: { value: "updated" } });
+    expect(share).toBeDisabled();
+
+    const form = displayName.closest("form");
+    if (!form) throw new Error("expected subscription edit form");
+    fireEvent.submit(form);
+    fireEvent.submit(form);
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "保存订阅" })).toBeDisabled();
+    await act(async () => resolveSave(true));
+    expect(share).toBeEnabled();
+
+    await user.click(share);
+    expect(onShare).toHaveBeenCalledTimes(1);
+  });
+  it("keeps sharing disabled when save reports an in-band failure", async () => {
+    const user = userEvent.setup();
+    render(
+      <SubscriptionEditPage
+        definition={remoteSubscriptionDefinition}
+        item={subscriptions[0]}
+        onBack={noop}
+        onSave={() => false}
+        onShare={noop}
+        sources={subscriptions}
+      />,
+    );
+
+    const share = screen.getByRole("button", { name: "分享订阅" });
+    fireEvent.change(screen.getByRole("textbox", { name: "显示名称" }), {
+      target: { value: "invalid" },
+    });
+    await user.click(screen.getByRole("button", { name: "保存订阅" }));
+
+    expect(share).toBeDisabled();
+  });
   it("switches remote subscription edits to local content without stale remote fields", async () => {
     const user = userEvent.setup();
-    const onSave = vi.fn();
-    render(<SubscriptionEditPage item={subscriptions[0]} onBack={noop} onSave={onSave} definition={remoteSubscriptionDefinition} sources={subscriptions} />);
+    const onSave = vi.fn(saveSuccess);
+    render(<SubscriptionEditPage item={subscriptions[0]} onBack={noop} onSave={onSave} onShare={noop} definition={remoteSubscriptionDefinition} sources={subscriptions} />);
 
     expect(screen.getByRole("button", { name: "远程" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("textbox", { name: "名称" })).toBeDisabled();
 
     await user.click(screen.getByRole("button", { name: "本地" }));
 
+    expect(screen.getByRole("button", { name: "分享订阅" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "本地" })).toHaveAttribute("aria-pressed", "true");
     const localContentInput = within(screen.getByRole("group", { name: "基本信息" })).getByRole("textbox", { name: "内容" });
     const localContentEditor = localContentInput.closest("[data-highlighted-textarea]");
@@ -53,7 +117,7 @@ describe("SubscriptionEditPage", () => {
   });
   it("switches remote subscription edits to a collection without stale source fields", async () => {
     const user = userEvent.setup();
-    const onSave = vi.fn();
+    const onSave = vi.fn(saveSuccess);
     render(<SubscriptionEditPage item={subscriptions[0]} onBack={noop} onSave={onSave} definition={remoteSubscriptionDefinition} sources={subscriptions} />);
 
     await user.click(screen.getByRole("button", { name: "组合" }));
@@ -89,7 +153,7 @@ describe("SubscriptionEditPage", () => {
           meta: { description: "main group\nbackup group" },
         }}
         onBack={noop}
-        onSave={noop}
+        onSave={saveSuccess}
         sources={subscriptions}
       />,
     );
@@ -108,7 +172,7 @@ describe("SubscriptionEditPage", () => {
   });
   it("confirms before leaving a dirty subscription edit page", async () => {
     const user = userEvent.setup();
-    render(<SubscriptionEditPage item={subscriptions[2]} onBack={noop} onSave={noop} sources={subscriptions} />);
+    render(<SubscriptionEditPage item={subscriptions[2]} onBack={noop} onSave={saveSuccess} sources={subscriptions} />);
 
     await user.type(screen.getByRole("textbox", { name: "描述" }), "private");
     await user.click(screen.getByRole("button", { name: "返回" }));
@@ -119,7 +183,7 @@ describe("SubscriptionEditPage", () => {
   });
   it("prefills source editing with full source fields", async () => {
     const user = userEvent.setup();
-    render(<SubscriptionEditPage item={subscriptions[0]} onBack={noop} onSave={noop} definition={remoteSubscriptionDefinition} sources={subscriptions} />);
+    render(<SubscriptionEditPage item={subscriptions[0]} onBack={noop} onSave={saveSuccess} definition={remoteSubscriptionDefinition} sources={subscriptions} />);
 
     expect(screen.getByRole("textbox", { name: "订阅地址" })).toHaveValue("https://example.com/sub");
     expect(screen.getByRole("textbox", { name: "User-Agent" })).toHaveValue("Sandrone Test");
@@ -151,7 +215,7 @@ describe("SubscriptionEditPage", () => {
     expect(screen.queryByRole("combobox", { name: /名称操作/ })).not.toBeInTheDocument();
   });
   it("orders source editing sections by the remote subscription workflow", () => {
-    const { container } = render(<SubscriptionEditPage item={subscriptions[0]} onBack={noop} onSave={noop} definition={remoteSubscriptionDefinition} sources={subscriptions} />);
+    const { container } = render(<SubscriptionEditPage item={subscriptions[0]} onBack={noop} onSave={saveSuccess} definition={remoteSubscriptionDefinition} sources={subscriptions} />);
 
     const sourceInfo = screen.getByRole("group", { name: "基本信息" });
     const processorRules = screen.getByRole("group", { name: "处理链" });

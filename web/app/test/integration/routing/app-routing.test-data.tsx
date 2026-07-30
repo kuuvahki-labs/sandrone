@@ -87,23 +87,6 @@ export const remoteSubscriptionDefinition = {
   meta: { description: "daily", owner: "ops" },
 };
 
-export const collectionDefinition = {
-  name: "default",
-  type: "collection",
-  inputs: [
-    { name: "warn", type: "subscription", ref: { kind: "subscription", name: "warn" } },
-  ],
-  processors: [
-    {
-      name: "只保留香港",
-      type: "filter",
-      stage: "nodes",
-      params: { action: "keep", field: "name", match: "regex", pattern: "HK" },
-    },
-  ],
-  meta: { description: "private" },
-};
-
 export const subscriptionPreview = {
   subscription_name: "provider",
   format: "uri-list",

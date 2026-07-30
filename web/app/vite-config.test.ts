@@ -19,6 +19,20 @@ describe("Vite development proxy", () => {
 });
 
 describe("Vitest projects", () => {
+  it("uses isolated threads with the verified worker count", () => {
+    const test = (viteConfig as {
+      test?: {
+        pool?: string;
+        isolate?: boolean;
+        maxWorkers?: number;
+      };
+    }).test;
+
+    expect(test?.pool).toBe("threads");
+    expect(test?.isolate).toBe(true);
+    expect(test?.maxWorkers).toBe(4);
+  });
+
   it("routes browser-dependent TypeScript tests by a stable filename convention", () => {
     const projects = (viteConfig as {
       test?: {

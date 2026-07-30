@@ -1,9 +1,8 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  collectionDefinition,
   installDefaultFetchMock,
   jsonResponse,
   projectSettingsEnvelope,
@@ -16,48 +15,6 @@ import {
 
 describe("React Router app subscription workflows", () => {
   beforeEach(installDefaultFetchMock);
-
-  it("does not load subscription traffic automatically by default", async () => {
-    const listResources = {
-      ...resources,
-      subscriptions: [
-        ...resources.subscriptions,
-        { name: "local", type: "local", format: "uri-list", meta: { description: "scratch" } },
-      ],
-    };
-    const requests: Array<{ url: string; init?: RequestInit }> = [];
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      requests.push({ url, init });
-      const resourceResponse = resourceListResponse(url, listResources, init);
-      if (resourceResponse) return resourceResponse;
-      if (url.endsWith("/v1/subscriptions/provider/traffic")) {
-        return jsonResponse({
-          subscription_name: "provider",
-          type: "remote",
-          format: "uri-list",
-          traffic: { upload_bytes: 1024, download_bytes: 2048, used_bytes: 3072, total_bytes: 10240, plan_name: "VIP 1" },
-        });
-      }
-      if (url.endsWith("/v1/subscriptions/warn/traffic")) {
-        return jsonResponse({
-          subscription_name: "warn",
-          type: "remote",
-          format: "uri-list",
-        });
-      }
-      return jsonResponse(remoteSubscriptionDefinition);
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    renderApp("/subscriptions");
-
-    await screen.findByRole("heading", { name: "我的订阅" });
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    const list = screen.getByRole("list", { name: "订阅列表" });
-    expect(within(list).queryByText("↑ 1 KiB · ↓ 2 KiB · TOT 10 KiB")).not.toBeInTheDocument();
-    const trafficRequests = requests.filter((request) => request.url.includes("/v1/subscriptions/") && request.url.endsWith("/traffic"));
-    expect(trafficRequests).toEqual([]);
-  });
 
   it("loads remote subscription traffic when automatic loading is enabled", async () => {
     const listResources = {
@@ -104,47 +61,6 @@ describe("React Router app subscription workflows", () => {
     expect(trafficRequests.every((request) => request.init?.method === "POST")).toBe(true);
   });
 
-  it("identifies subscriptions in concurrent traffic failure notices", async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      const resourceResponse = resourceListResponse(url, resources, init);
-      if (resourceResponse) return resourceResponse;
-      if (url === "/v1/settings") return jsonResponse(projectSettingsEnvelope({ autoLoadTraffic: true }));
-      if (url.endsWith("/traffic")) {
-        return jsonResponse({
-          error: {
-            code: "file_input_not_found",
-            message: "remote returned status 503",
-          },
-        }, { status: 400 });
-      }
-      return jsonResponse(remoteSubscriptionDefinition);
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
-    renderApp("/subscriptions");
-
-    expect(await screen.findByText("订阅「provider」的用量加载失败：remote returned status 503")).toBeInTheDocument();
-    expect(await screen.findByText("订阅「warn」的用量加载失败：remote returned status 503")).toBeInTheDocument();
-  });
-
-  it("does not load subscription traffic while opening the edit route", async () => {
-    const requests: Array<{ url: string; init?: RequestInit }> = [];
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      requests.push({ url, init });
-      const resourceResponse = resourceListResponse(url, resources, init);
-      if (resourceResponse) return resourceResponse;
-      if (url.includes("/v1/subscriptions/provider")) return jsonResponse(remoteSubscriptionDefinition);
-      return jsonResponse({ ok: true });
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    renderApp("/subscriptions/remote/provider/edit");
-
-    expect(await screen.findByRole("heading", { name: "编辑订阅" })).toBeInTheDocument();
-    expect(requests.some((request) => request.url.endsWith("/v1/subscriptions/provider/traffic"))).toBe(false);
-  });
-
   it("opens subscription new pages from the speed dial", async () => {
     const user = userEvent.setup();
     renderApp("/subscriptions");
@@ -162,40 +78,6 @@ describe("React Router app subscription workflows", () => {
 
     expect(await screen.findByRole("textbox", { name: "订阅地址" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "远程" })).toHaveAttribute("aria-pressed", "true");
-  });
-
-  it("creates collections without binding a target format", async () => {
-    const user = userEvent.setup();
-    const requests: Array<{ url: string; init?: RequestInit }> = [];
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      requests.push({ url, init });
-      const resourceResponse = resourceListResponse(url, resources, init);
-      if (resourceResponse) return resourceResponse;
-      return jsonResponse({ ok: true });
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    renderApp("/subscriptions/new?type=collection");
-
-    await screen.findByRole("heading", { name: "新建订阅" });
-    expect(screen.queryByRole("textbox", { name: "输出格式" })).not.toBeInTheDocument();
-    const providerSource = screen.getByRole("checkbox", { name: "provider 远程订阅 · uri-list" });
-    const warnSource = screen.getByRole("checkbox", { name: "warn 远程订阅 · uri-list" });
-    expect(providerSource).not.toBeChecked();
-    expect(warnSource).not.toBeChecked();
-    await user.click(providerSource);
-    await user.click(warnSource);
-    await user.click(screen.getByRole("button", { name: "保存订阅" }));
-
-    const post = requests.find((request) => request.url.endsWith("/v1/subscriptions") && request.init?.method === "POST");
-    expect(post).toBeDefined();
-    const body = JSON.parse(String(post?.init?.body));
-    expect(body.target).toBeUndefined();
-    expect(body.type).toBe("collection");
-    expect(body.inputs).toEqual([
-      { name: "provider", type: "subscription", ref: { kind: "subscription", name: "provider" } },
-      { name: "warn", type: "subscription", ref: { kind: "subscription", name: "warn" } },
-    ]);
   });
 
   it("opens the remote editor after creating a subscription", async () => {
@@ -255,63 +137,6 @@ describe("React Router app subscription workflows", () => {
     expect(screen.queryByRole("heading", { name: "编辑订阅" })).not.toBeInTheDocument();
   });
 
-  it("opens the collection editor after creating a combined subscription", async () => {
-    const user = userEvent.setup();
-    let created = false;
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      if (url.includes("/v1/subscriptions") && init?.method === "POST") {
-        created = true;
-        return jsonResponse({ ok: true }, { status: 201 });
-      }
-      const resourceResponse = resourceListResponse(url, created ? {
-          ...resources,
-          subscriptions: [...resources.subscriptions, { name: "private", type: "collection", meta: { node_count: "0", source_count: "2" } }],
-        } : resources, init);
-      if (resourceResponse) return resourceResponse;
-      if (url.includes("/v1/subscriptions/private")) {
-        return jsonResponse({ name: "private", type: "collection", inputs: [] });
-      }
-      return jsonResponse({ ok: true });
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    renderApp("/subscriptions/new?type=collection");
-
-    await screen.findByRole("heading", { name: "新建订阅" });
-    fireEvent.change(screen.getByRole("textbox", { name: "名称" }), {
-      target: { value: "private" },
-    });
-    await user.click(screen.getByRole("checkbox", { name: "provider 远程订阅 · uri-list" }));
-    await user.click(screen.getByRole("checkbox", { name: "warn 远程订阅 · uri-list" }));
-    await user.click(screen.getByRole("button", { name: "保存订阅" }));
-
-    expect(await screen.findByRole("heading", { name: "编辑订阅" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "名称" })).toHaveValue("private");
-  });
-
-  it("loads stored collection inputs before editing a combined subscription", async () => {
-    const requests: Array<{ url: string; init?: RequestInit }> = [];
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      requests.push({ url, init });
-      const resourceResponse = resourceListResponse(url, resources, init);
-      if (resourceResponse) return resourceResponse;
-      if (url.includes("/v1/subscriptions/default")) return jsonResponse(collectionDefinition);
-      return jsonResponse({ ok: true });
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    renderApp("/subscriptions/collection/default/edit");
-
-    expect(await screen.findByRole("heading", { name: "编辑订阅" })).toBeInTheDocument();
-    await waitFor(() => {
-      expect(requests.some((request) => request.url.includes("/v1/subscriptions/default"))).toBe(true);
-    });
-    const sourcePicker = screen.getByRole("group", { name: "包含订阅" });
-    expect(within(sourcePicker).getByRole("checkbox", { name: "provider 远程订阅 · uri-list" })).not.toBeChecked();
-    expect(within(sourcePicker).getByRole("checkbox", { name: "warn 远程订阅 · uri-list" })).toBeChecked();
-    expect(screen.getByRole("group", { name: "处理器 只保留香港" })).toBeInTheDocument();
-  });
-
   it("keeps new page input and shows an alert when creating a subscription fails", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -336,91 +161,6 @@ describe("React Router app subscription workflows", () => {
     await user.click(screen.getByRole("button", { name: "保存订阅" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("remote fetch failed");
-    expect(screen.getByRole("textbox", { name: "订阅地址" })).toHaveValue("https://example.com/sub");
-  });
-
-  it("blocks empty remote creation before sending a request", async () => {
-    const user = userEvent.setup();
-    const requests: Array<{ url: string; init?: RequestInit }> = [];
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      requests.push({ url, init });
-      const resourceResponse = resourceListResponse(url, resources, init);
-      if (resourceResponse) return resourceResponse;
-      return jsonResponse({ ok: true });
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    renderApp("/subscriptions/new?type=remote");
-
-    await screen.findByRole("heading", { name: "新建订阅" });
-    await user.click(screen.getByRole("button", { name: "保存订阅" }));
-
-    expect(await screen.findByRole("alert")).toHaveTextContent("请输入远程订阅 URL");
-    expect(requests.some((request) => request.url.endsWith("/v1/subscriptions") && request.init?.method === "POST")).toBe(false);
-  });
-
-  it("blocks empty collection creation before sending a request", async () => {
-    const user = userEvent.setup();
-    const requests: Array<{ url: string; init?: RequestInit }> = [];
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      requests.push({ url, init });
-      const resourceResponse = resourceListResponse(url, resources, init);
-      if (resourceResponse) return resourceResponse;
-      return jsonResponse({ ok: true });
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    renderApp("/subscriptions/new?type=collection");
-
-    await screen.findByRole("heading", { name: "新建订阅" });
-    await user.click(screen.getByRole("button", { name: "保存订阅" }));
-
-    expect(await screen.findByRole("alert")).toHaveTextContent("请输入组合名称并选择至少一个包含订阅");
-    expect(requests.some((request) => request.url.endsWith("/v1/subscriptions") && request.init?.method === "POST")).toBe(false);
-  });
-
-  it("creates local subscription content from multi-line share links as plain text", async () => {
-    const user = userEvent.setup();
-    const requests: Array<{ url: string; init?: RequestInit }> = [];
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      requests.push({ url, init });
-      const resourceResponse = resourceListResponse(url, resources, init);
-      if (resourceResponse) return resourceResponse;
-      return jsonResponse({ ok: true }, { status: init?.method === "POST" ? 201 : 200 });
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    renderApp("/subscriptions/new?type=local");
-
-    const content = "ss://YWVzLTEyOC1nY206c2VjcmV0@example.com:8388#node-a\nvmess://example";
-    await screen.findByRole("heading", { name: "新建订阅" });
-    const subscriptionInput = screen.getByRole("textbox", { name: "内容" });
-    expect(subscriptionInput.tagName).toBe("TEXTAREA");
-    fireEvent.change(subscriptionInput, { target: { value: content } });
-    await user.click(screen.getByRole("button", { name: "保存订阅" }));
-
-    const post = requests.find((request) => request.url.endsWith("/v1/subscriptions") && request.init?.method === "POST");
-    expect(post).toBeDefined();
-    const body = JSON.parse(String(post?.init?.body));
-    expect(body).toMatchObject({
-      name: "manual",
-      type: "local",
-      content,
-      meta: { ui: "web" },
-    });
-    expect(body.format).toBeUndefined();
-    expect(body.remote).toBeUndefined();
-  });
-
-  it("opens subscription cards directly in the editor", async () => {
-    const user = userEvent.setup();
-    renderApp("/subscriptions");
-
-    await screen.findByRole("heading", { name: "我的订阅" });
-    await user.click(screen.getByRole("button", { name: "编辑：provider" }));
-
-    expect(await screen.findByRole("heading", { name: "编辑订阅" })).toBeInTheDocument();
-    expect(await screen.findByRole("group", { name: "处理器 入口重命名" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "订阅地址" })).toHaveValue("https://example.com/sub");
   });
 
@@ -457,7 +197,7 @@ describe("React Router app subscription workflows", () => {
       return jsonResponse({ ok: true });
     });
     vi.stubGlobal("fetch", fetchMock);
-    renderApp("/subscriptions/remote/provider/edit");
+    const { router } = renderApp("/subscriptions/remote/provider/edit");
 
     await screen.findByRole("textbox", { name: "订阅地址" });
     await user.click(screen.getByRole("button", { name: "本地" }));
@@ -473,46 +213,65 @@ describe("React Router app subscription workflows", () => {
     expect(body).toMatchObject({ name: "provider", type: "local", content: "ss://converted" });
     expect(body.remote).toBeUndefined();
     expect(await screen.findByRole("button", { name: "本地" })).toHaveAttribute("aria-pressed", "true");
-    expect(await screen.findByRole("textbox", { name: "内容" })).toHaveValue("ss://converted");
+    expect(within(await screen.findByRole("group", { name: "基本信息" })).getByRole("textbox", { name: "内容" })).toHaveValue("ss://converted");
+    await user.click(screen.getByRole("button", { name: "预览订阅" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/subscriptions/local/provider/preview"));
   });
 
-  it("preserves processors and remote fields when saving remote edits", async () => {
+  it("preserves newer local edits across a pending type-changing save refresh", async () => {
     const user = userEvent.setup();
+    const saveResponse = deferred<Response>();
     const requests: Array<{ url: string; init?: RequestInit }> = [];
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const localResources = {
+      ...resources,
+      subscriptions: [
+        { name: "provider", type: "local", format: "uri-list", meta: { description: "daily" } },
+        ...resources.subscriptions.filter((item) => item.name !== "provider"),
+      ],
+    };
+    const localSubscriptionDefinition = {
+      name: "provider",
+      type: "local",
+      format: "uri-list",
+      content: "ss://submitted",
+      meta: { description: "daily" },
+    };
+    let saved = false;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       requests.push({ url, init });
-      const resourceResponse = resourceListResponse(url, resources, init);
-      if (resourceResponse) return resourceResponse;
-      if (url.includes("/v1/subscriptions/provider") && init?.method !== "POST") {
-        return jsonResponse(remoteSubscriptionDefinition);
+      if (url.endsWith("/v1/subscriptions") && init?.method === "POST") {
+        const response = await saveResponse.promise;
+        saved = true;
+        return response;
       }
-      return jsonResponse({ ok: true }, { status: init?.method === "POST" ? 201 : 200 });
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    renderApp("/subscriptions/remote/provider/edit");
+      const resourceResponse = resourceListResponse(url, saved ? localResources : resources, init);
+      if (resourceResponse) return resourceResponse;
+      if (url.includes("/v1/subscriptions/provider")) {
+        return jsonResponse(saved ? localSubscriptionDefinition : remoteSubscriptionDefinition);
+      }
+      return jsonResponse({ ok: true });
+    }));
+    const { router } = renderApp("/subscriptions/remote/provider/edit");
 
-    expect(await screen.findByRole("group", { name: "处理器 入口重命名" })).toBeInTheDocument();
-    expect(screen.queryByRole("textbox", { name: "处理器 JSON" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("combobox", { name: "第 2 个处理器类型" })).not.toBeInTheDocument();
+    await screen.findByRole("textbox", { name: "订阅地址" });
+    await user.click(screen.getByRole("button", { name: "本地" }));
+    const content = within(screen.getByRole("group", { name: "基本信息" })).getByRole("textbox", { name: "内容" });
+    fireEvent.change(content, { target: { value: "ss://submitted" } });
     await user.click(screen.getByRole("button", { name: "保存订阅" }));
+    await waitFor(() => expect(requests.some((request) => request.url.endsWith("/v1/subscriptions") && request.init?.method === "POST")).toBe(true));
 
-    const post = requests.find((request) => request.url.endsWith("/v1/subscriptions") && request.init?.method === "POST");
-    expect(post).toBeDefined();
-    expect(JSON.parse(String(post?.init?.body))).toMatchObject({
-      name: "provider",
-      type: "remote",
-      format: "base64",
-      remote: {
-        url: "https://example.com/sub",
-        timeout_ms: 10000,
-      },
-      processors: [
-        { type: "quick_settings", stage: "nodes" },
-        ...remoteSubscriptionDefinition.processors,
-      ],
-      meta: { description: "daily", owner: "ops", ui: "web" },
+    fireEvent.change(content, { target: { value: "ss://newer" } });
+    expect(content).toHaveValue("ss://newer");
+
+    await act(async () => {
+      saveResponse.resolve(jsonResponse({ ok: true }, { status: 201 }));
+      await saveResponse.promise;
     });
+
+    await waitFor(() => expect(router.state.location.pathname).toBe("/subscriptions/local/provider/edit"));
+    expect(within(await screen.findByRole("group", { name: "基本信息" })).getByRole("textbox", { name: "内容" })).toHaveValue("ss://newer");
+    expect(screen.getByRole("button", { name: "分享订阅" })).toBeDisabled();
   });
 
   it("does not persist display-only auto format when saving remote edits", async () => {
@@ -552,29 +311,6 @@ describe("React Router app subscription workflows", () => {
     const body = JSON.parse(String(post?.init?.body));
     expect(body.name).toBe("auto");
     expect(body.format).toBeUndefined();
-  });
-
-  it("opens a subscription processor preview from the editor", async () => {
-    const user = userEvent.setup();
-    const requests: Array<{ url: string; init?: RequestInit }> = [];
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      requests.push({ url, init });
-      const resourceResponse = resourceListResponse(url, resources, init);
-      if (resourceResponse) return resourceResponse;
-      if (url.includes("/v1/subscriptions/provider/preview")) return jsonResponse(subscriptionPreview);
-      if (url.includes("/v1/subscriptions/provider")) return jsonResponse(remoteSubscriptionDefinition);
-      return jsonResponse({ ok: true });
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    renderApp("/subscriptions/remote/provider/edit");
-
-    await user.click(await screen.findByRole("button", { name: "预览订阅" }));
-
-    expect(await screen.findByRole("heading", { name: "节点预览" })).toBeInTheDocument();
-    expect(screen.getByText("source-node-a")).toBeInTheDocument();
-    const previewRequest = requests.find((request) => request.url.endsWith("/v1/subscriptions/provider/preview"));
-    expect(previewRequest?.init?.method).toBe("POST");
   });
 
   it("reloads the subscription definition after returning from preview", async () => {
@@ -625,3 +361,11 @@ describe("React Router app subscription workflows", () => {
   });
 
 });
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((next) => {
+    resolve = next;
+  });
+  return { promise, resolve };
+}

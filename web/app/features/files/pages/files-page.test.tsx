@@ -57,12 +57,16 @@ describe("FilesPage", () => {
     await user.click(await screen.findByRole("menuitem", { name: "远程" }));
     await user.click(screen.getByRole("button", { name: "编辑：default.yaml" }));
     await user.click(screen.getByRole("button", { name: "default.yaml 更多操作" }));
+    await user.click(screen.getByRole("menuitem", { name: "编辑" }));
+    await user.click(screen.getByRole("button", { name: "default.yaml 更多操作" }));
     await user.click(screen.getByRole("menuitem", { name: "分享" }));
     await user.click(screen.getByRole("button", { name: "default.yaml 更多操作" }));
     await user.click(screen.getByRole("menuitem", { name: "删除" }));
 
     expect(onCreateRemote).toHaveBeenCalledTimes(1);
-    expect(onEdit).toHaveBeenCalledWith(items[0]);
+    expect(onEdit).toHaveBeenCalledTimes(2);
+    expect(onEdit).toHaveBeenNthCalledWith(1, items[0]);
+    expect(onEdit).toHaveBeenNthCalledWith(2, items[0]);
     expect(onShare).toHaveBeenCalledWith(items[0]);
     expect(onDelete).toHaveBeenCalledWith(items[0]);
   });

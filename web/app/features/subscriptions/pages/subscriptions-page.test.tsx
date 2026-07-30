@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   createAction,
@@ -21,6 +21,7 @@ describe("SubscriptionsPage", () => {
       { kind: "local" as const, name: "local", title: "local", label: "本地订阅", status: "ready" as const, format: "uri-list" },
       subscriptions[2],
     ];
+    const onEdit = vi.fn();
     const { container } = render(
       <SubscriptionsPage
         createActions={[
@@ -30,7 +31,7 @@ describe("SubscriptionsPage", () => {
         ]}
         items={items}
         onDelete={noop}
-        onEdit={noop}
+        onEdit={onEdit}
         onShare={noop}
       />,
     );
@@ -70,7 +71,8 @@ describe("SubscriptionsPage", () => {
     await user.click(screen.getByRole("button", { name: "default 更多操作" }));
     expect(screen.queryByRole("menuitem", { name: "刷新" })).not.toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "诊断" })).not.toBeInTheDocument();
-    await user.keyboard("{Escape}");
+    await user.click(screen.getByRole("menuitem", { name: "编辑" }));
+    expect(onEdit).toHaveBeenCalledWith(items[3]);
   });
   it("does not reserve a details area when traffic is unavailable", () => {
     render(

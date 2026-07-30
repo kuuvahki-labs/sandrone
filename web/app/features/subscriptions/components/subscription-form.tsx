@@ -29,6 +29,7 @@ export interface SubscriptionFormFieldsProps {
   item?: SubscriptionItem;
   mode: "create" | "edit";
   onCopySource?: (value: string, target: SubscriptionCopyTarget) => void | Promise<void>;
+  onDirty?: () => void;
   onTypeChange: (type: SubscriptionCreateType) => void;
   scriptFiles?: ResourceOption[];
   sources: SubscriptionItem[];
@@ -39,7 +40,7 @@ export type SubscriptionCopyTarget = "content" | "url";
 
 const emptySourceRefs: string[] = [];
 
-export function SubscriptionFormFields({ definition, item, mode, onCopySource, onTypeChange, scriptFiles, sources, type }: SubscriptionFormFieldsProps) {
+export function SubscriptionFormFields({ definition, item, mode, onCopySource, onDirty, onTypeChange, scriptFiles, sources, type }: SubscriptionFormFieldsProps) {
   const { t } = useI18n();
   const meta = definition?.meta ?? (item?.description ? { description: item.description } : {});
   const description = meta.description ?? item?.description ?? "";
@@ -152,7 +153,7 @@ export function SubscriptionFormFields({ definition, item, mode, onCopySource, o
               <TextField fullWidth defaultValue={displayName} label={t("subscriptions.form.displayName")} name="display_name" />
               <TextField fullWidth multiline defaultValue={description} label={t("subscriptions.form.description")} minRows={2} name="description" />
               {mode === "edit" ? <input name="meta" type="hidden" defaultValue={formatJSONForForm(meta)} /> : null}
-              <SourceMultiSelect defaultValue={collectionDefaultValue} excludeName={collectionName} subscriptions={sources} />
+              <SourceMultiSelect defaultValue={collectionDefaultValue} excludeName={collectionName} onDirty={onDirty} subscriptions={sources} />
             </div>
           ) : null}
           <RenderCachePolicyField defaultValue={definition?.renderCacheTTLSeconds} />
@@ -162,7 +163,7 @@ export function SubscriptionFormFields({ definition, item, mode, onCopySource, o
         <Typography className="px-1 font-semibold" component="legend">
           {t("subscriptions.form.processors")}
         </Typography>
-        <ProcessorBuilder defaultValue={processorDefaultValue} scriptFiles={scriptFiles} />
+        <ProcessorBuilder defaultValue={processorDefaultValue} onDirty={onDirty} scriptFiles={scriptFiles} />
       </Paper>
     </div>
   );
