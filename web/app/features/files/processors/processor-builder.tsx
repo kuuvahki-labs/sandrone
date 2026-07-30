@@ -26,6 +26,13 @@ import {
 import type { ProcessorDetail, ResourceOption } from "~/shared/resources/types";
 
 import { FileMergeParamsEditor } from "./merge-params-editor";
+import {
+  recognizeRuleSourceRewriteProcessorPreset,
+  RULE_SOURCE_REWRITE_PRESET_OPTION,
+  ruleSourceRewriteProcessorPreset,
+} from "./rule-source-rewrite-preset";
+
+const RULE_SOURCE_REWRITE_KINDS = new Set(["mihomo", "sing-box", "shadowrocket"]);
 
 export function FileProcessorBuilder({ defaultValue = [], kind, onDirty, onValidityChange, scriptFiles = [] }: { defaultValue?: ProcessorDetail[]; kind: FileKind; onDirty?: () => void; onValidityChange?: (valid: boolean) => void; scriptFiles?: ResourceOption[] }) {
   const { t } = useI18n();
@@ -34,6 +41,10 @@ export function FileProcessorBuilder({ defaultValue = [], kind, onDirty, onValid
   const processorOptions = [
     { value: "script", label: t("model.processor.script") },
     ...(driver.processors.mergeModes.length ? [{ value: "merge", label: t("model.processor.merge") }] : []),
+    ...(RULE_SOURCE_REWRITE_KINDS.has(kind) ? [{
+      value: RULE_SOURCE_REWRITE_PRESET_OPTION,
+      label: t("files.processor.ruleSourceRewritePreset"),
+    }] : []),
     ...(driver.processors.adapter?.options?.(t) ?? []),
   ];
 
@@ -135,6 +146,10 @@ function mergeParams(params: Record<string, unknown>, kind: FileKind): Record<st
 }
 
 function addFileProcessorDrafts(type: string, current: ProcessorDraft[], kind: FileKind, driver: Readonly<FileDriverDefinition>): ProcessorDraft[] {
+  if (type === RULE_SOURCE_REWRITE_PRESET_OPTION) {
+    if (current.some(recognizeRuleSourceRewriteProcessorPreset)) return current;
+    return [...current, draftFromProcessor(ruleSourceRewriteProcessorPreset(), Date.now())];
+  }
   return driver.processors.adapter?.addPreset?.(type, current)
     ?? [...current, { id: createProcessorID(), name: "", type, params: defaultParams(type, kind) }];
 }

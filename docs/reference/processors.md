@@ -229,6 +229,24 @@ runtime registry 仍会列出 `inject_nodes`，但它要求直接调用内部 re
 file-stage `script` 可修改完整文件 envelope，并可使用受控资源 API。参数、
 返回转换和安全边界只在 [Scripting API](scripting-api.md) 详述。
 
+### Web 内置规则源地址替换
+
+Web 文件处理器编辑器为 Mihomo、sing-box 和 Shadowrocket 提供
+“GitHub 规则源地址替换”快捷项。它不是新的 processor type；选择后会在链末尾
+追加一个普通的 file-stage `script`，脚本来源是可编辑的 `inline` 内容。
+
+预填脚本把下列已知规则库前缀改写为 jsDelivr：
+
+| GitHub Raw | 默认目标 |
+| --- | --- |
+| `https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/` | `https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/` |
+| `https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/` | `https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@sing/` |
+| `https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/` | `https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/` |
+
+这些只是可编辑的默认替换值。用户可以在普通内联脚本编辑器中换成其他镜像；
+名称和 marker 不绑定 jsDelivr。没有匹配项时正文保持不变，不产生 warning。
+删除该 script 即停止输出时改写，结构化规则集字段本身不会被迁移。
+
 ## 失败与原子性
 
 链在第一个 build 或 apply 错误处停止，后续 processor 不运行：

@@ -7,6 +7,8 @@ import type { ProcessorDetail } from "~/shared/resources/types";
 import { FileMergeParamsEditor } from "./merge-params-editor";
 import { FileProcessorBuilder } from "./processor-builder";
 
+const typedRuleSourceKinds = ["mihomo", "sing-box", "shadowrocket"] as const;
+
 describe("FileProcessorBuilder", () => {
   it("serializes script and merge processors through the hidden form contract", () => {
     render(
@@ -23,6 +25,57 @@ describe("FileProcessorBuilder", () => {
       { name: "Remote script", type: "script", stage: "file", params: { source: { type: "remote", remote: { url: "https://example.com/process.js" } }, timeout_ms: 2000 } },
       { type: "merge", stage: "file", params: { mode: "yaml_override", content: "dns:\n  enable: true" } },
     ]);
+  });
+
+  it.each(typedRuleSourceKinds)("offers the rule source rewrite preset for %s", async (kind) => {
+    const user = userEvent.setup();
+    render(<FileProcessorBuilder kind={kind} />);
+
+    await user.click(screen.getByRole("combobox", { name: "类型" }));
+    expect(screen.getByRole("option", { name: "GitHub 规则源地址替换" })).toBeInTheDocument();
+  });
+
+  it("does not offer the rule source rewrite shortcut for static files", async () => {
+    const user = userEvent.setup();
+    render(<FileProcessorBuilder kind="static" />);
+
+    await user.click(screen.getByRole("combobox", { name: "类型" }));
+    expect(screen.queryByRole("option", { name: "GitHub 规则源地址替换" })).not.toBeInTheDocument();
+  });
+
+  it("appends one editable standard script and preserves it across kinds", async () => {
+    const user = userEvent.setup();
+    const existing: ProcessorDetail = {
+      name: "Existing",
+      type: "script",
+      stage: "file",
+      params: { source: { type: "inline", content: "function main(input) { return input; }" } },
+    };
+    const { rerender } = render(<FileProcessorBuilder kind="mihomo" defaultValue={[existing]} />);
+
+    await selectMuiOption(
+      user,
+      screen.getByRole("combobox", { name: "类型" }),
+      "GitHub 规则源地址替换",
+    );
+    await user.click(screen.getByRole("button", { name: "添加处理器" }));
+
+    const added = currentProcessors();
+    expect(added).toHaveLength(2);
+    expect(added[0]).toEqual(existing);
+    expect(added[1]).toMatchObject({
+      name: "GitHub Rule Source Rewrite",
+      type: "script",
+      stage: "file",
+      params: { source: { type: "inline" } },
+    });
+    expect(screen.getAllByRole("textbox", { name: "内联脚本" })).toHaveLength(2);
+
+    await user.click(screen.getByRole("button", { name: "添加处理器" }));
+    expect(currentProcessors()).toHaveLength(2);
+
+    rerender(<FileProcessorBuilder key="static" kind="static" defaultValue={[added[1]]} />);
+    expect(currentProcessors()).toEqual([added[1]]);
   });
 
   it("adds preset dependencies once and removes Mihomo presets for another kind", async () => {
