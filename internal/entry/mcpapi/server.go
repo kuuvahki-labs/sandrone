@@ -50,26 +50,6 @@ func New(rt *app.Runtime) *Server {
 	return s
 }
 
-func (s *Server) Name() string { return "mcp" }
-
-func (s *Server) Run(ctx context.Context, rt *app.Runtime) error {
-	if rt != nil && rt != s.rt {
-		s.rt = rt
-		s.server = newSDKServer(rt)
-		registerTools(s.server, rt)
-		registerResources(s.server, rt)
-		registerPrompts(s.server, rt)
-	}
-	s.rt.Logger.Info("starting MCP server", "transport", "stdio")
-	err := s.server.Run(ctx, &mcp.StdioTransport{})
-	if err != nil && !app.IsContextDone(err) {
-		s.rt.Logger.Error("MCP server stopped with error", "transport", "stdio", "error", err)
-		return err
-	}
-	s.rt.Logger.Info("MCP server stopped", "transport", "stdio")
-	return err
-}
-
 func (s *Server) Handler() http.Handler {
 	return mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
 		return s.server

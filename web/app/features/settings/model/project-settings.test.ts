@@ -21,9 +21,10 @@ describe("project settings model", () => {
     expect(completed.http.listen).toBe("127.0.0.1:1137");
   });
 
-  it("omits a redacted token unless replacement or clearing was requested", () => {
-    expect(settingsUpdateFromView(defaultProjectSettings).http).not.toHaveProperty("token");
-    expect(settingsUpdateFromView(defaultProjectSettings, "replacement").http.token).toBe("replacement");
-    expect(settingsUpdateFromView(defaultProjectSettings, "").http.token).toBe("");
+  it("serializes only server-owned startup settings", () => {
+    const update = settingsUpdateFromView(defaultProjectSettings);
+
+    expect(update.http).toEqual({ listen: "127.0.0.1:1137" });
+    expect(update.mcp).not.toHaveProperty("transport");
   });
 });

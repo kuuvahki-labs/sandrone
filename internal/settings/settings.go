@@ -22,39 +22,77 @@ import (
 const SchemaVersion = 1
 
 func Decode(body []byte) (domain.Settings, error) {
-	var update domain.SettingsUpdate
+	value, _, err := DecodeStored(body)
+	return value, err
+}
+
+// DecodeStored decodes persisted settings and reports whether removed fields
+// should be erased by rewriting the canonical representation.
+func DecodeStored(body []byte) (domain.Settings, bool, error) {
+	var stored storedSettings
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&update); err != nil {
-		return domain.Settings{}, err
+	if err := decoder.Decode(&stored); err != nil {
+		return domain.Settings{}, false, err
 	}
 	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
 		if err != nil {
-			return domain.Settings{}, err
+			return domain.Settings{}, false, err
 		}
-		return domain.Settings{}, errors.New("settings contain trailing JSON")
-	}
-	token := ""
-	if update.HTTP.Token != nil {
-		token = *update.HTTP.Token
+		return domain.Settings{}, false, errors.New("settings contain trailing JSON")
 	}
 	value := domain.Settings{
-		SchemaVersion: update.SchemaVersion,
-		HTTP: domain.HTTPSettings{
-			Listen:        update.HTTP.Listen,
-			Token:         token,
-			TokenRequired: update.HTTP.TokenRequired,
+		SchemaVersion: stored.SchemaVersion,
+		HTTP:          domain.HTTPSettings{Listen: stored.HTTP.Listen},
+		MCP: domain.MCPSettings{
+			Path:                 stored.MCP.Path,
+			AllowManagementTools: stored.MCP.AllowManagementTools,
+			MaxOutputBytes:       stored.MCP.MaxOutputBytes,
 		},
-		MCP:            update.MCP,
-		WebUI:          update.WebUI,
-		Log:            update.Log,
-		RemoteDefaults: update.RemoteDefaults,
-		ProbeDefaults:  update.ProbeDefaults,
-		Appearance:     update.Appearance,
-		Subscriptions:  update.Subscriptions,
+		WebUI:          stored.WebUI,
+		Log:            stored.Log,
+		RemoteDefaults: stored.RemoteDefaults,
+		ProbeDefaults:  stored.ProbeDefaults,
+		Appearance:     stored.Appearance,
+		Subscriptions:  stored.Subscriptions,
 	}
-	value.SpecifyCacheDefaults(update.CacheDefaults)
-	return Normalize(value)
+	if stored.CacheDefaults != nil {
+		value.SpecifyCacheDefaults(*stored.CacheDefaults)
+	}
+	normalized, err := Normalize(value)
+	if err != nil {
+		return domain.Settings{}, false, err
+	}
+	removedFields := stored.HTTP.LegacyToken != nil ||
+		stored.HTTP.LegacyTokenRequired != nil ||
+		stored.MCP.LegacyTransport != nil
+	return normalized, removedFields, nil
+}
+
+type storedSettings struct {
+	SchemaVersion  int                         `json:"schema_version"`
+	HTTP           storedHTTPSettings          `json:"http"`
+	MCP            storedMCPSettings           `json:"mcp"`
+	WebUI          domain.WebUISettings        `json:"webui"`
+	Log            domain.LogSettings          `json:"log"`
+	RemoteDefaults domain.RemoteDefaults       `json:"remote_defaults"`
+	ProbeDefaults  domain.ProbeDefaults        `json:"probe_defaults"`
+	CacheDefaults  *domain.CacheDefaults       `json:"cache_defaults"`
+	Appearance     domain.AppearanceSettings   `json:"appearance"`
+	Subscriptions  domain.SubscriptionSettings `json:"subscriptions"`
+}
+
+type storedHTTPSettings struct {
+	Listen              string  `json:"listen"`
+	LegacyToken         *string `json:"token,omitempty"`
+	LegacyTokenRequired *bool   `json:"token_required,omitempty"`
+}
+
+type storedMCPSettings struct {
+	LegacyTransport      *string `json:"transport,omitempty"`
+	Path                 string  `json:"path"`
+	AllowManagementTools bool    `json:"allow_management_tools"`
+	MaxOutputBytes       int     `json:"max_output_bytes"`
 }
 
 func Default() domain.Settings {
@@ -64,7 +102,6 @@ func Default() domain.Settings {
 			Listen: "127.0.0.1:1137",
 		},
 		MCP: domain.MCPSettings{
-			Transport:      "stdio",
 			Path:           "/mcp",
 			MaxOutputBytes: 1 << 20,
 		},
@@ -105,13 +142,10 @@ func Normalize(value domain.Settings) (domain.Settings, error) {
 	out.SchemaVersion = SchemaVersion
 
 	out.HTTP.Listen = firstNonEmpty(strings.TrimSpace(value.HTTP.Listen), defaults.HTTP.Listen)
-	out.HTTP.Token = value.HTTP.Token
-	out.HTTP.TokenRequired = value.HTTP.TokenRequired
 	if err := validateHTTP(out.HTTP); err != nil {
 		return domain.Settings{}, err
 	}
 
-	out.MCP.Transport = firstNonEmpty(normalizeTransport(value.MCP.Transport), defaults.MCP.Transport)
 	out.MCP.Path = firstNonEmpty(strings.TrimSpace(value.MCP.Path), defaults.MCP.Path)
 	out.MCP.AllowManagementTools = value.MCP.AllowManagementTools
 	out.MCP.MaxOutputBytes = value.MCP.MaxOutputBytes
@@ -153,18 +187,10 @@ func Normalize(value domain.Settings) (domain.Settings, error) {
 	return out, nil
 }
 
-func ApplyUpdate(current domain.Settings, update domain.SettingsUpdate) (domain.Settings, error) {
-	token := current.HTTP.Token
-	if update.HTTP.Token != nil {
-		token = *update.HTTP.Token
-	}
+func ApplyUpdate(update domain.SettingsUpdate) (domain.Settings, error) {
 	next := domain.Settings{
-		SchemaVersion: update.SchemaVersion,
-		HTTP: domain.HTTPSettings{
-			Listen:        update.HTTP.Listen,
-			Token:         token,
-			TokenRequired: update.HTTP.TokenRequired,
-		},
+		SchemaVersion:  update.SchemaVersion,
+		HTTP:           update.HTTP,
 		MCP:            update.MCP,
 		WebUI:          update.WebUI,
 		Log:            update.Log,
@@ -179,12 +205,8 @@ func ApplyUpdate(current domain.Settings, update domain.SettingsUpdate) (domain.
 
 func View(value domain.Settings) domain.SettingsView {
 	return domain.SettingsView{
-		SchemaVersion: value.SchemaVersion,
-		HTTP: domain.HTTPSettingsView{
-			Listen:          value.HTTP.Listen,
-			TokenConfigured: value.HTTP.Token != "",
-			TokenRequired:   value.HTTP.TokenRequired,
-		},
+		SchemaVersion:  value.SchemaVersion,
+		HTTP:           value.HTTP,
 		MCP:            value.MCP,
 		WebUI:          value.WebUI,
 		Log:            value.Log,
@@ -260,25 +282,14 @@ func normalizeProbeDefaults(value, defaults domain.ProbeDefaults) (domain.ProbeD
 }
 
 func validateHTTP(value domain.HTTPSettings) error {
-	host, _, err := net.SplitHostPort(value.Listen)
+	_, _, err := net.SplitHostPort(value.Listen)
 	if err != nil {
 		return invalid("invalid HTTP listen address: %v", err)
-	}
-	if !isLocalHost(host) && value.Token == "" && !value.TokenRequired {
-		return invalid("binding HTTP to a non-local address requires a token")
-	}
-	if value.TokenRequired && value.Token == "" {
-		return invalid("HTTP token is required when token auth is enabled")
 	}
 	return nil
 }
 
 func validateMCP(value domain.MCPSettings) error {
-	switch value.Transport {
-	case "stdio", "streamable-http":
-	default:
-		return invalid("unsupported MCP transport %q", value.Transport)
-	}
 	if !strings.HasPrefix(value.Path, "/") {
 		return invalid("MCP path must start with /")
 	}
@@ -357,10 +368,6 @@ func validateHTTPURL(label, rawURL string) error {
 	return nil
 }
 
-func normalizeTransport(value string) string {
-	return strings.ReplaceAll(strings.ToLower(strings.TrimSpace(value)), "_", "-")
-}
-
 func firstNonEmpty(values ...string) string {
 	for _, value := range values {
 		if value != "" {
@@ -368,15 +375,6 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
-}
-
-func isLocalHost(host string) bool {
-	switch strings.ToLower(host) {
-	case "", "localhost":
-		return true
-	}
-	ip := net.ParseIP(host)
-	return ip != nil && ip.IsLoopback()
 }
 
 func invalid(format string, args ...any) error {

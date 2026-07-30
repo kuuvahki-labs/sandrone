@@ -155,8 +155,8 @@ test.beforeEach(async ({ page }) => {
   await page.route("**/v1/settings", async (route) => {
     const settings = {
       schema_version: 1,
-      http: { listen: "127.0.0.1:1137", token_configured: false, token_required: false },
-      mcp: { transport: "stdio", path: "/mcp", allow_management_tools: false, max_output_bytes: 1048576 },
+      http: { listen: "127.0.0.1:1137" },
+      mcp: { path: "/mcp", allow_management_tools: false, max_output_bytes: 1048576 },
       webui: { static_dir: "" },
       log: { level: "info" },
       remote_defaults: { user_agent: "sandrone/0.1.0", timeout_ms: 15000 },

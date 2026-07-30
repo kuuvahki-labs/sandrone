@@ -206,7 +206,9 @@ cache 被排除，因为它可重建、可能过期，也不应决定恢复后�
 - 进程在删除与写入之间崩溃时可能留下部分 Store。
 - rollback 自身也可能失败，并会作为复合错误报告。
 - 共享同一后端的其它进程不受当前 Coordinator 约束。
-- 只接受当前支持的 storage schema，不在恢复时自动迁移。
+- 只接受当前支持的 storage schema。唯一的读取期清理是重写
+  `settings.json` 中已经移除的启动字段，避免旧的敏感值继续保留或进入后续备份；
+  其他结构不在恢复时自动迁移。
 
 `storage_schema_version=1` 是备份容器和 key tree 的版本，不是每个 JSON
 资源 shape 的迁移承诺。恢复会原样写回资源 bytes；当前运行时要求 file record

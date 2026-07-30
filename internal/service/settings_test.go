@@ -69,11 +69,8 @@ func newProjectSettingsServiceWithState(stored, effective domain.Settings, overr
 
 func settingsUpdate(value domain.SettingsView) domain.SettingsUpdate {
 	return domain.SettingsUpdate{
-		SchemaVersion: value.SchemaVersion,
-		HTTP: domain.HTTPSettingsUpdate{
-			Listen:        value.HTTP.Listen,
-			TokenRequired: value.HTTP.TokenRequired,
-		},
+		SchemaVersion:  value.SchemaVersion,
+		HTTP:           value.HTTP,
 		MCP:            value.MCP,
 		WebUI:          value.WebUI,
 		Log:            value.Log,

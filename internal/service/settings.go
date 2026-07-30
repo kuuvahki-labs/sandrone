@@ -22,7 +22,7 @@ func (s *Service) PutSettings(ctx context.Context, update domain.SettingsUpdate)
 	}
 
 	s.settingsMu.Lock()
-	next, err := projectsettings.ApplyUpdate(s.storedSettings, update)
+	next, err := projectsettings.ApplyUpdate(update)
 	if err != nil {
 		s.settingsMu.Unlock()
 		return domain.SettingsSnapshot{}, err
@@ -100,9 +100,6 @@ func restartRequiredPaths(stored, effective domain.Settings, overrides map[strin
 		}
 	}
 	add("http.listen", stored.HTTP.Listen != effective.HTTP.Listen)
-	add("http.token", stored.HTTP.Token != effective.HTTP.Token)
-	add("http.token_required", stored.HTTP.TokenRequired != effective.HTTP.TokenRequired)
-	add("mcp.transport", stored.MCP.Transport != effective.MCP.Transport)
 	add("mcp.path", stored.MCP.Path != effective.MCP.Path)
 	add("mcp.allow_management_tools", stored.MCP.AllowManagementTools != effective.MCP.AllowManagementTools)
 	add("mcp.max_output_bytes", stored.MCP.MaxOutputBytes != effective.MCP.MaxOutputBytes)

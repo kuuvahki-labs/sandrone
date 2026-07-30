@@ -1,25 +1,16 @@
 # MCP 参考
 
-本页定义 Sandrone 当前 MCP 入口的公开契约：transport、鉴权、tools、
+本页定义 Sandrone 当前 MCP 入口的公开契约：Streamable HTTP、鉴权、tools、
 resources、prompts、输出限制与安全边界。启动 flags 见 [CLI 参考](cli.md)，
 领域字段继续以 [FileSpec](file-spec.md)、[Processors](processors.md)、
 [脚本 API](scripting-api.md)和 [HTTP API](http-api/README.md)为准。
 
-## Transport 与启动
+## Streamable HTTP 与启动
 
-Sandrone 支持两种 MCP transport：
-
-| transport | 启动方式 | 边界 |
-| --- | --- | --- |
-| `stdio` | `sandrone serve mcp` | 缺省方式；协议使用进程标准输入与标准输出。 |
-| `streamable-http` | `sandrone serve mcp --transport streamable-http` | 挂载到 Sandrone HTTP listener，缺省路径为 `/mcp`。 |
-
-`sandrone serve all` 固定使用 `streamable-http`，在一个 listener 上同时提供
-HTTP API、可选 Web UI 和 MCP。`--path` 可以修改 MCP 路径，但必须以 `/` 开头。
-Streamable HTTP handler 使用 JSON response mode。
-
-stdio 不使用 HTTP bearer token；它依赖启动进程的用户权限、工作目录和数据目录
-隔离。Streamable HTTP 复用 HTTP server 的静态 bearer token：
+Sandrone 的 MCP server 使用 Streamable HTTP。`sandrone serve mcp` 启动只挂载
+MCP 的 HTTP listener；`sandrone serve all` 在同一个 listener 上同时提供 HTTP
+API、可选 Web UI 和 MCP。`--path` 可以修改 MCP 路径，但必须以 `/` 开头。
+handler 使用 JSON response mode，并复用 HTTP server 的静态 bearer token：
 
 ```http
 Authorization: Bearer <token>
@@ -45,7 +36,7 @@ script，以 `SANDRONE_URL` 指向 Sandrone server，并通过可选
 `SANDRONE_TOKEN` 发送 bearer token。对于不能执行 script 的客户端，MCP 仍是
 可用执行面；MCP server 的连接地址和 bearer token 继续只配置在 MCP 客户端，
 不写入 Skill。HTTP route 与响应见 [HTTP API 参考](http-api/README.md)，这里
-的 MCP transport 与 tool 契约不因 Skill 选择 HTTP 而改变。
+的 MCP HTTP 与 tool 契约不因 Skill 选择 HTTP script 而改变。
 
 ## Tool 注册与管理边界
 
@@ -231,4 +222,3 @@ subscription preview/render 只接受已存定义，所以新 subscription 通�
   或原始 warning 上下文，不能假定已经脱敏。
 - 内建 Streamable HTTP listener 不终止 TLS。跨主机使用时应在可信网络或提供
   TLS 的反向代理之后部署，并保护 bearer token。
-- stdio 客户端继承启动进程对 data dir 和网络的权限；只应连接可信客户端。

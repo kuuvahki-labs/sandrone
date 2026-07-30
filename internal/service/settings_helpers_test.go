@@ -16,7 +16,7 @@ func putProjectSettings(t *testing.T, svc *service.Service, ctx context.Context,
 	value := projectsettings.Default()
 	update := domain.SettingsUpdate{
 		SchemaVersion:  value.SchemaVersion,
-		HTTP:           domain.HTTPSettingsUpdate{Listen: value.HTTP.Listen, TokenRequired: value.HTTP.TokenRequired},
+		HTTP:           value.HTTP,
 		MCP:            value.MCP,
 		WebUI:          value.WebUI,
 		Log:            value.Log,

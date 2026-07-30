@@ -10,11 +10,8 @@ export const defaultProjectSettings: SettingsView = {
   schema_version: 1,
   http: {
     listen: "127.0.0.1:1137",
-    token_configured: false,
-    token_required: false,
   },
   mcp: {
-    transport: "stdio",
     path: "/mcp",
     allow_management_tools: false,
     max_output_bytes: 1 << 20,
@@ -71,14 +68,10 @@ export function completeProjectSettings(settings?: Partial<SettingsView>): Setti
   };
 }
 
-export function settingsUpdateFromView(view: SettingsView, token?: string | null): SettingsUpdate {
+export function settingsUpdateFromView(view: SettingsView): SettingsUpdate {
   return {
     schema_version: view.schema_version,
-    http: {
-      listen: view.http.listen,
-      token_required: view.http.token_required,
-      ...(token === undefined ? {} : { token }),
-    },
+    http: view.http,
     mcp: view.mcp,
     webui: view.webui,
     log: view.log,
@@ -103,16 +96,7 @@ export function optimisticSettingsEnvelope(
   previous: SettingsEnvelope,
   update: SettingsUpdate,
 ): SettingsEnvelope {
-  const settings = completeProjectSettings({
-    ...update,
-    http: {
-      listen: update.http.listen,
-      token_configured: update.http.token === undefined || update.http.token === null
-        ? previous.settings.http.token_configured
-        : update.http.token.length > 0,
-      token_required: update.http.token_required,
-    },
-  });
+  const settings = completeProjectSettings(update);
   return {
     ...previous,
     settings,

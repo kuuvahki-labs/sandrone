@@ -26,7 +26,6 @@ func TestSettingsStoreWritesRootFileWithPrivateMode(t *testing.T) {
 	fs := afero.NewBasePathFs(afero.NewOsFs(), dir)
 	repo := store.NewSettingsStore(store.Coordinate(store.NewFSStore(fs)))
 	value := settings.Default()
-	value.HTTP.Token = "secret"
 
 	require.NoError(t, repo.Put(context.Background(), value))
 
@@ -37,7 +36,7 @@ func TestSettingsStoreWritesRootFileWithPrivateMode(t *testing.T) {
 
 	got, err := repo.Get(context.Background())
 	require.NoError(t, err)
-	require.Equal(t, "secret", got.HTTP.Token)
+	require.Equal(t, value.HTTP, got.HTTP)
 	require.Equal(t, value.Appearance, got.Appearance)
 }
 
@@ -60,6 +59,29 @@ func TestSettingsStoreReplacesExistingFileWithoutLeavingTemporaryFiles(t *testin
 	require.NoError(t, err)
 	require.Len(t, entries, 1)
 	require.Equal(t, "settings.json", entries[0].Name())
+}
+
+func TestSettingsStoreRewritesRemovedStartupFieldsOnRead(t *testing.T) {
+	dir := t.TempDir()
+	fs := afero.NewBasePathFs(afero.NewOsFs(), dir)
+	raw := store.NewFSStore(fs)
+	require.NoError(t, raw.Write(context.Background(), store.SettingsKey, []byte(`{
+		"schema_version": 1,
+		"http": {"listen": "127.0.0.1:1137", "token": "legacy-secret", "token_required": true},
+		"mcp": {"transport": "stdio", "path": "/mcp", "allow_management_tools": false, "max_output_bytes": 1048576},
+		"webui": {"static_dir": ""},
+		"log": {"level": "info"}
+	}`)))
+	repo := store.NewSettingsStore(store.Coordinate(raw))
+
+	_, err := repo.Get(context.Background())
+	require.NoError(t, err)
+
+	body, err := os.ReadFile(filepath.Join(dir, store.SettingsKey))
+	require.NoError(t, err)
+	require.NotContains(t, string(body), "legacy-secret")
+	require.NotContains(t, string(body), `"token_required"`)
+	require.NotContains(t, string(body), `"transport"`)
 }
 
 func TestSettingsStoreRejectsTrailingJSONValues(t *testing.T) {

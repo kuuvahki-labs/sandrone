@@ -18,7 +18,6 @@ func TestValidateRequiresTokenForBarePortListen(t *testing.T) {
 	err := Validate(Config{
 		DataDir: t.TempDir(),
 		HTTP:    HTTPConfig{Listen: ":1137"},
-		MCP:     MCPConfig{Transport: "stdio"},
 	})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "requires --token")
@@ -28,7 +27,6 @@ func TestValidateAllowsLocalhostListenWithoutToken(t *testing.T) {
 	err := Validate(Config{
 		DataDir: t.TempDir(),
 		HTTP:    HTTPConfig{Listen: "127.0.0.1:1137"},
-		MCP:     MCPConfig{Transport: "stdio"},
 	})
 	require.NoError(t, err)
 }
@@ -40,7 +38,6 @@ func TestValidateRejectsWebUIStaticDirFile(t *testing.T) {
 	err := Validate(Config{
 		DataDir: t.TempDir(),
 		HTTP:    HTTPConfig{Listen: "127.0.0.1:1137"},
-		MCP:     MCPConfig{Transport: "stdio"},
 		WebUI:   WebUIConfig{StaticDir: staticFile},
 	})
 
@@ -52,7 +49,6 @@ func TestValidateRejectsUnsupportedLogLevel(t *testing.T) {
 	err := Validate(Config{
 		DataDir: t.TempDir(),
 		HTTP:    HTTPConfig{Listen: "127.0.0.1:1137"},
-		MCP:     MCPConfig{Transport: "stdio"},
 		Log:     LogConfig{Level: "trace"},
 	})
 

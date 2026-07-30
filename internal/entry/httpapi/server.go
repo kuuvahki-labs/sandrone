@@ -209,7 +209,7 @@ func (s *Server) routes() {
 }
 
 func (s *Server) auth(next http.Handler) http.Handler {
-	if !app.TokenRequired(s.rt.Config.HTTP) {
+	if s.rt.Config.HTTP.Token == "" {
 		return next
 	}
 	token := s.rt.Config.HTTP.Token

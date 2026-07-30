@@ -15,7 +15,6 @@ func TestDefaultSettingsContainsWholeProject(t *testing.T) {
 
 	require.Equal(t, 1, got.SchemaVersion)
 	require.Equal(t, "127.0.0.1:1137", got.HTTP.Listen)
-	require.Equal(t, "stdio", got.MCP.Transport)
 	require.Equal(t, "/mcp", got.MCP.Path)
 	require.Equal(t, 1<<20, got.MCP.MaxOutputBytes)
 	require.Equal(t, "info", got.Log.Level)
@@ -25,29 +24,49 @@ func TestDefaultSettingsContainsWholeProject(t *testing.T) {
 	require.Equal(t, 60, got.CacheDefaults.SubscriptionTrafficTTLSeconds)
 }
 
-func TestApplyUpdatePreservesOmittedTokenAndClearsExplicitEmptyToken(t *testing.T) {
-	current := settings.Default()
-	current.HTTP.Token = "secret"
+func TestStoredAndPublicSettingsOmitStartupAuthenticationAndMCPTransport(t *testing.T) {
+	value := settings.Default()
 
-	preserved, err := settings.ApplyUpdate(current, updateFromSettings(current, nil))
+	stored, err := json.Marshal(value)
 	require.NoError(t, err)
-	require.Equal(t, "secret", preserved.HTTP.Token)
+	public, err := json.Marshal(settings.View(value))
+	require.NoError(t, err)
 
-	empty := ""
-	cleared, err := settings.ApplyUpdate(preserved, updateFromSettings(preserved, &empty))
-	require.NoError(t, err)
-	require.Empty(t, cleared.HTTP.Token)
+	for _, body := range [][]byte{stored, public} {
+		require.NotContains(t, string(body), `"token"`)
+		require.NotContains(t, string(body), `"token_required"`)
+		require.NotContains(t, string(body), `"token_configured"`)
+		require.NotContains(t, string(body), `"transport"`)
+	}
 }
 
-func TestSettingsViewRedactsToken(t *testing.T) {
-	value := settings.Default()
-	value.HTTP.Token = "must-not-leak"
-
-	body, err := json.Marshal(settings.View(value))
-
+func TestDecodeMigratesLegacyStartupAuthenticationAndMCPTransport(t *testing.T) {
+	value, err := settings.Decode([]byte(`{
+		"schema_version": 1,
+		"http": {
+			"listen": "127.0.0.1:2237",
+			"token": "legacy-secret",
+			"token_required": true
+		},
+		"mcp": {
+			"transport": "stdio",
+			"path": "/agent",
+			"allow_management_tools": true,
+			"max_output_bytes": 2048
+		},
+		"webui": {"static_dir": ""},
+		"log": {"level": "warn"}
+	}`))
 	require.NoError(t, err)
-	require.NotContains(t, string(body), "must-not-leak")
-	require.Contains(t, string(body), `"token_configured":true`)
+	require.Equal(t, "127.0.0.1:2237", value.HTTP.Listen)
+	require.Equal(t, "/agent", value.MCP.Path)
+	require.True(t, value.MCP.AllowManagementTools)
+
+	body, err := json.Marshal(value)
+	require.NoError(t, err)
+	require.NotContains(t, string(body), "legacy-secret")
+	require.NotContains(t, string(body), `"token_required"`)
+	require.NotContains(t, string(body), `"transport"`)
 }
 
 func TestNormalizeRejectsInvalidProjectFields(t *testing.T) {
@@ -91,24 +110,5 @@ func TestNormalizeRejectsInvalidProjectFields(t *testing.T) {
 			require.Error(t, err)
 			require.True(t, domain.IsCode(err, domain.CodeInvalidArgument), "got %v", err)
 		})
-	}
-}
-
-func updateFromSettings(value domain.Settings, token *string) domain.SettingsUpdate {
-	return domain.SettingsUpdate{
-		SchemaVersion: value.SchemaVersion,
-		HTTP: domain.HTTPSettingsUpdate{
-			Listen:        value.HTTP.Listen,
-			Token:         token,
-			TokenRequired: value.HTTP.TokenRequired,
-		},
-		MCP:            value.MCP,
-		WebUI:          value.WebUI,
-		Log:            value.Log,
-		RemoteDefaults: value.RemoteDefaults,
-		ProbeDefaults:  value.ProbeDefaults,
-		CacheDefaults:  value.CacheDefaults,
-		Appearance:     value.Appearance,
-		Subscriptions:  value.Subscriptions,
 	}
 }

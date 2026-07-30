@@ -681,6 +681,17 @@ func TestServeMCPHelpDocumentsSingleManagementSwitch(t *testing.T) {
 	}
 }
 
+func TestServeHelpOmitsRemovedAuthenticationAndTransportFlags(t *testing.T) {
+	for _, command := range []string{"http", "mcp", "all"} {
+		t.Run(command, func(t *testing.T) {
+			help := runHelp(t, "serve", command)
+
+			require.NotContains(t, help, "--token-required")
+			require.NotContains(t, help, "--transport")
+		})
+	}
+}
+
 func TestServeHTTPPassesFlagsToRuntime(t *testing.T) {
 	dataDir := t.TempDir()
 	stopErr := errors.New("stop after runtime")
@@ -821,7 +832,6 @@ func TestServeReadsBooleanAndIntegerStartupEnvironmentOverrides(t *testing.T) {
 		"",
 		WithEnv(map[string]string{
 			EnvToken:                   "env-secret",
-			EnvTokenRequired:           "true",
 			EnvMCPPath:                 "/agent",
 			EnvMCPAllowManagementTools: "true",
 			EnvMCPMaxOutputBytes:       "2048",
@@ -834,11 +844,9 @@ func TestServeReadsBooleanAndIntegerStartupEnvironmentOverrides(t *testing.T) {
 
 	require.Equal(t, 1, code)
 	require.Contains(t, stderr, stopErr.Error())
-	require.True(t, got.HTTP.TokenRequired)
 	require.Equal(t, "/agent", got.MCP.Path)
 	require.True(t, got.MCP.AllowManagementTools)
 	require.Equal(t, 2048, got.MCP.MaxOutputBytes)
-	require.Equal(t, "environment", got.OverrideSources["http.token_required"])
 	require.Equal(t, "environment", got.OverrideSources["mcp.path"])
 	require.Equal(t, "environment", got.OverrideSources["mcp.allow_management_tools"])
 	require.Equal(t, "environment", got.OverrideSources["mcp.max_output_bytes"])

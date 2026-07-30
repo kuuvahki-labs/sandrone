@@ -47,7 +47,6 @@ revision 的来源和职责见[构建身份](build-info.md)。
 | --- | --- | --- | --- |
 | `--listen <host:port>` | `SANDRONE_LISTEN` | `127.0.0.1:1137` | HTTP 监听地址 |
 | `--token <token>` | `SANDRONE_TOKEN` | 空 | HTTP 与 MCP HTTP 的 bearer token |
-| `--token-required` | `SANDRONE_TOKEN_REQUIRED` | `false` | 即使监听本机地址也要求配置 token |
 | `--webui-static-dir <dir>` | `SANDRONE_WEBUI_STATIC_DIR` | 空 | 覆盖 Web UI 静态资源目录 |
 | `--log-level <level>` | `SANDRONE_LOG_LEVEL` | `info` | `debug`、`info`、`warn` 或 `error` |
 
@@ -57,9 +56,10 @@ revision 的来源和职责见[构建身份](build-info.md)。
 显式 flag > 环境变量 > <data_dir>/settings.json > 内建默认值
 ```
 
-环境变量或 flag 只覆盖当前进程，不回写 `settings.json`。管理 API 保存了被
-覆盖的字段时，当前进程继续使用覆盖值。`warning` 也会被接受为 `warn`
-日志级别。静态资源目录若非现有目录，启动失败。统一文件与管理接口见
+环境变量或 flag 只覆盖当前进程，不回写 `settings.json`。token 只从
+`--token` 或 `SANDRONE_TOKEN` 读取，既不属于项目设置，也不会进入备份。管理
+API 保存了其它被覆盖字段时，当前进程继续使用覆盖值。`warning` 也会被接受为
+`warn` 日志级别。静态资源目录若非现有目录，启动失败。统一文件与管理接口见
 [项目设置接口](http-api/settings.md)。
 
 ## 节点格式
@@ -198,23 +198,21 @@ sandrone file render <name-or-spec-path>
 
 ### `serve mcp`
 
-启动 MCP server，并额外接受：
+通过 Streamable HTTP 启动 MCP server，并额外接受：
 
 | flag | 环境变量 | 内建缺省值 | 含义 |
 | --- | --- | --- | --- |
-| `--transport` | `SANDRONE_MCP_TRANSPORT` | `stdio` | `stdio` 或 `streamable-http`；下划线写法会规范化为连字符 |
 | `--path` | `SANDRONE_MCP_PATH` | `/mcp` | streamable HTTP 路径，必须以 `/` 开头 |
 | `--allow-management-tools` | `SANDRONE_MCP_ALLOW_MANAGEMENT_TOOLS` | `false` | 注册可覆盖或立即删除定义的管理 tools；只应在可信本机 Agent 场景启用 |
 | `--max-output-bytes` | `SANDRONE_MCP_MAX_OUTPUT_BYTES` | `1048576` | MCP 内联输出上限；不能为负数 |
 
-`stdio` 直接使用进程标准输入/输出；`streamable-http` 使用 `--listen` 和
-`--path` 启动 HTTP listener。
+server 使用 `--listen` 和 `--path` 启动 HTTP listener。
 
 ### `serve all`
 
 在一个 HTTP listener 上同时提供 HTTP API、可选 Web UI 与 MCP streamable
 HTTP。它接受 `--path`、`--allow-management-tools` 和
-`--max-output-bytes`；传输固定为 `streamable-http`。
+`--max-output-bytes`。
 
 MCP 的 tool/resource/prompt catalog、单一管理开关的行为和正文省略规则见
 [MCP 参考](mcp.md)。管理 tools 缺省不注册；启用后 `put` 可覆盖同名定义，
@@ -224,8 +222,7 @@ MCP 的 tool/resource/prompt catalog、单一管理开关的行为和正文省�
 
 - 缺省监听 `127.0.0.1:1137`，本机地址允许无 token 启动。
 - 监听非 loopback 地址时必须配置 `--token`。
-- 只要 token 非空，HTTP 鉴权即启用；`--token-required` 且 token 为空也会
-  拒绝启动。
+- 只要 token 非空，HTTP 鉴权即启用。
 - bearer token 同时保护普通 HTTP API 和 MCP HTTP。
 - `serve` 持续运行，入口因 context 取消或 HTTP server 正常关闭而返回时视为
   正常结束；其它启动或运行错误以退出码 `1` 返回。

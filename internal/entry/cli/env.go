@@ -8,8 +8,6 @@ const (
 	EnvToken                   = "SANDRONE_TOKEN"
 	EnvWebUIStaticDir          = "SANDRONE_WEBUI_STATIC_DIR"
 	EnvLogLevel                = "SANDRONE_LOG_LEVEL"
-	EnvTokenRequired           = "SANDRONE_TOKEN_REQUIRED" // #nosec G101 -- environment variable name, not a credential
-	EnvMCPTransport            = "SANDRONE_MCP_TRANSPORT"
 	EnvMCPPath                 = "SANDRONE_MCP_PATH"
 	EnvMCPAllowManagementTools = "SANDRONE_MCP_ALLOW_MANAGEMENT_TOOLS"
 	EnvMCPMaxOutputBytes       = "SANDRONE_MCP_MAX_OUTPUT_BYTES"

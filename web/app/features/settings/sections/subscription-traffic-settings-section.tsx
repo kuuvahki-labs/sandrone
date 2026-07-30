@@ -19,26 +19,20 @@ export function SubscriptionTrafficSettingsSection({
 
   return (
     <Card component="article" variant="outlined">
-      <CardContent>
-        <div className="grid gap-3">
-          <Typography component="h3" variant="h6">
-            {t("settings.subscriptionTraffic.title")}
-          </Typography>
-          <div>
-            <FormControlLabel
-              control={(
-                <Switch
-                  checked={value}
-                  onChange={(event) => onChange(event.target.checked)}
-                />
-              )}
-              label={t("settings.subscriptionTraffic.autoLoad.label")}
+      <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Typography component="h3" variant="h6">
+          {t("settings.subscriptionTraffic.title")}
+        </Typography>
+        <FormControlLabel
+          className="m-0"
+          control={(
+            <Switch
+              checked={value}
+              onChange={(event) => onChange(event.target.checked)}
             />
-            <Typography color="text.secondary" variant="body2">
-              {t("settings.subscriptionTraffic.autoLoad.description")}
-            </Typography>
-          </div>
-        </div>
+          )}
+          label={t("settings.subscriptionTraffic.autoLoad.label")}
+        />
       </CardContent>
     </Card>
   );

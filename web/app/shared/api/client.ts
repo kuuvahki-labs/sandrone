@@ -95,11 +95,8 @@ export interface SettingsView {
   schema_version: number;
   http: {
     listen: string;
-    token_configured: boolean;
-    token_required: boolean;
   };
   mcp: {
-    transport: "stdio" | "streamable-http";
     path: string;
     allow_management_tools: boolean;
     max_output_bytes: number;
@@ -126,8 +123,6 @@ export interface SettingsUpdate {
   schema_version: number;
   http: {
     listen: string;
-    token?: string | null;
-    token_required: boolean;
   };
   mcp: SettingsView["mcp"];
   webui: SettingsView["webui"];

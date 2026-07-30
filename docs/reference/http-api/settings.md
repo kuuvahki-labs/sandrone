@@ -3,8 +3,10 @@
 ## 用途
 
 本页定义统一项目设置、内置规则集目录和 Store 整体备份的管理接口。除
-`data_dir` 外，Sandrone 的启动设置、运行默认值、外观语言和订阅行为都属于
-同一个项目设置对象，权威文件是可选的 `<data_dir>/settings.json`。
+`data_dir` 和 bearer token 外，Sandrone 的启动设置、运行默认值、外观语言和
+订阅行为都属于同一个项目设置对象，权威文件是可选的
+`<data_dir>/settings.json`。bearer token 只从启动 flag 或环境变量读取，不进入
+设置 API、设置文件或备份。
 
 这些接口位于受保护的 `/v1/*` 边界。启用 bearer token 后，请求必须携带：
 
@@ -33,12 +35,9 @@ SettingsEnvelope {
 {
   "schema_version": 1,
   "http": {
-    "listen": "127.0.0.1:1137",
-    "token_configured": true,
-    "token_required": false
+    "listen": "127.0.0.1:1137"
   },
   "mcp": {
-    "transport": "stdio",
     "path": "/mcp",
     "allow_management_tools": false,
     "max_output_bytes": 1048576
@@ -70,8 +69,7 @@ SettingsEnvelope {
 ```
 
 `settings` 和 `effective` 都使用上面的完整结构。`settings` 是持久化目标；
-`effective` 是当前进程实际使用的值。HTTP token 永不返回原文，只通过
-`token_configured` 表示是否已配置。
+`effective` 是当前进程实际使用的值。启动 token 不属于这两个对象。
 
 `overrides` 的 key 是设置路径，值为 `environment` 或 `flag`。被环境变量或
 显式 flag 覆盖的启动字段即使写入文件，也不会进入 `restart_required`，因为
@@ -82,24 +80,15 @@ SettingsEnvelope {
 请求体是完整设置对象，不是 merge patch。未知字段会被拒绝，正文上限为
 16 MiB。成功返回更新后的同一 envelope。
 
-`http.token` 使用特殊更新语义：
-
-- 缺失或 `null`：保留当前存储 token；
-- 非空字符串：替换 token；
-- 空字符串：清除 token。
-
-其它字段必须按完整对象提交。典型请求：
+所有字段必须按完整对象提交。典型请求：
 
 ```json
 {
   "schema_version": 1,
   "http": {
-    "listen": "127.0.0.1:1137",
-    "token": null,
-    "token_required": false
+    "listen": "127.0.0.1:1137"
   },
   "mcp": {
-    "transport": "stdio",
     "path": "/mcp",
     "allow_management_tools": false,
     "max_output_bytes": 1048576
@@ -166,7 +155,8 @@ curl -fsS \
 
 下载全部非 cache Store 数据的 ZIP。响应使用 `application/zip`、
 `Cache-Control: no-store` 和安全的 `Content-Disposition` 文件名。
-`settings.json` 会以包含真实 token 的原始 bytes 进入归档，因此备份是敏感明文。
+`settings.json` 会以原始 bytes 进入归档。启动 token 不在其中，但订阅 URL、
+节点凭据、脚本和其它 Store 数据仍可能包含敏感内容，因此备份仍是敏感明文。
 
 ### `POST /v1/backup/restore`
 

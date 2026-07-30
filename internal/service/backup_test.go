@@ -129,20 +129,20 @@ func TestBackupRestoreRejectsInvalidSettingsWithoutMutation(t *testing.T) {
 	require.Equal(t, before, snapshotBackupStoreFiles(t, resourceStore))
 }
 
-func TestBackupExportRetainsStoredSettingsToken(t *testing.T) {
+func TestBackupExportOmitsStartupAuthentication(t *testing.T) {
 	ctx := context.Background()
 	resourceStore := store.NewFSStore(afero.NewMemMapFs())
 	svc := service.New(service.WithStore(resourceStore), service.WithClock(func() time.Time { return testBackupNow }))
 	update := projectSettingsUpdate(projectsettings.Default())
-	token := "backup-secret"
-	update.HTTP.Token = &token
 	_, err := svc.PutSettings(ctx, update)
 	require.NoError(t, err)
 
 	result, err := svc.ExportBackup(ctx)
 	require.NoError(t, err)
 	archive := readBackupZip(t, result.Body)
-	require.Contains(t, string(archive.files["data/settings.json"]), token)
+	settingsBody := string(archive.files["data/settings.json"])
+	require.NotContains(t, settingsBody, `"token"`)
+	require.NotContains(t, settingsBody, `"token_required"`)
 }
 
 func TestBackupExportExcludesExactAndNestedCacheKeys(t *testing.T) {
@@ -171,7 +171,7 @@ func TestBackupExportExcludesExactAndNestedCacheKeys(t *testing.T) {
 func projectSettingsUpdate(value domain.Settings) domain.SettingsUpdate {
 	return domain.SettingsUpdate{
 		SchemaVersion:  value.SchemaVersion,
-		HTTP:           domain.HTTPSettingsUpdate{Listen: value.HTTP.Listen, TokenRequired: value.HTTP.TokenRequired},
+		HTTP:           value.HTTP,
 		MCP:            value.MCP,
 		WebUI:          value.WebUI,
 		Log:            value.Log,

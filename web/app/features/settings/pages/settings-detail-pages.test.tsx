@@ -28,6 +28,7 @@ describe("settings runtime page", () => {
     expect(pageHeader?.parentElement).toHaveClass("grid", "gap-6");
     expect(screen.getByRole("heading", { name: "订阅流量" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "运行默认值" })).toBeInTheDocument();
+    expect(screen.queryByText("打开订阅页时自动读取远程订阅流量。此偏好保存在服务器设置中。")).not.toBeInTheDocument();
     const automaticTraffic = screen.getByRole("switch", { name: "自动获取流量" });
     expect(automaticTraffic).not.toBeChecked();
     expect(screen.getByRole("button", { name: "返回" })).toBeInTheDocument();
@@ -73,6 +74,7 @@ describe("settings runtime page", () => {
 
     const saveRuntimeDefaults = screen.getByRole("button", { name: "保存设置" });
     expect(saveRuntimeDefaults).toHaveTextContent("保存");
+    expect(saveRuntimeDefaults.closest("footer")).toHaveClass("sticky", "bottom-14", "min-[820px]:bottom-0");
     await user.click(saveRuntimeDefaults);
 
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({

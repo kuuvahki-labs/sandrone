@@ -82,7 +82,7 @@ func WithRuntimeFactory(factory func(app.Config) (*app.Runtime, error)) Option {
 	}
 }
 
-// Execute builds and runs the production CLI against process stdio and args.
+// Execute builds and runs the production CLI against process streams and args.
 func Execute(ctx context.Context) int {
 	return ExecuteContext(ctx, os.Args[1:], os.Stdin, os.Stdout, os.Stderr)
 }

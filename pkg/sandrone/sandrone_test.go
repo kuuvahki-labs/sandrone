@@ -188,13 +188,10 @@ func TestEngineSettingsRoundTrip(t *testing.T) {
 
 	update := sandrone.SettingsUpdate{
 		SchemaVersion: defaults.Settings.SchemaVersion,
-		HTTP: domain.HTTPSettingsUpdate{
-			Listen:        defaults.Settings.HTTP.Listen,
-			TokenRequired: defaults.Settings.HTTP.TokenRequired,
-		},
-		MCP:   defaults.Settings.MCP,
-		WebUI: defaults.Settings.WebUI,
-		Log:   defaults.Settings.Log,
+		HTTP:          defaults.Settings.HTTP,
+		MCP:           defaults.Settings.MCP,
+		WebUI:         defaults.Settings.WebUI,
+		Log:           defaults.Settings.Log,
 		RemoteDefaults: sandrone.RemoteDefaults{
 			UserAgent: "Sandrone Test",
 			Proxy:     "socks5://127.0.0.1:1080",

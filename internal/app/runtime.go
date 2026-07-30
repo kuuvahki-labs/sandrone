@@ -37,13 +37,11 @@ type Config struct {
 }
 
 type HTTPConfig struct {
-	Listen        string
-	Token         string
-	TokenRequired bool
+	Listen string
+	Token  string
 }
 
 type MCPConfig struct {
-	Transport            string
 	Path                 string
 	AllowManagementTools bool
 	MaxOutputBytes       int
@@ -113,9 +111,6 @@ func Defaults(cfg Config) Config {
 	if cfg.HTTP.Listen == "" {
 		cfg.HTTP.Listen = defaults.HTTP.Listen
 	}
-	if cfg.MCP.Transport == "" {
-		cfg.MCP.Transport = defaults.MCP.Transport
-	}
 	if cfg.MCP.Path == "" {
 		cfg.MCP.Path = defaults.MCP.Path
 	}
@@ -137,17 +132,9 @@ func Validate(cfg Config) error {
 		if err != nil {
 			return domain.WrapError(domain.CodeInvalidArgument, "invalid HTTP listen address", err)
 		}
-		if !isLocalHost(host) && cfg.HTTP.Token == "" && !cfg.HTTP.TokenRequired {
+		if !isLocalHost(host) && cfg.HTTP.Token == "" {
 			return domain.NewError(domain.CodeInvalidArgument, "binding HTTP to a non-local address requires --token")
 		}
-	}
-	if cfg.HTTP.TokenRequired && cfg.HTTP.Token == "" {
-		return domain.NewError(domain.CodeInvalidArgument, "--token is required when token auth is enabled")
-	}
-	switch normalizeTransport(cfg.MCP.Transport) {
-	case "stdio", "streamable-http":
-	default:
-		return domain.NewError(domain.CodeInvalidArgument, "unsupported MCP transport "+cfg.MCP.Transport)
 	}
 	if cfg.MCP.Path != "" && !strings.HasPrefix(cfg.MCP.Path, "/") {
 		return domain.NewError(domain.CodeInvalidArgument, "MCP path must start with /")
@@ -194,17 +181,6 @@ func parseLogLevel(level string) (slog.Level, error) {
 	default:
 		return slog.LevelInfo, domain.NewError(domain.CodeInvalidArgument, "unsupported log level "+level)
 	}
-}
-
-func TokenRequired(cfg HTTPConfig) bool {
-	if cfg.TokenRequired {
-		return true
-	}
-	return cfg.Token != ""
-}
-
-func normalizeTransport(transport string) string {
-	return strings.ReplaceAll(strings.ToLower(strings.TrimSpace(transport)), "_", "-")
 }
 
 func isLocalHost(host string) bool {

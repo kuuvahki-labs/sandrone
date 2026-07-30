@@ -19,36 +19,28 @@ import (
 	projectsettings "github.com/kuuvahki-labs/sandrone/internal/settings"
 )
 
-func TestSettingsEndpointRoundTripRedactsAndPreservesToken(t *testing.T) {
+func TestSettingsEndpointRoundTripOmitsStartupAuthenticationAndMCPTransport(t *testing.T) {
 	rt := testRuntime(t, app.Config{})
 	server := httpapi.New(rt)
 
 	update := settingsUpdate()
-	token := "stored-secret"
-	update.HTTP.Token = &token
-	put := httptest.NewRecorder()
-	server.Handler().ServeHTTP(put, httptest.NewRequest(http.MethodPut, "/v1/settings", jsonBody(t, update)))
-	require.Equal(t, http.StatusOK, put.Code)
-	require.NotContains(t, put.Body.String(), token)
-	require.Contains(t, put.Body.String(), `"token_configured": true`)
-
-	update = settingsUpdate()
 	update.HTTP.Listen = "127.0.0.1:2237"
 	update.Appearance.ThemeMode = "light"
 	update.Subscriptions.AutoLoadTraffic = true
-	put = httptest.NewRecorder()
+	put := httptest.NewRecorder()
 	server.Handler().ServeHTTP(put, httptest.NewRequest(http.MethodPut, "/v1/settings", jsonBody(t, update)))
 	require.Equal(t, http.StatusOK, put.Code)
-	require.NotContains(t, put.Body.String(), token)
+	require.NotContains(t, put.Body.String(), `"token"`)
+	require.NotContains(t, put.Body.String(), `"token_required"`)
+	require.NotContains(t, put.Body.String(), `"token_configured"`)
+	require.NotContains(t, put.Body.String(), `"transport"`)
 
 	get := httptest.NewRecorder()
 	server.Handler().ServeHTTP(get, httptest.NewRequest(http.MethodGet, "/v1/settings", nil))
 	require.Equal(t, http.StatusOK, get.Code)
-	require.NotContains(t, get.Body.String(), token)
 
 	var snapshot domain.SettingsSnapshot
 	require.NoError(t, json.Unmarshal(get.Body.Bytes(), &snapshot))
-	require.True(t, snapshot.Settings.HTTP.TokenConfigured)
 	require.Equal(t, "127.0.0.1:2237", snapshot.Settings.HTTP.Listen)
 	require.Equal(t, "light", snapshot.Effective.Appearance.ThemeMode)
 	require.True(t, snapshot.Effective.Subscriptions.AutoLoadTraffic)
@@ -56,26 +48,27 @@ func TestSettingsEndpointRoundTripRedactsAndPreservesToken(t *testing.T) {
 
 	body, err := os.ReadFile(filepath.Join(rt.Config.DataDir, "settings.json"))
 	require.NoError(t, err)
-	require.Contains(t, string(body), token)
+	require.NotContains(t, string(body), `"token"`)
+	require.NotContains(t, string(body), `"transport"`)
 }
 
-func TestSettingsEndpointReplacesAndClearsToken(t *testing.T) {
+func TestSettingsEndpointRejectsRemovedStartupAuthenticationAndTransportFields(t *testing.T) {
 	rt := testRuntime(t, app.Config{})
 	server := httpapi.New(rt)
+	base, err := json.Marshal(settingsUpdate())
+	require.NoError(t, err)
 
-	update := settingsUpdate()
-	replacement := "replacement"
-	update.HTTP.Token = &replacement
-	response := httptest.NewRecorder()
-	server.Handler().ServeHTTP(response, httptest.NewRequest(http.MethodPut, "/v1/settings", jsonBody(t, update)))
-	require.Equal(t, http.StatusOK, response.Code)
-
-	clearToken := ""
-	update.HTTP.Token = &clearToken
-	response = httptest.NewRecorder()
-	server.Handler().ServeHTTP(response, httptest.NewRequest(http.MethodPut, "/v1/settings", jsonBody(t, update)))
-	require.Equal(t, http.StatusOK, response.Code)
-	require.Contains(t, response.Body.String(), `"token_configured": false`)
+	for name, body := range map[string]string{
+		"token":          strings.Replace(string(base), `"listen":"127.0.0.1:1137"`, `"listen":"127.0.0.1:1137","token":"secret"`, 1),
+		"token required": strings.Replace(string(base), `"listen":"127.0.0.1:1137"`, `"listen":"127.0.0.1:1137","token_required":true`, 1),
+		"transport":      strings.Replace(string(base), `"path":"/mcp"`, `"path":"/mcp","transport":"streamable-http"`, 1),
+	} {
+		t.Run(name, func(t *testing.T) {
+			response := httptest.NewRecorder()
+			server.Handler().ServeHTTP(response, httptest.NewRequest(http.MethodPut, "/v1/settings", strings.NewReader(body)))
+			require.Equal(t, http.StatusBadRequest, response.Code)
+		})
+	}
 }
 
 func TestSettingsEndpointRejectsUnknownFieldWithoutChangingFile(t *testing.T) {
@@ -119,14 +112,12 @@ func TestSettingsEndpointUsesActiveStartupAuthentication(t *testing.T) {
 	require.Equal(t, http.StatusUnauthorized, unauthorized.Code)
 
 	update := settingsUpdate()
-	replacement := "next-start-secret"
-	update.HTTP.Token = &replacement
 	request := httptest.NewRequest(http.MethodPut, "/v1/settings", jsonBody(t, update))
 	request.Header.Set("Authorization", "Bearer active-secret")
 	response := httptest.NewRecorder()
 	server.Handler().ServeHTTP(response, request)
 	require.Equal(t, http.StatusOK, response.Code)
-	require.Contains(t, response.Body.String(), `"http.token": "programmatic"`)
+	require.NotContains(t, response.Body.String(), `"token"`)
 
 	request = httptest.NewRequest(http.MethodGet, "/v1/settings", nil)
 	request.Header.Set("Authorization", "Bearer next-start-secret")
@@ -166,7 +157,7 @@ func settingsUpdate() domain.SettingsUpdate {
 	value := projectsettings.Default()
 	return domain.SettingsUpdate{
 		SchemaVersion:  value.SchemaVersion,
-		HTTP:           domain.HTTPSettingsUpdate{Listen: value.HTTP.Listen, TokenRequired: value.HTTP.TokenRequired},
+		HTTP:           value.HTTP,
 		MCP:            value.MCP,
 		WebUI:          value.WebUI,
 		Log:            value.Log,

@@ -11,6 +11,7 @@ import (
 )
 
 func ResolveSettings(ctx context.Context, cfg Config, repository *store.SettingsStore) (Config, error) {
+	startupToken := cfg.HTTP.Token
 	stored, err := repository.Get(ctx)
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
@@ -34,12 +35,10 @@ func ResolveSettings(ctx context.Context, cfg Config, repository *store.Settings
 	cfg.StoredSettings = stored
 	cfg.EffectiveSettings = normalized
 	cfg.HTTP = HTTPConfig{
-		Listen:        normalized.HTTP.Listen,
-		Token:         normalized.HTTP.Token,
-		TokenRequired: normalized.HTTP.TokenRequired,
+		Listen: normalized.HTTP.Listen,
+		Token:  startupToken,
 	}
 	cfg.MCP = MCPConfig{
-		Transport:            normalized.MCP.Transport,
 		Path:                 normalized.MCP.Path,
 		AllowManagementTools: normalized.MCP.AllowManagementTools,
 		MaxOutputBytes:       normalized.MCP.MaxOutputBytes,
@@ -55,15 +54,6 @@ func ResolveSettings(ctx context.Context, cfg Config, repository *store.Settings
 func applyStartupOverrides(value *domain.Settings, cfg Config, sources map[string]string) {
 	if _, ok := sources["http.listen"]; ok {
 		value.HTTP.Listen = cfg.HTTP.Listen
-	}
-	if _, ok := sources["http.token"]; ok {
-		value.HTTP.Token = cfg.HTTP.Token
-	}
-	if _, ok := sources["http.token_required"]; ok {
-		value.HTTP.TokenRequired = cfg.HTTP.TokenRequired
-	}
-	if _, ok := sources["mcp.transport"]; ok {
-		value.MCP.Transport = cfg.MCP.Transport
 	}
 	if _, ok := sources["mcp.path"]; ok {
 		value.MCP.Path = cfg.MCP.Path
@@ -94,9 +84,6 @@ func withProgrammaticOverrideSources(cfg Config) Config {
 		}
 	}
 	mark("http.listen", cfg.HTTP.Listen != "")
-	mark("http.token", cfg.HTTP.Token != "")
-	mark("http.token_required", cfg.HTTP.TokenRequired)
-	mark("mcp.transport", cfg.MCP.Transport != "")
 	mark("mcp.path", cfg.MCP.Path != "")
 	mark("mcp.allow_management_tools", cfg.MCP.AllowManagementTools)
 	mark("mcp.max_output_bytes", cfg.MCP.MaxOutputBytes != 0)

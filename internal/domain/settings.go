@@ -74,13 +74,10 @@ func (s *Settings) SpecifyCacheDefaults(value CacheDefaults) {
 }
 
 type HTTPSettings struct {
-	Listen        string `json:"listen"`
-	Token         string `json:"token"`
-	TokenRequired bool   `json:"token_required"`
+	Listen string `json:"listen"`
 }
 
 type MCPSettings struct {
-	Transport            string `json:"transport"`
 	Path                 string `json:"path"`
 	AllowManagementTools bool   `json:"allow_management_tools"`
 	MaxOutputBytes       int    `json:"max_output_bytes"`
@@ -103,15 +100,9 @@ type SubscriptionSettings struct {
 	AutoLoadTraffic bool `json:"auto_load_traffic"`
 }
 
-type HTTPSettingsUpdate struct {
-	Listen        string  `json:"listen"`
-	Token         *string `json:"token"`
-	TokenRequired bool    `json:"token_required"`
-}
-
 type SettingsUpdate struct {
 	SchemaVersion  int                  `json:"schema_version"`
-	HTTP           HTTPSettingsUpdate   `json:"http"`
+	HTTP           HTTPSettings         `json:"http"`
 	MCP            MCPSettings          `json:"mcp"`
 	WebUI          WebUISettings        `json:"webui"`
 	Log            LogSettings          `json:"log"`
@@ -122,15 +113,9 @@ type SettingsUpdate struct {
 	Subscriptions  SubscriptionSettings `json:"subscriptions"`
 }
 
-type HTTPSettingsView struct {
-	Listen          string `json:"listen"`
-	TokenConfigured bool   `json:"token_configured"`
-	TokenRequired   bool   `json:"token_required"`
-}
-
 type SettingsView struct {
 	SchemaVersion  int                  `json:"schema_version"`
-	HTTP           HTTPSettingsView     `json:"http"`
+	HTTP           HTTPSettings         `json:"http"`
 	MCP            MCPSettings          `json:"mcp"`
 	WebUI          WebUISettings        `json:"webui"`
 	Log            LogSettings          `json:"log"`
