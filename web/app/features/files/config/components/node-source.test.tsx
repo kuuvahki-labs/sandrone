@@ -32,95 +32,61 @@ const preview: ConfigNodePreviewInput = {
 };
 
 describe("config node source section", () => {
-  it("selects one subscription, loads its preview, and shows only current nodes", async () => {
+  it("loads a collapsed sanitized preview and reuses it after switching sources", async () => {
     const user = userEvent.setup();
-    const loadPreview = vi.fn<LoadSubscriptionPreview>().mockResolvedValue(preview);
+    const providerRequest = deferred<ConfigNodePreviewInput>();
+    const allPreview: ConfigNodePreviewInput = {
+      ...preview,
+      subscriptionName: "all",
+      nodes: [{
+        identity: "sha256:all",
+        after: { name: "all-node", type: "vmess", endpoint: "all.example:443" },
+      }],
+    };
+    const loadPreview = vi.fn<LoadSubscriptionPreview>((name) => (
+      name === "provider" ? providerRequest.promise : Promise.resolve(allPreview)
+    ));
     render(<NodeSourceHarness loadPreview={loadPreview} />);
 
     const section = screen.getByRole("group", { name: "节点来源" });
-    await user.click(within(section).getByRole("combobox", { name: "订阅" }));
-    await user.click(await screen.findByRole("option", { name: /provider/ }));
+    await selectSubscription(user, "provider");
+    expect(within(section).getByRole("status")).toHaveTextContent("正在加载节点");
+    expect(currentState()).toEqual({
+      status: "loading",
+      subscriptionName: "provider",
+      preview: null,
+    });
+    await act(async () => providerRequest.resolve(preview));
 
     expect(await within(section).findByText("已加载 1 个节点")).toBeInTheDocument();
     const expand = within(section).getByRole("button", { name: "展开" });
     expect(expand).toHaveTextContent("展开");
+    expect(within(section).queryByText("hk")).not.toBeInTheDocument();
     await user.click(expand);
     expect(within(section).getByText("hk")).toBeInTheDocument();
     expect(within(section).getByText("ss · hk.example:8388")).toBeInTheDocument();
     expect(within(section).queryByText("removed")).not.toBeInTheDocument();
+    expect(within(section).getByRole("button", { name: "刷新节点" })).toHaveTextContent("刷新");
     expect(currentState()).toMatchObject({
       status: "ready",
       subscriptionName: "provider",
       preview: { options: [{ name: "hk" }] },
     });
-    expect(loadPreview).toHaveBeenCalledTimes(1);
-    expect(loadPreview).toHaveBeenCalledWith("provider");
-  });
 
-  it("shows an inline error and retries without changing the selected subscription", async () => {
-    const user = userEvent.setup();
-    const loadPreview = vi.fn<LoadSubscriptionPreview>()
-      .mockRejectedValueOnce(new Error("preview offline"))
-      .mockResolvedValueOnce(preview);
-    render(<NodeSourceHarness loadPreview={loadPreview} />);
-
-    const section = screen.getByRole("group", { name: "节点来源" });
-    await user.click(within(section).getByRole("combobox", { name: "订阅" }));
-    await user.click(await screen.findByRole("option", { name: /provider/ }));
-
-    expect(await within(section).findByRole("alert")).toHaveTextContent("preview offline");
-    expect(within(section).getByRole("combobox", { name: "订阅" })).toHaveValue("provider");
-    const retry = within(section).getByRole("button", { name: "重试加载节点" });
-    expect(retry).toHaveTextContent("重试");
-    await user.click(retry);
-
-    expect(await within(section).findByText("已加载 1 个节点")).toBeInTheDocument();
-    expect(within(section).queryByRole("alert")).not.toBeInTheDocument();
-    expect(loadPreview).toHaveBeenCalledTimes(2);
-  });
-
-  it("reuses sanitized previews when switching back to a subscription", async () => {
-    const user = userEvent.setup();
-    const allPreview: ConfigNodePreviewInput = {
-      ...preview,
+    await selectSubscription(user, "all");
+    await waitFor(() => expect(currentState()).toMatchObject({
+      status: "ready",
       subscriptionName: "all",
-      nodes: [{ identity: "sha256:all", after: { name: "all-node", type: "vmess", endpoint: "all.example:443" } }],
-    };
-    const loadPreview = vi.fn<LoadSubscriptionPreview>(async (name) => name === "provider" ? preview : allPreview);
-    render(<NodeSourceHarness loadPreview={loadPreview} />);
-    const section = screen.getByRole("group", { name: "节点来源" });
-    const picker = within(section).getByRole("combobox", { name: "订阅" });
-
-    await user.click(picker);
-    await user.click(await screen.findByRole("option", { name: /provider/ }));
+      preview: { options: [{ name: "all-node" }] },
+    }));
+    await selectSubscription(user, "provider");
     expect(await within(section).findByText("已加载 1 个节点")).toBeInTheDocument();
-    await user.click(picker);
-    await user.click(await screen.findByRole("option", { name: /all/ }));
-    expect(await within(section).findByText("已加载 1 个节点")).toBeInTheDocument();
-    await user.click(picker);
-    await user.click(await screen.findByRole("option", { name: /provider/ }));
-
-    expect(await within(section).findByText("已加载 1 个节点")).toBeInTheDocument();
+    expect(currentState()).toMatchObject({
+      status: "ready",
+      subscriptionName: "provider",
+      preview: { options: [{ name: "hk" }] },
+    });
     expect(loadPreview.mock.calls.map(([name]) => name)).toEqual(["provider", "all"]);
-  });
-
-  it("shows loading state and keeps the loaded node list collapsible", async () => {
-    const user = userEvent.setup();
-    let resolvePreview: ((value: ConfigNodePreviewInput) => void) | undefined;
-    const loadPreview = vi.fn<LoadSubscriptionPreview>(() => new Promise((resolve) => { resolvePreview = resolve; }));
-    render(<NodeSourceHarness loadPreview={loadPreview} />);
-    const section = screen.getByRole("group", { name: "节点来源" });
-
-    await user.click(within(section).getByRole("combobox", { name: "订阅" }));
-    await user.click(await screen.findByRole("option", { name: /provider/ }));
-    expect(within(section).getByRole("status")).toHaveTextContent("正在加载节点");
-    await act(async () => { resolvePreview?.(preview); });
-
-    expect(await within(section).findByText("已加载 1 个节点")).toBeInTheDocument();
-    expect(within(section).queryByText("hk")).not.toBeInTheDocument();
-    await user.click(within(section).getByRole("button", { name: "展开" }));
-    expect(within(section).getByText("hk")).toBeInTheDocument();
-    expect(within(section).getByRole("button", { name: "刷新节点" })).toHaveTextContent("刷新");
   });
 
   it("shows sanitized preview warnings and candidate omissions without blocking the source", async () => {
@@ -166,113 +132,32 @@ describe("config node source section", () => {
     });
   });
 
-  it("invalidates the parent preview immediately when another source starts loading", async () => {
-    const user = userEvent.setup();
-    let resolveAll: ((value: ConfigNodePreviewInput) => void) | undefined;
-    const allPreview: ConfigNodePreviewInput = { ...preview, subscriptionName: "all" };
-    const loadPreview = vi.fn<LoadSubscriptionPreview>((name) => {
-      if (name === "provider") return Promise.resolve(preview);
-      return new Promise((resolve) => { resolveAll = resolve; });
-    });
-    render(<NodeSourceHarness loadPreview={loadPreview} />);
-
-    await selectSubscription(user, "provider");
-    await waitFor(() => expect(screen.getByTestId("preview-state")).toHaveTextContent('"status":"ready"'));
-    await selectSubscription(user, "all");
-    expect(screen.getByTestId("preview-state")).toHaveTextContent(JSON.stringify({
-      status: "loading",
-      subscriptionName: "all",
-      preview: null,
-    }));
-
-    await act(async () => resolveAll?.(allPreview));
-    expect(screen.getByTestId("preview-state")).toHaveTextContent('"subscriptionName":"all"');
-    expect(screen.getByTestId("preview-state")).toHaveTextContent('"status":"ready"');
-  });
-
-  it("invalidates the parent preview immediately during a forced refresh", async () => {
-    const user = userEvent.setup();
-    let resolveRefresh: ((value: ConfigNodePreviewInput) => void) | undefined;
-    const loadPreview = vi.fn<LoadSubscriptionPreview>()
-      .mockResolvedValueOnce(preview)
-      .mockImplementationOnce(() => new Promise((resolve) => { resolveRefresh = resolve; }));
-    render(<NodeSourceHarness loadPreview={loadPreview} />);
-    const section = screen.getByRole("group", { name: "节点来源" });
-
-    await selectSubscription(user, "provider");
-    expect(await within(section).findByText("已加载 1 个节点")).toBeInTheDocument();
-    await user.click(within(section).getByRole("button", { name: "刷新节点" }));
-    expect(screen.getByTestId("preview-state")).toHaveTextContent(JSON.stringify({
-      status: "loading",
-      subscriptionName: "provider",
-      preview: null,
-    }));
-
-    await act(async () => resolveRefresh?.(preview));
-    expect(screen.getByTestId("preview-state")).toHaveTextContent('"status":"ready"');
-    expect(loadPreview).toHaveBeenCalledTimes(2);
-  });
-
-  it("keeps a refreshed subscription loading when switching away and back", async () => {
-    const user = userEvent.setup();
-    let resolveRefresh: ((value: ConfigNodePreviewInput) => void) | undefined;
-    const refreshedPreview: ConfigNodePreviewInput = {
-      ...preview,
-      nodes: [{
-        identity: "sha256:fresh",
-        after: { name: "fresh-hk", type: "ss", endpoint: "fresh.example:8388" },
-      }],
-    };
-    const allPreview: ConfigNodePreviewInput = {
-      ...preview,
-      subscriptionName: "all",
-      nodes: [{
-        identity: "sha256:all",
-        after: { name: "all-node", type: "vmess", endpoint: "all.example:443" },
-      }],
-    };
-    const loadPreview = vi.fn<LoadSubscriptionPreview>((name) => {
-      if (name === "all") return Promise.resolve(allPreview);
-      if (loadPreview.mock.calls.filter(([calledName]) => calledName === "provider").length === 1) {
-        return Promise.resolve(preview);
-      }
-      return new Promise((resolve) => { resolveRefresh = resolve; });
-    });
-    render(<NodeSourceHarness loadPreview={loadPreview} />);
-    const section = screen.getByRole("group", { name: "节点来源" });
-
-    await selectSubscription(user, "provider");
-    expect(await within(section).findByText("已加载 1 个节点")).toBeInTheDocument();
-    await user.click(within(section).getByRole("button", { name: "刷新节点" }));
-    await selectSubscription(user, "all");
-    await waitFor(() => expect(currentState()).toMatchObject({ status: "ready", subscriptionName: "all" }));
-    await selectSubscription(user, "provider");
-
-    expect(currentState()).toEqual({
-      status: "loading",
-      subscriptionName: "provider",
-      preview: null,
-    });
-    expect(within(section).queryByText("已加载 1 个节点")).not.toBeInTheDocument();
-    expect(loadPreview.mock.calls.map(([name]) => name)).toEqual(["provider", "provider", "all"]);
-
-    await act(async () => resolveRefresh?.(refreshedPreview));
-    await waitFor(() => expect(currentState()).toMatchObject({
-      status: "ready",
-      subscriptionName: "provider",
-      preview: { options: [{ name: "fresh-hk" }] },
-    }));
-  });
-
-  it("rejects a mismatched preview identity without rendering or caching its nodes", async () => {
+  it("retries both generic errors and uncached preview identity mismatches", async () => {
     const user = userEvent.setup();
     const mismatched = { ...preview, subscriptionName: "provider" };
     const allPreview = { ...preview, subscriptionName: "all" };
     const loadPreview = vi.fn<LoadSubscriptionPreview>()
+      .mockRejectedValueOnce(new Error("preview offline"))
+      .mockResolvedValueOnce(preview)
       .mockResolvedValueOnce(mismatched)
       .mockResolvedValueOnce(allPreview);
     render(<NodeSourceHarness loadPreview={loadPreview} />);
     const section = screen.getByRole("group", { name: "节点来源" });
+
+    await selectSubscription(user, "provider");
+    expect(await within(section).findByRole("alert")).toHaveTextContent("preview offline");
+    expect(within(section).getByRole("combobox", { name: "订阅" })).toHaveValue("provider");
+    expect(currentState()).toEqual({
+      status: "error",
+      subscriptionName: "provider",
+      preview: null,
+      error: "preview offline",
+    });
+    const retryProvider = within(section).getByRole("button", { name: "重试加载节点" });
+    expect(retryProvider).toHaveTextContent("重试");
+    await user.click(retryProvider);
+    expect(await within(section).findByText("已加载 1 个节点")).toBeInTheDocument();
+    expect(within(section).queryByRole("alert")).not.toBeInTheDocument();
 
     await selectSubscription(user, "all");
     expect(await within(section).findByRole("alert"))
@@ -288,8 +173,80 @@ describe("config node source section", () => {
 
     await user.click(within(section).getByRole("button", { name: "重试加载节点" }));
     expect(await within(section).findByText("已加载 1 个节点")).toBeInTheDocument();
-    expect(loadPreview).toHaveBeenCalledTimes(2);
     expect(currentState()).toMatchObject({ status: "ready", subscriptionName: "all" });
+    expect(loadPreview.mock.calls.map(([name]) => name)).toEqual([
+      "provider",
+      "provider",
+      "all",
+      "all",
+    ]);
+  });
+
+  it("invalidates on refresh and source switches while reusing an in-flight request", async () => {
+    const user = userEvent.setup();
+    const refreshRequest = deferred<ConfigNodePreviewInput>();
+    const allRequest = deferred<ConfigNodePreviewInput>();
+    const refreshedPreview: ConfigNodePreviewInput = {
+      ...preview,
+      nodes: [{
+        identity: "sha256:fresh",
+        after: { name: "fresh-hk", type: "ss", endpoint: "fresh.example:8388" },
+      }],
+    };
+    const allPreview: ConfigNodePreviewInput = {
+      ...preview,
+      subscriptionName: "all",
+      nodes: [{
+        identity: "sha256:all",
+        after: { name: "all-node", type: "vmess", endpoint: "all.example:443" },
+      }],
+    };
+    let providerCalls = 0;
+    const loadPreview = vi.fn<LoadSubscriptionPreview>((name) => {
+      if (name === "all") return allRequest.promise;
+      providerCalls += 1;
+      if (providerCalls === 1) {
+        return Promise.resolve(preview);
+      }
+      return refreshRequest.promise;
+    });
+    render(<NodeSourceHarness loadPreview={loadPreview} />);
+    const section = screen.getByRole("group", { name: "节点来源" });
+
+    await selectSubscription(user, "provider");
+    expect(await within(section).findByText("已加载 1 个节点")).toBeInTheDocument();
+    await user.click(within(section).getByRole("button", { name: "刷新节点" }));
+    expect(currentState()).toEqual({
+      status: "loading",
+      subscriptionName: "provider",
+      preview: null,
+    });
+
+    await selectSubscription(user, "all");
+    expect(currentState()).toEqual({
+      status: "loading",
+      subscriptionName: "all",
+      preview: null,
+    });
+    await act(async () => allRequest.resolve(allPreview));
+    await waitFor(() => expect(currentState()).toMatchObject({ status: "ready", subscriptionName: "all" }));
+
+    await selectSubscription(user, "provider");
+
+    expect(currentState()).toEqual({
+      status: "loading",
+      subscriptionName: "provider",
+      preview: null,
+    });
+    expect(within(section).queryByText("已加载 1 个节点")).not.toBeInTheDocument();
+    expect(loadPreview.mock.calls.map(([name]) => name)).toEqual(["provider", "provider", "all"]);
+
+    await act(async () => refreshRequest.resolve(refreshedPreview));
+    await waitFor(() => expect(currentState()).toMatchObject({
+      status: "ready",
+      subscriptionName: "provider",
+      preview: { options: [{ name: "fresh-hk" }] },
+    }));
   });
 
   it("deduplicates the initial preview request under React Strict Mode", async () => {
@@ -300,6 +257,16 @@ describe("config node source section", () => {
     expect(loadPreview).toHaveBeenCalledTimes(1);
   });
 });
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, reject, resolve };
+}
 
 function NodeSourceHarness({ initialSelected = "", loadPreview }: { initialSelected?: string; loadPreview: LoadSubscriptionPreview }) {
   const [selected, setSelected] = useState(initialSelected);

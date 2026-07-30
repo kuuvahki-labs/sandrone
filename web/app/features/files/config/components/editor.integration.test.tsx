@@ -94,7 +94,7 @@ describe("config file workbench integration", { timeout: 20_000 }, () => {
       .toBeInTheDocument();
   });
 
-  it("projects a catalog choice into the hidden serialized output", async () => {
+  it("restores catalog state after a template round trip and reports adaptive changes", async () => {
     localStorage.setItem("sandrone.locale", "en-US");
     const user = userEvent.setup();
     const entry = {
@@ -103,15 +103,29 @@ describe("config file workbench integration", { timeout: 20_000 }, () => {
       url: "https://raw.githubusercontent.com/example/catalog/main/geosite-cn.mrs",
     } as const;
     const catalog: RuleSetCatalogResult = { items: [entry] };
+    const adapter = structuredAdapter("mihomo");
+    const options = adapter.adaptive.defaultOptions();
+    const generation = adapter.adaptive.generate(
+      ["HK-01", "香港-02"],
+      options,
+    );
+    const startingDraft = {
+      ...adapter.adaptive.merge(minimalConfig, generation).config,
+      adaptive_groups: adapter.adaptive.configFromOptions(options),
+    };
+    const onDirty = vi.fn();
     renderEditor({
+      adapter,
+      defaultValue: startingDraft,
       loadRuleSetCatalog: vi.fn().mockResolvedValue(catalog),
+      onDirty,
     });
 
     await user.click(screen.getByRole("button", { name: "Add from catalog" }));
-    const dialog = await screen.findByRole("dialog", {
+    const catalogDialog = await screen.findByRole("dialog", {
       name: "Rule set catalog",
     });
-    await user.click(within(dialog).getByRole("button", {
+    await user.click(within(catalogDialog).getByRole("button", {
       name: "Add rule set “geosite-cn”",
     }));
 
@@ -127,33 +141,33 @@ describe("config file workbench integration", { timeout: 20_000 }, () => {
       interval: 86400,
       url: entry.url,
     });
-  });
-
-  it("applies a template and restores the serialized structure on undo", async () => {
-    const user = userEvent.setup();
-    const adapter = structuredAdapter("mihomo");
-    const generation = adapter.adaptive.generate(
-      ["HK-01", "香港-02"],
-      adapter.adaptive.defaultOptions(),
-    );
-    const startingDraft = adapter.adaptive.merge(
-      minimalConfig,
-      generation,
-    ).config;
-    renderEditor({ adapter, defaultValue: startingDraft });
 
     const startingGroups = structuredClone(currentConfig().groups);
-    await user.click(screen.getByRole("radio", { name: /标准/ }));
-    const dialog = screen.getByRole("dialog", { name: "替换当前配置？" });
-    await user.click(within(dialog).getByRole("button", {
-      name: "替换当前配置",
+    const startingRuleSets = structuredClone(currentConfig().rule_sets);
+    await user.click(screen.getByRole("radio", { name: "Standard" }));
+    const templateDialog = screen.getByRole("dialog", {
+      name: "Replace current configuration?",
+    });
+    await user.click(within(templateDialog).getByRole("button", {
+      name: "Replace current configuration",
     }));
     expect(screen.queryByRole("button", {
-      name: "展开代理组 Hong Kong",
+      name: "Expand proxy group Hong Kong",
     })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "撤销" }));
+    await user.click(screen.getByRole("button", { name: "Undo" }));
     expect(currentConfig().groups).toEqual(startingGroups);
+    expect(currentConfig().rule_sets).toEqual(startingRuleSets);
+
+    onDirty.mockClear();
+    await user.click(screen.getByRole("combobox", {
+      name: "Proxy group type",
+    }));
+    await user.click(await screen.findByRole("option", {
+      name: "load-balance",
+    }));
+
+    expect(onDirty).toHaveBeenCalled();
   });
 
   it("updates hidden output and validity after a structured edit", async () => {
@@ -186,39 +200,6 @@ describe("config file workbench integration", { timeout: 20_000 }, () => {
       expect(onValidityChange).toHaveBeenLastCalledWith(false);
     });
     expect(currentConfig().rules).toEqual([]);
-  });
-
-  it("calls the explicit dirty binding for adaptive option changes", async () => {
-    const user = userEvent.setup();
-    const adapter = structuredAdapter("mihomo");
-    const options = adapter.adaptive.defaultOptions();
-    const generation = adapter.adaptive.generate(
-      ["HK-01", "香港-02"],
-      options,
-    );
-    const persistedDraft = {
-      ...adapter.adaptive.merge(minimalConfig, generation).config,
-      adaptive_groups: adapter.adaptive.configFromOptions(options),
-    };
-    const onDirty = vi.fn();
-    render(
-      <FileConfigEditor
-        adapter={adapter}
-        baseEditor={<textarea aria-label="base config" defaultValue="" />}
-        defaultValue={persistedDraft}
-        mode="edit"
-        onDirty={onDirty}
-        subscriptions={subscriptions}
-        ui={requireFileDriverUI("mihomo")}
-      />,
-    );
-
-    await user.click(screen.getByRole("combobox", { name: "代理组类型" }));
-    await user.click(await screen.findByRole("option", {
-      name: "load-balance",
-    }));
-
-    expect(onDirty).toHaveBeenCalled();
   });
 
   it("keeps an invalid persisted file shareable at the edit-page boundary", async () => {

@@ -36,7 +36,7 @@ const expectedAppEntries = [
   "core",
   "eslint-config.test.ts",
   "features",
-  "root.test.tsx",
+  "root.test.ts",
   "root.tsx",
   "routes",
   "routes.ts",

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { SubscriptionItem } from "~/features/subscriptions/model/types";
 import type { ApiClient } from "~/shared/api/client";
+import { createTranslator } from "~/shared/i18n/context";
 
 import { createSubscriptionActions } from "./create-subscription-actions";
 
@@ -17,9 +18,9 @@ describe("subscription actions", () => {
   afterEach(() => {
     vi.useRealTimers();
     if (originalClipboardDescriptor) {
-      Object.defineProperty(navigator, "clipboard", originalClipboardDescriptor);
+      Object.defineProperty(globalThis.navigator, "clipboard", originalClipboardDescriptor);
     } else {
-      Reflect.deleteProperty(navigator, "clipboard");
+      Reflect.deleteProperty(globalThis.navigator, "clipboard");
     }
     originalClipboardDescriptor = undefined;
   });
@@ -366,8 +367,8 @@ describe("subscription actions", () => {
 
   it("copies subscription URL text to the clipboard", async () => {
     const writeText = vi.fn(async (_value: string) => undefined);
-    originalClipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, "clipboard");
-    Object.defineProperty(navigator, "clipboard", {
+    originalClipboardDescriptor = Object.getOwnPropertyDescriptor(globalThis.navigator, "clipboard");
+    Object.defineProperty(globalThis.navigator, "clipboard", {
       configurable: true,
       value: { writeText },
     });
@@ -381,8 +382,8 @@ describe("subscription actions", () => {
 
   it("copies local subscription content to the clipboard", async () => {
     const writeText = vi.fn(async (_value: string) => undefined);
-    originalClipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, "clipboard");
-    Object.defineProperty(navigator, "clipboard", {
+    originalClipboardDescriptor = Object.getOwnPropertyDescriptor(globalThis.navigator, "clipboard");
+    Object.defineProperty(globalThis.navigator, "clipboard", {
       configurable: true,
       value: { writeText },
     });
@@ -416,6 +417,7 @@ function setupActions() {
       navigate,
       refreshResources,
       showNotice,
+      t: createTranslator("zh-CN"),
     }),
   };
 }

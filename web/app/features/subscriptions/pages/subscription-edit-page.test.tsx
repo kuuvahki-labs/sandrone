@@ -74,7 +74,7 @@ describe("SubscriptionEditPage", () => {
 
     expect(share).toBeDisabled();
   });
-  it("switches remote subscription edits to local content without stale remote fields", async () => {
+  it("switches remote edits across local and collection modes without stale fields", async () => {
     const user = userEvent.setup();
     const onSave = vi.fn(saveSuccess);
     render(<SubscriptionEditPage item={subscriptions[0]} onBack={noop} onSave={onSave} onShare={noop} definition={remoteSubscriptionDefinition} sources={subscriptions} />);
@@ -86,6 +86,14 @@ describe("SubscriptionEditPage", () => {
 
     expect(screen.getByRole("button", { name: "分享订阅" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "本地" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByRole("button", { name: "返回" }));
+    const dialog = screen.getByRole("dialog", { name: "放弃修改？" });
+    expect(dialog).toHaveTextContent("离开后当前编辑内容不会保存");
+    const continueEditing = within(dialog).getByRole("button", { name: "继续编辑" });
+    expect(continueEditing).toBeInTheDocument();
+    await user.click(continueEditing);
+    expect(screen.queryByRole("dialog", { name: "放弃修改？" })).not.toBeInTheDocument();
+
     const localContentInput = within(screen.getByRole("group", { name: "基本信息" })).getByRole("textbox", { name: "内容" });
     const localContentEditor = localContentInput.closest("[data-highlighted-textarea]");
     expect(localContentEditor).toHaveAttribute("data-highlighted-textarea", "text");
@@ -98,14 +106,14 @@ describe("SubscriptionEditPage", () => {
     fireEvent.change(localContentInput, { target: { value: "ss://converted" } });
     await user.click(screen.getByRole("button", { name: "保存订阅" }));
 
-    const saved = onSave.mock.calls[0]?.[0] as FormData;
-    expect(saved.get("subscription_type")).toBe("local");
-    expect(saved.get("source_input")).toBe("ss://converted");
-    expect(saved.get("user_agent")).toBeNull();
-    expect(saved.get("proxy")).toBeNull();
-    expect(saved.get("timeout_ms")).toBeNull();
-    expect(saved.getAll("subscriptions")).toEqual([]);
-    expect(JSON.parse(String(saved.get("processors")))).toEqual([
+    const savedLocal = onSave.mock.calls[0]?.[0] as FormData;
+    expect(savedLocal.get("subscription_type")).toBe("local");
+    expect(savedLocal.get("source_input")).toBe("ss://converted");
+    expect(savedLocal.get("user_agent")).toBeNull();
+    expect(savedLocal.get("proxy")).toBeNull();
+    expect(savedLocal.get("timeout_ms")).toBeNull();
+    expect(savedLocal.getAll("subscriptions")).toEqual([]);
+    expect(JSON.parse(String(savedLocal.get("processors")))).toEqual([
       { type: "quick_settings", stage: "nodes" },
       {
         name: "入口重命名",
@@ -114,11 +122,6 @@ describe("SubscriptionEditPage", () => {
         params: { mode: "prefix", value: "source-" },
       },
     ]);
-  });
-  it("switches remote subscription edits to a collection without stale source fields", async () => {
-    const user = userEvent.setup();
-    const onSave = vi.fn(saveSuccess);
-    render(<SubscriptionEditPage item={subscriptions[0]} onBack={noop} onSave={onSave} definition={remoteSubscriptionDefinition} sources={subscriptions} />);
 
     await user.click(screen.getByRole("button", { name: "组合" }));
 
@@ -131,14 +134,23 @@ describe("SubscriptionEditPage", () => {
     await user.click(warnSource);
     await user.click(screen.getByRole("button", { name: "保存订阅" }));
 
-    const saved = onSave.mock.calls[0]?.[0] as FormData;
-    expect(saved.get("subscription_type")).toBe("collection");
-    expect(saved.getAll("subscriptions")).toEqual(["warn"]);
-    expect(saved.get("source_input")).toBeNull();
-    expect(saved.get("format")).toBeNull();
-    expect(saved.get("user_agent")).toBeNull();
-    expect(saved.get("proxy")).toBeNull();
-    expect(saved.get("timeout_ms")).toBeNull();
+    const savedCollection = onSave.mock.calls[1]?.[0] as FormData;
+    expect(savedCollection.get("subscription_type")).toBe("collection");
+    expect(savedCollection.getAll("subscriptions")).toEqual(["warn"]);
+    expect(savedCollection.get("source_input")).toBeNull();
+    expect(savedCollection.get("format")).toBeNull();
+    expect(savedCollection.get("user_agent")).toBeNull();
+    expect(savedCollection.get("proxy")).toBeNull();
+    expect(savedCollection.get("timeout_ms")).toBeNull();
+    expect(JSON.parse(String(savedCollection.get("processors")))).toEqual([
+      { type: "quick_settings", stage: "nodes" },
+      {
+        name: "入口重命名",
+        type: "rename",
+        stage: "nodes",
+        params: { mode: "prefix", value: "source-" },
+      },
+    ]);
   });
   it("renders subscription editing as a segmented full page form", () => {
     render(
@@ -170,20 +182,9 @@ describe("SubscriptionEditPage", () => {
     expect(screen.getByText("处理链")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "保存订阅" })).toBeInTheDocument();
   });
-  it("confirms before leaving a dirty subscription edit page", async () => {
+  it("prefills and orders the full remote-source editing workflow", async () => {
     const user = userEvent.setup();
-    render(<SubscriptionEditPage item={subscriptions[2]} onBack={noop} onSave={saveSuccess} sources={subscriptions} />);
-
-    await user.type(screen.getByRole("textbox", { name: "描述" }), "private");
-    await user.click(screen.getByRole("button", { name: "返回" }));
-
-    const dialog = screen.getByRole("dialog", { name: "放弃修改？" });
-    expect(dialog).toHaveTextContent("离开后当前编辑内容不会保存");
-    expect(within(dialog).getByRole("button", { name: "继续编辑" })).toBeInTheDocument();
-  });
-  it("prefills source editing with full source fields", async () => {
-    const user = userEvent.setup();
-    render(<SubscriptionEditPage item={subscriptions[0]} onBack={noop} onSave={saveSuccess} definition={remoteSubscriptionDefinition} sources={subscriptions} />);
+    const { container } = render(<SubscriptionEditPage item={subscriptions[0]} onBack={noop} onSave={saveSuccess} definition={remoteSubscriptionDefinition} sources={subscriptions} />);
 
     expect(screen.getByRole("textbox", { name: "订阅地址" })).toHaveValue("https://example.com/sub");
     expect(screen.getByRole("textbox", { name: "User-Agent" })).toHaveValue("Sandrone Test");
@@ -213,9 +214,6 @@ describe("SubscriptionEditPage", () => {
     expect(screen.getByRole("combobox", { name: "重命名方式" })).toHaveTextContent("添加前缀");
     expect(screen.getByRole("textbox", { name: "内容" })).toHaveValue("source-");
     expect(screen.queryByRole("combobox", { name: /名称操作/ })).not.toBeInTheDocument();
-  });
-  it("orders source editing sections by the remote subscription workflow", () => {
-    const { container } = render(<SubscriptionEditPage item={subscriptions[0]} onBack={noop} onSave={saveSuccess} definition={remoteSubscriptionDefinition} sources={subscriptions} />);
 
     const sourceInfo = screen.getByRole("group", { name: "基本信息" });
     const processorRules = screen.getByRole("group", { name: "处理链" });

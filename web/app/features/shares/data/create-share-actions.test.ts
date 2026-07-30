@@ -11,9 +11,9 @@ describe("share actions", () => {
 
   afterEach(() => {
     if (originalClipboardDescriptor) {
-      Object.defineProperty(navigator, "clipboard", originalClipboardDescriptor);
+      Object.defineProperty(globalThis.navigator, "clipboard", originalClipboardDescriptor);
     } else {
-      Reflect.deleteProperty(navigator, "clipboard");
+      Reflect.deleteProperty(globalThis.navigator, "clipboard");
     }
     originalClipboardDescriptor = undefined;
   });
@@ -163,8 +163,8 @@ describe("share actions", () => {
 
   function installClipboardMock() {
     const writeText = vi.fn(async () => undefined);
-    originalClipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, "clipboard");
-    Object.defineProperty(navigator, "clipboard", {
+    originalClipboardDescriptor = Object.getOwnPropertyDescriptor(globalThis.navigator, "clipboard");
+    Object.defineProperty(globalThis.navigator, "clipboard", {
       configurable: true,
       value: { writeText },
     });

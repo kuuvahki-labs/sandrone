@@ -1,17 +1,67 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { saveAdminToken } from "~/shared/storage/preferences";
 
-import { ApiClient } from "./client";
+import { ApiClient, type Fetcher } from "./client";
+
+type FetchInput = Parameters<Fetcher>[0];
+type FetchOptions = NonNullable<Parameters<Fetcher>[1]>;
+type FetchBody = FetchOptions["body"];
+
+class MemoryStorage implements Storage {
+  readonly #items = new Map<string, string>();
+
+  get length(): number {
+    return this.#items.size;
+  }
+
+  clear(): void {
+    this.#items.clear();
+  }
+
+  getItem(key: string): string | null {
+    return this.#items.get(key) ?? null;
+  }
+
+  key(index: number): string | null {
+    return Array.from(this.#items.keys())[index] ?? null;
+  }
+
+  removeItem(key: string): void {
+    this.#items.delete(key);
+  }
+
+  setItem(key: string, value: string): void {
+    this.#items.set(key, value);
+  }
+}
+
+const originalLocalStorageDescriptor = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+const testStorage = new MemoryStorage();
+
+beforeAll(() => {
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: testStorage,
+  });
+});
+
+afterAll(() => {
+  if (originalLocalStorageDescriptor) {
+    Object.defineProperty(globalThis, "localStorage", originalLocalStorageDescriptor);
+  } else {
+    Reflect.deleteProperty(globalThis, "localStorage");
+  }
+});
 
 describe("ApiClient", () => {
   beforeEach(() => {
-    localStorage.clear();
+    testStorage.clear();
   });
 
   it("sends bearer auth for protected requests", async () => {
     saveAdminToken("secret");
-    const calls: RequestInit[] = [];
+    const calls: FetchOptions[] = [];
     const client = new ApiClient({
       fetcher: async (_input, init) => {
         calls.push(init ?? {});
@@ -28,7 +78,7 @@ describe("ApiClient", () => {
 
   it("omits auth for health checks", async () => {
     saveAdminToken("secret");
-    const calls: RequestInit[] = [];
+    const calls: FetchOptions[] = [];
     const client = new ApiClient({
       fetcher: async (_input, init) => {
         calls.push(init ?? {});
@@ -43,7 +93,7 @@ describe("ApiClient", () => {
 
   it("loads version information without bearer auth", async () => {
     saveAdminToken("secret");
-    const calls: Array<{ input: RequestInfo | URL; init?: RequestInit }> = [];
+    const calls: Array<{ input: FetchInput; init?: FetchOptions }> = [];
     const client = new ApiClient({
       fetcher: async (input, init) => {
         calls.push({ input, init });
@@ -118,7 +168,7 @@ describe("ApiClient", () => {
 
   it("downloads an authenticated backup as a raw blob with the server filename", async () => {
     saveAdminToken("secret");
-    const calls: Array<{ input: RequestInfo | URL; init?: RequestInit }> = [];
+    const calls: Array<{ input: FetchInput; init?: FetchOptions }> = [];
     const client = new ApiClient({
       fetcher: async (input, init) => {
         calls.push({ input, init });
@@ -158,7 +208,7 @@ describe("ApiClient", () => {
 
   it("uploads an authenticated backup as the raw ZIP blob", async () => {
     saveAdminToken("secret");
-    const calls: Array<{ input: RequestInfo | URL; init?: RequestInit }> = [];
+    const calls: Array<{ input: FetchInput; init?: FetchOptions }> = [];
     const archive = new Blob([new Uint8Array([80, 75, 3, 4])], { type: "application/zip" });
     const client = new ApiClient({
       fetcher: async (input, init) => {
@@ -237,7 +287,7 @@ describe("ApiClient", () => {
   });
 
   it("preserves the ordered subscription request flow", async () => {
-    const calls: Array<{ input: string; method: string; body?: BodyInit | null }> = [];
+    const calls: Array<{ input: string; method: string; body?: FetchBody }> = [];
     const client = new ApiClient({
       fetcher: async (input, init) => {
         calls.push({
@@ -280,7 +330,7 @@ describe("ApiClient", () => {
   });
 
   it("preserves the ordered file request flow", async () => {
-    const calls: Array<{ input: string; method: string; body?: BodyInit | null }> = [];
+    const calls: Array<{ input: string; method: string; body?: FetchBody }> = [];
     const client = new ApiClient({
       fetcher: async (input, init) => {
         calls.push({
@@ -422,7 +472,7 @@ describe("ApiClient", () => {
     await client.getSettings();
     await client.updateSettings({} as never);
 
-    const calls = fetcher.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit?]>;
+    const calls = fetcher.mock.calls as unknown as Array<[FetchInput, FetchOptions?]>;
     expect(calls.map(([input, init]) => [String(input), init?.method ?? "GET"])).toEqual([
       ["/v1/settings", "GET"],
       ["/v1/settings", "PUT"],
@@ -430,7 +480,7 @@ describe("ApiClient", () => {
   });
 
   it("requests subscription previews with encoded resource names", async () => {
-    const calls: Array<{ input: RequestInfo | URL; init?: RequestInit }> = [];
+    const calls: Array<{ input: FetchInput; init?: FetchOptions }> = [];
     const client = new ApiClient({
       fetcher: async (input, init) => {
         calls.push({ input, init });
@@ -448,7 +498,7 @@ describe("ApiClient", () => {
   });
 
   it("requests subscription traffic with refresh control", async () => {
-    const calls: Array<{ input: RequestInfo | URL; init?: RequestInit }> = [];
+    const calls: Array<{ input: FetchInput; init?: FetchOptions }> = [];
     const client = new ApiClient({
       fetcher: async (input, init) => {
         calls.push({ input, init });
@@ -466,7 +516,7 @@ describe("ApiClient", () => {
   });
 
   it("requests the complete target-specific rule-set catalog", async () => {
-    const calls: Array<{ input: RequestInfo | URL; init?: RequestInit }> = [];
+    const calls: Array<{ input: FetchInput; init?: FetchOptions }> = [];
     const client = new ApiClient({
       fetcher: async (input, init) => {
         calls.push({ input, init });
@@ -482,7 +532,7 @@ describe("ApiClient", () => {
   });
 
   it("previews saved files as JSON", async () => {
-    const calls: Array<{ input: RequestInfo | URL; init?: RequestInit }> = [];
+    const calls: Array<{ input: FetchInput; init?: FetchOptions }> = [];
     const client = new ApiClient({
       fetcher: async (input, init) => {
         calls.push({ input, init });
@@ -499,7 +549,7 @@ describe("ApiClient", () => {
   });
 
   it("loads saved file source before compilation", async () => {
-    const calls: Array<{ input: RequestInfo | URL; init?: RequestInit }> = [];
+    const calls: Array<{ input: FetchInput; init?: FetchOptions }> = [];
     const client = new ApiClient({
       fetcher: async (input, init) => {
         calls.push({ input, init });
@@ -516,7 +566,7 @@ describe("ApiClient", () => {
   });
 
   it("creates subscription shares with target format and valid range", async () => {
-    const calls: Array<{ input: RequestInfo | URL; init?: RequestInit }> = [];
+    const calls: Array<{ input: FetchInput; init?: FetchOptions }> = [];
     const client = new ApiClient({
       fetcher: async (input, init) => {
         calls.push({ input, init });
@@ -548,7 +598,7 @@ describe("ApiClient", () => {
   });
 
   it("deletes shares with DELETE", async () => {
-    const calls: Array<{ input: RequestInfo | URL; init?: RequestInit }> = [];
+    const calls: Array<{ input: FetchInput; init?: FetchOptions }> = [];
     const client = new ApiClient({
       fetcher: async (input, init) => {
         calls.push({ input, init });

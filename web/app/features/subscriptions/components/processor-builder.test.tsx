@@ -39,26 +39,36 @@ function renderProcessorBuilder({
 }
 
 describe("ProcessorBuilder", () => {
-  it("serializes all probe processor parameters from the subscription processing chain", () => {
+  it("projects persisted rename and probe processors into the complete ordered chain", async () => {
+    const user = userEvent.setup();
     const { serializedProcessors } = renderProcessorBuilder({
-      defaultValue: [{
-        type: "probe",
-        stage: "nodes",
-        params: {
-          method: "url_test",
-          core: "sing-box",
-          url: "https://www.gstatic.com/generate_204",
-          expected_status: "204",
-          timeout_ms: 5000,
-          attempts: 2,
-          concurrency: 3,
-          cache_ttl_seconds: 300,
-          annotate: true,
-          sort: "duration",
-          fail_mode: "drop",
+      defaultValue: [
+        ...(remoteSubscriptionDefinition.processors ?? []),
+        {
+          type: "probe",
+          stage: "nodes",
+          params: {
+            method: "url_test",
+            core: "sing-box",
+            url: "https://www.gstatic.com/generate_204",
+            expected_status: "204",
+            timeout_ms: 5000,
+            attempts: 2,
+            concurrency: 3,
+            cache_ttl_seconds: 300,
+            annotate: true,
+            sort: "duration",
+            fail_mode: "drop",
+          },
         },
-      }],
+      ],
     });
+
+    const renameGroup = screen.getByRole("group", { name: "处理器 入口重命名" });
+    await user.click(within(renameGroup).getByRole("button", { name: "编辑名称" }));
+    const nameInput = within(renameGroup).getByRole("textbox", { name: "名称" });
+    expect(nameInput).toHaveValue("入口重命名");
+    expect(nameInput).toHaveAttribute("placeholder", "留空使用默认名称");
 
     const probeGroup = screen.getByRole("group", { name: "处理器 测活" });
     expect(within(probeGroup).getByRole("combobox", { name: "方式" })).toHaveTextContent("url_test");
@@ -77,6 +87,12 @@ describe("ProcessorBuilder", () => {
     expect(serializedProcessors()).toEqual([
       { type: "quick_settings", stage: "nodes" },
       {
+        name: "入口重命名",
+        type: "rename",
+        stage: "nodes",
+        params: { mode: "prefix", value: "source-" },
+      },
+      {
         type: "probe",
         stage: "nodes",
         params: {
@@ -95,7 +111,8 @@ describe("ProcessorBuilder", () => {
       },
     ]);
   });
-  it("fills probe runtime defaults into inputs and serializes them", async () => {
+
+  it("adds probe defaults before the information-node filter preset", async () => {
     const user = userEvent.setup();
     const { serializedProcessors } = renderProcessorBuilder();
 
@@ -111,11 +128,6 @@ describe("ProcessorBuilder", () => {
     expect(within(probeGroup).queryByRole("textbox", { name: "NTP 服务器" })).not.toBeInTheDocument();
     const probeURL = within(probeGroup).getByRole("combobox", { name: "URL" });
     expect(probeURL).toHaveValue("http://www.gstatic.com/generate_204");
-    await user.click(probeURL);
-    await user.keyboard("{ArrowDown}");
-    await user.click(await screen.findByRole("option", {
-      name: "华为 http://connectivitycheck.platform.hicloud.com/generate_204",
-    }));
     expect(within(probeGroup).getByRole("spinbutton", { name: "超时毫秒" })).toHaveValue(5000);
     expect(within(probeGroup).getByRole("spinbutton", { name: "尝试次数" })).toHaveValue(1);
     expect(within(probeGroup).getByRole("spinbutton", { name: "并发数" })).toHaveValue(10);
@@ -130,7 +142,39 @@ describe("ProcessorBuilder", () => {
         params: {
           method: "url_test",
           core: "sing-box",
-          url: "http://connectivitycheck.platform.hicloud.com/generate_204",
+          url: "http://www.gstatic.com/generate_204",
+          timeout_ms: 5000,
+          attempts: 1,
+          concurrency: 10,
+          cache_ttl_seconds: 0,
+          fail_mode: "keep",
+        },
+      },
+    ]);
+
+    await selectMuiOption(user, screen.getByRole("combobox", { name: "类型" }), "过滤信息节点（预设）");
+    await user.click(screen.getByRole("button", { name: "添加处理器" }));
+
+    expect(serializedProcessors()).toEqual([
+      { type: "quick_settings", stage: "nodes" },
+      {
+        name: "过滤信息节点",
+        type: "filter",
+        stage: "nodes",
+        params: {
+          action: "drop",
+          field: "name",
+          match: "regex",
+          pattern: "(?i)(网址|流量|时间|应急|过期|bandwidth|expire)",
+        },
+      },
+      {
+        type: "probe",
+        stage: "nodes",
+        params: {
+          method: "url_test",
+          core: "sing-box",
+          url: "http://www.gstatic.com/generate_204",
           timeout_ms: 5000,
           attempts: 1,
           concurrency: 10,
@@ -140,35 +184,54 @@ describe("ProcessorBuilder", () => {
       },
     ]);
   });
-  it("serializes visual processor edits into the hidden form field", async () => {
+
+  it("seeds quick settings before visual filter edits and flat rename additions", async () => {
     const user = userEvent.setup();
     const onDirty = vi.fn();
     const { serializedProcessors } = renderProcessorBuilder({ onDirty });
 
-    expect(screen.getByRole("combobox", { name: "类型" })).toHaveTextContent("过滤");
+    const newType = screen.getByRole("combobox", { name: "类型" });
+    expect(newType).toHaveTextContent("过滤");
+    const addProcessor = screen.getByRole("button", { name: "添加处理器" });
+    expect(addProcessor).toHaveTextContent("添加");
+    expect(addProcessor).toHaveClass("shrink-0", "whitespace-nowrap");
+    await user.click(newType);
+    const listbox = await screen.findByRole("listbox");
+    const options = within(listbox).getAllByRole("option");
+    expect(options[0]).toHaveTextContent("过滤");
+    expect(within(listbox).queryByRole("option", { name: "排除匹配节点" })).not.toBeInTheDocument();
+    expect(within(listbox).queryByRole("option", { name: "按类型过滤" })).not.toBeInTheDocument();
+    expect(within(listbox).queryByRole("option", { name: "清理名称" })).not.toBeInTheDocument();
+    await user.click(options[0]);
+
     const quickSettingsGroup = screen.getByRole("group", { name: "处理器 快捷设置" });
     expect(within(quickSettingsGroup).getByText("处理器 1")).toBeInTheDocument();
     expect(within(quickSettingsGroup).queryByRole("textbox", { name: "名称" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "添加处理器" }));
+    expect(screen.queryByRole("combobox", { name: "第 1 个处理器类型" })).not.toBeInTheDocument();
+    expect(serializedProcessors()).toEqual([
+      { type: "quick_settings", stage: "nodes" },
+    ]);
+
+    await user.click(addProcessor);
     expect(onDirty).toHaveBeenCalled();
     expect(screen.queryByRole("combobox", { name: "第 1 个处理器阶段" })).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "第 2 个处理器类型" })).not.toBeInTheDocument();
-    const addedProcessorGroup = screen.getByRole("group", { name: "处理器 过滤" });
-    expect(within(addedProcessorGroup).getByText("处理器 2")).toBeInTheDocument();
-    await user.click(within(addedProcessorGroup).getByRole("button", { name: "编辑名称" }));
-    const addedProcessorName = within(addedProcessorGroup).getByRole("textbox", { name: "名称" });
-    expect(addedProcessorName).toHaveValue("");
-    fireEvent.change(addedProcessorName, { target: { value: "按 server 过滤" } });
-    expect(screen.getByRole("combobox", { name: "过滤动作" })).toHaveTextContent("保留");
-    await user.click(screen.getByRole("combobox", { name: "匹配字段" }));
+    const filterGroup = screen.getByRole("group", { name: "处理器 过滤" });
+    expect(within(filterGroup).getByText("处理器 2")).toBeInTheDocument();
+    await user.click(within(filterGroup).getByRole("button", { name: "编辑名称" }));
+    const filterName = within(filterGroup).getByRole("textbox", { name: "名称" });
+    expect(filterName).toHaveValue("");
+    fireEvent.change(filterName, { target: { value: "按 server 过滤" } });
+    expect(within(filterGroup).getByRole("combobox", { name: "过滤动作" })).toHaveTextContent("保留");
+    await user.click(within(filterGroup).getByRole("combobox", { name: "匹配字段" }));
     const fieldListbox = await screen.findByRole("listbox");
     expect(within(fieldListbox).getByRole("option", { name: "name" })).toBeInTheDocument();
     expect(within(fieldListbox).getByRole("option", { name: "type" })).toBeInTheDocument();
     await user.click(within(fieldListbox).getByRole("option", { name: "server" }));
     expect(screen.queryByRole("option", { name: "source_format" })).not.toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "tags" })).not.toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "匹配方式" })).toHaveTextContent("正则");
-    fireEvent.change(screen.getByRole("textbox", { name: "正则表达式" }), {
+    expect(within(filterGroup).getByRole("combobox", { name: "匹配方式" })).toHaveTextContent("正则");
+    fireEvent.change(within(filterGroup).getByRole("textbox", { name: "正则表达式" }), {
       target: { value: "example\\.com" },
     });
 
@@ -176,35 +239,22 @@ describe("ProcessorBuilder", () => {
       { type: "quick_settings", stage: "nodes" },
       { name: "按 server 过滤", type: "filter", stage: "nodes", params: { action: "keep", field: "server", match: "regex", pattern: "example\\.com" } },
     ]);
-  });
-  it("adds the optional information-node filter preset before health checks", async () => {
-    const user = userEvent.setup();
-    const { serializedProcessors } = renderProcessorBuilder({
-      defaultValue: [{
-        type: "probe",
-        stage: "nodes",
-        params: { method: "url_test", core: "sing-box" },
-      }],
-    });
 
-    await selectMuiOption(user, screen.getByRole("combobox", { name: "类型" }), "过滤信息节点（预设）");
-    await user.click(screen.getByRole("button", { name: "添加处理器" }));
+    await selectMuiOption(user, newType, "名称处理");
+    await user.click(addProcessor);
+    const renameGroup = screen.getByRole("group", { name: "处理器 名称处理" });
+    expect(within(renameGroup).getByRole("checkbox", { name: "去除首尾空白" })).toBeChecked();
+    expect(within(renameGroup).getByRole("combobox", { name: "重命名方式" })).toHaveTextContent("不重命名");
+    expect(within(renameGroup).queryByRole("combobox", { name: /名称操作/ })).not.toBeInTheDocument();
 
-    const saved = serializedProcessors();
-    expect(saved.map((processor: { type: string }) => processor.type)).toEqual(["quick_settings", "filter", "probe"]);
-    expect(saved[1]).toEqual({
-      name: "过滤信息节点",
-      type: "filter",
-      stage: "nodes",
-      params: {
-        action: "drop",
-        field: "name",
-        match: "regex",
-        pattern: "(?i)(网址|流量|时间|应急|过期|bandwidth|expire)",
-      },
-    });
+    expect(serializedProcessors()).toEqual([
+      { type: "quick_settings", stage: "nodes" },
+      { name: "按 server 过滤", type: "filter", stage: "nodes", params: { action: "keep", field: "server", match: "regex", pattern: "example\\.com" } },
+      { type: "rename", stage: "nodes", params: { trim: true } },
+    ]);
   });
-  it("uses the shared script params contract for subscription processors", async () => {
+
+  it("binds shared script and custom key-value editors into one ordered chain", async () => {
     const user = userEvent.setup();
     const { serializedProcessors } = renderProcessorBuilder({
       defaultValue: [
@@ -219,6 +269,11 @@ describe("ProcessorBuilder", () => {
             content: "return input;",
             timeout_ms: 5000,
           },
+        },
+        {
+          type: "custom",
+          stage: "nodes",
+          params: { enabled: true, threshold: 2 },
         },
       ],
       scriptFiles,
@@ -240,6 +295,12 @@ describe("ProcessorBuilder", () => {
     expect(argsInput).toHaveValue("flag=true\nin=zh");
     expect(within(scriptGroup).getByRole("spinbutton", { name: "超时毫秒" })).toHaveValue(5000);
     expect(within(scriptGroup).queryByRole("textbox", { name: "脚本 ID" })).not.toBeInTheDocument();
+
+    const customGroup = screen.getByRole("group", { name: "处理器 custom" });
+    const paramsInput = within(customGroup).getByRole("textbox", { name: "参数键值" });
+    expect(paramsInput).toHaveValue("enabled=true\nthreshold=2");
+    expect(paramsInput.closest("[data-highlighted-textarea]")).toHaveAttribute("data-highlighted-textarea", "text");
+    fireEvent.change(paramsInput, { target: { value: "enabled=false\nthreshold=3" } });
 
     await user.click(within(scriptGroup).getByRole("button", { name: "文件脚本" }));
     expect(within(scriptGroup).queryByRole("textbox", { name: "内联脚本" })).not.toBeInTheDocument();
@@ -263,94 +324,7 @@ describe("ProcessorBuilder", () => {
           timeout_ms: 5000,
         },
       },
-    ]);
-  });
-  it("uses a highlighted key-value editor for custom processor params", () => {
-    const { serializedProcessors } = renderProcessorBuilder({
-      defaultValue: [
-        {
-          type: "custom",
-          stage: "nodes",
-          params: { enabled: true, threshold: 2 },
-        },
-      ],
-    });
-
-    const customGroup = screen.getByRole("group", { name: "处理器 custom" });
-    const paramsInput = within(customGroup).getByRole("textbox", { name: "参数键值" });
-    expect(paramsInput).toHaveValue("enabled=true\nthreshold=2");
-    expect(paramsInput.closest("[data-highlighted-textarea]")).toHaveAttribute("data-highlighted-textarea", "text");
-
-    fireEvent.change(paramsInput, { target: { value: "enabled=false\nthreshold=3" } });
-
-    expect(serializedProcessors()).toEqual([
-      { type: "quick_settings", stage: "nodes" },
       { type: "custom", stage: "nodes", params: { enabled: false, threshold: 3 } },
-    ]);
-  });
-  it("opens the processor name editor with the saved name as the input value", async () => {
-    const user = userEvent.setup();
-    renderProcessorBuilder({
-      defaultValue: remoteSubscriptionDefinition.processors,
-    });
-
-    const processorGroup = screen.getByRole("group", { name: "处理器 入口重命名" });
-    await user.click(within(processorGroup).getByRole("button", { name: "编辑名称" }));
-    const nameInput = within(processorGroup).getByRole("textbox", { name: "名称" });
-
-    expect(nameInput).toHaveValue("入口重命名");
-    expect(nameInput).toHaveAttribute("placeholder", "留空使用默认名称");
-  });
-  it("seeds quick settings as the first processor before later additions", async () => {
-    const user = userEvent.setup();
-    const { serializedProcessors } = renderProcessorBuilder();
-
-    const newType = screen.getByRole("combobox", { name: "类型" });
-    expect(newType).toHaveTextContent("过滤");
-    expect(screen.getByRole("button", { name: "添加处理器" })).toHaveTextContent("添加");
-    expect(screen.getByRole("button", { name: "添加处理器" })).toHaveClass("shrink-0", "whitespace-nowrap");
-    await user.click(newType);
-    const listbox = await screen.findByRole("listbox");
-    const options = within(listbox).getAllByRole("option");
-    expect(options[0]).toHaveTextContent("过滤");
-    expect(within(listbox).queryByRole("option", { name: "排除匹配节点" })).not.toBeInTheDocument();
-    expect(within(listbox).queryByRole("option", { name: "按类型过滤" })).not.toBeInTheDocument();
-    expect(within(listbox).queryByRole("option", { name: "清理名称" })).not.toBeInTheDocument();
-    await user.click(options[0]);
-    const quickSettingsGroup = screen.getByRole("group", { name: "处理器 快捷设置" });
-    expect(within(quickSettingsGroup).getByText("处理器 1")).toBeInTheDocument();
-    expect(within(quickSettingsGroup).queryByRole("textbox", { name: "名称" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("combobox", { name: "第 1 个处理器类型" })).not.toBeInTheDocument();
-    expect(serializedProcessors()).toEqual([
-      { type: "quick_settings", stage: "nodes" },
-    ]);
-
-    await user.click(screen.getByRole("button", { name: "添加处理器" }));
-
-    const addedProcessorGroup = screen.getByRole("group", { name: "处理器 过滤" });
-    expect(within(addedProcessorGroup).getByText("处理器 2")).toBeInTheDocument();
-    await user.click(within(addedProcessorGroup).getByRole("button", { name: "编辑名称" }));
-    expect(within(addedProcessorGroup).getByRole("textbox", { name: "名称" })).toHaveValue("");
-    expect(screen.queryByRole("combobox", { name: "第 2 个处理器类型" })).not.toBeInTheDocument();
-    expect(serializedProcessors()).toEqual([
-      { type: "quick_settings", stage: "nodes" },
-      { type: "filter", stage: "nodes", params: { action: "keep", field: "name", match: "regex" } },
-    ]);
-  });
-  it("serializes added name processing as flat params", async () => {
-    const user = userEvent.setup();
-    const { serializedProcessors } = renderProcessorBuilder();
-
-    await selectMuiOption(user, screen.getByRole("combobox", { name: "类型" }), "名称处理");
-    await user.click(screen.getByRole("button", { name: "添加处理器" }));
-
-    const addedProcessorGroup = screen.getByRole("group", { name: "处理器 名称处理" });
-    expect(within(addedProcessorGroup).getByRole("checkbox", { name: "去除首尾空白" })).toBeChecked();
-    expect(within(addedProcessorGroup).getByRole("combobox", { name: "重命名方式" })).toHaveTextContent("不重命名");
-    expect(within(addedProcessorGroup).queryByRole("combobox", { name: /名称操作/ })).not.toBeInTheDocument();
-    expect(serializedProcessors()).toEqual([
-      { type: "quick_settings", stage: "nodes" },
-      { type: "rename", stage: "nodes", params: { trim: true } },
     ]);
   });
 });

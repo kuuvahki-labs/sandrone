@@ -3,6 +3,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vitest/config";
 
 const backendTarget = process.env.SANDRONE_DEV_API_TARGET || "http://127.0.0.1:1137";
+const muiOptimizerInclude = Object.freeze(["@mui/material/**"]);
 
 export default defineConfig({
   plugins: [tailwindcss(), !process.env.VITEST && reactRouter()],
@@ -44,6 +45,9 @@ export default defineConfig({
     isolate: true,
     maxWorkers: 4,
     testTimeout: 15_000,
+    experimental: {
+      fsModuleCache: true,
+    },
     projects: [
       {
         extends: true,
@@ -52,6 +56,14 @@ export default defineConfig({
           environment: "node",
           include: ["app/**/*.test.ts"],
           exclude: ["app/**/*.dom.test.ts"],
+          deps: {
+            optimizer: {
+              ssr: {
+                enabled: true,
+                include: [...muiOptimizerInclude],
+              },
+            },
+          },
         },
       },
       {
@@ -61,6 +73,14 @@ export default defineConfig({
           environment: "jsdom",
           include: ["app/**/*.test.tsx", "app/**/*.dom.test.ts"],
           setupFiles: ["./app/test/setup.ts"],
+          deps: {
+            optimizer: {
+              client: {
+                enabled: true,
+                include: [...muiOptimizerInclude],
+              },
+            },
+          },
         },
       },
     ],

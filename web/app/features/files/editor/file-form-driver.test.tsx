@@ -3,85 +3,21 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { FileConfigEditor } from "~/features/files/config/components/editor";
+import type { FileDriverDefinition } from "~/features/files/drivers/core/file-driver";
 import { requireFileDriver } from "~/features/files/drivers/registry";
 import { requireFileDriverUI } from "~/features/files/editor/file-driver-ui-registry";
 
-import { FileFormFields } from "./file-form";
+import { FileFormFields, FileKindConfigWorkbench } from "./file-form";
 import { FileTypeSummary } from "./file-type-summary";
 import { RawFileConfigEditor } from "./raw-config-editor";
+import { FileSourceEditor } from "./source-editor";
 
 afterEach(() => {
   localStorage.removeItem("sandrone.locale");
+  vi.restoreAllMocks();
 });
 
 describe("file form drivers", () => {
-  it("serializes structured settings in the new orchestration envelope and keeps empty arrays", () => {
-    render(<FileConfigEditor
-      adapter={structuredAdapter("mihomo")}
-      baseEditor={<div />}
-      defaultValue={{ subscriptions: ["provider"], settingsMode: "structured", groups: [], rule_sets: [], rules: [] }}
-      mode="edit"
-      subscriptions={[]}
-      ui={requireFileDriverUI("mihomo")}
-    />);
-
-    expect(currentConfig()).toEqual({
-      subscriptions: ["provider"],
-		settings: { groups: [], rule_sets: [], rules: [] },
-    });
-    expect(currentConfig()).not.toHaveProperty("group_preset");
-    expect(currentConfig()).not.toHaveProperty("ruleset_preset");
-  });
-
-  it("submits an advanced native group without rewriting its wire settings", () => {
-    const adapter = structuredAdapter("mihomo");
-    const settings = {
-      groups: [{ name: "Provider", type: "select", use: ["airport"] }],
-      rule_sets: [],
-      rules: [],
-    };
-    const defaultValue = adapter.decode({ settingsPresent: true, settings }, "en-US");
-
-    render(<FileConfigEditor
-      adapter={adapter}
-      baseEditor={<div />}
-      defaultValue={defaultValue}
-      mode="edit"
-      subscriptions={[]}
-      ui={requireFileDriverUI("mihomo")}
-    />);
-
-    expect(currentConfig()).toEqual({ settings });
-  });
-
-  it.each(["mihomo", "shadowrocket"])("normalizes %s adaptive settings only after an option changes", async (kind) => {
-    localStorage.setItem("sandrone.locale", "en-US");
-    const user = userEvent.setup();
-    const adapter = structuredAdapter(kind);
-    const settings = { adaptive_groups: { regions: ["us", "hk"] } };
-
-    render(<FileConfigEditor
-      adapter={adapter}
-      baseEditor={<div />}
-      defaultValue={adapter.decode({ settingsPresent: true, settings }, "en-US")}
-      mode="edit"
-      subscriptions={[]}
-      ui={requireFileDriverUI(kind)}
-    />);
-
-    await user.click(screen.getByRole("combobox", { name: "Proxy group type" }));
-    await user.click(await screen.findByRole("option", { name: "load-balance" }));
-
-    expect(currentConfig()).toEqual({
-      settings: {
-        adaptive_groups: {
-          type: "load-balance",
-          regions: ["hk", "us"],
-        },
-      },
-    });
-  });
-
   it("round-trips raw settings until replacement is explicitly confirmed", async () => {
     const user = userEvent.setup();
     vi.spyOn(window, "confirm").mockReturnValue(false);
@@ -110,55 +46,6 @@ describe("file form drivers", () => {
 
     expect(screen.getByRole("heading", { name: "Configuration content" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Base configuration content" })).toBeInTheDocument();
-  });
-
-  it("keeps omitted Shadowrocket sections absent until that section is edited", async () => {
-    localStorage.setItem("sandrone.locale", "en-US");
-    const user = userEvent.setup();
-    render(<FileConfigEditor
-      adapter={structuredAdapter("shadowrocket")}
-      baseEditor={<div />}
-      defaultValue={{ settingsMode: "structured" }}
-      mode="edit"
-      subscriptions={[]}
-      ui={requireFileDriverUI("shadowrocket")}
-    />);
-
-    expect(currentConfig()).toEqual({ settings: {} });
-
-    const groups = screen.getByRole("group", { name: "Proxy groups" });
-    expect(within(groups).getAllByRole("button", { name: /^Expand proxy group/ })).toHaveLength(1);
-    await user.click(within(groups).getByRole("button", { name: "Expand proxy group Proxy" }));
-    fireEvent.change(within(groups).getByRole("textbox", { name: "Name" }), { target: { value: "Manual" } });
-    expect(currentSettings().groups).toEqual(expect.arrayContaining([expect.objectContaining({ name: "Manual" })]));
-    expect(currentSettings()).not.toHaveProperty("rule_sets");
-    expect(currentSettings()).not.toHaveProperty("rules");
-
-    await user.click(within(screen.getByRole("group", { name: "Rule sets" })).getByRole("button", { name: "Add rule set" }));
-    expect(currentSettings()).toMatchObject({ rule_sets: [expect.objectContaining({ name: "custom" })] });
-    expect(currentSettings()).not.toHaveProperty("rules");
-
-    const rules = screen.getByRole("group", { name: "Rules" });
-    await user.click(within(rules).getByRole("button", { name: /^Rules/ }));
-    await user.click(within(rules).getByRole("button", { name: "Add rule" }));
-    expect(currentSettings()).toHaveProperty("rules");
-  });
-
-  it("preserves multiple subscriptions and marks the form invalid", async () => {
-    const onValidityChange = vi.fn();
-    render(<FileConfigEditor
-      adapter={structuredAdapter("mihomo")}
-      baseEditor={<div />}
-      defaultValue={{ subscriptions: ["one", "two"], settingsMode: "structured" }}
-      mode="edit"
-      onValidityChange={onValidityChange}
-      subscriptions={[]}
-      ui={requireFileDriverUI("mihomo")}
-    />);
-
-    await waitFor(() => expect(onValidityChange).toHaveBeenLastCalledWith(false));
-    expect(screen.getByText(/one, two/)).toHaveTextContent(/collection subscription|集合订阅/i);
-    expect(currentConfig().subscriptions).toEqual(["one", "two"]);
   });
 
   it.each([
@@ -237,14 +124,144 @@ describe("file form drivers", () => {
 
 });
 
+describe("FileSourceEditor", () => {
+  it("serializes remote metadata and removes it when switching to inline content", async () => {
+    const user = userEvent.setup();
+    render(
+      <FileSourceEditor
+        defaultValue={{
+          type: "remote",
+          remote: {
+            url: "https://example.com/config.yaml",
+            user_agent: "Sandrone Tests",
+            proxy: "http://127.0.0.1:7890",
+            timeout_ms: 2500,
+            cache_ttl_seconds: 45,
+          },
+        }}
+      />,
+    );
+
+    expect(currentSource()).toEqual({
+      type: "remote",
+      remote: {
+        url: "https://example.com/config.yaml",
+        user_agent: "Sandrone Tests",
+        proxy: "http://127.0.0.1:7890",
+        timeout_ms: 2500,
+        cache_ttl_seconds: 45,
+      },
+    });
+
+    await user.click(screen.getByRole("button", { name: "本地" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "内容" }), { target: { value: "port: 7890" } });
+
+    expect(currentSource()).toEqual({ type: "inline", content: "port: 7890" });
+  });
+
+  it("shows the driver base for an implicit source while preserving the empty source object", () => {
+    render(
+      <FileSourceEditor
+        defaultValue={{}}
+        inlineFallback="mixed-port: 7890"
+        preserveImplicit
+      />,
+    );
+
+    expect(screen.getByRole("textbox", { name: "内容" })).toHaveValue("mixed-port: 7890");
+    expect(currentSource()).toEqual({});
+  });
+
+  it("keeps explicit empty remote content when switching to inline", async () => {
+    const user = userEvent.setup();
+    render(
+      <FileSourceEditor
+        defaultValue={{
+          type: "remote",
+          content: "",
+          remote: { url: "https://example.com/empty.yaml" },
+        }}
+        inlineFallback="default: true\n"
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "本地" }));
+
+    expect(screen.getByRole("textbox", { name: "内容" })).toHaveValue("");
+    expect(currentSource()).toEqual({ type: "inline", content: "" });
+  });
+});
+
+describe("raw-only file kind workbench", () => {
+  it("edits a third kind through the generic raw settings path without a structured adapter", () => {
+    const onValidityChange = vi.fn();
+    render(
+      <FileKindConfigWorkbench
+        baseEditor={<div>future base</div>}
+        configDefault={{ subscriptions: ["provider"], settingsPresent: true, settings: { future: true } }}
+        createNamingLocale="en-US"
+        mode="edit"
+        driver={rawOnlyDriver}
+        subscriptions={[{ name: "provider", title: "provider" }]}
+        onValidityChange={onValidityChange}
+      />,
+    );
+
+    const settings = screen.getByRole("textbox", { name: /raw settings|原始 settings/i });
+    expect(settings).toHaveValue(JSON.stringify({ future: true }, null, 2));
+    expect(currentConfig()).toEqual({ subscriptions: ["provider"], settings: { future: true } });
+
+    fireEvent.change(settings, { target: { value: "{invalid" } });
+    expect(onValidityChange).toHaveBeenLastCalledWith(false);
+    fireEvent.change(settings, { target: { value: "{\"future\":false}" } });
+    expect(currentConfig()).toEqual({ subscriptions: ["provider"], settings: { future: false } });
+    expect(onValidityChange).toHaveBeenLastCalledWith(true);
+  });
+
+  it("preserves an omitted settings member until the raw editor changes it", () => {
+    render(
+      <FileKindConfigWorkbench
+        baseEditor={<div />}
+        configDefault={{ subscriptions: ["provider"], settingsPresent: false }}
+        createNamingLocale="en-US"
+        mode="edit"
+        driver={rawOnlyDriver}
+        subscriptions={[{ name: "provider", title: "provider" }]}
+      />,
+    );
+
+    expect(currentConfig()).toEqual({ subscriptions: ["provider"] });
+    fireEvent.change(screen.getByRole("textbox", { name: /raw settings|原始 settings/i }), {
+      target: { value: "{\"future\":true}" },
+    });
+    expect(currentConfig()).toEqual({ subscriptions: ["provider"], settings: { future: true } });
+  });
+});
+
+const rawOnlyDriver: FileDriverDefinition = {
+  kind: "future-client",
+  presentation: { labelKey: "files.kind.static", icon: "file" },
+  configuration: { mode: "raw" },
+  createPresets: [{ kind: "future-client", source: "future-client", sourceType: "inline", order: 100, initialName: "future.json" }],
+  source: {
+    defaultBase: () => "{}",
+    basePlaceholder: "{}",
+    remoteURLPlaceholder: "https://example.com/future.json",
+    syntax: "json",
+    strategy: "optional-base",
+    validate: () => null,
+  },
+  processors: {
+    defaults: () => [],
+    mergeModes: ["json_overlay", "json_override"],
+    validate: () => [],
+  },
+};
+
 function currentConfig(): Record<string, unknown> {
   const input = document.querySelector<HTMLInputElement>('input[name="config"]');
   if (!input) throw new Error("expected config input");
   return JSON.parse(input.value) as Record<string, unknown>;
-}
-
-function currentSettings(): Record<string, unknown> {
-  return currentConfig().settings as Record<string, unknown>;
 }
 
 function currentSource(): Record<string, unknown> {
