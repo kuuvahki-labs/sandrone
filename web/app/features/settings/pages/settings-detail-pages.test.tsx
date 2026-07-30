@@ -15,7 +15,7 @@ describe("settings runtime page", () => {
 
     render(
       <SettingsRuntimePage
-        overrides={{}}
+        overrides={{ "http.listen": "environment" }}
         restartRequired={[]}
         settings={defaultProjectSettings}
         onBack={onBack}
@@ -23,19 +23,19 @@ describe("settings runtime page", () => {
       />,
     );
 
-    const pageHeader = screen.getByRole("heading", { name: "高级设置", level: 2 }).closest("header");
-    expect(pageHeader).toHaveClass("MuiPaper-root", "MuiPaper-outlined");
-    expect(pageHeader?.parentElement).toHaveClass("grid", "gap-6");
     expect(screen.getByRole("heading", { name: "订阅流量" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "运行默认值" })).toBeInTheDocument();
-    expect(screen.queryByText("打开订阅页时自动读取远程订阅流量。此偏好保存在服务器设置中。")).not.toBeInTheDocument();
     const automaticTraffic = screen.getByRole("switch", { name: "自动获取流量" });
     expect(automaticTraffic).not.toBeChecked();
-    expect(screen.getByRole("button", { name: "返回" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "远程请求" })).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByRole("button", { name: "缓存" })).toHaveAttribute("aria-expanded", "false");
     expect(screen.getByRole("button", { name: "测活" })).toHaveAttribute("aria-expanded", "false");
 
+    expect(screen.getByRole("textbox", { name: "监听地址" })).toHaveValue("127.0.0.1:1137");
+    expect(screen.getByText("当前由 environment 覆盖")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("textbox", { name: "MCP 路径" }), {
+      target: { value: "/agent" },
+    });
     await user.click(automaticTraffic);
     const remoteGroup = screen.getByRole("region", { name: "远程请求" });
     fireEvent.change(within(remoteGroup).getByRole("textbox", { name: "User-Agent" }), {
@@ -60,7 +60,6 @@ describe("settings runtime page", () => {
     await user.click(screen.getByRole("button", { name: "测活" }));
     const probeGroup = screen.getByRole("region", { name: "测活" });
     expect(within(probeGroup).getAllByRole("combobox")).toHaveLength(2);
-    expect(probeGroup).not.toHaveTextContent(/sing-box|mihomo/);
     expect(within(probeGroup).getByRole("combobox", { name: "默认测活方式" })).toHaveTextContent("url_test");
     const probeURL = within(probeGroup).getByRole("combobox", { name: "URL" });
     await user.click(probeURL);
@@ -73,8 +72,6 @@ describe("settings runtime page", () => {
     });
 
     const saveRuntimeDefaults = screen.getByRole("button", { name: "保存设置" });
-    expect(saveRuntimeDefaults).toHaveTextContent("保存");
-    expect(saveRuntimeDefaults.closest("footer")).toHaveClass("sticky", "bottom-14", "min-[820px]:bottom-0");
     await user.click(saveRuntimeDefaults);
 
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
@@ -93,6 +90,7 @@ describe("settings runtime page", () => {
         subscription_render_ttl_seconds: 180,
         file_render_ttl_seconds: 240,
       }),
+      mcp: expect.objectContaining({ path: "/agent" }),
       subscriptions: { auto_load_traffic: true },
     }));
 
@@ -102,27 +100,11 @@ describe("settings runtime page", () => {
 });
 
 describe("settings data page", () => {
-  it("shows the focused heading and plaintext warning and returns", async () => {
-    const user = userEvent.setup();
-    const onBack = vi.fn();
-
-    renderDataPage({ onBack });
-
-    const pageHeader = screen.getByRole("heading", { name: "数据管理" }).closest("header");
-    expect(pageHeader).toHaveClass("MuiPaper-root", "MuiPaper-outlined");
-    expect(pageHeader?.parentElement).toHaveClass("grid", "gap-6");
-    expect(screen.getByRole("note")).toHaveTextContent("备份是未加密的明文");
-    await user.click(screen.getByRole("button", { name: "返回" }));
-
-    expect(onBack).toHaveBeenCalledTimes(1);
-  });
-
   it("shows the selected ZIP", async () => {
     const user = userEvent.setup();
     renderDataPage();
 
     const input = screen.getByLabelText("选择备份 ZIP 文件");
-    expect(input).toHaveClass("sr-only");
     expect(input).toHaveAttribute("accept", ".zip,application/zip");
     await user.upload(input, backupFile());
 

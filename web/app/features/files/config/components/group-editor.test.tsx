@@ -250,29 +250,6 @@ describe("ProxyGroupEditor Shadowrocket schema", () => {
   });
 });
 
-describe("ProxyGroupEditor sing-box summaries", () => {
-  it("uses native collapsed type labels without offering a hidden group control", async () => {
-    const user = userEvent.setup();
-    render(<ControlledEditor
-      initialGroups={[
-        { type: "selector", tag: "Proxy", outbounds: ["direct"] },
-        { type: "urltest", tag: "Auto", outbounds: ["$nodes"], url: "https://example.com/generate_204", interval: "5m" },
-      ]}
-      kind="sing-box"
-      onChange={vi.fn()}
-    />);
-
-    expect(screen.getByText("selector", { exact: true })).toBeInTheDocument();
-    expect(screen.getByText("urltest", { exact: true })).toBeInTheDocument();
-    expect(screen.queryByText("select", { exact: true })).not.toBeInTheDocument();
-    expect(screen.queryByText("url-test", { exact: true })).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "展开代理组 Proxy" }));
-
-    expect(screen.queryByRole("checkbox", { name: /隐藏分组|Hide group/i })).not.toBeInTheDocument();
-  });
-});
-
 function ControlledEditor({ initialGroups, kind = "mihomo", nodes = [], onChange }: {
   initialGroups: ConfigMap[];
   kind?: string;

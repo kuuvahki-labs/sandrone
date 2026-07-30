@@ -7,17 +7,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { loadThemePreference, saveThemePreference } from "~/shared/storage/preferences";
 
-import { appTheme, MuiProvider } from "./material-ui";
+import { MuiProvider } from "./material-ui";
 
 function ThemeModeProbe() {
   const { mode } = useColorScheme();
   return <output aria-label="resolved theme mode">{mode ?? "unset"}</output>;
 }
-
-const themeWithSchemes = appTheme as typeof appTheme & {
-  colorSchemes: Record<"dark" | "light", { palette: { background: { default: string }; primary: { main: string } } }>;
-  cssVarPrefix: string;
-};
 
 describe("MUI theme provider", () => {
   afterEach(() => {
@@ -76,19 +71,6 @@ describe("MUI theme provider", () => {
 
     await waitFor(() => expect(screen.getByLabelText("resolved theme mode")).toHaveTextContent("system"));
     expect(document.documentElement).toHaveAttribute("data-mui-color-scheme", "dark");
-  });
-
-  it("uses MUI Material Design 2 defaults instead of custom M3 component styling", () => {
-    expect(themeWithSchemes.cssVarPrefix).toBe("mui");
-    expect(themeWithSchemes.colorSchemes.dark.palette.primary.main).toBe("#90caf9");
-    expect(themeWithSchemes.colorSchemes.light.palette.primary.main).toBe("#1976d2");
-    expect(themeWithSchemes.colorSchemes.dark.palette.background.default).toBe("#121212");
-    expect(themeWithSchemes.colorSchemes.light.palette.background.default).toBe("#fff");
-    expect(appTheme.shape.borderRadius).toBe(4);
-    expect(appTheme.components?.MuiButton?.styleOverrides).toBeUndefined();
-    expect(appTheme.components?.MuiDialog?.styleOverrides).toBeUndefined();
-    expect(appTheme.components?.MuiFab?.styleOverrides).toBeUndefined();
-    expect(appTheme.components?.MuiBottomNavigationAction?.styleOverrides).toBeUndefined();
   });
 
   it("routes MUI link and button hrefs through semantic React Router links", () => {

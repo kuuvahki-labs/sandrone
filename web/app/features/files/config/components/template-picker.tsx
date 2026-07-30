@@ -1,7 +1,6 @@
 import { type ReactNode, useId, useState } from "react";
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
-import Chip from "@mui/material/Chip";
 import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
@@ -26,7 +25,6 @@ export interface ConfigTemplatePickerCopy {
   cancel: string;
   confirm: string;
   confirmAccessibleLabel: string;
-  customized: string;
   dialogDescription: string;
   dialogTitle: string;
   groups: (count: number) => string;
@@ -40,7 +38,6 @@ export interface ConfigTemplatePickerProps {
   confirmBeforeApply?: boolean;
   copy?: Partial<ConfigTemplatePickerCopy>;
   currentTemplateId?: string;
-  customized?: boolean;
   labelledBy?: string;
   onRequestApply: (choice: ConfigTemplateChoice) => void;
 }
@@ -63,7 +60,6 @@ const defaultCopy: ConfigTemplatePickerCopy = {
   cancel: "Cancel",
   confirm: "Replace",
   confirmAccessibleLabel: "Replace configuration",
-  customized: "Customized",
   dialogDescription: "This replaces the current groups, rule sets, and rules with:",
   dialogTitle: "Replace configuration?",
   groups: (count) => `${count} ${count === 1 ? "group" : "groups"}`,
@@ -77,14 +73,12 @@ export function ConfigTemplatePicker({
   confirmBeforeApply = false,
   copy,
   currentTemplateId,
-  customized = false,
   labelledBy,
   onRequestApply,
 }: ConfigTemplatePickerProps) {
   const [pendingChoice, setPendingChoice] = useState<ConfigTemplateChoice | null>(null);
   const labelId = useId();
   const choiceIdPrefix = useId();
-  const customizedId = useId();
   const resolvedCopy = { ...defaultCopy, ...copy };
 
   function requestSelection(choiceId: string) {
@@ -108,16 +102,10 @@ export function ConfigTemplatePicker({
   return (
     <>
       <FormControl className="min-w-0" component="fieldset" fullWidth>
-        {!labelledBy || customized ? (
-          <span className="flex min-w-0 items-center gap-2">
-            {!labelledBy ? <FormLabel className="min-w-0" id={labelId}>
-              {resolvedCopy.label}
-            </FormLabel> : null}
-            {customized ? <Chip color="warning" id={customizedId} label={resolvedCopy.customized} size="small" variant="outlined" /> : null}
-          </span>
-        ) : null}
+        {!labelledBy ? <FormLabel className="min-w-0" id={labelId}>
+          {resolvedCopy.label}
+        </FormLabel> : null}
         <RadioGroup
-          aria-describedby={customized ? customizedId : undefined}
           aria-labelledby={labelledBy ?? labelId}
           className={`${labelledBy ? "" : "mt-2 "}grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-3`}
           value={currentTemplateId ?? ""}

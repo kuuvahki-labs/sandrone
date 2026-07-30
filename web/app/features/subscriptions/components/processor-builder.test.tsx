@@ -194,7 +194,6 @@ describe("ProcessorBuilder", () => {
     expect(newType).toHaveTextContent("过滤");
     const addProcessor = screen.getByRole("button", { name: "添加处理器" });
     expect(addProcessor).toHaveTextContent("添加");
-    expect(addProcessor).toHaveClass("shrink-0", "whitespace-nowrap");
     await user.click(newType);
     const listbox = await screen.findByRole("listbox");
     const options = within(listbox).getAllByRole("option");

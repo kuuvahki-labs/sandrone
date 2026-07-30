@@ -164,9 +164,11 @@ export function FileConfigEditor({ adapter, baseEditor, createNamingLocale = "en
   const adaptiveDisabledReason = adaptiveDisabledReasonKey
     ? t(adaptiveDisabledReasonKey)
     : undefined;
-  const templateSummary = recognizedTemplate && recognition.adaptive
-    ? t("files.config.templateWithAdaptive", { template: copy.templateNames[recognizedTemplate] })
-    : undefined;
+  const templateSummary = recognition.match === "custom"
+    ? copy.customized
+    : recognizedTemplate && recognition.adaptive
+      ? t("files.config.templateWithAdaptive", { template: copy.templateNames[recognizedTemplate] })
+      : undefined;
   const templatePickerCopy = recognition.adaptive
     ? { ...copy.templatePicker, dialogDescription: t("files.config.templateApplyAdaptiveDescription") }
     : copy.templatePicker;
@@ -237,7 +239,6 @@ export function FileConfigEditor({ adapter, baseEditor, createNamingLocale = "en
             confirmBeforeApply={formMode === "edit" || recognition.adaptive}
             copy={templatePickerCopy}
             currentTemplateId={recognizedTemplate ?? undefined}
-            customized={recognition.match === "custom"}
             labelledBy="config-templates-header"
             onRequestApply={applyTemplate}
           />
@@ -358,7 +359,6 @@ function workbenchCopy(t: Translator) {
     cancel: t("actions.cancel"),
     confirm: t("actions.replace"),
     confirmAccessibleLabel: t("files.config.templateApplyConfirm"),
-    customized: t("files.config.templateCustomized"),
     dialogDescription: t("files.config.templateApplyDescription"),
     dialogTitle: t("files.config.templateApplyTitle"),
     groups: (count) => t("files.config.templateCountGroups", { count }),

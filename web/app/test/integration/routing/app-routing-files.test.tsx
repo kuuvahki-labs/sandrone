@@ -249,16 +249,4 @@ describe("React Router app file workflows", () => {
     expect(screen.queryByRole("heading", { name: "编辑文件" })).not.toBeInTheDocument();
   });
 
-  it("labels the file definition loading state without repeating its context", async () => {
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const resourceResponse = resourceListResponse(String(input), resources, init);
-      if (resourceResponse) return resourceResponse;
-      return new Promise<Response>(() => undefined);
-    }));
-
-    renderApp("/files/default.yaml/edit");
-
-    expect(await screen.findByRole("heading", { name: "正在读取文件定义" })).toBeInTheDocument();
-  });
-
 });

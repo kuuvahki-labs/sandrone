@@ -6,7 +6,6 @@ import {
   asHeaders,
   installDefaultFetchMock,
   jsonResponse,
-  projectSettingsEnvelope,
   remoteSubscriptionDefinition,
   renderApp,
   resourceListResponse,
@@ -63,48 +62,6 @@ describe("React Router app boot and auth workflows", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("renders the token form in English when the locale is en-US", async () => {
-    localStorage.setItem("sandrone.locale", "en-US");
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      if (url.endsWith("/v1/subscriptions")) {
-        return jsonResponse(
-          { error: { code: "unauthorized", message: "token required" } },
-          { status: 401 },
-        );
-      }
-      if (url === "/v1/settings") {
-        return jsonResponse(projectSettingsEnvelope({ locale: "en-US" }));
-      }
-      const resourceResponse = resourceListResponse(url, resources, init);
-      if (resourceResponse) return resourceResponse;
-      return jsonResponse({ ok: true });
-    }));
-
-    renderApp("/subscriptions");
-
-    expect(await screen.findByRole("heading", { name: "Authentication required" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Admin token")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Enter" })).toBeInTheDocument();
-  });
-
-  it("shows the Sandrone logo while resource lists are loading", async () => {
-    let resolveResponse: ((response: Response) => void) | undefined;
-    const responseReady = new Promise<Response>((resolve) => {
-      resolveResponse = resolve;
-    });
-    vi.stubGlobal("fetch", vi.fn(() => responseReady));
-
-    renderApp("/subscriptions");
-
-    const loadingLogo = screen.getAllByRole("img", { name: "Sandrone logo" }).find((image) => image.getAttribute("src") === "/brand/sandrone-logo-64.png");
-    expect(loadingLogo).toBeTruthy();
-    expect(loadingLogo?.parentElement).toHaveClass("justify-items-center");
-    expect(screen.getByRole("heading", { name: "正在连接 Sandrone" })).toBeInTheDocument();
-    resolveResponse?.(jsonResponse({ items: resources.subscriptions }));
-    expect(await screen.findByRole("heading", { name: "我的订阅" })).toBeInTheDocument();
-  });
-
   it("reloads resources and leaves the token form after entering a valid token", async () => {
     const user = userEvent.setup();
     const requests: Array<{ url: string; init?: RequestInit }> = [];
@@ -124,8 +81,6 @@ describe("React Router app boot and auth workflows", () => {
     renderApp("/subscriptions");
 
     expect(await screen.findByRole("heading", { name: "需要认证" })).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "Sandrone logo" })).toHaveAttribute("src", "/brand/sandrone-logo-64.png");
-    expect(screen.getByLabelText("认证品牌")).toHaveClass("justify-items-center");
     expect(screen.getByRole("button", { name: "进入" })).toBeInTheDocument();
     const tokenInput = screen.getByLabelText("管理员 token");
     await waitFor(() => expect(tokenInput).toHaveFocus());

@@ -152,36 +152,6 @@ describe("SubscriptionEditPage", () => {
       },
     ]);
   });
-  it("renders subscription editing as a segmented full page form", () => {
-    render(
-      <SubscriptionEditPage
-        item={{ ...subscriptions[2], displayName: "默认组合", title: "默认组合" }}
-        definition={{
-          name: "default",
-          displayName: "默认组合",
-          kind: "collection",
-          sourceRefs: ["provider", "warn"],
-          processors: [],
-          meta: { description: "main group\nbackup group" },
-        }}
-        onBack={noop}
-        onSave={saveSuccess}
-        sources={subscriptions}
-      />,
-    );
-
-    expect(screen.getByRole("heading", { name: "编辑订阅" })).toBeInTheDocument();
-    expect(screen.getByText("组合信息")).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "名称" })).toHaveValue("default");
-    expect(screen.getByRole("textbox", { name: "名称" })).toBeDisabled();
-    expect(screen.getByRole("textbox", { name: "显示名称" })).toHaveValue("默认组合");
-    expect(screen.getByRole("textbox", { name: "描述" })).toHaveValue("main group\nbackup group");
-    const sourcePicker = screen.getByRole("group", { name: "包含订阅" });
-    expect(within(sourcePicker).getByRole("checkbox", { name: "provider 远程订阅 · uri-list" })).toBeChecked();
-    expect(within(sourcePicker).getByRole("checkbox", { name: "warn 远程订阅 · uri-list" })).toBeChecked();
-    expect(screen.getByText("处理链")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "保存订阅" })).toBeInTheDocument();
-  });
   it("prefills and orders the full remote-source editing workflow", async () => {
     const user = userEvent.setup();
     const { container } = render(<SubscriptionEditPage item={subscriptions[0]} onBack={noop} onSave={saveSuccess} definition={remoteSubscriptionDefinition} sources={subscriptions} />);

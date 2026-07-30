@@ -13,24 +13,6 @@ import {
 import { FileNewPage } from "./file-new-page";
 
 describe("FileNewPage", () => {
-  it("uses the file context for static content labels and remote help", () => {
-    const { rerender } = render(<FileNewPage source="local" onBack={noop} onSave={noop} />);
-
-    const localName = screen.getByRole("textbox", { name: "名称" });
-    expect(localName).toHaveValue("");
-    expect(localName).toBeRequired();
-    const contentSource = screen.getByRole("group", { name: "内容来源" });
-    expect(within(contentSource).getByRole("textbox", { name: "内容" })).not.toHaveAttribute("placeholder");
-
-    rerender(<FileNewPage key="remote" source="remote" onBack={noop} onSave={noop} />);
-    const remoteName = screen.getByRole("textbox", { name: "名称" });
-    expect(remoteName).toHaveValue("");
-    expect(remoteName).toBeRequired();
-    expect(
-      screen.getByText("生成和预览时按远程请求缓存策略读取。"),
-    ).toBeInTheDocument();
-  });
-
   it("blocks a new sing-box file until preview, then submits its resolved driver", async () => {
     const user = userEvent.setup();
     const loadSubscriptionPreview = vi.fn().mockResolvedValue(configNodePreview("provider", ["Node 1"]));

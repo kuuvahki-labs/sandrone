@@ -18,7 +18,6 @@ describe("config rule editors", () => {
 
     const section = screen.getByRole("group", { name: "规则集" });
     const add = within(section).getByRole("button", { name: "添加规则集" });
-    expect(add.closest('[data-slot="config-list-actions"]')).not.toBeNull();
 
     await user.click(add);
 
@@ -44,7 +43,6 @@ describe("config rule editors", () => {
 
     const section = screen.getByRole("group", { name: "规则策略" });
     const add = within(section).getByRole("button", { name: "添加规则" });
-    expect(add.closest('[data-slot="config-list-actions"]')).not.toBeNull();
 
     await user.click(add);
 

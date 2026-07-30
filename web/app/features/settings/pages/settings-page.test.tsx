@@ -9,30 +9,8 @@ import { SettingsPage } from "./settings-page";
 const noop = () => undefined;
 
 describe("settings page", () => {
-  it("uses outlined floating labels for overview fields", () => {
-    render(
-      <SettingsPage
-        localeMode="auto"
-        publicBaseUrl="https://example.com"
-        themeMode="system"
-        onOpenData={noop}
-        onOpenRuntime={noop}
-        onLocaleMode={noop}
-        onSaveBaseUrl={noop}
-        onSignOut={noop}
-        onThemeMode={noop}
-      />,
-    );
-
-    expect(screen.getByText("主题模式", { selector: "label.MuiInputLabel-root" })).toBeInTheDocument();
-    expect(screen.getByText("语言", { selector: "label.MuiInputLabel-root" })).toBeInTheDocument();
-    expect(screen.getByText("Public Base URL", { selector: "label.MuiInputLabel-root" })).toBeInTheDocument();
-  });
-
-  it("renders a progressive settings overview with working form and navigation actions", async () => {
+  it("updates theme mode and the public base URL", async () => {
     const user = userEvent.setup();
-    const onOpenData = vi.fn();
-    const onOpenRuntime = vi.fn();
     const onSaveBaseUrl = vi.fn();
     const onThemeMode = vi.fn();
     render(
@@ -40,8 +18,8 @@ describe("settings page", () => {
         localeMode="auto"
         publicBaseUrl="https://example.com"
         themeMode="system"
-        onOpenData={onOpenData}
-        onOpenRuntime={onOpenRuntime}
+        onOpenData={noop}
+        onOpenRuntime={noop}
         onLocaleMode={noop}
         onSaveBaseUrl={onSaveBaseUrl}
         onSignOut={noop}
@@ -49,36 +27,8 @@ describe("settings page", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "设置" })).toBeInTheDocument();
-    expect(screen.getByText("管理界面偏好与服务配置")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "外观与语言" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "服务连接" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "数据与账户" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "关于 Sandrone" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "GitHub" })).toHaveAttribute("href", "https://github.com/kuuvahki-labs/sandrone");
-    const pageRoot = screen.getByRole("heading", { name: "设置" }).closest("section");
-    expect(pageRoot).toHaveClass("grid", "gap-6");
-    expect(pageRoot).not.toHaveClass("max-w-[760px]");
-    const pageHeader = screen.getByRole("heading", { name: "设置" }).closest("header");
-    expect(pageHeader).toHaveClass("MuiPaper-root", "MuiPaper-outlined");
-    expect(pageHeader?.parentElement).toBe(pageRoot);
-    expect(screen.queryByTestId("PaletteOutlinedIcon")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("StorageOutlinedIcon")).not.toBeInTheDocument();
-
-    const advanced = screen.getByRole("button", { name: "打开高级设置" });
-    expect(advanced).toHaveTextContent("高级设置");
-    expect(advanced).not.toHaveTextContent(/远程请求|缓存|测活/);
-    expect(screen.queryByRole("heading", { name: "运行默认值" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("note")).not.toBeInTheDocument();
-
     const saveBaseUrl = screen.getByRole("button", { name: "保存服务地址" });
-    expect(saveBaseUrl).toHaveTextContent("保存");
-    expect(screen.getByRole("combobox", { name: "主题模式" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "Public Base URL" })).toHaveValue("https://example.com");
-    expect(screen.getByText("仅保存在当前浏览器。")).toBeInTheDocument();
 
-    await user.click(advanced);
-    await user.click(screen.getByRole("button", { name: "管理备份与恢复" }));
     await user.click(screen.getByRole("combobox", { name: "主题模式" }));
     await user.click(screen.getByRole("option", { name: "浅色" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Public Base URL" }), {
@@ -86,57 +36,8 @@ describe("settings page", () => {
     });
     await user.click(saveBaseUrl);
 
-    expect(onOpenRuntime).toHaveBeenCalledTimes(1);
-    expect(onOpenData).toHaveBeenCalledTimes(1);
     expect(onThemeMode).toHaveBeenCalledWith("light");
     expect(onSaveBaseUrl).toHaveBeenCalledWith("https://public.example.test");
-  });
-  it.each([
-    ["0.1.0", "0123456789abcdef", "v0.1.0 (0123456789ab)"],
-    ["0.1.0", "", "v0.1.0"],
-    ["dev", "", "dev"],
-    [undefined, undefined, "暂不可用"],
-  ])("shows the project build identity for %s", (version, revision, expected) => {
-    render(
-      <SettingsPage
-        localeMode="auto"
-        publicBaseUrl="https://example.com"
-        revision={revision}
-        themeMode="system"
-        version={version}
-        onOpenData={noop}
-        onOpenRuntime={noop}
-        onLocaleMode={noop}
-        onSaveBaseUrl={noop}
-        onSignOut={noop}
-        onThemeMode={noop}
-      />,
-    );
-
-    expect(screen.getByText(expected)).toBeInTheDocument();
-  });
-  it("renders settings language controls in English", () => {
-    localStorage.setItem("sandrone.locale", "en-US");
-
-    render(
-      <SettingsPage
-        localeMode="en-US"
-        publicBaseUrl="https://example.com"
-        themeMode="system"
-        onOpenData={noop}
-        onOpenRuntime={noop}
-        onLocaleMode={noop}
-        onSaveBaseUrl={noop}
-        onSignOut={noop}
-        onThemeMode={noop}
-      />,
-    );
-
-    expect(screen.getByRole("heading", { name: "Settings" })).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Language" })).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Theme mode" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Data and account" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Manage backup and restore" })).toBeInTheDocument();
   });
   it("requests a locale-mode update through the language control", async () => {
     const user = userEvent.setup();

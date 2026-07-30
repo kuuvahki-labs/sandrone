@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -15,43 +15,57 @@ const pageActions = {
 };
 
 describe("FilePreviewPage", () => {
-  it.each([
+  it("shows final bodies directly without adding tabs or alerts", () => {
+    const cases = [
     ["JSON", "application/json", "{\"future\":true}", "future"],
     ["YAML", "application/yaml", "rules:\n  - allow\n", "allow"],
     ["plain text", "text/plain", "plain final output", "plain final output"],
     ["empty", "application/octet-stream", "", ""],
-  ])("shows the final %s body directly", (_, contentType, body, expected) => {
-    render(
+    ] as const;
+    const view = render(
       <FilePreviewPage
         {...pageActions}
-        preview={{ body, contentType, warnings: [] }}
+        preview={{ body: cases[0][2], contentType: cases[0][1], warnings: [] }}
       />,
     );
 
-    const code = screen.getByRole("region", { name: "最终文件内容" }).querySelector("code");
-    if (body) {
-      expect(code?.textContent).toContain(expected);
-    } else {
-      expect(code?.textContent.trim()).toBe("");
+    for (const [, contentType, body, expected] of cases) {
+      view.rerender(
+        <FilePreviewPage
+          {...pageActions}
+          preview={{ body, contentType, warnings: [] }}
+        />,
+      );
+      const code = screen.getByRole("region", { name: "最终文件内容" }).querySelector("code");
+      if (body) {
+        expect(code?.textContent).toContain(expected);
+      } else {
+        expect(code?.textContent.trim()).toBe("");
+      }
     }
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it.each([
-    ["rename.JS", "application/octet-stream"],
-    ["rename.txt", "text/javascript; charset=utf-8"],
-  ])("highlights %s with %s as JavaScript", (fileName, contentType) => {
-    render(
+  it("uses JavaScript highlighting from either the filename or content type", () => {
+    const view = render(
       <FilePreviewPage
         {...pageActions}
-        fileName={fileName}
-        preview={{ body: "const answer = 42;", contentType, warnings: [] }}
+        fileName="rename.JS"
+        preview={{ body: "const answer = 42;", contentType: "application/octet-stream", warnings: [] }}
       />,
     );
 
     expect(screen.getByText("javascript")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "最终文件内容" })).toHaveTextContent("const answer = 42;");
+    view.rerender(
+      <FilePreviewPage
+        {...pageActions}
+        fileName="rename.txt"
+        preview={{ body: "const answer = 42;", contentType: "text/javascript; charset=utf-8", warnings: [] }}
+      />,
+    );
+    expect(screen.getByText("javascript")).toBeInTheDocument();
   });
 
   it("keeps JSON highlighting ahead of the JavaScript filename fallback", () => {
@@ -80,26 +94,6 @@ describe("FilePreviewPage", () => {
     expect(screen.getByRole("region", { name: "最终文件内容" })).toHaveTextContent("[General]");
   });
 
-  it("fills the viewport remainder when final source is available", () => {
-    render(
-      <FilePreviewPage
-        {...pageActions}
-        preview={{ body: "line 1\nline 2", contentType: "text/plain", warnings: [] }}
-      />,
-    );
-
-    const page = screen.getByRole("heading", { name: "文件预览" }).closest("section");
-    const block = screen.getByRole("region", { name: "最终文件内容" });
-    expect(page).toHaveClass(
-      "flex",
-      "h-[calc(100dvh-2.5rem)]",
-      "min-[820px]:h-[calc(100dvh-3rem)]",
-      "min-h-0",
-      "flex-col",
-    );
-    expect(block).toHaveClass("flex", "min-h-0", "flex-1", "flex-col");
-  });
-
   it("keeps server warnings above the final body", () => {
     render(
       <FilePreviewPage
@@ -124,9 +118,6 @@ describe("FilePreviewPage", () => {
     );
 
     expect(screen.getByRole("heading", { name: "正在生成" })).toBeInTheDocument();
-    const page = screen.getByRole("heading", { name: "文件预览" }).closest("section");
-    expect(page).toHaveClass("grid");
-    expect(page).not.toHaveClass("h-[calc(100dvh-2.5rem)]");
     expect(screen.getByRole("button", { name: "刷新文件预览" })).toBeDisabled();
 
     rerender(<FilePreviewPage failed fileName="default.txt" onBack={vi.fn()} onRefresh={onRefresh} />);
@@ -138,7 +129,7 @@ describe("FilePreviewPage", () => {
 });
 
 describe("FilesPage", () => {
-  it("renders the file summary, search, source icons, and list actions", async () => {
+  it("searches files and dispatches list actions", async () => {
     const user = userEvent.setup();
     const items: FileItem[] = [
       { ...files[0], displayName: "移动端配置", title: "移动端配置", processorCount: 1 },
@@ -162,22 +153,7 @@ describe("FilesPage", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "我的文件" })).toBeInTheDocument();
-    const summary = screen.getByLabelText("文件摘要");
-    expect(within(summary).getByText("总数")).toBeInTheDocument();
-    expect(within(summary).getByText("本地")).toBeInTheDocument();
-    expect(within(summary).getByText("远程")).toBeInTheDocument();
-    expect(within(summary).getByText("配置文件")).toBeInTheDocument();
-    const list = screen.getByRole("list", { name: "文件列表" });
-    expect(iconForListItem(list, "编辑：default.yaml", "CloudOutlinedIcon")).toBeInTheDocument();
-    expect(iconForListItem(list, "编辑：inline.yaml", "DescriptionOutlinedIcon")).toBeInTheDocument();
-    expect(iconForListItem(list, "编辑：summary-only.yaml", "CloudOutlinedIcon")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "编辑：client.yaml" }).querySelector('img[src="/brand/clients/mihomo.webp"]')).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "编辑：client.json" }).querySelector('img[src="/brand/clients/sing-box.svg"]')).toBeInTheDocument();
-    expect(iconForListItem(list, "编辑：client.conf", "RocketLaunchOutlinedIcon")).toBeInTheDocument();
-
     const searchbox = screen.getByRole("searchbox", { name: "搜索文件" });
-    expect(screen.getByText("搜索", { selector: "label" })).toBeInTheDocument();
     fireEvent.change(searchbox, { target: { value: "移动端" } });
     expect(screen.getByText("移动端配置")).toBeInTheDocument();
     expect(screen.queryByText("inline.yaml")).not.toBeInTheDocument();
@@ -201,9 +177,3 @@ describe("FilesPage", () => {
     expect(onDelete).toHaveBeenCalledWith(items[0]);
   });
 });
-
-function iconForListItem(list: HTMLElement, actionName: string, iconTestId: string): Element | null {
-  const item = within(list).getByRole("button", { name: actionName }).closest("li");
-  expect(item).not.toBeNull();
-  return item?.querySelector(`[data-testid="${iconTestId}"]`) ?? null;
-}

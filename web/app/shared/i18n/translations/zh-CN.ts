@@ -245,7 +245,7 @@ export const zhCN = {
   "files.config.templateCountGroups": "{count} 个代理组",
   "files.config.templateCountRuleSets": "{count} 个规则集",
   "files.config.templateCountRules": "{count} 条规则",
-  "files.config.templateCustomized": "已自定义",
+  "files.config.templateCustomized": "当前：自定义配置",
   "files.config.templateFull": "完整",
   "files.config.templateFullDescription": "覆盖社交、影音、游戏、云服务与更多场景。",
   "files.config.templateLabel": "配置模板",

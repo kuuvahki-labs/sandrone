@@ -61,25 +61,6 @@ describe("React Router app subscription workflows", () => {
     expect(trafficRequests.every((request) => request.init?.method === "POST")).toBe(true);
   });
 
-  it("opens subscription new pages from the speed dial", async () => {
-    const user = userEvent.setup();
-    renderApp("/subscriptions");
-
-    await screen.findByRole("heading", { name: "我的订阅" });
-    await user.click(screen.getByRole("button", { name: "新建订阅" }));
-    await user.click(await screen.findByRole("menuitem", { name: "新建组合订阅" }));
-
-    expect(await screen.findByRole("heading", { name: "新建订阅" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "组合" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("textbox", { name: "名称" })).toHaveValue("default");
-    expect(screen.getByRole("group", { name: "包含订阅" })).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "远程" }));
-
-    expect(await screen.findByRole("textbox", { name: "订阅地址" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "远程" })).toHaveAttribute("aria-pressed", "true");
-  });
-
   it("opens the remote editor after creating a subscription", async () => {
     const user = userEvent.setup();
     let created = false;

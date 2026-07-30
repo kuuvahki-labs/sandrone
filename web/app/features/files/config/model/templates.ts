@@ -98,7 +98,7 @@ const TEMPLATE_MODULES: Record<ConfigTemplateID, readonly string[]> = {
   full: MODULES.map((item) => item.id),
 };
 const TEMPLATE_METADATA: Record<ConfigTemplateID, { name: string; description: string }> = {
-  minimal: { name: "Minimal", description: "Core selection, blocking, private, China, global, and final routing." },
+  minimal: { name: "Minimal", description: "Core selection, private, China, global, and final routing." },
   standard: { name: "Standard", description: "Core routing plus frequently used and region-restricted services." },
   full: { name: "Full", description: "Broad social, media, gaming, cloud, finance, education, news, and shopping coverage." },
 };

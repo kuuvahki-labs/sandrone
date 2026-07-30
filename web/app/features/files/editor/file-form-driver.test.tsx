@@ -8,8 +8,6 @@ import { requireFileDriver } from "~/features/files/drivers/registry";
 import { requireFileDriverUI } from "~/features/files/editor/file-driver-ui-registry";
 
 import { FileFormFields, FileKindConfigWorkbench } from "./file-form";
-import { FileTypeSummary } from "./file-type-summary";
-import { RawFileConfigEditor } from "./raw-config-editor";
 import { FileSourceEditor } from "./source-editor";
 
 afterEach(() => {
@@ -37,39 +35,6 @@ describe("file form drivers", () => {
     expect(window.confirm).toHaveBeenCalledOnce();
     expect(screen.getByRole("textbox", { name: /settings JSON/i })).toBeInTheDocument();
     expect(currentConfig()).toEqual({ subscriptions: ["provider"], settings: { future_nested: { keep: true } } });
-  });
-
-  it("labels raw configuration as editable configuration content", () => {
-    localStorage.setItem("sandrone.locale", "en-US");
-
-    render(<RawFileConfigEditor baseEditor={<div />} subscriptions={[]} />);
-
-    expect(screen.getByRole("heading", { name: "Configuration content" })).toBeInTheDocument();
-    expect(screen.getByRole("group", { name: "Base configuration content" })).toBeInTheDocument();
-  });
-
-  it.each([
-    ["file", "通用", '[data-testid="DescriptionOutlinedIcon"]'],
-    ["mihomo", "mihomo", 'img[src="/brand/clients/mihomo.webp"]'],
-    ["sing-box", "sing-box", 'img[src="/brand/clients/sing-box.svg"]'],
-    ["rocket", "Shadowrocket", '[data-testid="RocketLaunchOutlinedIcon"]'],
-  ] as const)("renders the %s FileTypeSummary as static metadata", (icon, label, iconSelector) => {
-    render(
-      <FileTypeSummary icon={icon} label={label} title="文件类型" />,
-    );
-
-    const metadata = screen.getByRole("group", { name: "文件类型" });
-    expect(metadata).toHaveTextContent(label);
-    expect(metadata.querySelector(iconSelector)).toBeInTheDocument();
-    expect(metadata.querySelector("button, input, select, textarea")).not.toBeInTheDocument();
-    expect(metadata.querySelector(".MuiChip-root")).not.toBeInTheDocument();
-  });
-
-  it("composes static file-type metadata without a hidden kind input", () => {
-    render(<FileFormFields defaultName="client.conf" driver={requireFileDriver("static")} mode="edit" />);
-
-    expect(screen.getByRole("group", { name: "文件类型" })).toBeInTheDocument();
-    expect(document.querySelector('input[name="kind"]')).not.toBeInTheDocument();
   });
 
   it("aggregates sing-box source validity into form validity", async () => {

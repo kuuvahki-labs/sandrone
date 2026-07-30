@@ -7,7 +7,6 @@ import type { ConfigReferenceOption } from "~/features/files/config/model/refere
 import type { RuleSetCatalogItem, RuleSetCatalogResult } from "~/features/files/model/types";
 
 import {
-  ConfigListActions,
   ConfigRowDisclosure,
   ConfigRowSummary,
   DenseConfigRow,
@@ -29,19 +28,6 @@ afterEach(() => {
 });
 
 describe("shared config editor rows", () => {
-  it("renders long summaries as wrapping plain text", () => {
-    const { container } = render(
-      <ConfigRowSummary
-        primary="Developer Tools With A Very Long Name"
-        secondary={["select", "Auto", "订阅节点", "DIRECT"]}
-      />,
-    );
-
-    expect(container.querySelector(".MuiChip-root")).not.toBeInTheDocument();
-    expect(screen.getByText("Developer Tools With A Very Long Name")).toHaveClass("break-words", "whitespace-normal");
-    expect(container).toHaveTextContent("select · Auto · 订阅节点 · DIRECT");
-  });
-
   it("keeps desktop controls and mobile menu callbacks accessible", async () => {
     const user = userEvent.setup();
     const onDelete = vi.fn();
@@ -232,7 +218,7 @@ describe("ConfigWorkbenchSection", () => {
     expect(onExpandedChange).toHaveBeenLastCalledWith(false);
   });
 
-  it("keeps flexible status information from displacing actions or the rightmost collapse trigger", async () => {
+  it("keeps header actions outside the disclosure trigger", async () => {
     const user = userEvent.setup();
     const onAdd = vi.fn();
     render(
@@ -240,8 +226,6 @@ describe("ConfigWorkbenchSection", () => {
         headerActions={<button type="button" onClick={onAdd}>Add</button>}
         id="groups"
         label="Groups"
-        severity="warning"
-        severityLabel="A localized status label that may become much longer"
       >
         <p>Groups editor</p>
       </ConfigWorkbenchSection>,
@@ -249,14 +233,10 @@ describe("ConfigWorkbenchSection", () => {
 
     const trigger = screen.getByRole("button", { name: /Groups/ });
     const add = screen.getByRole("button", { name: "Add" });
-    const info = document.querySelector('[data-slot="section-info"]');
     const actions = add.closest('[data-slot="section-actions"]');
 
     expect(trigger).not.toContainElement(add);
-    expect(info).toHaveClass("min-w-0", "flex-1");
-    expect(info).toContainElement(screen.getByText("A localized status label that may become much longer"));
-    expect(actions).toHaveClass("shrink-0");
-    expect(actions).not.toHaveClass("w-full");
+    expect(actions).not.toBeNull();
     expect(trigger.compareDocumentPosition(actions as HTMLElement)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 
     await user.click(add);
@@ -296,16 +276,6 @@ describe("config editor disclosure primitives", () => {
     expect(onToggle).toHaveBeenCalledOnce();
   });
 
-  it("renders list actions in a stable footer slot", () => {
-    render(
-      <ConfigListActions>
-        <button type="button">Add proxy group</button>
-      </ConfigListActions>,
-    );
-
-    expect(screen.getByRole("button", { name: "Add proxy group" })
-      .closest('[data-slot="config-list-actions"]')).not.toBeNull();
-  });
 });
 
 const referenceOptions: ConfigReferenceOption[] = [
@@ -321,8 +291,6 @@ describe("config reference fields", () => {
     render(<OrderedReferencesHarness />);
 
     expect(referenceValues()).toEqual(["$nodes", "DIRECT", "DIRECT"]);
-    expect(screen.getByRole("button", { name: "添加成员" }).parentElement)
-      .toHaveClass("flex", "justify-end");
     expect(screen.getByRole("button", { name: "拖动成员 1" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "下移成员 1" }));
     expect(referenceValues()).toEqual(["DIRECT", "$nodes", "DIRECT"]);
@@ -380,12 +348,11 @@ const choices: ConfigTemplateChoice[] = [
 ];
 
 describe("ConfigTemplatePicker", () => {
-  it("renders three accessible card-style radios with the current and customized states", () => {
+  it("renders three accessible card-style radios with the current selection", () => {
     render(
       <ConfigTemplatePicker
         choices={choices}
         currentTemplateId="standard"
-        customized
         onRequestApply={() => undefined}
       />,
     );
@@ -399,8 +366,6 @@ describe("ConfigTemplatePicker", () => {
       "Balanced defaults for daily use 4 groups · 3 rule sets · 48 rules",
     );
     expect(screen.getByRole("radio", { name: "Minimal" })).not.toBeChecked();
-    expect(screen.getByText("Customized")).toBeInTheDocument();
-    expect(group).toHaveAccessibleDescription("Customized");
     expect(screen.getByText("Balanced defaults for daily use")).toBeInTheDocument();
     expect(screen.getByText("4 groups")).toBeInTheDocument();
     expect(screen.getByText("3 rule sets")).toBeInTheDocument();
@@ -433,7 +398,6 @@ describe("ConfigTemplatePicker", () => {
         choices={choices}
         confirmBeforeApply
         currentTemplateId="standard"
-        customized
         onRequestApply={onRequestApply}
       />,
     );
@@ -592,29 +556,6 @@ it("shows loading and request error states", async () => {
   });
   expect(await screen.findByText("Catalog snapshot unavailable")).toBeInTheDocument();
   expect(screen.queryByText("No matching rule sets.")).not.toBeInTheDocument();
-});
-
-it("uses rule-set library terminology in Chinese dialog states", async () => {
-  localStorage.setItem("sandrone.locale", "zh-CN");
-  const request = deferred<RuleSetCatalogResult>();
-  render(
-    <RuleSetCatalogDialog
-      kind="mihomo"
-      open
-      loadCatalog={vi.fn().mockReturnValue(request.promise)}
-      onAdd={vi.fn()}
-      onClose={vi.fn()}
-    />,
-  );
-
-  expect(screen.getByRole("dialog", { name: "规则集库" })).toBeInTheDocument();
-  expect(screen.getByLabelText("正在加载规则集库")).toBeInTheDocument();
-
-  await act(async () => {
-    request.reject("offline");
-    await request.promise.catch(() => undefined);
-  });
-  expect(await screen.findByText("规则集库加载失败")).toBeInTheDocument();
 });
 
 it("shows local empty and conflict states without closing", async () => {

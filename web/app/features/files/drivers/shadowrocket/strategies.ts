@@ -343,7 +343,9 @@ function shadowrocketTemplates(
   return createConfigTemplateStrategy({
     groupNames: (groups) => groups.map((group) => trimmedString(group.name)).filter(Boolean),
     materialize: materializeShadowrocketTemplate,
-    moduleIDs: (_id, moduleIDs) => moduleIDs.filter((moduleID) => moduleID !== "auto"),
+    moduleIDs: (_id, moduleIDs) => moduleIDs.filter((moduleID) => (
+      moduleID !== "auto" && moduleID !== "ad"
+    )),
     normalizeRecognition: (config) => {
       const adaptiveLayer = adaptiveStrategy.recognizesCanonicalLayer(config);
       const stripped = adaptiveLayer ? adaptiveStrategy.strip(config) : { changed: false, config, strippedGroupNames: [] };
@@ -392,7 +394,7 @@ function materializeShadowrocketTemplate(
 }
 
 const ARTIFACT_NAMES: Readonly<Record<string, string>> = {
-  "category-ads-all": "Advertising", private: "Lan", "geolocation-cn": "China", "geolocation-!cn": "Global",
+  private: "Lan", "geolocation-cn": "China", "geolocation-!cn": "Global",
   openai: "OpenAI", anthropic: "Anthropic", youtube: "YouTube", google: "Google", microsoft: "Microsoft",
   onedrive: "OneDrive", apple: "Apple", icloud: "iCloud", github: "GitHub", gitlab: "GitLab", atlassian: "Atlassian",
   telegram: "Telegram", twitter: "Twitter", facebook: "Facebook", instagram: "Instagram", whatsapp: "Whatsapp",

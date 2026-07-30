@@ -60,6 +60,12 @@ module。registry 组合值，不充当 re-export surface。
 
 - owner-specific focused tests 与源码 colocate；`*.test.ts` 使用 Vitest
   `node`，覆盖纯 model、config、graph 与静态契约。
+- 前端测试优先覆盖纯逻辑，并尽量将业务规则、状态转换和序列化提取为可在
+  `node` 环境运行的测试；只有契约确实依赖 DOM、browser API、React 生命周期
+  或可访问交互时，才使用 jsdom/UI 测试。
+- TDD 阶段可以用临时测试驱动实现；功能稳定后，应删除仅证明旧实现、样式细节
+  或已被更低层契约完整覆盖的一次性测试，保留用于防止数据丢失、竞态、边界漂移
+  和用户行为回归的长期测试。
 - React component、page 和 focused route/module 测试使用 `*.test.tsx`
   与 `jsdom`；无 JSX 但依赖 browser API 的测试使用 `*.dom.test.ts`。
 - `app/test/integration/routing` 使用真实 root 与 route modules，覆盖跨路由导航、

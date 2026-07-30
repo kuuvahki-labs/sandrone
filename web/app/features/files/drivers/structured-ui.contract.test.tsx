@@ -230,8 +230,7 @@ describe("structured driver UI slots", () => {
     expect(within(ruleSetRow).queryByRole("group", { name: /来源|Source/i })).not.toBeInTheDocument();
     expect(within(ruleSetRow).getByRole("combobox", { name: /格式|Format/i })).toHaveTextContent("future-json");
     expect(within(ruleSetRow).getByRole("textbox", { name: /更新间隔|Update interval/i })).toHaveValue("15m");
-    const nameField = within(ruleSetRow).getByRole("textbox", { name: /^名称$|^Name$/i });
-    expect(nameField.closest(".grid")).toHaveClass("md:grid-cols-2");
+    expect(within(ruleSetRow).getByRole("textbox", { name: /^名称$|^Name$/i })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "展开规则 1" }));
     expect(screen.getByText("future rule fields: custom-rule")).toBeInTheDocument();

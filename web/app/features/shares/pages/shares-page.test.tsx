@@ -132,25 +132,4 @@ describe("shares page", () => {
     await waitFor(() => expect(window.getSelection()?.toString()).toBe(attemptedUrl));
   });
 
-  it("summarizes each share status in a balanced four-card grid", () => {
-    const items: ShareItem[] = [
-      shares[0],
-      { ...shares[0], id: "valid-two", title: "valid-two" },
-      { ...shares[0], id: "upcoming", title: "upcoming", status: "upcoming" },
-      { ...shares[0], id: "expired", title: "expired", status: "expired" },
-      { ...shares[0], id: "exhausted", title: "exhausted", status: "exhausted" },
-    ];
-
-    render(<SharesPage items={items} onCopy={vi.fn()} onCopyUrl={vi.fn()} onDelete={vi.fn()} />);
-
-    const summary = screen.getByLabelText("分享链接摘要");
-    expect(Array.from(summary.children).map((item) => item.textContent)).toEqual([
-      "2有效",
-      "1未生效",
-      "1已过期",
-      "1次数用尽",
-    ]);
-    expect(summary).toHaveClass("grid-cols-2", "md:grid-cols-4");
-    expect(within(summary).queryByText("全部")).not.toBeInTheDocument();
-  });
 });

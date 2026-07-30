@@ -494,6 +494,11 @@ describe("current frontend layout", () => {
     expect(appStyles).toContain('@import "tailwindcss";');
     expect(appStyles).toContain('@import "./styles/base.css" layer(base);');
 
+    const baseStyles = readFileSync(join(appDir, "styles/base.css"), "utf8");
+    expect(baseStyles).toContain(".highlighted-textarea-input {");
+    expect(baseStyles).toContain("-webkit-text-fill-color: transparent;");
+    expect(baseStyles).toContain(".highlighted-textarea-input::selection");
+
     const muiProvider = readFileSync(join(appDir, "core/material-ui.tsx"), "utf8");
     expect(muiProvider).toContain("StyledEngineProvider");
     expect(muiProvider).toContain("enableCssLayer");

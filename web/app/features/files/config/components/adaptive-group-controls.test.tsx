@@ -22,12 +22,6 @@ afterEach(() => {
 });
 
 describe("ConfigAdaptiveGroupControls", () => {
-  it("keeps the adaptive-group description focused on what generation does", () => {
-    render(<ControlsHarness generatedCount={0} onGenerate={vi.fn()} />);
-
-    expect(screen.getByText("按所选地区创建分组；支持动态筛选的客户端无需节点预览。")).toBeInTheDocument();
-  });
-
   it("submits only on click with persisted url-test and five-region defaults", async () => {
     const user = userEvent.setup();
     const onGenerate = vi.fn();

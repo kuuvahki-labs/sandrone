@@ -247,7 +247,7 @@ export const enUS: Record<TranslationKey, string> = {
   "files.config.templateCountGroups": "{count} proxy groups",
   "files.config.templateCountRuleSets": "{count} rule sets",
   "files.config.templateCountRules": "{count} rules",
-  "files.config.templateCustomized": "Customized",
+  "files.config.templateCustomized": "Current: Custom configuration",
   "files.config.templateFull": "Full",
   "files.config.templateFullDescription": "Broad social, media, gaming, cloud, and service coverage.",
   "files.config.templateLabel": "Configuration template",

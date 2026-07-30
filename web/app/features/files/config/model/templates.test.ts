@@ -12,7 +12,7 @@ type ConfigKind = typeof CONFIG_KINDS[number];
 const TEMPLATE_IDS = ["minimal", "standard", "full"] as const satisfies readonly ConfigTemplateID[];
 const SHADOWROCKET_RULE_BASE = "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket";
 const SHADOWROCKET_TEMPLATE_ARTIFACTS = new Set([
-  "Abema", "Advertising", "Amazon", "AmazonPrimeVideo", "Anthropic", "Apple", "AppleTV", "Atlassian", "BBC",
+  "Abema", "Amazon", "AmazonPrimeVideo", "Anthropic", "Apple", "AppleTV", "Atlassian", "BBC",
   "Bahamut", "BiliBiliIntl", "Binance", "Blizzard", "Bloomberg", "CNN", "China", "Cloudflare", "DAZN",
   "DigitalOcean", "Discord", "Disney", "Docker", "Dropbox", "EA", "Epic", "Facebook", "GitHub",
   "GitLab", "Global", "Gog", "Google", "HBO", "Hulu", "Instagram", "Jetbrains", "KKTV", "Lan", "Line",
@@ -60,10 +60,10 @@ describe("config templates", () => {
   it.each(CONFIG_KINDS)("exposes the module tiers with computed %s counts", (kind) => {
     const templates = getConfigTemplates(kind);
     const expectedMinimal = kind === "shadowrocket"
-      ? MINIMAL_MODULES.filter((moduleID) => moduleID !== "auto")
+      ? MINIMAL_MODULES.filter((moduleID) => moduleID !== "auto" && moduleID !== "ad")
       : MINIMAL_MODULES;
     const expectedStandard = kind === "shadowrocket"
-      ? STANDARD_MODULES.filter((moduleID) => moduleID !== "auto")
+      ? STANDARD_MODULES.filter((moduleID) => moduleID !== "auto" && moduleID !== "ad")
       : STANDARD_MODULES;
 
     expect(templates.map((template) => template.id)).toEqual(TEMPLATE_IDS);
@@ -72,7 +72,10 @@ describe("config templates", () => {
     expect(templates[2].modules).toEqual(expect.arrayContaining(FULL_ONLY_MODULES));
     expect(templates[2].modules).not.toEqual(expect.arrayContaining(["adult", "gemini", "google-scholar"]));
     expect(templates[2].modules.includes("auto")).toBe(kind !== "shadowrocket");
-    if (kind === "shadowrocket") expect(templates.map((template) => template.groupCount)).toEqual([6, 13, 32]);
+    if (kind === "shadowrocket") {
+      expect(templates.every((template) => !template.modules.includes("ad"))).toBe(true);
+      expect(templates.map((template) => template.groupCount)).toEqual([5, 12, 31]);
+    }
 
     for (const template of templates) {
       const config = createConfigFromTemplate(kind, template.id);
@@ -173,6 +176,15 @@ describe("config templates", () => {
    }
  });
 
+  it.each(TEMPLATE_IDS)("omits ad blocking from the %s Shadowrocket template", (templateID) => {
+    const config = createConfigFromTemplate("shadowrocket", templateID);
+
+    expect(config.groups?.map((group) => group.name)).not.toContain("Ad Block");
+    expect(config.rule_sets?.map((ruleSet) => ruleSet.name)).not.toContain("category-ads-all");
+    expect(config.rules?.filter((rule): rule is string => typeof rule === "string")
+      .some((rule) => rule.includes("category-ads-all") || rule.includes(",Ad Block"))).toBe(false);
+  });
+
   it.each(TEMPLATE_IDS)("uses each fixed Blackmatrix catalog URL once in the %s Shadowrocket template", (templateID) => {
     const config = createConfigFromTemplate("shadowrocket", templateID);
     const urls = (config.rule_sets ?? []).map((ruleSet) => String(ruleSet.url));
@@ -225,13 +237,18 @@ describe("config templates", () => {
     expect(names).toEqual(expect.arrayContaining([
       "🚀 节点选择",
       ...(kind === "shadowrocket" ? [] : ["⚡ 自动选择"]),
-      "🛑 广告拦截",
+      ...(kind === "shadowrocket" ? [] : ["🛑 广告拦截"]),
       "🐦 推特/X",
       "🐟 漏网之鱼",
     ]));
+    if (kind === "shadowrocket") expect(names).not.toContain("🛑 广告拦截");
     expect(referenceProblems(kind, config)).toEqual([]);
-    expect(config.rule_sets?.map((ruleSet) => ruleSet[kind === "sing-box" ? "tag" : "name"]))
-      .toContain("category-ads-all");
+    const ruleSetNames = config.rule_sets?.map((ruleSet) => ruleSet[kind === "sing-box" ? "tag" : "name"]);
+    if (kind === "shadowrocket") {
+      expect(ruleSetNames).not.toContain("category-ads-all");
+    } else {
+      expect(ruleSetNames).toContain("category-ads-all");
+    }
     expect(recognizeConfigTemplate(kind, config)).toEqual({
       adaptive: false,
       match: "full",
