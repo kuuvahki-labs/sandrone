@@ -50,6 +50,14 @@ func SourceRefs(format string) []domain.SourceRef {
 			Revision: "spec",
 			Note:     "VMess URI is base64 JSON",
 		}}
+	case "vmess-aead":
+		return []domain.SourceRef{{
+			Kind:     "protocol",
+			Name:     "VMessAEAD / VLESS sharing link",
+			URL:      "https://github.com/XTLS/Xray-core/discussions/716",
+			Revision: "accessed-2026-07-30",
+			Note:     "XTLS VMessAEAD and VLESS URL sharing profile",
+		}}
 	case "vless":
 		return []domain.SourceRef{{
 			Kind:     "protocol",

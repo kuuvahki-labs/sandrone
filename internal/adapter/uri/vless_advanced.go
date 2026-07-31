@@ -2,6 +2,7 @@ package uri
 
 import (
 	"encoding/json"
+	"io"
 	"net/url"
 	"strings"
 
@@ -54,23 +55,350 @@ type xhttpRealityWire struct {
 	ShortID   string `json:"shortId,omitempty"`
 }
 
-func applyVLESSXHTTPExtra(transport *domain.TransportOptions, values url.Values) {
-	if transport == nil || transport.Type != "xhttp" {
-		return
-	}
-	transport.XHTTP = &domain.XHTTPTransportOptions{Mode: values.Get("mode")}
-	raw := values.Get("extra")
-	if raw == "" {
-		return
+func applyXHTTPExtra(transport *domain.TransportOptions, values url.Values) bool {
+	raw, ok := prepareXHTTPExtra(transport, values)
+	if !ok {
+		return false
 	}
 	var extra xhttpExtraWire
 	if json.Unmarshal([]byte(raw), &extra) != nil {
-		return
+		return false
 	}
-	transport.XHTTP.ReuseSettings = reuseFromWire(extra.XMux)
+	promoteXHTTPExtraFromWire(transport.XHTTP, &extra)
+	return xhttpExtraComplete(raw)
+}
+
+func applyVMessXHTTPExtra(transport *domain.TransportOptions, values url.Values) bool {
+	raw, ok := prepareXHTTPExtra(transport, values)
+	if !ok {
+		return false
+	}
+	var extra xhttpExtraWire
+	if json.Unmarshal([]byte(raw), &extra) == nil && !jsonContainsNull(raw) {
+		promoteXHTTPExtraFromWire(transport.XHTTP, &extra)
+		return xhttpExtraComplete(raw)
+	}
+	if fields, ok := jsonObjectFields([]byte(raw)); ok {
+		if xmux, exists := lookupJSONField(fields, "xmux"); exists {
+			transport.XHTTP.ReuseSettings = reuseFromJSON(xmux)
+		}
+		if download, exists := lookupJSONField(fields, "downloadSettings"); exists {
+			transport.XHTTP.DownloadSettings = downloadFromJSON(download)
+		}
+	}
+	return xhttpExtraComplete(raw)
+}
+
+func promoteXHTTPExtraFromWire(options *domain.XHTTPTransportOptions, extra *xhttpExtraWire) {
+	options.ReuseSettings = reuseFromWire(extra.XMux)
 	if extra.DownloadSettings != nil {
-		transport.XHTTP.DownloadSettings = downloadFromWire(extra.DownloadSettings)
+		options.DownloadSettings = downloadFromWire(extra.DownloadSettings)
 	}
+}
+
+func prepareXHTTPExtra(transport *domain.TransportOptions, values url.Values) (string, bool) {
+	if transport == nil || transport.Type != "xhttp" {
+		return "", false
+	}
+	transport.XHTTP = &domain.XHTTPTransportOptions{Mode: values.Get("mode")}
+	raw := values.Get("extra")
+	return raw, raw != ""
+}
+
+func xhttpExtraComplete(raw string) bool {
+	decoder := json.NewDecoder(strings.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	var complete *xhttpExtraWire
+	if err := decoder.Decode(&complete); err != nil {
+		return false
+	}
+	if complete == nil || decoder.Decode(&struct{}{}) != io.EOF {
+		return false
+	}
+	if jsonContainsNull(raw) {
+		return false
+	}
+	return xhttpExtraValuesComplete(complete)
+}
+
+func xhttpExtraValuesComplete(extra *xhttpExtraWire) bool {
+	if extra.DownloadSettings == nil {
+		return true
+	}
+	download := extra.DownloadSettings
+	if download.Network != "xhttp" {
+		return false
+	}
+	if download.XHTTPSettings != nil &&
+		download.XHTTPSettings.Extra != nil &&
+		download.XHTTPSettings.Extra.DownloadSettings != nil {
+		return false
+	}
+	switch download.Security {
+	case "", "none":
+		return download.TLSSettings == nil && download.RealitySettings == nil
+	case "tls":
+		return download.TLSSettings != nil && download.RealitySettings == nil
+	case "reality":
+		return download.RealitySettings != nil && download.TLSSettings == nil
+	default:
+		return false
+	}
+}
+
+func jsonContainsNull(raw string) bool {
+	decoder := json.NewDecoder(strings.NewReader(raw))
+	for {
+		token, err := decoder.Token()
+		if err == io.EOF {
+			return false
+		}
+		if err != nil {
+			return false
+		}
+		if token == nil {
+			return true
+		}
+	}
+}
+
+func jsonObjectFields(raw []byte) (map[string]json.RawMessage, bool) {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil || fields == nil {
+		return nil, false
+	}
+	return fields, true
+}
+
+func lookupJSONField(fields map[string]json.RawMessage, name string) (json.RawMessage, bool) {
+	if raw, ok := fields[name]; ok {
+		return raw, true
+	}
+	var matchedKey string
+	var matched json.RawMessage
+	for key, raw := range fields {
+		if strings.EqualFold(key, name) && (matchedKey == "" || key < matchedKey) {
+			matchedKey = key
+			matched = raw
+		}
+	}
+	return matched, matchedKey != ""
+}
+
+func decodeJSONField[T any](fields map[string]json.RawMessage, name string) (T, bool) {
+	var value T
+	raw, ok := lookupJSONField(fields, name)
+	if !ok || jsonContainsNull(string(raw)) {
+		return value, false
+	}
+	if json.Unmarshal(raw, &value) != nil {
+		return value, false
+	}
+	return value, true
+}
+
+func reuseFromJSON(raw json.RawMessage) *domain.XHTTPReuseSettings {
+	fields, ok := jsonObjectFields(raw)
+	if !ok {
+		return nil
+	}
+	reuse := &domain.XHTTPReuseSettings{}
+	promoted := len(fields) == 0
+	if value, ok := decodeJSONField[string](fields, "maxConcurrency"); ok {
+		reuse.MaxConcurrency = value
+		promoted = true
+	}
+	if value, ok := decodeJSONField[string](fields, "maxConnections"); ok {
+		reuse.MaxConnections = value
+		promoted = true
+	}
+	if value, ok := decodeJSONField[string](fields, "cMaxReuseTimes"); ok {
+		reuse.CMaxReuseTimes = value
+		promoted = true
+	}
+	if value, ok := decodeJSONField[string](fields, "hMaxRequestTimes"); ok {
+		reuse.HMaxRequestTimes = value
+		promoted = true
+	}
+	if value, ok := decodeJSONField[string](fields, "hMaxReusableSecs"); ok {
+		reuse.HMaxReusableSecs = value
+		promoted = true
+	}
+	if value, ok := decodeJSONField[int](fields, "hKeepAlivePeriod"); ok {
+		reuse.HKeepAlivePeriod = value
+		promoted = true
+	}
+	if !promoted {
+		return nil
+	}
+	return reuse
+}
+
+func downloadFromJSON(raw json.RawMessage) *domain.XHTTPDownloadSettings {
+	fields, ok := jsonObjectFields(raw)
+	if !ok {
+		return nil
+	}
+	download := &domain.XHTTPDownloadSettings{}
+	promoted := len(fields) == 0
+	if value, ok := decodeJSONField[string](fields, "address"); ok {
+		download.Server = &value
+		promoted = true
+	}
+	if value, ok := decodeJSONField[uint16](fields, "port"); ok {
+		download.Port = &value
+		promoted = true
+	}
+	if _, ok := decodeJSONField[string](fields, "network"); ok {
+		promoted = true
+	}
+	security, hasSecurity := decodeJSONField[string](fields, "security")
+	if hasSecurity {
+		promoted = true
+	}
+	if settingsRaw, exists := lookupJSONField(fields, "xhttpSettings"); exists {
+		if applyDownloadXHTTPSettingsFromJSON(download, settingsRaw) {
+			promoted = true
+		}
+	}
+
+	var tls *domain.TLSOptions
+	if settingsRaw, exists := lookupJSONField(fields, "tlsSettings"); exists {
+		if settings := tlsFromJSON(settingsRaw); settings != nil {
+			tls = settings
+			promoted = true
+		}
+	}
+	if hasSecurity && security == "tls" {
+		if tls == nil {
+			tls = &domain.TLSOptions{Enabled: true}
+		}
+		promoted = true
+	}
+
+	var reality *domain.RealityOptions
+	if settingsRaw, exists := lookupJSONField(fields, "realitySettings"); exists {
+		if settings := realityFromJSON(settingsRaw); settings != nil {
+			reality = settings
+			promoted = true
+		}
+	}
+	if hasSecurity && security == "reality" {
+		if reality == nil {
+			reality = &domain.RealityOptions{Enabled: true}
+		}
+		promoted = true
+	}
+	if reality != nil {
+		if tls == nil {
+			tls = &domain.TLSOptions{Enabled: true}
+		}
+		tls.Reality = reality
+	}
+	download.TLS = tls
+
+	if !promoted {
+		return nil
+	}
+	return download
+}
+
+func applyDownloadXHTTPSettingsFromJSON(download *domain.XHTTPDownloadSettings, raw json.RawMessage) bool {
+	fields, ok := jsonObjectFields(raw)
+	if !ok {
+		return false
+	}
+	promoted := len(fields) == 0
+	if value, ok := decodeJSONField[string](fields, "path"); ok {
+		download.Path = &value
+		promoted = true
+	}
+	if value, ok := decodeJSONField[string](fields, "host"); ok {
+		download.Host = &value
+		promoted = true
+	}
+	if extraRaw, exists := lookupJSONField(fields, "extra"); exists {
+		if extraFields, ok := jsonObjectFields(extraRaw); ok {
+			if xmuxRaw, exists := lookupJSONField(extraFields, "xmux"); exists {
+				if reuse := reuseFromJSON(xmuxRaw); reuse != nil {
+					download.ReuseSettings = reuse
+					promoted = true
+				}
+			}
+		}
+	}
+	return promoted
+}
+
+func tlsFromJSON(raw json.RawMessage) *domain.TLSOptions {
+	fields, ok := jsonObjectFields(raw)
+	if !ok {
+		return nil
+	}
+	tls := &domain.TLSOptions{Enabled: true}
+	promoted := len(fields) == 0
+	if value, ok := decodeJSONField[string](fields, "serverName"); ok {
+		tls.ServerName = value
+		promoted = true
+	}
+	if value, ok := decodeJSONField[bool](fields, "allowInsecure"); ok {
+		tls.InsecureSkipVerify = value
+		promoted = true
+	}
+	if value, ok := decodeJSONField[[]string](fields, "alpn"); ok {
+		tls.ALPN = value
+		promoted = true
+	}
+	if value, ok := decodeJSONField[string](fields, "fingerprint"); ok {
+		tls.ClientFingerprint = value
+		promoted = true
+	}
+
+	ech := &domain.ECHOptions{Enabled: true}
+	if value, ok := decodeJSONField[[]string](fields, "echConfigList"); ok {
+		ech.Config = value
+		promoted = true
+	}
+	if value, ok := decodeJSONField[string](fields, "echQuery"); ok {
+		ech.QueryServerName = value
+		promoted = true
+	}
+	if value, ok := decodeJSONField[string](fields, "echDNS"); ok {
+		ech.DNS = value
+		promoted = true
+	}
+	if value, ok := decodeJSONField[string](fields, "echForceQuery"); ok {
+		ech.ForceQuery = value
+		promoted = true
+	}
+	if len(ech.Config) > 0 || ech.QueryServerName != "" || ech.DNS != "" || ech.ForceQuery != "" {
+		tls.ECH = ech
+	}
+	if !promoted {
+		return nil
+	}
+	return tls
+}
+
+func realityFromJSON(raw json.RawMessage) *domain.RealityOptions {
+	fields, ok := jsonObjectFields(raw)
+	if !ok {
+		return nil
+	}
+	reality := &domain.RealityOptions{Enabled: true}
+	promoted := len(fields) == 0
+	if value, ok := decodeJSONField[string](fields, "publicKey"); ok {
+		reality.PublicKey = value
+		promoted = true
+	}
+	if value, ok := decodeJSONField[string](fields, "shortId"); ok {
+		reality.ShortID = value
+		promoted = true
+	}
+	if !promoted {
+		return nil
+	}
+	return reality
 }
 
 func reuseFromWire(wire *xhttpReuseWire) *domain.XHTTPReuseSettings {

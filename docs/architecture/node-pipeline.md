@@ -50,6 +50,14 @@ parser 不访问 Store、不执行节点探测，也不根据最终客户端策�
 
 normalize 是 adapter 把外部别名、默认语义和目标结构统一成 `NodeIR` 的边界。service 随后用共享的 node validation 检查协议必填项与结构约束。
 
+URI adapter 会把 WebSocket path 中独占的 `?ed=<正整数>` 约定转换为
+`transport.max_early_data`，同时将
+`transport.early_data_header_name` 设为 `Sec-WebSocket-Protocol`；包含其他
+query 参数或无效 `ed` 的 path 保持原样。各 parser 返回后，service 会统一移除
+非 TCP/raw transport 上的 VLESS `xtls-rprx-vision` flow，并产生
+`node_normalized_incompatible_flow` warning。这个兼容修正与目标 renderer
+无关，不允许在 sing-box 或 Mihomo 输出层静默形成不同语义。
+
 校验会在多个可信边界复用：
 
 - parser 输出完成规范化后。

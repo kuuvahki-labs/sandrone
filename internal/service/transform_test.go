@@ -478,6 +478,120 @@ proxies:
 	require.Len(t, singBoxParsed.Nodes, 1)
 	require.Equal(t, domain.NodeTypeTUIC, singBoxParsed.Nodes[0].Type)
 }
+
+func TestServiceParseNormalizesIncompatibleVLESSVisionFlow(t *testing.T) {
+	svc := service.New()
+	tests := []struct {
+		name    string
+		format  string
+		content string
+	}{
+		{
+			name:   "uri",
+			format: "uri",
+			content: "vless://11111111-1111-1111-1111-111111111111@example.com:443" +
+				"?encryption=none&security=tls&flow=xtls-rprx-vision&type=ws&path=%2Fws#vless",
+		},
+		{
+			name:   "mihomo",
+			format: "mihomo",
+			content: `
+proxies:
+  - name: vless
+    type: vless
+    server: example.com
+    port: 443
+    uuid: 11111111-1111-1111-1111-111111111111
+    flow: xtls-rprx-vision
+    network: ws
+    ws-opts:
+      path: /ws
+`,
+		},
+		{
+			name:   "sing-box",
+			format: "sing-box",
+			content: `{
+  "outbounds": [{
+    "type": "vless",
+    "tag": "vless",
+    "server": "example.com",
+    "server_port": 443,
+    "uuid": "11111111-1111-1111-1111-111111111111",
+    "flow": "xtls-rprx-vision",
+    "transport": {"type": "ws", "path": "/ws"}
+  }]
+}`,
+		},
+		{
+			name:   "json nodes",
+			format: "json-nodes",
+			content: `[{
+  "name": "vless",
+  "type": "vless",
+  "server": "example.com",
+  "port": 443,
+  "uuid": "11111111-1111-1111-1111-111111111111",
+  "flow": "xtls-rprx-vision",
+  "transport": {"type": "websocket", "path": "/ws"}
+}]`,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := svc.Parse(context.Background(), domain.ParseRequest{
+				Format:  tc.format,
+				Content: []byte(tc.content),
+			})
+
+			require.NoError(t, err)
+			require.Len(t, result.Nodes, 1)
+			require.Empty(t, result.Nodes[0].Flow)
+			require.Len(t, result.Report.Warnings, 1)
+			warning := result.Report.Warnings[0]
+			require.Equal(t, "node_normalized_incompatible_flow", warning.Code)
+			require.Equal(t, "flow", warning.Field)
+			require.Equal(t, "normalized", warning.Source)
+			require.Equal(t, "vless", warning.Node)
+			require.NotNil(t, warning.NodeIndex)
+			require.Zero(t, *warning.NodeIndex)
+			require.NotContains(t, warning.Message, "11111111-1111-1111-1111-111111111111")
+		})
+	}
+}
+
+func TestServiceParseKeepsVLESSVisionFlowForStreamTransports(t *testing.T) {
+	svc := service.New()
+	for _, transport := range []string{"", "tcp", "raw"} {
+		name := transport
+		if name == "" {
+			name = "empty"
+		}
+		t.Run(name, func(t *testing.T) {
+			transportJSON := ""
+			if transport != "" {
+				transportJSON = `,"transport":{"type":"` + transport + `"}`
+			}
+			result, err := svc.Parse(context.Background(), domain.ParseRequest{
+				Format: "json-nodes",
+				Content: []byte(`[{
+  "name": "vless",
+  "type": "vless",
+  "server": "example.com",
+  "port": 443,
+  "uuid": "11111111-1111-1111-1111-111111111111",
+  "flow": "xtls-rprx-vision"` + transportJSON + `
+}]`),
+			})
+
+			require.NoError(t, err)
+			require.Len(t, result.Nodes, 1)
+			require.Equal(t, "xtls-rprx-vision", result.Nodes[0].Flow)
+			require.Empty(t, result.Report.Warnings)
+		})
+	}
+}
+
 func TestServiceParseWithProcessorChain(t *testing.T) {
 	svc := service.New()
 	result, err := svc.Parse(context.Background(), domain.ParseRequest{

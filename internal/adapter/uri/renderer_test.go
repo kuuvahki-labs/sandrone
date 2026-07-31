@@ -2,6 +2,7 @@ package uri_test
 
 import (
 	"context"
+	"encoding/base64"
 	"net/url"
 	"strings"
 	"testing"
@@ -334,6 +335,21 @@ func TestRenderParseVMessGRPCRoundtrip(t *testing.T) {
 	require.Equal(t, "grpc", reparsed[0].Transport.Type)
 	require.Equal(t, "svc", reparsed[0].Transport.ServiceName)
 	require.Empty(t, reparsed[0].Transport.Path)
+}
+
+func TestRenderParsedVMessAEADStillUsesLegacyBase64JSON(t *testing.T) {
+	p := uri.NewParser()
+	nodes, _, err := p.Parse(context.Background(), []byte(
+		"vmess://11111111-1111-1111-1111-111111111111@example.com:443?encryption=zero#vmess-aead",
+	))
+	require.NoError(t, err)
+
+	body, _, err := uri.NewRenderer().RenderWithReport(
+		context.Background(), nodes, domain.RenderOptions{},
+	)
+	require.NoError(t, err)
+	legacyJSON := `{"add":"example.com","aid":"0","id":"11111111-1111-1111-1111-111111111111","net":"tcp","port":"443","ps":"vmess-aead","scy":"zero","type":"none","v":"2"}`
+	require.Equal(t, "vmess://"+base64.StdEncoding.EncodeToString([]byte(legacyJSON)), string(body))
 }
 
 func TestRenderURIVLESSXHTTPRealityRoundtrip(t *testing.T) {

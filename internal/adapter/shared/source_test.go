@@ -19,6 +19,7 @@ func TestSourceRefs(t *testing.T) {
 		{format: "ss", name: "SIP002", kind: "protocol", count: 1},
 		{format: "shadowsocks", name: "SIP002", kind: "protocol", count: 1},
 		{format: "vmess", name: "vmess", kind: "protocol", count: 1},
+		{format: "vmess-aead", name: "VMessAEAD / VLESS sharing link", kind: "protocol", count: 1},
 		{format: "vless", name: "VLESS", kind: "protocol", count: 1},
 		{format: "trojan", name: "trojan", kind: "protocol", count: 1},
 		{format: "hysteria", name: "Hysteria v1", kind: "protocol", count: 1},

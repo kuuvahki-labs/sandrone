@@ -93,10 +93,10 @@ func applyHysteria2ParseQueryTLS(node *domain.NodeIR, values url.Values) {
 	}
 }
 
-func applyTransportQuery(node *domain.NodeIR, values url.Values) {
+func applyTransportQuery(node *domain.NodeIR, values url.Values) bool {
 	typ := shared.QueryFirst(values, "type", "net", "transport")
 	if typ == "" {
-		return
+		return false
 	}
 	node.Transport = &domain.TransportOptions{
 		Type:        typ,
@@ -105,15 +105,20 @@ func applyTransportQuery(node *domain.NodeIR, values url.Values) {
 		ServiceName: shared.QueryFirst(values, "serviceName", "service_name"),
 	}
 	normalizeTransport(node.Transport)
+	normalizeWebSocketEarlyData(node.Transport)
 	if node.Transport.Type == "tcp" && tcpHeaderTypeIsDefault(values) {
 		node.Transport.Host = ""
 	}
 	if node.Transport.Host != "" {
 		node.Transport.Headers = map[string]string{"Host": node.Transport.Host}
 	}
-	if node.Type == domain.NodeTypeVLESS {
-		applyVLESSXHTTPExtra(node.Transport, values)
+	if node.Type == domain.NodeTypeVMess {
+		return applyVMessXHTTPExtra(node.Transport, values)
 	}
+	if node.Type == domain.NodeTypeVLESS {
+		return applyXHTTPExtra(node.Transport, values)
+	}
+	return false
 }
 
 func isTelegramProxyWebURL(u *url.URL) bool {
@@ -139,6 +144,32 @@ func normalizeTransport(transport *domain.TransportOptions) {
 	case "h2":
 		transport.Type = "http"
 	}
+}
+
+func normalizeWebSocketEarlyData(transport *domain.TransportOptions) {
+	if transport.Type != "websocket" {
+		return
+	}
+	path, rawQuery, ok := strings.Cut(transport.Path, "?")
+	if !ok {
+		return
+	}
+	rawMaxEarlyData, ok := strings.CutPrefix(rawQuery, "ed=")
+	if !ok || rawMaxEarlyData == "" {
+		return
+	}
+	for _, char := range rawMaxEarlyData {
+		if char < '0' || char > '9' {
+			return
+		}
+	}
+	maxEarlyData, err := strconv.Atoi(rawMaxEarlyData)
+	if err != nil || maxEarlyData <= 0 {
+		return
+	}
+	transport.Path = path
+	transport.MaxEarlyData = maxEarlyData
+	transport.EarlyDataHeaderName = "Sec-WebSocket-Protocol"
 }
 
 func preserveURIQuery(node *domain.NodeIR, values url.Values, known map[string]bool) {

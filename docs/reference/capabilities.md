@@ -53,6 +53,11 @@ v1.13.14；Shadowrocket 字段引用固定的上游 revision。调用方需要�
 显式 `uri-list`/`base64` 解析会对每行先尝试 URI，并兼容单行 JSON/YAML
 节点；远程自动检测使用严格 URI-list，不接受该单行结构化回退。
 
+VMess URI 输入同时接受 legacy `vmess://Base64(JSON)` 与 Discussion #716
+风格的 `vmess://UUID@host:port?...` URL；URL 输入只提升当前 `NodeIR` 可表达
+的字段，未支持参数保留为 Raw 并产生 warning。VMess URI 输出仍为 legacy
+Base64 JSON，不承诺对 #716 的完整或无损往返。
+
 ## 输出格式
 
 | format | 产物 |

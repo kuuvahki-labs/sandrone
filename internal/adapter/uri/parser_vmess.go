@@ -3,6 +3,9 @@ package uri
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/shared"
@@ -10,8 +13,163 @@ import (
 )
 
 var errVMessZeroPort = errors.New("zero vmess port")
+var vmessAEADUUIDPattern = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
 func parseVMess(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
+	payload := strings.TrimPrefix(raw, "vmess://")
+	if strings.Contains(payload, "@") {
+		return parseVMessAEAD(raw)
+	}
+	return parseLegacyVMess(raw)
+}
+
+func parseVMessAEAD(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
+	node := domain.NodeIR{Type: domain.NodeTypeVMess, SourceFormat: "uri"}
+	source := shared.SourceInfo("vmess", shared.SourceRefs("vmess-aead"))
+	u, err := url.Parse(raw)
+	if err != nil {
+		return node, source, domain.WrapError(domain.CodeParseFailed, "parse vmess AEAD URI", err)
+	}
+	if u.Opaque != "" || u.Path != "" || u.RawPath != "" {
+		return node, source, domain.NewError(domain.CodeParseFailed, "vmess AEAD URL path is not allowed")
+	}
+	if u.User == nil || u.User.Username() == "" {
+		return node, source, domain.NewError(domain.CodeParseFailed, "missing vmess uuid")
+	}
+	if _, hasPassword := u.User.Password(); hasPassword {
+		return node, source, domain.NewError(domain.CodeParseFailed, "vmess AEAD userinfo must contain only a uuid")
+	}
+	if !vmessAEADUUIDPattern.MatchString(u.User.Username()) {
+		return node, source, domain.NewError(domain.CodeParseFailed, "invalid vmess uuid")
+	}
+	host, port, err := shared.ParseURLHostPort(u, "")
+	if err != nil {
+		return node, source, domain.WrapError(domain.CodeParseFailed, "parse vmess AEAD server", err)
+	}
+	values, err := url.ParseQuery(u.RawQuery)
+	if err != nil {
+		return node, source, domain.WrapError(domain.CodeParseFailed, "parse vmess AEAD query", err)
+	}
+	for _, key := range sortedQueryKeys(values) {
+		if len(values[key]) > 1 {
+			return node, source, domain.NewError(
+				domain.CodeParseFailed,
+				fmt.Sprintf("duplicate vmess AEAD query parameter %q", key),
+			)
+		}
+	}
+
+	node.Name = shared.DecodeName(u.Fragment, host)
+	node.Server = host
+	node.Port = port
+	node.UUID = u.User.Username()
+	node.Cipher = firstNonEmpty(values.Get("encryption"), "auto")
+	node.PacketEncoding = shared.QueryFirst(values, "packetEncoding", "packet-encoding")
+	applyTLSQuery(&node, values)
+	xhttpExtraComplete := applyTransportQuery(&node, values)
+	node.Raw = map[string]json.RawMessage{}
+	known := vmessAEADKnownQueryFields(node, values, xhttpExtraComplete)
+	preserveURIQuery(&node, values, known)
+	return node, source, nil
+}
+
+func vmessAEADKnownQueryFields(node domain.NodeIR, values url.Values, xhttpExtraComplete bool) map[string]bool {
+	known := map[string]bool{}
+	if values.Get("encryption") != "" {
+		known["encryption"] = true
+	}
+	if key, value := vmessAEADFirstQueryField(values, "packetEncoding", "packet-encoding"); value != "" && node.PacketEncoding == value {
+		known[key] = true
+	}
+	if tls := node.TLS; tls != nil {
+		if key, value := vmessAEADFirstQueryField(values, "security", "tls"); vmessAEADTLSModeIsTyped(value) && tls.Enabled {
+			known[key] = true
+		}
+		if key, value := vmessAEADFirstQueryField(values, "sni", "servername", "serverName"); value != "" && tls.ServerName == value {
+			known[key] = true
+		}
+		if key, value := vmessAEADFirstQueryField(values, "allowInsecure", "allow_insecure", "allow-insecure", "skip-cert-verify", "insecure"); vmessAEADBoolQueryIsValid(value) {
+			known[key] = true
+		}
+		if values.Get("alpn") != "" && len(tls.ALPN) > 0 {
+			known["alpn"] = true
+		}
+		if value := values.Get("fp"); value != "" && tls.ClientFingerprint == value {
+			known["fp"] = true
+		}
+		if key, value := vmessAEADFirstQueryField(values, "fingerprint", "pinSHA256", "pcs"); value != "" && tls.Fingerprint == value {
+			known[key] = true
+		}
+		if reality := tls.Reality; reality != nil {
+			if key, value := vmessAEADFirstQueryField(values, "pbk", "public-key"); value != "" && reality.PublicKey == value {
+				known[key] = true
+			}
+			if key, value := vmessAEADFirstQueryField(values, "sid", "short-id"); value != "" && reality.ShortID == value {
+				known[key] = true
+			}
+		}
+		if tls.ECH != nil {
+			if values.Get("ech") != "" {
+				known["ech"] = true
+			}
+			if values.Get("echForceQuery") != "" {
+				known["echForceQuery"] = true
+			}
+		}
+	}
+	if transport := node.Transport; transport != nil {
+		if key, value := vmessAEADFirstQueryField(values, "type", "net", "transport"); value != "" {
+			known[key] = true
+		}
+		if key, value := vmessAEADFirstQueryField(values, "path", "wspath", "wsPath", "ws-path", "obfs-uri"); value != "" && transport.Path == value {
+			known[key] = true
+		}
+		if key, value := vmessAEADFirstQueryField(values, "host", "authority", "wsHost", "ws-host", "requestHost", "http-host"); value != "" && (transport.Host == value || transport.Headers["Host"] == value) {
+			known[key] = true
+		}
+		if key, value := vmessAEADFirstQueryField(values, "serviceName", "service_name"); value != "" && transport.ServiceName == value {
+			known[key] = true
+		}
+		if transport.XHTTP != nil {
+			if value := values.Get("mode"); value != "" && transport.XHTTP.Mode == value {
+				known["mode"] = true
+			}
+			if xhttpExtraComplete && values.Get("extra") != "" {
+				known["extra"] = true
+			}
+		}
+	}
+	return known
+}
+
+func vmessAEADFirstQueryField(values url.Values, keys ...string) (string, string) {
+	for _, key := range keys {
+		if value := values.Get(key); value != "" {
+			return key, value
+		}
+	}
+	return "", ""
+}
+
+func vmessAEADTLSModeIsTyped(value string) bool {
+	switch strings.ToLower(value) {
+	case "tls", "reality", "true":
+		return true
+	default:
+		return false
+	}
+}
+
+func vmessAEADBoolQueryIsValid(value string) bool {
+	switch strings.ToLower(value) {
+	case "true", "1", "yes", "y", "on", "false", "0", "no", "n", "off":
+		return true
+	default:
+		return false
+	}
+}
+
+func parseLegacyVMess(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 	node := domain.NodeIR{Type: domain.NodeTypeVMess, SourceFormat: "uri"}
 	source := shared.SourceInfo("vmess", shared.SourceRefs("vmess"))
 	payload := strings.TrimPrefix(raw, "vmess://")

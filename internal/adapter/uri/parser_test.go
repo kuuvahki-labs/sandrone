@@ -3,6 +3,7 @@ package uri_test
 import (
 	"context"
 	"encoding/base64"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -63,6 +64,791 @@ func TestParseVMessURI(t *testing.T) {
 	require.NotNil(t, got.TLS)
 	require.True(t, got.TLS.Enabled)
 	require.Equal(t, "example.com", got.TLS.ServerName)
+}
+
+func TestParseLegacyVMessWebSocketPathDoesNotDecodeURIEarlyDataConvention(t *testing.T) {
+	p := uri.NewParser()
+	payload := `{"v":"2","ps":"vmess-ws","add":"example.com","port":"443","id":"11111111-1111-1111-1111-111111111111","aid":"0","net":"ws","path":"/do?ed=2048"}`
+	raw := "vmess://" + base64.StdEncoding.EncodeToString([]byte(payload))
+
+	nodes, _, err := p.Parse(context.Background(), []byte(raw))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	got := nodes[0]
+	require.NotNil(t, got.Transport)
+	require.Equal(t, "/do?ed=2048", got.Transport.Path)
+	require.Zero(t, got.Transport.MaxEarlyData)
+	require.Empty(t, got.Transport.EarlyDataHeaderName)
+}
+
+func TestParseVMessAEADURL(t *testing.T) {
+	p := uri.NewParser()
+	raw := "vmess://11111111-1111-1111-1111-111111111111@example.com:443#vmess-aead"
+
+	nodes, source, err := p.Parse(context.Background(), []byte(raw))
+
+	require.NoError(t, err)
+	require.NotNil(t, source)
+	require.Equal(t, "vmess", source.Format)
+	require.Len(t, nodes, 1)
+	got := nodes[0]
+	require.Equal(t, domain.NodeTypeVMess, got.Type)
+	require.Equal(t, "vmess-aead", got.Name)
+	require.Equal(t, "example.com", got.Server)
+	require.Equal(t, uint16(443), got.Port)
+	require.Equal(t, "11111111-1111-1111-1111-111111111111", got.UUID)
+	require.Equal(t, "auto", got.Cipher)
+	require.Zero(t, got.AlterID)
+	require.Nil(t, got.TLS)
+	require.Nil(t, got.Transport)
+	require.Empty(t, got.Raw)
+}
+
+func TestParseVMessAEADWebSocketTLSURL(t *testing.T) {
+	p := uri.NewParser()
+	raw := "vmess://11111111-1111-1111-1111-111111111111@example.com:443?encryption=zero&security=tls&type=ws&host=cdn.example.com&path=%2Fws&sni=sni.example.com#VMess%20AEAD"
+
+	nodes, _, err := p.Parse(context.Background(), []byte(raw))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	got := nodes[0]
+	require.Equal(t, "VMess AEAD", got.Name)
+	require.Equal(t, "zero", got.Cipher)
+	require.NotNil(t, got.TLS)
+	require.True(t, got.TLS.Enabled)
+	require.Equal(t, "sni.example.com", got.TLS.ServerName)
+	require.NotNil(t, got.Transport)
+	require.Equal(t, "websocket", got.Transport.Type)
+	require.Equal(t, "cdn.example.com", got.Transport.Host)
+	require.Equal(t, "/ws", got.Transport.Path)
+	require.Equal(t, map[string]string{"Host": "cdn.example.com"}, got.Transport.Headers)
+	require.Empty(t, got.Raw)
+}
+
+func TestParseVMessAEADIPv6URL(t *testing.T) {
+	p := uri.NewParser()
+	raw := "vmess://11111111-1111-1111-1111-111111111111@[2001:db8::1]:8443?encryption=auto#ipv6"
+
+	nodes, _, err := p.Parse(context.Background(), []byte(raw))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	require.Equal(t, "2001:db8::1", nodes[0].Server)
+	require.Equal(t, uint16(8443), nodes[0].Port)
+}
+
+func TestParseVMessAEADRejectsMalformedAuthority(t *testing.T) {
+	p := uri.NewParser()
+	tests := []struct {
+		name string
+		raw  string
+		want string
+	}{
+		{
+			name: "missing explicit port",
+			raw:  "vmess://11111111-1111-1111-1111-111111111111@example.com#missing-port",
+			want: "parse vmess AEAD server",
+		},
+		{
+			name: "password-style userinfo",
+			raw:  "vmess://11111111-1111-1111-1111-111111111111:secret@example.com:443#password",
+			want: "userinfo must contain only a uuid",
+		},
+		{
+			name: "invalid uuid",
+			raw:  "vmess://not-a-uuid@example.com:443",
+			want: "invalid vmess uuid",
+		},
+		{
+			name: "non-empty path",
+			raw:  "vmess://11111111-1111-1111-1111-111111111111@example.com:443/not-in-profile",
+			want: "vmess AEAD URL path is not allowed",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, err := p.Parse(context.Background(), []byte(tc.raw))
+			require.Error(t, err)
+			require.True(t, domain.IsCode(err, domain.CodeParseFailed), "unexpected error: %v", err)
+			require.Contains(t, err.Error(), tc.want)
+		})
+	}
+}
+
+func TestParseVMessAEADRejectsDuplicateQueryKey(t *testing.T) {
+	p := uri.NewParser()
+	raw := "vmess://11111111-1111-1111-1111-111111111111@example.com:443?security=tls&security=reality"
+
+	_, _, err := p.Parse(context.Background(), []byte(raw))
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), `duplicate vmess AEAD query parameter "security"`)
+}
+
+func TestParseVMessAEADXHTTPRealityAndUnsupportedRaw(t *testing.T) {
+	p := uri.NewParser()
+	raw := "vmess://11111111-1111-1111-1111-111111111111@example.com:443?encryption=auto&security=reality&pbk=public-key&sid=08&type=xhttp&path=%2Fxhttp&host=cdn.example.com&mode=packet-up&extra=%7B%22xmux%22%3A%7B%22maxConcurrency%22%3A%228-16%22%7D%7D&pqv=mlkem&fm=1#vmess-xhttp"
+
+	nodes, source, err := p.Parse(context.Background(), []byte(raw))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	got := nodes[0]
+	require.NotNil(t, got.TLS)
+	require.NotNil(t, got.TLS.Reality)
+	require.Equal(t, "public-key", got.TLS.Reality.PublicKey)
+	require.Equal(t, "08", got.TLS.Reality.ShortID)
+	require.NotNil(t, got.Transport)
+	require.Equal(t, "xhttp", got.Transport.Type)
+	require.NotNil(t, got.Transport.XHTTP)
+	require.Equal(t, "packet-up", got.Transport.XHTTP.Mode)
+	require.NotNil(t, got.Transport.XHTTP.ReuseSettings)
+	require.Equal(t, "8-16", got.Transport.XHTTP.ReuseSettings.MaxConcurrency)
+	require.NotContains(t, got.Raw, "uri.query.mode")
+	require.NotContains(t, got.Raw, "uri.query.extra")
+	require.JSONEq(t, `"mlkem"`, string(got.Raw["uri.query.pqv"]))
+	require.JSONEq(t, `"1"`, string(got.Raw["uri.query.fm"]))
+	require.Equal(t, []string{"uri.query.fm", "uri.query.pqv"}, warningFields(source.Warnings))
+}
+
+func TestParseVMessAEADPreservesModeInapplicableXHTTPFields(t *testing.T) {
+	p := uri.NewParser()
+	raw := "vmess://11111111-1111-1111-1111-111111111111@example.com:443?type=ws&mode=packet-up&extra=%7B%7D"
+
+	nodes, source, err := p.Parse(context.Background(), []byte(raw))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	got := nodes[0]
+	require.NotNil(t, got.Transport)
+	require.Equal(t, "websocket", got.Transport.Type)
+	require.JSONEq(t, `"packet-up"`, string(got.Raw["uri.query.mode"]))
+	require.JSONEq(t, `"{}"`, string(got.Raw["uri.query.extra"]))
+	require.Equal(t, []string{"uri.query.extra", "uri.query.mode"}, warningFields(source.Warnings))
+}
+
+func TestParseVMessAEADPreservesShortIDWithoutReality(t *testing.T) {
+	p := uri.NewParser()
+	raw := "vmess://11111111-1111-1111-1111-111111111111@example.com:443?sid=08"
+
+	nodes, source, err := p.Parse(context.Background(), []byte(raw))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	require.Nil(t, nodes[0].TLS)
+	require.JSONEq(t, `"08"`, string(nodes[0].Raw["uri.query.sid"]))
+	require.Equal(t, []string{"uri.query.sid"}, warningFields(source.Warnings))
+}
+
+func TestParseVMessAEADAccountsForPromotedWebSocketHostAlias(t *testing.T) {
+	p := uri.NewParser()
+	raw := "vmess://11111111-1111-1111-1111-111111111111@example.com:443?type=ws&wsHost=cdn.example.com"
+
+	nodes, source, err := p.Parse(context.Background(), []byte(raw))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	got := nodes[0]
+	require.NotNil(t, got.Transport)
+	require.Equal(t, "websocket", got.Transport.Type)
+	require.Equal(t, "cdn.example.com", got.Transport.Host)
+	require.NotContains(t, got.Raw, "uri.query.wsHost")
+	require.NotContains(t, warningFields(source.Warnings), "uri.query.wsHost")
+}
+
+func TestParseVMessAEADPreservesUnselectedSemanticAlias(t *testing.T) {
+	p := uri.NewParser()
+	raw := "vmess://11111111-1111-1111-1111-111111111111@example.com:443?type=ws&host=selected.example.com&wsHost=unselected.example.com"
+
+	nodes, source, err := p.Parse(context.Background(), []byte(raw))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	got := nodes[0]
+	require.NotNil(t, got.Transport)
+	require.Equal(t, "selected.example.com", got.Transport.Host)
+	require.NotContains(t, got.Raw, "uri.query.host")
+	require.JSONEq(t, `"unselected.example.com"`, string(got.Raw["uri.query.wsHost"]))
+	require.Equal(t, []string{"uri.query.wsHost"}, warningFields(source.Warnings))
+}
+
+func TestParseVMessAEADPreservesInvalidXHTTPExtra(t *testing.T) {
+	p := uri.NewParser()
+	raw := "vmess://11111111-1111-1111-1111-111111111111@example.com:443?type=xhttp&mode=packet-up&extra=not-json"
+
+	nodes, source, err := p.Parse(context.Background(), []byte(raw))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	got := nodes[0]
+	require.NotNil(t, got.Transport)
+	require.NotNil(t, got.Transport.XHTTP)
+	require.Equal(t, "packet-up", got.Transport.XHTTP.Mode)
+	require.JSONEq(t, `"not-json"`, string(got.Raw["uri.query.extra"]))
+	require.Equal(t, []string{"uri.query.extra"}, warningFields(source.Warnings))
+}
+
+func TestParseVMessAEADPreservesNonObjectXHTTPExtra(t *testing.T) {
+	p := uri.NewParser()
+	raw := "vmess://11111111-1111-1111-1111-111111111111@example.com:443?type=xhttp&mode=packet-up&extra=null"
+
+	nodes, source, err := p.Parse(context.Background(), []byte(raw))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	got := nodes[0]
+	require.NotNil(t, got.Transport)
+	require.NotNil(t, got.Transport.XHTTP)
+	require.Equal(t, "packet-up", got.Transport.XHTTP.Mode)
+	require.JSONEq(t, `"null"`, string(got.Raw["uri.query.extra"]))
+	require.Equal(t, []string{"uri.query.extra"}, warningFields(source.Warnings))
+}
+
+func TestParseVMessAEADPreservesPartiallyRepresentableXHTTPExtra(t *testing.T) {
+	p := uri.NewParser()
+	raw := "vmess://11111111-1111-1111-1111-111111111111@example.com:443?type=xhttp&mode=packet-up&extra=%7B%22xmux%22%3A%7B%22maxConcurrency%22%3A%228-16%22%2C%22futureOption%22%3A1%7D%7D"
+
+	nodes, source, err := p.Parse(context.Background(), []byte(raw))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	got := nodes[0]
+	require.NotNil(t, got.Transport)
+	require.NotNil(t, got.Transport.XHTTP)
+	require.Equal(t, "packet-up", got.Transport.XHTTP.Mode)
+	require.NotNil(t, got.Transport.XHTTP.ReuseSettings)
+	require.Equal(t, "8-16", got.Transport.XHTTP.ReuseSettings.MaxConcurrency)
+	require.JSONEq(t, `"{\"xmux\":{\"maxConcurrency\":\"8-16\",\"futureOption\":1}}"`, string(got.Raw["uri.query.extra"]))
+	require.Equal(t, []string{"uri.query.extra"}, warningFields(source.Warnings))
+}
+
+func TestParseVMessAEADXHTTPDownloadPreservesSemanticallyIncompleteExtra(t *testing.T) {
+	tests := []struct {
+		name         string
+		extra        string
+		wantRaw      string
+		requireTyped func(*testing.T, domain.NodeIR)
+	}{
+		{
+			name:    "future network cannot disappear through the fixed renderer network",
+			extra:   `{"downloadSettings":{"address":"download.example.com","network":"future","xhttpSettings":{"path":"/download"}}}`,
+			wantRaw: `"{\"downloadSettings\":{\"address\":\"download.example.com\",\"network\":\"future\",\"xhttpSettings\":{\"path\":\"/download\"}}}"`,
+			requireTyped: func(t *testing.T, got domain.NodeIR) {
+				t.Helper()
+				download := got.Transport.XHTTP.DownloadSettings
+				require.NotNil(t, download)
+				require.NotNil(t, download.Server)
+				require.Equal(t, "download.example.com", *download.Server)
+				require.NotNil(t, download.Path)
+				require.Equal(t, "/download", *download.Path)
+			},
+		},
+		{
+			name:    "missing network cannot inherit the fixed renderer network",
+			extra:   `{"downloadSettings":{"security":"none"}}`,
+			wantRaw: `"{\"downloadSettings\":{\"security\":\"none\"}}"`,
+		},
+		{
+			name:    "null download settings cannot be treated as absent",
+			extra:   `{"downloadSettings":null}`,
+			wantRaw: `"{\"downloadSettings\":null}"`,
+		},
+		{
+			name:    "future security cannot be treated as no security",
+			extra:   `{"downloadSettings":{"network":"xhttp","security":"future"}}`,
+			wantRaw: `"{\"downloadSettings\":{\"network\":\"xhttp\",\"security\":\"future\"}}"`,
+		},
+		{
+			name:    "null security cannot be treated as absent security",
+			extra:   `{"downloadSettings":{"network":"xhttp","security":null}}`,
+			wantRaw: `"{\"downloadSettings\":{\"network\":\"xhttp\",\"security\":null}}"`,
+		},
+		{
+			name:    "tls security cannot consume reality settings",
+			extra:   `{"downloadSettings":{"network":"xhttp","security":"tls","realitySettings":{"publicKey":"public-key","shortId":"08"}}}`,
+			wantRaw: `"{\"downloadSettings\":{\"network\":\"xhttp\",\"security\":\"tls\",\"realitySettings\":{\"publicKey\":\"public-key\",\"shortId\":\"08\"}}}"`,
+		},
+		{
+			name:    "nested download settings cannot disappear after xmux promotion",
+			extra:   `{"downloadSettings":{"network":"xhttp","security":"none","xhttpSettings":{"extra":{"xmux":{"maxConnections":"4"},"downloadSettings":{"network":"xhttp","security":"none"}}}}}`,
+			wantRaw: `"{\"downloadSettings\":{\"network\":\"xhttp\",\"security\":\"none\",\"xhttpSettings\":{\"extra\":{\"xmux\":{\"maxConnections\":\"4\"},\"downloadSettings\":{\"network\":\"xhttp\",\"security\":\"none\"}}}}}"`,
+			requireTyped: func(t *testing.T, got domain.NodeIR) {
+				t.Helper()
+				download := got.Transport.XHTTP.DownloadSettings
+				require.NotNil(t, download)
+				require.NotNil(t, download.ReuseSettings)
+				require.Equal(t, "4", download.ReuseSettings.MaxConnections)
+			},
+		},
+		{
+			name:    "nested null download settings cannot be treated as absent",
+			extra:   `{"downloadSettings":{"network":"xhttp","security":"none","xhttpSettings":{"extra":{"downloadSettings":null}}}}`,
+			wantRaw: `"{\"downloadSettings\":{\"network\":\"xhttp\",\"security\":\"none\",\"xhttpSettings\":{\"extra\":{\"downloadSettings\":null}}}}"`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, source := parseVMessAEADXHTTPDownloadExtra(t, tc.extra)
+			if tc.requireTyped != nil {
+				tc.requireTyped(t, got)
+			}
+			require.Equal(t, tc.wantRaw, string(got.Raw["uri.query.extra"]))
+			require.Equal(t, []string{"uri.query.extra"}, warningFields(source.Warnings))
+			require.Len(t, source.Warnings, 1)
+			require.Equal(t, "parse_unknown_field", source.Warnings[0].Code)
+			require.Equal(t, "field preserved in NodeIR Raw", source.Warnings[0].Message)
+			require.Equal(t, "uri.query.extra", source.Warnings[0].Field)
+			require.Equal(t, "uri", source.Warnings[0].Source)
+		})
+	}
+}
+
+func TestParseVMessAEADXHTTPDownloadConsumesSupportedSettings(t *testing.T) {
+	tests := []struct {
+		name         string
+		extra        string
+		requireTyped func(*testing.T, domain.NodeIR)
+	}{
+		{
+			name:  "exact xhttp network with no security",
+			extra: `{"downloadSettings":{"address":"download.example.com","network":"xhttp","security":"none","xhttpSettings":{"path":"/download"}}}`,
+			requireTyped: func(t *testing.T, got domain.NodeIR) {
+				t.Helper()
+				download := got.Transport.XHTTP.DownloadSettings
+				require.NotNil(t, download)
+				require.NotNil(t, download.Server)
+				require.Equal(t, "download.example.com", *download.Server)
+				require.NotNil(t, download.Path)
+				require.Equal(t, "/download", *download.Path)
+				require.Nil(t, download.TLS)
+			},
+		},
+		{
+			name:  "exact tls security with tls settings",
+			extra: `{"downloadSettings":{"network":"xhttp","security":"tls","tlsSettings":{"serverName":"download.example.com","allowInsecure":true,"alpn":["h2"],"fingerprint":"chrome"}}}`,
+			requireTyped: func(t *testing.T, got domain.NodeIR) {
+				t.Helper()
+				download := got.Transport.XHTTP.DownloadSettings
+				require.NotNil(t, download)
+				require.NotNil(t, download.TLS)
+				require.True(t, download.TLS.Enabled)
+				require.Equal(t, "download.example.com", download.TLS.ServerName)
+				require.True(t, download.TLS.InsecureSkipVerify)
+				require.Equal(t, []string{"h2"}, download.TLS.ALPN)
+				require.Equal(t, "chrome", download.TLS.ClientFingerprint)
+				require.Nil(t, download.TLS.Reality)
+			},
+		},
+		{
+			name:  "exact reality security with reality settings",
+			extra: `{"downloadSettings":{"network":"xhttp","security":"reality","realitySettings":{"publicKey":"public-key","shortId":"08"}}}`,
+			requireTyped: func(t *testing.T, got domain.NodeIR) {
+				t.Helper()
+				download := got.Transport.XHTTP.DownloadSettings
+				require.NotNil(t, download)
+				require.NotNil(t, download.TLS)
+				require.True(t, download.TLS.Enabled)
+				require.NotNil(t, download.TLS.Reality)
+				require.True(t, download.TLS.Reality.Enabled)
+				require.Equal(t, "public-key", download.TLS.Reality.PublicKey)
+				require.Equal(t, "08", download.TLS.Reality.ShortID)
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, source := parseVMessAEADXHTTPDownloadExtra(t, tc.extra)
+			tc.requireTyped(t, got)
+			require.Empty(t, got.Raw)
+			require.Empty(t, source.Warnings)
+		})
+	}
+}
+
+func TestParseVMessAEADXHTTPExplicitNullPreservesRawAndPromotesSiblings(t *testing.T) {
+	tests := []struct {
+		name         string
+		extra        string
+		wantRaw      string
+		requireTyped func(*testing.T, domain.NodeIR)
+	}{
+		{
+			name:    "top level null xmux does not hide a valid download sibling",
+			extra:   `{"xmux":null,"downloadSettings":{"address":"download.example.com","network":"xhttp","security":"none"}}`,
+			wantRaw: `"{\"xmux\":null,\"downloadSettings\":{\"address\":\"download.example.com\",\"network\":\"xhttp\",\"security\":\"none\"}}"`,
+			requireTyped: func(t *testing.T, got domain.NodeIR) {
+				t.Helper()
+				require.Nil(t, got.Transport.XHTTP.ReuseSettings)
+				download := got.Transport.XHTTP.DownloadSettings
+				require.NotNil(t, download)
+				require.NotNil(t, download.Server)
+				require.Equal(t, "download.example.com", *download.Server)
+			},
+		},
+		{
+			name:    "null reuse string and integer leaves do not hide valid leaves",
+			extra:   `{"xmux":{"maxConcurrency":null,"maxConnections":"2","cMaxReuseTimes":"64","hKeepAlivePeriod":null}}`,
+			wantRaw: `"{\"xmux\":{\"maxConcurrency\":null,\"maxConnections\":\"2\",\"cMaxReuseTimes\":\"64\",\"hKeepAlivePeriod\":null}}"`,
+			requireTyped: func(t *testing.T, got domain.NodeIR) {
+				t.Helper()
+				reuse := got.Transport.XHTTP.ReuseSettings
+				require.NotNil(t, reuse)
+				require.Empty(t, reuse.MaxConcurrency)
+				require.Equal(t, "2", reuse.MaxConnections)
+				require.Equal(t, "64", reuse.CMaxReuseTimes)
+				require.Zero(t, reuse.HKeepAlivePeriod)
+			},
+		},
+		{
+			name:    "null download address and port do not hide a valid path",
+			extra:   `{"downloadSettings":{"address":null,"port":null,"network":"xhttp","security":"none","xhttpSettings":{"path":"/download"}}}`,
+			wantRaw: `"{\"downloadSettings\":{\"address\":null,\"port\":null,\"network\":\"xhttp\",\"security\":\"none\",\"xhttpSettings\":{\"path\":\"/download\"}}}"`,
+			requireTyped: func(t *testing.T, got domain.NodeIR) {
+				t.Helper()
+				download := got.Transport.XHTTP.DownloadSettings
+				require.NotNil(t, download)
+				require.Nil(t, download.Server)
+				require.Nil(t, download.Port)
+				require.NotNil(t, download.Path)
+				require.Equal(t, "/download", *download.Path)
+			},
+		},
+		{
+			name:    "null xhttp path does not hide host and nested reuse siblings",
+			extra:   `{"downloadSettings":{"network":"xhttp","security":"none","xhttpSettings":{"path":null,"host":"cdn.example.com","extra":{"xmux":{"maxConnections":"4"}}}}}`,
+			wantRaw: `"{\"downloadSettings\":{\"network\":\"xhttp\",\"security\":\"none\",\"xhttpSettings\":{\"path\":null,\"host\":\"cdn.example.com\",\"extra\":{\"xmux\":{\"maxConnections\":\"4\"}}}}}"`,
+			requireTyped: func(t *testing.T, got domain.NodeIR) {
+				t.Helper()
+				download := got.Transport.XHTTP.DownloadSettings
+				require.NotNil(t, download)
+				require.Nil(t, download.Path)
+				require.NotNil(t, download.Host)
+				require.Equal(t, "cdn.example.com", *download.Host)
+				require.NotNil(t, download.ReuseSettings)
+				require.Equal(t, "4", download.ReuseSettings.MaxConnections)
+			},
+		},
+		{
+			name:    "null xhttp host and extra do not hide a valid path sibling",
+			extra:   `{"downloadSettings":{"network":"xhttp","security":"none","xhttpSettings":{"path":"/download","host":null,"extra":null}}}`,
+			wantRaw: `"{\"downloadSettings\":{\"network\":\"xhttp\",\"security\":\"none\",\"xhttpSettings\":{\"path\":\"/download\",\"host\":null,\"extra\":null}}}"`,
+			requireTyped: func(t *testing.T, got domain.NodeIR) {
+				t.Helper()
+				download := got.Transport.XHTTP.DownloadSettings
+				require.NotNil(t, download)
+				require.NotNil(t, download.Path)
+				require.Equal(t, "/download", *download.Path)
+				require.Nil(t, download.Host)
+				require.Nil(t, download.ReuseSettings)
+			},
+		},
+		{
+			name:    "null tls scalar slice and ech leaves do not hide valid tls siblings",
+			extra:   `{"downloadSettings":{"network":"xhttp","security":"tls","tlsSettings":{"serverName":null,"allowInsecure":null,"alpn":null,"fingerprint":"chrome","echConfigList":null,"echQuery":"query.example","echDNS":null,"echForceQuery":"full"}}}`,
+			wantRaw: `"{\"downloadSettings\":{\"network\":\"xhttp\",\"security\":\"tls\",\"tlsSettings\":{\"serverName\":null,\"allowInsecure\":null,\"alpn\":null,\"fingerprint\":\"chrome\",\"echConfigList\":null,\"echQuery\":\"query.example\",\"echDNS\":null,\"echForceQuery\":\"full\"}}}"`,
+			requireTyped: func(t *testing.T, got domain.NodeIR) {
+				t.Helper()
+				tls := got.Transport.XHTTP.DownloadSettings.TLS
+				require.NotNil(t, tls)
+				require.Empty(t, tls.ServerName)
+				require.False(t, tls.InsecureSkipVerify)
+				require.Nil(t, tls.ALPN)
+				require.Equal(t, "chrome", tls.ClientFingerprint)
+				require.NotNil(t, tls.ECH)
+				require.Nil(t, tls.ECH.Config)
+				require.Equal(t, "query.example", tls.ECH.QueryServerName)
+				require.Empty(t, tls.ECH.DNS)
+				require.Equal(t, "full", tls.ECH.ForceQuery)
+			},
+		},
+		{
+			name:    "null array element is not promoted as an empty string",
+			extra:   `{"downloadSettings":{"network":"xhttp","security":"tls","tlsSettings":{"serverName":"download.example.com","alpn":["h2",null]}}}`,
+			wantRaw: `"{\"downloadSettings\":{\"network\":\"xhttp\",\"security\":\"tls\",\"tlsSettings\":{\"serverName\":\"download.example.com\",\"alpn\":[\"h2\",null]}}}"`,
+			requireTyped: func(t *testing.T, got domain.NodeIR) {
+				t.Helper()
+				tls := got.Transport.XHTTP.DownloadSettings.TLS
+				require.NotNil(t, tls)
+				require.Equal(t, "download.example.com", tls.ServerName)
+				require.Nil(t, tls.ALPN)
+			},
+		},
+		{
+			name:    "null reality public key does not hide a valid short id sibling",
+			extra:   `{"downloadSettings":{"network":"xhttp","security":"reality","realitySettings":{"publicKey":null,"shortId":"08"}}}`,
+			wantRaw: `"{\"downloadSettings\":{\"network\":\"xhttp\",\"security\":\"reality\",\"realitySettings\":{\"publicKey\":null,\"shortId\":\"08\"}}}"`,
+			requireTyped: func(t *testing.T, got domain.NodeIR) {
+				t.Helper()
+				reality := got.Transport.XHTTP.DownloadSettings.TLS.Reality
+				require.NotNil(t, reality)
+				require.Empty(t, reality.PublicKey)
+				require.Equal(t, "08", reality.ShortID)
+			},
+		},
+		{
+			name:    "null reality short id does not hide a valid public key sibling",
+			extra:   `{"downloadSettings":{"network":"xhttp","security":"reality","realitySettings":{"publicKey":"public-key","shortId":null}}}`,
+			wantRaw: `"{\"downloadSettings\":{\"network\":\"xhttp\",\"security\":\"reality\",\"realitySettings\":{\"publicKey\":\"public-key\",\"shortId\":null}}}"`,
+			requireTyped: func(t *testing.T, got domain.NodeIR) {
+				t.Helper()
+				reality := got.Transport.XHTTP.DownloadSettings.TLS.Reality
+				require.NotNil(t, reality)
+				require.Equal(t, "public-key", reality.PublicKey)
+				require.Empty(t, reality.ShortID)
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := requireVMessAEADXHTTPExtraPreserved(t, tc.extra, tc.wantRaw)
+			tc.requireTyped(t, got)
+		})
+	}
+}
+
+func TestParseVMessAEADXHTTPStringContainingNullIsConsumed(t *testing.T) {
+	got, source := parseVMessAEADXHTTPDownloadExtra(t, `{"xmux":{"maxConcurrency":"null"}}`)
+
+	require.NotNil(t, got.Transport.XHTTP.ReuseSettings)
+	require.Equal(t, "null", got.Transport.XHTTP.ReuseSettings.MaxConcurrency)
+	require.Empty(t, got.Raw)
+	require.Empty(t, source.Warnings)
+}
+
+func TestParseVMessAEADXHTTPCaseInsensitiveWireFieldsRemainTyped(t *testing.T) {
+	extra := `{"XMUX":{"MAXCONCURRENCY":"8-16"},"DOWNLOADSETTINGS":{"ADDRESS":"download.example.com","NETWORK":"xhttp","SECURITY":"none","XHTTPSETTINGS":{"PATH":"/download"}}}`
+
+	got, source := parseVMessAEADXHTTPDownloadExtra(t, extra)
+
+	require.NotNil(t, got.Transport.XHTTP.ReuseSettings)
+	require.Equal(t, "8-16", got.Transport.XHTTP.ReuseSettings.MaxConcurrency)
+	download := got.Transport.XHTTP.DownloadSettings
+	require.NotNil(t, download)
+	require.NotNil(t, download.Server)
+	require.Equal(t, "download.example.com", *download.Server)
+	require.NotNil(t, download.Path)
+	require.Equal(t, "/download", *download.Path)
+	require.Empty(t, got.Raw)
+	require.Empty(t, source.Warnings)
+}
+
+func TestParseVMessAEADXHTTPCaseVariantsKeepWholeStructDecodeOrder(t *testing.T) {
+	extra := `{"xmux":{"maxConcurrency":"first"},"XMUX":{"MAXCONCURRENCY":"last"}}`
+
+	got, source := parseVMessAEADXHTTPDownloadExtra(t, extra)
+
+	require.NotNil(t, got.Transport.XHTTP.ReuseSettings)
+	require.Equal(t, "last", got.Transport.XHTTP.ReuseSettings.MaxConcurrency)
+	require.Empty(t, got.Raw)
+	require.Empty(t, source.Warnings)
+}
+
+func TestParseVMessAEADXHTTPTypeErrorsPreserveRawAndPromoteSiblings(t *testing.T) {
+	tests := []struct {
+		name         string
+		extra        string
+		wantRaw      string
+		requireTyped func(*testing.T, domain.NodeIR)
+	}{
+		{
+			name:    "invalid download port does not block top level xmux",
+			extra:   `{"xmux":{"maxConcurrency":"8-16"},"downloadSettings":{"network":"xhttp","security":"none","port":"bad"}}`,
+			wantRaw: `"{\"xmux\":{\"maxConcurrency\":\"8-16\"},\"downloadSettings\":{\"network\":\"xhttp\",\"security\":\"none\",\"port\":\"bad\"}}"`,
+			requireTyped: func(t *testing.T, got domain.NodeIR) {
+				t.Helper()
+				require.NotNil(t, got.Transport.XHTTP.ReuseSettings)
+				require.Equal(t, "8-16", got.Transport.XHTTP.ReuseSettings.MaxConcurrency)
+			},
+		},
+		{
+			name:    "invalid reuse leaf does not block a valid reuse leaf",
+			extra:   `{"xmux":{"maxConcurrency":"8-16","maxConnections":1}}`,
+			wantRaw: `"{\"xmux\":{\"maxConcurrency\":\"8-16\",\"maxConnections\":1}}"`,
+			requireTyped: func(t *testing.T, got domain.NodeIR) {
+				t.Helper()
+				require.NotNil(t, got.Transport.XHTTP.ReuseSettings)
+				require.Equal(t, "8-16", got.Transport.XHTTP.ReuseSettings.MaxConcurrency)
+				require.Empty(t, got.Transport.XHTTP.ReuseSettings.MaxConnections)
+			},
+		},
+		{
+			name:    "invalid download leaf does not block valid address and path",
+			extra:   `{"downloadSettings":{"address":"download.example.com","port":"bad","network":"xhttp","security":"none","xhttpSettings":{"path":"/download"}}}`,
+			wantRaw: `"{\"downloadSettings\":{\"address\":\"download.example.com\",\"port\":\"bad\",\"network\":\"xhttp\",\"security\":\"none\",\"xhttpSettings\":{\"path\":\"/download\"}}}"`,
+			requireTyped: func(t *testing.T, got domain.NodeIR) {
+				t.Helper()
+				download := got.Transport.XHTTP.DownloadSettings
+				require.NotNil(t, download)
+				require.NotNil(t, download.Server)
+				require.Equal(t, "download.example.com", *download.Server)
+				require.Nil(t, download.Port)
+				require.NotNil(t, download.Path)
+				require.Equal(t, "/download", *download.Path)
+			},
+		},
+		{
+			name:    "invalid tls bool does not block valid tls string siblings",
+			extra:   `{"downloadSettings":{"network":"xhttp","security":"tls","tlsSettings":{"serverName":"download.example.com","allowInsecure":"bad","fingerprint":"chrome"}}}`,
+			wantRaw: `"{\"downloadSettings\":{\"network\":\"xhttp\",\"security\":\"tls\",\"tlsSettings\":{\"serverName\":\"download.example.com\",\"allowInsecure\":\"bad\",\"fingerprint\":\"chrome\"}}}"`,
+			requireTyped: func(t *testing.T, got domain.NodeIR) {
+				t.Helper()
+				download := got.Transport.XHTTP.DownloadSettings
+				require.NotNil(t, download)
+				tls := download.TLS
+				require.NotNil(t, tls)
+				require.Equal(t, "download.example.com", tls.ServerName)
+				require.False(t, tls.InsecureSkipVerify)
+				require.Equal(t, "chrome", tls.ClientFingerprint)
+			},
+		},
+		{
+			name:    "invalid reality leaf does not block a valid reality sibling",
+			extra:   `{"downloadSettings":{"network":"xhttp","security":"reality","realitySettings":{"publicKey":1,"shortId":"08"}}}`,
+			wantRaw: `"{\"downloadSettings\":{\"network\":\"xhttp\",\"security\":\"reality\",\"realitySettings\":{\"publicKey\":1,\"shortId\":\"08\"}}}"`,
+			requireTyped: func(t *testing.T, got domain.NodeIR) {
+				t.Helper()
+				download := got.Transport.XHTTP.DownloadSettings
+				require.NotNil(t, download)
+				require.NotNil(t, download.TLS)
+				reality := download.TLS.Reality
+				require.NotNil(t, reality)
+				require.Empty(t, reality.PublicKey)
+				require.Equal(t, "08", reality.ShortID)
+			},
+		},
+		{
+			name:    "invalid ech leaf does not block valid tls and ech siblings",
+			extra:   `{"downloadSettings":{"network":"xhttp","security":"tls","tlsSettings":{"serverName":"download.example.com","echConfigList":"bad","echQuery":"query.example"}}}`,
+			wantRaw: `"{\"downloadSettings\":{\"network\":\"xhttp\",\"security\":\"tls\",\"tlsSettings\":{\"serverName\":\"download.example.com\",\"echConfigList\":\"bad\",\"echQuery\":\"query.example\"}}}"`,
+			requireTyped: func(t *testing.T, got domain.NodeIR) {
+				t.Helper()
+				download := got.Transport.XHTTP.DownloadSettings
+				require.NotNil(t, download)
+				tls := download.TLS
+				require.NotNil(t, tls)
+				require.Equal(t, "download.example.com", tls.ServerName)
+				require.NotNil(t, tls.ECH)
+				require.Nil(t, tls.ECH.Config)
+				require.Equal(t, "query.example", tls.ECH.QueryServerName)
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := requireVMessAEADXHTTPExtraPreserved(t, tc.extra, tc.wantRaw)
+			tc.requireTyped(t, got)
+		})
+	}
+}
+
+func TestVLESSXHTTPInvalidTypedExtraRetainsAllOrNothingPromotion(t *testing.T) {
+	extra := `{"xmux":{"maxConcurrency":"8-16"},"downloadSettings":{"network":"xhttp","security":"none","port":"bad"}}`
+	raw := "vless://11111111-1111-1111-1111-111111111111@example.com:443?encryption=none&type=xhttp&extra=" + url.QueryEscape(extra)
+
+	nodes, source, err := uri.NewParser().Parse(context.Background(), []byte(raw))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	require.NotNil(t, nodes[0].Transport)
+	require.NotNil(t, nodes[0].Transport.XHTTP)
+	require.Nil(t, nodes[0].Transport.XHTTP.ReuseSettings)
+	require.Nil(t, nodes[0].Transport.XHTTP.DownloadSettings)
+	require.Empty(t, nodes[0].Raw)
+	require.Empty(t, source.Warnings)
+}
+
+func parseVMessAEADXHTTPDownloadExtra(t *testing.T, extra string) (domain.NodeIR, *domain.SourceInfo) {
+	t.Helper()
+	raw := "vmess://11111111-1111-1111-1111-111111111111@example.com:443?type=xhttp&extra=" + url.QueryEscape(extra)
+	nodes, source, err := uri.NewParser().Parse(context.Background(), []byte(raw))
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	require.NotNil(t, source)
+	got := nodes[0]
+	require.NotNil(t, got.Transport)
+	require.Equal(t, "xhttp", got.Transport.Type)
+	require.NotNil(t, got.Transport.XHTTP)
+	return got, source
+}
+
+func requireVMessAEADXHTTPExtraPreserved(t *testing.T, extra, wantRaw string) domain.NodeIR {
+	t.Helper()
+	got, source := parseVMessAEADXHTTPDownloadExtra(t, extra)
+	require.Equal(t, wantRaw, string(got.Raw["uri.query.extra"]))
+	require.Equal(t, []string{"uri.query.extra"}, warningFields(source.Warnings))
+	require.Len(t, source.Warnings, 1)
+	require.Equal(t, "parse_unknown_field", source.Warnings[0].Code)
+	require.Equal(t, "field preserved in NodeIR Raw", source.Warnings[0].Message)
+	require.Equal(t, "uri.query.extra", source.Warnings[0].Field)
+	require.Equal(t, "uri", source.Warnings[0].Source)
+	return got
+}
+
+func TestParseVMessAEADFromBase64URIList(t *testing.T) {
+	p := uri.NewParser()
+	legacyDoc := `{"add":"legacy.example.com","port":"443","id":"11111111-1111-1111-1111-111111111111","ps":"legacy"}`
+	legacyURI := "vmess://" + base64.StdEncoding.EncodeToString([]byte(legacyDoc))
+	aeadURI := "vmess://22222222-2222-2222-2222-222222222222@example.com:8443?unsupported=value#wrapped-aead"
+	wrapped := base64.StdEncoding.EncodeToString([]byte(legacyURI + "\n" + aeadURI + "\n"))
+
+	nodes, source, err := p.ParseList(context.Background(), []byte(wrapped))
+
+	require.NoError(t, err)
+	require.NotNil(t, source)
+	require.Equal(t, "uri-list", source.Format)
+	require.Len(t, nodes, 2)
+	require.Equal(t, domain.NodeTypeVMess, nodes[0].Type)
+	require.Equal(t, "legacy", nodes[0].Name)
+	require.Equal(t, "legacy.example.com", nodes[0].Server)
+	require.Equal(t, uint16(443), nodes[0].Port)
+	require.Equal(t, domain.NodeTypeVMess, nodes[1].Type)
+	require.Equal(t, "wrapped-aead", nodes[1].Name)
+	require.Equal(t, "example.com", nodes[1].Server)
+	require.Equal(t, uint16(8443), nodes[1].Port)
+	require.Len(t, source.SourceRefs, 2)
+	require.Equal(t, "vmess", source.SourceRefs[0].Name)
+	require.Equal(t, "VMessAEAD / VLESS sharing link", source.SourceRefs[1].Name)
+	require.Equal(t, "https://github.com/XTLS/Xray-core/discussions/716", source.SourceRefs[1].URL)
+	require.Len(t, source.Warnings, 1)
+	warning := source.Warnings[0]
+	require.Equal(t, "parse_unknown_field", warning.Code)
+	require.Equal(t, "uri.query.unsupported", warning.Field)
+	require.Equal(t, "uri-list", warning.Source)
+	require.NotNil(t, warning.NodeIndex)
+	require.Equal(t, 1, *warning.NodeIndex)
+	require.NotNil(t, warning.NodeContext)
+	require.Equal(t, "uri-list", warning.NodeContext.Format)
+	require.Equal(t, "wrapped-aead", warning.NodeContext.Name)
+	require.Equal(t, domain.NodeTypeVMess, warning.NodeContext.Type)
+	require.Equal(t, aeadURI, warning.NodeContext.RawLine)
+	require.Equal(t, 2, warning.NodeContext.Line)
+}
+
+func TestParseVMessUsesProfileSpecificSourceReference(t *testing.T) {
+	p := uri.NewParser()
+	aead, aeadSource, err := p.Parse(context.Background(), []byte(
+		"vmess://11111111-1111-1111-1111-111111111111@example.com:443",
+	))
+	require.NoError(t, err)
+	require.Len(t, aead, 1)
+	require.Len(t, aeadSource.SourceRefs, 1)
+	require.Equal(t, "VMessAEAD / VLESS sharing link", aeadSource.SourceRefs[0].Name)
+	require.Equal(t, "https://github.com/XTLS/Xray-core/discussions/716", aeadSource.SourceRefs[0].URL)
+
+	doc := `{"add":"example.com","port":"443","id":"11111111-1111-1111-1111-111111111111"}`
+	legacy, legacySource, err := p.Parse(context.Background(), []byte(
+		"vmess://"+base64.StdEncoding.EncodeToString([]byte(doc)),
+	))
+	require.NoError(t, err)
+	require.Len(t, legacy, 1)
+	require.Len(t, legacySource.SourceRefs, 1)
+	require.Equal(t, "vmess", legacySource.SourceRefs[0].Name)
 }
 
 func TestParseVMessURLSafeBase64Payload(t *testing.T) {
@@ -1030,6 +1816,52 @@ func TestParseVLESSQueryTLSRealityTransportAndRaw(t *testing.T) {
 	require.Equal(t, map[string]string{"Host": "cdn.example.com"}, got.Transport.Headers)
 	require.JSONEq(t, `"packet-up"`, string(got.Raw["uri.query.mode"]))
 	require.JSONEq(t, `"value"`, string(got.Raw["uri.query.extra"]))
+}
+
+func TestParseVLESSWebSocketEarlyDataPath(t *testing.T) {
+	p := uri.NewParser()
+	raw := "vless://11111111-1111-1111-1111-111111111111@example.com:443?encryption=none&type=ws&path=%2Fdo%3Fed%3D2048#vless"
+
+	nodes, _, err := p.Parse(context.Background(), []byte(raw))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	got := nodes[0]
+	require.NotNil(t, got.Transport)
+	require.Equal(t, "websocket", got.Transport.Type)
+	require.Equal(t, "/do", got.Transport.Path)
+	require.Equal(t, 2048, got.Transport.MaxEarlyData)
+	require.Equal(t, "Sec-WebSocket-Protocol", got.Transport.EarlyDataHeaderName)
+}
+
+func TestParseVLESSWebSocketNonCanonicalEarlyDataPathStaysLiteral(t *testing.T) {
+	p := uri.NewParser()
+	tests := []string{
+		"/do?ed=",
+		"/do?ed=0",
+		"/do?ed=-1",
+		"/do?ed=invalid",
+		"/do?ed=2048&",
+		"/do?ed=2048&other=value",
+		"/do?ed=2048&ed=1024",
+		"/do?%65d=2048",
+		"/do?ed=%2B1",
+	}
+	for _, path := range tests {
+		t.Run(url.QueryEscape(path), func(t *testing.T) {
+			raw := "vless://11111111-1111-1111-1111-111111111111@example.com:443?encryption=none&type=ws&path=" + url.QueryEscape(path)
+
+			nodes, _, err := p.Parse(context.Background(), []byte(raw))
+
+			require.NoError(t, err)
+			require.Len(t, nodes, 1)
+			got := nodes[0]
+			require.NotNil(t, got.Transport)
+			require.Equal(t, path, got.Transport.Path)
+			require.Zero(t, got.Transport.MaxEarlyData)
+			require.Empty(t, got.Transport.EarlyDataHeaderName)
+		})
+	}
 }
 
 func TestParseVLESSDefaultTCPCompatibilityQueryIsSilent(t *testing.T) {

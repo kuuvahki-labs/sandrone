@@ -95,13 +95,23 @@ func (s *Service) fetchPublicRemoteInput(ctx context.Context, input domain.Remot
 }
 
 func (s *Service) parseNodeContent(ctx context.Context, format string, content []byte, allowAuto bool, sourceRef *domain.SourceRef) (*parseInputResult, error) {
+	var (
+		parsed *parseInputResult
+		err    error
+	)
 	if !isAutoNodeFormat(format) {
-		return s.parseNodeContentExplicit(ctx, format, content, sourceRef)
+		parsed, err = s.parseNodeContentExplicit(ctx, format, content, sourceRef)
+	} else {
+		if !allowAuto {
+			return nil, domain.NewError(domain.CodeInvalidArgument, "node input format is required")
+		}
+		parsed, err = s.parseNodeContentAuto(ctx, content, sourceRef)
 	}
-	if !allowAuto {
-		return nil, domain.NewError(domain.CodeInvalidArgument, "node input format is required")
+	if err != nil {
+		return nil, err
 	}
-	return s.parseNodeContentAuto(ctx, content, sourceRef)
+	normalizeParsedNodes(parsed)
+	return parsed, nil
 }
 
 func (s *Service) parseNodeContentExplicit(ctx context.Context, format string, content []byte, sourceRef *domain.SourceRef) (*parseInputResult, error) {
