@@ -128,6 +128,7 @@ processors:
 
 `method`、`core`、`url`、`ntp_server`、`expected_status`、
 `timeout_ms`、`attempts`、`concurrency`、`cache_ttl_seconds`。
+processor 的 `expected_status` 遵循 [HTTP probe](http-api/probing.md) 契约。
 省略值由 probe service 的规范化和运行时默认值处理。
 method 只接受 `tcp_connect`、`udp_ntp` 和 `url_test`；默认 `url_test`。
 `tcp_connect` 不使用 core，`udp_ntp` 当前使用 sing-box，`url_test` 支持

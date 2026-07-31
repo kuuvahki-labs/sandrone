@@ -249,7 +249,7 @@ func NTPServerFromRequest(req domain.ProbeRequest) string {
 }
 
 func URLTestTarget(req domain.ProbeRequest) string {
-	return urlTestTarget(req)
+	return urlTestURLFromRequest(req)
 }
 
 func NormalizeCore(core string) string {
@@ -293,7 +293,7 @@ func targetFromRequest(req domain.ProbeRequest, node domain.NodeIR) string {
 	case domain.ProbeUDPNTP:
 		return net.JoinHostPort(ntpServerFromRequest(req), "123")
 	case domain.ProbeURLTest:
-		return urlTestTarget(req)
+		return urlTestURLFromRequest(req)
 	default:
 		return ""
 	}
@@ -307,7 +307,7 @@ func ntpServerFromRequest(req domain.ProbeRequest) string {
 	return server
 }
 
-func urlTestTarget(req domain.ProbeRequest) string {
+func urlTestURLFromRequest(req domain.ProbeRequest) string {
 	if strings.TrimSpace(req.URL) != "" {
 		return strings.TrimSpace(req.URL)
 	}

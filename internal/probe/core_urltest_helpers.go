@@ -6,29 +6,44 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
+	"strconv"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
 
 func urlFromRequest(req domain.ProbeRequest) string {
-	return urlTestTarget(req)
+	return urlTestURLFromRequest(req)
 }
 
-func validateURLTestURL(rawURL string) error {
+func parseURLTestTarget(rawURL string) (urlTestTarget, error) {
 	parsed, err := url.Parse(rawURL)
 	if err != nil {
-		return err
+		return urlTestTarget{}, err
 	}
-	if parsed.Host == "" {
-		return fmt.Errorf("missing host")
+	if parsed.Hostname() == "" {
+		return urlTestTarget{}, fmt.Errorf("missing host")
 	}
+	var defaultPort string
 	switch parsed.Scheme {
-	case "http", "https":
-		return nil
+	case "http":
+		defaultPort = "80"
+	case "https":
+		defaultPort = "443"
 	default:
-		return fmt.Errorf("unsupported scheme %q", parsed.Scheme)
+		return urlTestTarget{}, fmt.Errorf("unsupported scheme %q", parsed.Scheme)
 	}
+	port := parsed.Port()
+	if port == "" {
+		port = defaultPort
+	} else if _, err := strconv.ParseUint(port, 10, 16); err != nil {
+		return urlTestTarget{}, fmt.Errorf("invalid port %q: %w", port, err)
+	}
+	return urlTestTarget{
+		raw:     rawURL,
+		address: net.JoinHostPort(parsed.Hostname(), port),
+	}, nil
 }
 
 func errorCodeForURLTest(err error) string {

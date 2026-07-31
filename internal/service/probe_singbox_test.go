@@ -47,21 +47,95 @@ func TestServiceSingBoxURLTestWithLocalProxy(t *testing.T) {
 				Port:   port,
 			}},
 		},
-		Method:    domain.ProbeURLTest,
-		Core:      "sing-box",
-		URL:       target.URL,
-		TimeoutMS: 2000,
+		Method:         domain.ProbeURLTest,
+		Core:           "sing-box",
+		URL:            target.URL,
+		ExpectedStatus: "200-299",
+		TimeoutMS:      2000,
 	})
 
 	require.NoError(t, err)
 	require.Len(t, result.Results, 1)
 	require.True(t, result.Results[0].Alive)
+	require.Empty(t, result.Report.Warnings)
 	require.Equal(t, "sing-box", result.Results[0].Core)
 	require.Equal(t, "singbox_url_test", result.Report.Probe.Backend)
 	select {
 	case <-targetHit:
 	case <-time.After(time.Second):
 		t.Fatal("sing-box did not request the configured HTTP test target")
+	}
+}
+
+func TestServiceSingBoxURLTestRejectsUnexpectedStatus(t *testing.T) {
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer target.Close()
+
+	proxyAddr, closeProxy := startSingBoxConnectProxy(t, target.Listener.Addr().String())
+	defer closeProxy()
+	host, port := splitSingBoxHostPort(t, proxyAddr)
+
+	svc := service.New()
+	result, err := svc.Probe(context.Background(), domain.ProbeRequest{
+		Input: domain.NodeInput{
+			Type: "inline_nodes",
+			Nodes: []domain.NodeIR{{
+				Name:   "local-http-proxy",
+				Type:   domain.NodeTypeHTTP,
+				Server: host,
+				Port:   port,
+			}},
+		},
+		Method:         domain.ProbeURLTest,
+		Core:           "sing-box",
+		URL:            target.URL,
+		ExpectedStatus: "200/201",
+		TimeoutMS:      2000,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.Results, 1)
+	require.False(t, result.Results[0].Alive)
+	require.Equal(t, "probe_core_api_failed", result.Results[0].ErrorCode)
+	require.Contains(t, result.Results[0].Error, "204")
+	require.Contains(t, result.Results[0].Error, "200/201")
+}
+
+func TestServiceSingBoxURLTestRejectsInvalidExpectedStatus(t *testing.T) {
+	targetHit := make(chan struct{}, 1)
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		targetHit <- struct{}{}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer target.Close()
+	host, port := splitSingBoxHostPort(t, target.Listener.Addr().String())
+
+	svc := service.New()
+	_, err := svc.Probe(context.Background(), domain.ProbeRequest{
+		Input: domain.NodeInput{
+			Type: "inline_nodes",
+			Nodes: []domain.NodeIR{{
+				Name:   "local-http-proxy",
+				Type:   domain.NodeTypeHTTP,
+				Server: host,
+				Port:   port,
+			}},
+		},
+		Method:         domain.ProbeURLTest,
+		Core:           "sing-box",
+		URL:            target.URL,
+		ExpectedStatus: "not-a-status",
+		TimeoutMS:      2000,
+	})
+
+	require.Error(t, err)
+	require.True(t, domain.IsCode(err, domain.CodeProbeInvalidTarget))
+	select {
+	case <-targetHit:
+		t.Fatal("sing-box requested the target before rejecting expected_status")
+	default:
 	}
 }
 

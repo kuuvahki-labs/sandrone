@@ -42,20 +42,64 @@ func TestServiceMihomoURLTestWithLocalProxy(t *testing.T) {
 				Port:   port,
 			}},
 		},
-		Method:    domain.ProbeURLTest,
-		Core:      "mihomo",
-		URL:       target.URL,
-		TimeoutMS: 2000,
+		Method:         domain.ProbeURLTest,
+		Core:           "mihomo",
+		URL:            target.URL,
+		ExpectedStatus: "200-299",
+		TimeoutMS:      2000,
 	})
 
 	require.NoError(t, err)
 	require.Len(t, result.Results, 1)
 	require.True(t, result.Results[0].Alive)
+	require.Empty(t, result.Report.Warnings)
 	require.Equal(t, "mihomo", result.Results[0].Core)
 	require.Equal(t, "mihomo_url_test", result.Report.Probe.Backend)
 }
 
+func TestServiceMihomoURLTestRejectsUnexpectedStatus(t *testing.T) {
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer target.Close()
+
+	proxyAddr, closeProxy := startConnectProxy(t)
+	defer closeProxy()
+	host, port := splitHostPort(t, proxyAddr)
+
+	svc := service.New()
+	result, err := svc.Probe(context.Background(), domain.ProbeRequest{
+		Input: domain.NodeInput{
+			Type: "inline_nodes",
+			Nodes: []domain.NodeIR{{
+				Name:   "local-http-proxy",
+				Type:   domain.NodeTypeHTTP,
+				Server: host,
+				Port:   port,
+			}},
+		},
+		Method:         domain.ProbeURLTest,
+		Core:           "mihomo",
+		URL:            target.URL,
+		ExpectedStatus: "200/201",
+		TimeoutMS:      2000,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.Results, 1)
+	require.False(t, result.Results[0].Alive)
+	require.Equal(t, "probe_core_api_failed", result.Results[0].ErrorCode)
+	require.Contains(t, result.Results[0].Error, "204")
+	require.Contains(t, result.Results[0].Error, "200/201")
+}
+
 func TestServiceMihomoURLTestRejectsInvalidExpectedStatus(t *testing.T) {
+	targetHit := make(chan struct{}, 1)
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		targetHit <- struct{}{}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer target.Close()
 	proxyAddr, closeProxy := startConnectProxy(t)
 	defer closeProxy()
 	host, port := splitHostPort(t, proxyAddr)
@@ -73,13 +117,18 @@ func TestServiceMihomoURLTestRejectsInvalidExpectedStatus(t *testing.T) {
 		},
 		Method:         domain.ProbeURLTest,
 		Core:           "mihomo",
-		URL:            "http://127.0.0.1/generate_204",
+		URL:            target.URL,
 		ExpectedStatus: "not-a-status",
 		TimeoutMS:      2000,
 	})
 
 	require.Error(t, err)
 	require.True(t, domain.IsCode(err, domain.CodeProbeInvalidTarget))
+	select {
+	case <-targetHit:
+		t.Fatal("mihomo requested the target before rejecting expected_status")
+	default:
+	}
 }
 
 func startConnectProxy(t *testing.T) (string, func()) {

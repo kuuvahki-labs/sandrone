@@ -4,12 +4,13 @@ package probe
 
 import (
 	"context"
-	"errors"
+	"crypto/tls"
+	"net"
 	"sync"
 	"time"
 
 	mihomoadapter "github.com/metacubex/mihomo/adapter"
-	"github.com/metacubex/mihomo/common/utils"
+	"github.com/metacubex/mihomo/component/ca"
 	mihomoconstant "github.com/metacubex/mihomo/constant"
 	"gopkg.in/yaml.v3"
 
@@ -26,6 +27,18 @@ type MihomoBackend struct {
 	now func() time.Time
 }
 
+type mihomoURLTestDialer struct {
+	proxy mihomoconstant.Proxy
+}
+
+func (d mihomoURLTestDialer) DialContext(ctx context.Context, _ string, address string) (net.Conn, error) {
+	var metadata mihomoconstant.Metadata
+	if err := metadata.SetRemoteAddress(address); err != nil {
+		return nil, err
+	}
+	return d.proxy.DialContext(ctx, &metadata)
+}
+
 func (b *MihomoBackend) Method() domain.ProbeMethod { return domain.ProbeURLTest }
 
 func (b *MihomoBackend) Core() string { return "mihomo" }
@@ -37,10 +50,11 @@ func (b *MihomoBackend) Version() string { return mihomoconstant.Version }
 func (b *MihomoBackend) Probe(ctx context.Context, backendReq BackendRequest, nodes []domain.NodeIR) (*domain.ProbeResult, error) {
 	req := backendReq.Probe
 	testURL := urlFromRequest(req)
-	if err := validateURLTestURL(testURL); err != nil {
+	target, err := parseURLTestTarget(testURL)
+	if err != nil {
 		return nil, domain.WrapError(domain.CodeProbeInvalidTarget, "invalid url_test url", err)
 	}
-	expectedStatus, err := utils.NewUnsignedRanges[uint16](req.ExpectedStatus)
+	expectedStatus, err := parseExpectedStatus(req.ExpectedStatus)
 	if err != nil {
 		return nil, domain.WrapError(domain.CodeProbeInvalidTarget, "invalid expected_status", err)
 	}
@@ -70,7 +84,7 @@ func (b *MihomoBackend) Probe(ctx context.Context, backendReq BackendRequest, no
 				results[i] = resultForError(req, node, "probe_context_canceled", ctx.Err(), b.now())
 				return
 			}
-			results[i] = b.probeNode(ctx, req, node, proxies[i], testURL, expectedStatus, timeout, attempts)
+			results[i] = b.probeNode(ctx, req, node, proxies[i], target, expectedStatus, timeout, attempts)
 		}()
 	}
 	wg.Wait()
@@ -82,7 +96,7 @@ func (b *MihomoBackend) Probe(ctx context.Context, backendReq BackendRequest, no
 	return &domain.ProbeResult{Results: results, Report: report}, nil
 }
 
-func (b *MihomoBackend) probeNode(ctx context.Context, req domain.ProbeRequest, node domain.NodeIR, mapping map[string]any, testURL string, expectedStatus utils.IntRanges[uint16], timeout time.Duration, attempts int) domain.NodeProbeResult {
+func (b *MihomoBackend) probeNode(ctx context.Context, req domain.ProbeRequest, node domain.NodeIR, mapping map[string]any, target urlTestTarget, expectedStatus expectedStatusMatcher, timeout time.Duration, attempts int) domain.NodeProbeResult {
 	proxy, err := mihomoadapter.ParseProxy(mapping)
 	if err != nil {
 		return resultForError(req, node, string(domain.CodeProbeInvalidTarget), err, b.now())
@@ -90,17 +104,27 @@ func (b *MihomoBackend) probeNode(ctx context.Context, req domain.ProbeRequest, 
 	var lastErr error
 	for attempt := 0; attempt < attempts; attempt++ {
 		attemptCtx, cancel := context.WithTimeout(ctx, timeout)
-		delay, err := proxy.URLTest(attemptCtx, testURL, expectedStatus)
-		cancel()
+		mihomoTLSClientConfig, err := ca.GetTLSConfig(ca.Option{})
 		if err == nil {
-			if req.ExpectedStatus != "" && !proxy.AliveForTestUrl(testURL) {
-				lastErr = errors.New("response status did not match expected_status")
-			} else {
-				return successResult(req, node, int(delay), b.now())
+			// Mihomo's TLS fork is not assignable to crypto/tls. An empty
+			// ca.Option configures only these two fields.
+			tlsClientConfig := &tls.Config{
+				Time:    mihomoTLSClientConfig.Time,
+				RootCAs: mihomoTLSClientConfig.RootCAs,
 			}
-		} else {
-			lastErr = err
+			var delay time.Duration
+			delay, err = runURLTest(attemptCtx, target, urlTestOptions{
+				dialer:          mihomoURLTestDialer{proxy: proxy},
+				expectedStatus:  expectedStatus,
+				tlsClientConfig: tlsClientConfig,
+			})
+			if err == nil {
+				cancel()
+				return successResult(req, node, int(delay/time.Millisecond), b.now())
+			}
 		}
+		cancel()
+		lastErr = err
 		if ctx.Err() != nil {
 			break
 		}

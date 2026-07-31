@@ -76,7 +76,7 @@ processor 已返回 `AppError` 时，处理链保留原 code，并补上缺失�
 | `probe_core_unavailable` | 指定或选中的核心 backend 在当前构建不可用 |
 | `probe_core_start_failed` | 真实代理核心无法分配资源、创建或启动 |
 | `probe_invalid_target` | 整批 URL、payload 或核心目标配置无效 |
-| `probe_core_api_failed` | 核心 API 调用失败；通常作为单节点结果码出现 |
+| `probe_core_api_failed` | URL 请求失败或响应状态不符合 `expected_status`；通常作为单节点结果码出现 |
 | `probe_timeout` | probe 超时；通常作为单节点结果码出现 |
 | `probe_tcp_failed` | TCP connect 失败；作为单节点结果码出现 |
 | `probe_udp_ntp_failed` | UDP NTP 测试失败；作为单节点结果码出现 |
@@ -152,7 +152,7 @@ endpoint 级限制以 [HTTP API 参考](http-api/README.md)为准。
 | `probe_timeout` | 单节点尝试超时 |
 | `probe_context_canceled` | context 在该节点完成前取消 |
 | `probe_tcp_failed` | TCP connect 失败，且不是超时或取消 |
-| `probe_core_api_failed` | URL-test 核心 API 调用失败 |
+| `probe_core_api_failed` | URL 请求失败或响应状态不符合 `expected_status` |
 | `probe_udp_ntp_failed` | UDP NTP 失败，且不是超时或取消 |
 
 成功节点的 `error_code` 和 `error` 为空。每个失败节点还会在顶层 report 中产生
@@ -194,8 +194,8 @@ endpoint 级限制以 [HTTP API 参考](http-api/README.md)为准。
 - Probe：`probe_cache_hit`、`probe_cache_write_failed`、
   `probe_expected_status_unsupported`，以及上一节的单节点 error code。
 
-`probe_expected_status_unsupported` 表示当前 backend 无法表达
-`expected_status`，条件被忽略但测试继续；它不是批次错误。
+`probe_expected_status_unsupported` 当前由 `tcp_connect` 在收到
+`expected_status` 时产生；它是 warning，不是批次错误。
 
 ## Report
 

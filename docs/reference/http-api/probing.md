@@ -25,7 +25,7 @@ backend 中执行可达性检查。它不保存输入、节点或 report，但�
 | `core` | string | 可选：`mihomo` 或 `sing-box`；用于需要代理核心的 probe。 |
 | `url` | string | `url_test` 目标；省略时使用项目设置。 |
 | `ntp_server` | string | `udp_ntp` 服务器；省略时使用项目设置。 |
-| `expected_status` | string | URL 测试的期望状态表达式；backend 不支持时可产生 warning。 |
+| `expected_status` | string | `expected_status` 对 sing-box 和 Mihomo 使用相同语义：空值或 `*` 接受任意状态；`204` 表示精确值；`200-299` 表示闭区间；`/` 或 `,` 可连接多个候选，例如 `200/204/301-303`。首尾空白会被忽略，空候选也会被忽略；每个值必须是 `0` 至 `65535` 的无符号 16 位整数，最多接受 28 个候选。违反这些约束会返回 `probe_invalid_target`，响应状态不匹配则该节点探测失败。 |
 | `timeout_ms` | integer | 非负；正数限制每次尝试，`0`/省略使用项目设置。 |
 | `attempts` | integer | 非负；正数限制每个节点的尝试次数，`0`/省略使用项目设置。 |
 | `concurrency` | integer | 非负；正数限制并行节点数，`0`/省略使用项目设置。 |

@@ -4,6 +4,7 @@ package probe
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,11 +13,13 @@ import (
 	"time"
 
 	box "github.com/sagernet/sing-box"
-	"github.com/sagernet/sing-box/common/urltest"
+	boxadapter "github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/include"
 	"github.com/sagernet/sing-box/option"
 	M "github.com/sagernet/sing/common/metadata"
+	N "github.com/sagernet/sing/common/network"
+	"github.com/sagernet/sing/common/ntp"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
@@ -34,6 +37,14 @@ type SingBoxBackend struct {
 	now func() time.Time
 }
 
+type singBoxURLTestDialer struct {
+	outbound N.Dialer
+}
+
+func (d singBoxURLTestDialer) DialContext(ctx context.Context, networkName, address string) (net.Conn, error) {
+	return d.outbound.DialContext(ctx, networkName, M.ParseSocksaddr(address))
+}
+
 func (b *SingBoxBackend) Method() domain.ProbeMethod { return domain.ProbeURLTest }
 
 func (b *SingBoxBackend) Core() string { return "sing-box" }
@@ -45,14 +56,23 @@ func (b *SingBoxBackend) Version() string { return constant.Version }
 func (b *SingBoxBackend) Probe(ctx context.Context, backendReq BackendRequest, nodes []domain.NodeIR) (*domain.ProbeResult, error) {
 	req := backendReq.Probe
 	testURL := urlFromRequest(req)
-	if err := validateURLTestURL(testURL); err != nil {
+	target, err := parseURLTestTarget(testURL)
+	if err != nil {
 		return nil, domain.WrapError(domain.CodeProbeInvalidTarget, "invalid url_test url", err)
+	}
+	expectedStatus, err := parseExpectedStatus(req.ExpectedStatus)
+	if err != nil {
+		return nil, domain.WrapError(domain.CodeProbeInvalidTarget, "invalid expected_status", err)
 	}
 	if backendReq.Payload == nil || len(backendReq.Payload.Body) == 0 {
 		return nil, domain.NewError(domain.CodeProbeInvalidTarget, "sing-box probe payload is missing")
 	}
 	boxCtx, cancel := context.WithCancel(include.Context(ctx))
 	defer cancel()
+	tlsClientConfig := &tls.Config{
+		Time:    ntp.TimeFuncFromContext(boxCtx),
+		RootCAs: boxadapter.RootPoolFromContext(boxCtx),
+	}
 	options, err := singBoxOptions(boxCtx, backendReq.Payload)
 	if err != nil {
 		return nil, err
@@ -87,7 +107,7 @@ func (b *SingBoxBackend) Probe(ctx context.Context, backendReq BackendRequest, n
 				results[i] = resultForError(req, node, "probe_context_canceled", ctx.Err(), b.now())
 				return
 			}
-			results[i] = b.probeNode(ctx, req, node, instance, testURL, timeout, attempts)
+			results[i] = b.probeNode(ctx, req, node, instance, target, expectedStatus, tlsClientConfig, timeout, attempts)
 		}()
 	}
 	wg.Wait()
@@ -96,16 +116,10 @@ func (b *SingBoxBackend) Probe(ctx context.Context, backendReq BackendRequest, n
 	for i := range results {
 		results[i].Backend = b.Name()
 	}
-	if req.ExpectedStatus != "" {
-		report.Warnings = append(report.Warnings, domain.Warning{
-			Code:    "probe_expected_status_unsupported",
-			Message: "sing-box urltest does not expose expected_status matching; expected_status was ignored",
-		})
-	}
 	return &domain.ProbeResult{Results: results, Report: report}, nil
 }
 
-func (b *SingBoxBackend) probeNode(ctx context.Context, req domain.ProbeRequest, node domain.NodeIR, instance *box.Box, testURL string, timeout time.Duration, attempts int) domain.NodeProbeResult {
+func (b *SingBoxBackend) probeNode(ctx context.Context, req domain.ProbeRequest, node domain.NodeIR, instance *box.Box, target urlTestTarget, expectedStatus expectedStatusMatcher, tlsClientConfig *tls.Config, timeout time.Duration, attempts int) domain.NodeProbeResult {
 	if node.Name == "" {
 		return resultForError(req, node, string(domain.CodeProbeInvalidTarget), errors.New("node name is required for sing-box outbound lookup"), b.now())
 	}
@@ -116,10 +130,17 @@ func (b *SingBoxBackend) probeNode(ctx context.Context, req domain.ProbeRequest,
 	var lastErr error
 	for attempt := 0; attempt < attempts; attempt++ {
 		attemptCtx, cancel := context.WithTimeout(ctx, timeout)
-		delay, err := urltest.URLTest(attemptCtx, testURL, outbound)
+		delay, err := runURLTest(attemptCtx, target, urlTestOptions{
+			dialer:          singBoxURLTestDialer{outbound: outbound},
+			expectedStatus:  expectedStatus,
+			tlsClientConfig: tlsClientConfig,
+			resetStartAfterDial: func(conn net.Conn) bool {
+				return N.NeedHandshakeForWrite(conn)
+			},
+		})
 		cancel()
 		if err == nil {
-			return successResult(req, node, int(delay), b.now())
+			return successResult(req, node, int(delay/time.Millisecond), b.now())
 		}
 		lastErr = err
 		if ctx.Err() != nil {
