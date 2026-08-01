@@ -66,6 +66,96 @@ func TestParseVMessURI(t *testing.T) {
 	require.Equal(t, "example.com", got.TLS.ServerName)
 }
 
+func TestParseLegacyVMessALPN(t *testing.T) {
+	p := uri.NewParser()
+	tests := []struct {
+		name        string
+		alpnJSON    string
+		wantALPN    []string
+		wantRawALPN bool
+		wantWarning bool
+	}{
+		{
+			name:     "comma separated string",
+			alpnJSON: `" h2, http/1.1, "`,
+			wantALPN: []string{"h2", "http/1.1"},
+		},
+		{
+			name:     "string array",
+			alpnJSON: `[" h2 ", "", "http/1.1"]`,
+			wantALPN: []string{"h2", "http/1.1"},
+		},
+		{
+			name:     "empty string is consumed",
+			alpnJSON: `""`,
+		},
+		{
+			name:     "empty array is consumed",
+			alpnJSON: `[]`,
+		},
+		{
+			name:     "whitespace string is consumed",
+			alpnJSON: `" , "`,
+		},
+		{
+			name:     "empty array entries are consumed",
+			alpnJSON: `[" ", ""]`,
+		},
+		{
+			name:        "mixed array remains raw",
+			alpnJSON:    `["h2", 7]`,
+			wantRawALPN: true,
+			wantWarning: true,
+		},
+		{
+			name:        "null remains raw",
+			alpnJSON:    `null`,
+			wantRawALPN: true,
+			wantWarning: true,
+		},
+		{
+			name:        "object remains raw",
+			alpnJSON:    `{}`,
+			wantRawALPN: true,
+			wantWarning: true,
+		},
+		{
+			name:        "number remains raw",
+			alpnJSON:    `7`,
+			wantRawALPN: true,
+			wantWarning: true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			doc := `{"v":"2","ps":"vmess-alpn","add":"example.com","port":"443","id":"11111111-1111-1111-1111-111111111111","alpn":` + tc.alpnJSON + `}`
+			raw := "vmess://" + base64.StdEncoding.EncodeToString([]byte(doc))
+
+			nodes, source, err := p.Parse(context.Background(), []byte(raw))
+
+			require.NoError(t, err)
+			require.Len(t, nodes, 1)
+			if len(tc.wantALPN) > 0 {
+				require.NotNil(t, nodes[0].TLS)
+				require.False(t, nodes[0].TLS.Enabled)
+				require.Equal(t, tc.wantALPN, nodes[0].TLS.ALPN)
+			} else {
+				require.Nil(t, nodes[0].TLS)
+			}
+			if tc.wantRawALPN {
+				require.Contains(t, nodes[0].Raw, "vmess.alpn")
+			} else {
+				require.NotContains(t, nodes[0].Raw, "vmess.alpn")
+			}
+			if tc.wantWarning {
+				require.Contains(t, warningFields(source.Warnings), "vmess.alpn")
+			} else {
+				require.NotContains(t, warningFields(source.Warnings), "vmess.alpn")
+			}
+		})
+	}
+}
+
 func TestParseLegacyVMessWebSocketPathDoesNotDecodeURIEarlyDataConvention(t *testing.T) {
 	p := uri.NewParser()
 	payload := `{"v":"2","ps":"vmess-ws","add":"example.com","port":"443","id":"11111111-1111-1111-1111-111111111111","aid":"0","net":"ws","path":"/do?ed=2048"}`

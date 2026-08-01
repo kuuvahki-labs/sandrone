@@ -229,7 +229,11 @@ func parseLegacyVMess(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 	if pcs := firstNonEmpty(shared.StringValue(doc["pcs"]), shared.StringValue(doc["fingerprint"]), shared.StringValue(doc["pinSHA256"])); pcs != "" {
 		node.TLS.Fingerprint = pcs
 	}
-	if node.TLS.Enabled || node.TLS.ServerName != "" || node.TLS.InsecureSkipVerify || node.TLS.ClientFingerprint != "" || node.TLS.Fingerprint != "" {
+	alpn, alpnKnown := parseLegacyVMessALPN(doc["alpn"])
+	if alpnKnown {
+		node.TLS.ALPN = alpn
+	}
+	if node.TLS.Enabled || node.TLS.ServerName != "" || node.TLS.InsecureSkipVerify || len(node.TLS.ALPN) > 0 || node.TLS.ClientFingerprint != "" || node.TLS.Fingerprint != "" {
 		// keep populated
 	} else {
 		node.TLS = nil
@@ -266,7 +270,7 @@ func parseLegacyVMess(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 	node.Raw = map[string]json.RawMessage{}
 	preserveVMessHeaderTypeRaw(node.Raw, doc, "type")
 	preserveVMessHeaderTypeRaw(node.Raw, doc, "headerType")
-	shared.AddUnknownRaw(node.Raw, "vmess.", doc, map[string]bool{
+	knownFields := map[string]bool{
 		"v": true, "ps": true, "name": true, "remarks": true, "add": true, "port": true,
 		"id": true, "uuid": true, "aid": true, "alterId": true, "alter_id": true,
 		"scy": true, "security": true, "cipher": true,
@@ -278,8 +282,36 @@ func parseLegacyVMess(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 		"fp": true, "fingerprint": true, "pinSHA256": true, "pcs": true,
 		"serviceName": true, "service_name": true,
 		"packetEncoding": true, "packet-encoding": true,
-	})
+	}
+	if alpnKnown {
+		knownFields["alpn"] = true
+	}
+	shared.AddUnknownRaw(node.Raw, "vmess.", doc, knownFields)
 	return node, source, nil
+}
+
+func parseLegacyVMessALPN(value any) ([]string, bool) {
+	var values []string
+	switch typed := value.(type) {
+	case string:
+		values = []string{typed}
+	case []any:
+		values = make([]string, 0, len(typed))
+		for _, item := range typed {
+			text, ok := item.(string)
+			if !ok {
+				return nil, false
+			}
+			values = append(values, text)
+		}
+	default:
+		return nil, false
+	}
+	alpn := make([]string, 0, len(values))
+	for _, value := range values {
+		alpn = append(alpn, splitList(value)...)
+	}
+	return alpn, true
 }
 
 func preserveVMessHeaderTypeRaw(raw map[string]json.RawMessage, doc map[string]any, key string) {
