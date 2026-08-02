@@ -5,9 +5,8 @@ import (
 	"strings"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
+	"github.com/kuuvahki-labs/sandrone/internal/probe"
 )
-
-const configProbeURL = "http://www.gstatic.com/generate_204"
 
 func mihomoGroups(preset string, names []string) []any {
 	switch preset {
@@ -30,14 +29,14 @@ func mihomoGroups(preset string, names []string) []any {
 				"name":     "Auto",
 				"type":     "url-test",
 				"proxies":  append([]string{}, names...),
-				"url":      configProbeURL,
+				"url":      probe.DefaultURLTestURL,
 				"interval": 300,
 			},
 			map[string]any{
 				"name":     "Fallback",
 				"type":     "fallback",
 				"proxies":  append([]string{}, names...),
-				"url":      configProbeURL,
+				"url":      probe.DefaultURLTestURL,
 				"interval": 300,
 			},
 		}
@@ -59,7 +58,7 @@ func regionMihomoGroups(names []string) []any {
 		}
 		groups = append(groups, map[string]any{"name": region, "type": "select", "proxies": proxies})
 	}
-	groups = append(groups, map[string]any{"name": "Auto", "type": "url-test", "proxies": append([]string{}, names...), "url": configProbeURL, "interval": 300})
+	groups = append(groups, map[string]any{"name": "Auto", "type": "url-test", "proxies": append([]string{}, names...), "url": probe.DefaultURLTestURL, "interval": 300})
 	return groups
 }
 
@@ -115,7 +114,7 @@ func singBoxOutbounds(preset string, names []string, nodeOutbounds []any) []any 
 				"type":      "urltest",
 				"tag":       "Auto",
 				"outbounds": append([]string{}, names...),
-				"url":       configProbeURL,
+				"url":       probe.DefaultURLTestURL,
 				"interval":  "5m",
 			},
 			map[string]any{
@@ -153,7 +152,7 @@ func regionSingBoxOutbounds(names []string) []any {
 		}
 		out = append(out, map[string]any{"type": "selector", "tag": region, "outbounds": proxies})
 	}
-	out = append(out, map[string]any{"type": "urltest", "tag": "Auto", "outbounds": append([]string{}, names...), "url": configProbeURL, "interval": "5m"})
+	out = append(out, map[string]any{"type": "urltest", "tag": "Auto", "outbounds": append([]string{}, names...), "url": probe.DefaultURLTestURL, "interval": "5m"})
 	return out
 }
 

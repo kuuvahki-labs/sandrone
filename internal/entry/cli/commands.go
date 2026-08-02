@@ -176,7 +176,7 @@ service default; caching is disabled when both values are 0. Use
 		Example: `  sandrone probe --format uri-list --method url-test --input sub.txt --timeout 3s --concurrency 10
   sandrone probe --method url-test --input-url https://example.com/sub --remote-timeout 5s
   sandrone probe --format uri-list --method udp-ntp --input nodes.txt --ntp-server time.apple.com --timeout 3s --cache-ttl 300
-  sandrone probe --format json-nodes --method url-test --core sing-box --input nodes.json --url http://www.gstatic.com/generate_204 --expected-status 204 --timeout 5s`,
+  sandrone probe --format json-nodes --method url-test --core sing-box --input nodes.json --url https://cp.cloudflare.com --expected-status 204 --timeout 5s`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			remoteInput := remote.remoteInput()
 			if err := rejectInputAndInputURL(input, cmd.Flags().Changed("input"), remoteInput); err != nil {
@@ -244,7 +244,7 @@ service default; caching is disabled when both values are 0. Use
 	addRemoteInputFlags(cmd.Flags(), &remote)
 	cmd.Flags().StringVar(&output, "output", "", "output file path, or stdout when empty or -")
 	cmd.Flags().StringVar(&core, "core", "sing-box", "core name for url-test or udp-ntp, for example mihomo or sing-box")
-	cmd.Flags().StringVar(&url, "url", "", "HTTP URL target for url-test, for example http://www.gstatic.com/generate_204")
+	cmd.Flags().StringVar(&url, "url", "", "HTTP URL target for url-test, for example https://cp.cloudflare.com")
 	cmd.Flags().StringVar(&ntpServer, "ntp-server", "", "NTP server for udp-ntp, for example time.apple.com")
 	cmd.Flags().StringVar(&expectedStatus, "expected-status", "", "expected HTTP status or range for url-test, for example 204 or 200-299")
 	cmd.Flags().DurationVar(&timeout, "timeout", 0, "per-node timeout as Go duration, for example 3s or 500ms")

@@ -19,8 +19,9 @@ const (
 	defaultTimeout     = 5 * time.Second
 	defaultAttempts    = 1
 	defaultConcurrency = 10
-	defaultURLTestURL  = "http://www.gstatic.com/generate_204"
-	defaultNTPServer   = "time.apple.com"
+	// DefaultURLTestURL is the target used when a URL-test request omits its URL.
+	DefaultURLTestURL = "https://cp.cloudflare.com"
+	defaultNTPServer  = "time.apple.com"
 )
 
 type Dialer interface {
@@ -311,7 +312,7 @@ func urlTestURLFromRequest(req domain.ProbeRequest) string {
 	if strings.TrimSpace(req.URL) != "" {
 		return strings.TrimSpace(req.URL)
 	}
-	return defaultURLTestURL
+	return DefaultURLTestURL
 }
 
 func timeoutFromRequest(req domain.ProbeRequest) time.Duration {

@@ -35,6 +35,7 @@ import {
   trimmedString,
 } from "~/features/files/drivers/core/strategy-helpers";
 import type { FileConfigDraft } from "~/features/files/model/types";
+import { DEFAULT_PROBE_URL } from "~/shared/probe/defaults";
 
 const BUILTIN_POLICIES = ["DIRECT", "REJECT", "REJECT-DROP", "PASS", "PASS-RULE", "COMPATIBLE", "GLOBAL"] as const;
 const ADAPTIVE_TYPE_OPTIONS = [
@@ -43,7 +44,6 @@ const ADAPTIVE_TYPE_OPTIONS = [
   { value: "load-balance", label: "load-balance" },
 ] as const;
 const RULE_BASE = "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo";
-const PROBE_URL = "http://www.gstatic.com/generate_204";
 
 const relations = mihomoRelations();
 const adaptive = mihomoAdaptive(mihomoAdaptiveDialect(relations));
@@ -189,7 +189,7 @@ function mihomoAdaptiveDialect(
       ...(item.excludeFilter ? { "exclude-filter": item.excludeFilter } : {}),
     };
     if (type === "url-test" || type === "load-balance") {
-      group.url = "https://cp.cloudflare.com";
+      group.url = DEFAULT_PROBE_URL;
       group.interval = 300;
       group.lazy = true;
     }
@@ -274,7 +274,7 @@ function materializeMihomoTemplate(
     const targets = templateGroupTargets(item, selectName, autoName, "DIRECT", "REJECT")
       .filter((target) => target !== name);
     return item.groupMode === "url-test"
-      ? { name, type: "url-test", proxies: targets, url: PROBE_URL, interval: 300 }
+      ? { name, type: "url-test", proxies: targets, url: DEFAULT_PROBE_URL, interval: 300 }
       : { name, type: "select", proxies: targets };
   });
   const ruleSets = blueprint.ruleEntries.map(({ ruleID }) => {

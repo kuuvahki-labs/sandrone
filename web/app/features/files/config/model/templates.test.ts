@@ -107,6 +107,14 @@ describe("config templates", () => {
    }
  });
 
+  it.each(["mihomo", "sing-box"] as const)("uses the Cloudflare probe URL in the %s standard template", (kind) => {
+    const config = createConfigFromTemplate(kind, "standard");
+    const autoGroup = config.groups?.find((group) =>
+      group.type === (kind === "mihomo" ? "url-test" : "urltest"));
+
+    expect(autoGroup?.url).toBe("https://cp.cloudflare.com");
+  });
+
   it("uses MetaCubeX MRS rule providers for Mihomo", () => {
     const config = createConfigFromTemplate("mihomo", "full");
 

@@ -51,7 +51,7 @@ SettingsEnvelope {
   "probe_defaults": {
     "method": "url_test",
     "core": "sing-box",
-    "url": "http://www.gstatic.com/generate_204",
+    "url": "https://cp.cloudflare.com",
     "ntp_server": "time.apple.com",
     "timeout_ms": 5000,
     "attempts": 1,

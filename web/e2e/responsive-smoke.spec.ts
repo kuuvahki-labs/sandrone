@@ -57,7 +57,7 @@ const fileDetail = {
     settings: {
       groups: [
         { name: "Proxy", type: "select", proxies: ["Auto", "$nodes", "DIRECT"] },
-        { name: "Auto", type: "url-test", proxies: ["$nodes"], url: "http://www.gstatic.com/generate_204", interval: 300 },
+        { name: "Auto", type: "url-test", proxies: ["$nodes"], url: "https://cp.cloudflare.com", interval: 300 },
         { name: "Final", type: "select", proxies: ["Proxy", "DIRECT"] },
       ],
       rule_sets: [{ name: "private", type: "inline", behavior: "classical", payload: ["DOMAIN-SUFFIX,local"] }],
@@ -163,7 +163,7 @@ test.beforeEach(async ({ page }) => {
       probe_defaults: {
         method: "url_test",
         core: "sing-box",
-        url: "http://www.gstatic.com/generate_204",
+        url: "https://cp.cloudflare.com",
         ntp_server: "time.apple.com",
         timeout_ms: 5000,
         attempts: 1,

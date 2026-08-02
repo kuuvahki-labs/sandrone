@@ -31,6 +31,7 @@ import {
 } from "~/features/files/drivers/core/structured-adapter";
 import type { FileConfigDraft } from "~/features/files/model/types";
 import type { Translator } from "~/shared/i18n/context";
+import { DEFAULT_PROBE_URL } from "~/shared/probe/defaults";
 
 import { mihomoConfigurationStrategies } from "./strategies";
 
@@ -173,7 +174,7 @@ function mihomoGroups(): StructuredFileConfigurationAdapter["groups"] {
         ...group,
         adapterState,
         type,
-        healthCheckURL: group.healthCheckURL || "https://cp.cloudflare.com",
+        healthCheckURL: group.healthCheckURL || DEFAULT_PROBE_URL,
         healthCheckInterval: group.healthCheckInterval || "300",
       };
     },
@@ -309,13 +310,13 @@ function defaultGroups(preset: string, locale: ConfigNamingLocale): ConfigMap[] 
       { name: anchor, type: "select", proxies: [auto, ...(["hk", "tw", "jp", "sg", "us"] as const).map((id) => configRegionName(id, locale)), other, "$nodes", "DIRECT"] },
       ...(["hk", "tw", "jp", "sg", "us"] as const).map((id) => ({ name: configRegionName(id, locale), type: "select", proxies: ["$nodes"] })),
       { name: other, type: "select", proxies: ["$nodes"] },
-      { name: auto, type: "url-test", proxies: ["$nodes"], url: "http://www.gstatic.com/generate_204", interval: 300 },
+      { name: auto, type: "url-test", proxies: ["$nodes"], url: DEFAULT_PROBE_URL, interval: 300 },
     ];
   }
   return [
     { name: anchor, type: "select", proxies: [auto, fallback, "$nodes", "DIRECT"] },
-    { name: auto, type: "url-test", proxies: ["$nodes"], url: "http://www.gstatic.com/generate_204", interval: 300 },
-    { name: fallback, type: "fallback", proxies: ["$nodes"], url: "http://www.gstatic.com/generate_204", interval: 300 },
+    { name: auto, type: "url-test", proxies: ["$nodes"], url: DEFAULT_PROBE_URL, interval: 300 },
+    { name: fallback, type: "fallback", proxies: ["$nodes"], url: DEFAULT_PROBE_URL, interval: 300 },
   ];
 }
 

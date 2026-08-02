@@ -35,6 +35,7 @@ import {
   trimmedString,
 } from "~/features/files/drivers/core/strategy-helpers";
 import type { FileConfigDraft } from "~/features/files/model/types";
+import { DEFAULT_PROBE_URL } from "~/shared/probe/defaults";
 
 const BUILTIN_POLICIES = ["direct", "block"] as const;
 const ADAPTIVE_TYPE_OPTIONS = [
@@ -42,7 +43,6 @@ const ADAPTIVE_TYPE_OPTIONS = [
   { value: "urltest", label: "urltest" },
 ] as const;
 const RULE_BASE = "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo";
-const PROBE_URL = "http://www.gstatic.com/generate_204";
 
 const relations = singBoxRelations();
 const adaptive = singBoxAdaptive(singBoxAdaptiveDialect(relations));
@@ -239,7 +239,7 @@ function singBoxAdaptiveDialect(
   const materialize: ConfigAdaptiveDialect["materialize"] = (item, type, nodeNames) => {
     const group: ConfigMap = { tag: item.name, type, outbounds: [...nodeNames] };
     if (type === "urltest") {
-      group.url = "https://www.gstatic.com/generate_204";
+      group.url = DEFAULT_PROBE_URL;
       group.interval = "5m";
       group.tolerance = 50;
     }
@@ -319,7 +319,7 @@ function materializeSingBoxTemplate(
     const outbounds = templateGroupTargets(item, selectName, autoName, "direct", "block")
       .filter((target) => target !== tag);
     return item.groupMode === "url-test"
-      ? { type: "urltest", tag, outbounds, url: PROBE_URL, interval: "5m" }
+      ? { type: "urltest", tag, outbounds, url: DEFAULT_PROBE_URL, interval: "5m" }
       : { type: "selector", tag, outbounds };
   });
   const ruleSets = blueprint.ruleEntries.map(({ ruleID }) => {

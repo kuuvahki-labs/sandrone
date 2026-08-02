@@ -3,6 +3,7 @@ import type {
   SettingsUpdate,
   SettingsView,
 } from "~/shared/api/client";
+import { DEFAULT_PROBE_URL } from "~/shared/probe/defaults";
 
 export type ProjectSettings = SettingsView;
 
@@ -30,7 +31,7 @@ export const defaultProjectSettings: SettingsView = {
   probe_defaults: {
     method: "url_test",
     core: "sing-box",
-    url: "http://www.gstatic.com/generate_204",
+    url: DEFAULT_PROBE_URL,
     ntp_server: "time.apple.com",
     timeout_ms: 5000,
     attempts: 1,

@@ -3,6 +3,7 @@ import FormControlLabel from "@mui/material/FormControlLabel";
 import TextField from "@mui/material/TextField";
 
 import { type Translator, useI18n } from "~/shared/i18n/context";
+import { DEFAULT_PROBE_URL } from "~/shared/probe/defaults";
 import {
   KeyValueParamsEditor,
   ProcessorEditorList,
@@ -37,7 +38,7 @@ const informationNodePattern = "(?i)(网址|流量|时间|应急|过期|bandwidt
 const probeRuntimeDefaults = {
   method: "url_test",
   core: "sing-box",
-  url: "http://www.gstatic.com/generate_204",
+  url: DEFAULT_PROBE_URL,
   ntpServer: "time.apple.com",
   failMode: "keep",
   timeoutMS: 5000,

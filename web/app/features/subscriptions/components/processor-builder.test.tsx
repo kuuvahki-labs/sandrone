@@ -127,7 +127,7 @@ describe("ProcessorBuilder", () => {
     expect(within(probeGroup).getByRole("combobox", { name: "失败处理" })).toHaveTextContent("保留");
     expect(within(probeGroup).queryByRole("textbox", { name: "NTP 服务器" })).not.toBeInTheDocument();
     const probeURL = within(probeGroup).getByRole("combobox", { name: "URL" });
-    expect(probeURL).toHaveValue("http://www.gstatic.com/generate_204");
+    expect(probeURL).toHaveValue("https://cp.cloudflare.com");
     expect(within(probeGroup).getByRole("spinbutton", { name: "超时毫秒" })).toHaveValue(5000);
     expect(within(probeGroup).getByRole("spinbutton", { name: "尝试次数" })).toHaveValue(1);
     expect(within(probeGroup).getByRole("spinbutton", { name: "并发数" })).toHaveValue(10);
@@ -142,7 +142,7 @@ describe("ProcessorBuilder", () => {
         params: {
           method: "url_test",
           core: "sing-box",
-          url: "http://www.gstatic.com/generate_204",
+          url: "https://cp.cloudflare.com",
           timeout_ms: 5000,
           attempts: 1,
           concurrency: 10,
@@ -174,7 +174,7 @@ describe("ProcessorBuilder", () => {
         params: {
           method: "url_test",
           core: "sing-box",
-          url: "http://www.gstatic.com/generate_204",
+          url: "https://cp.cloudflare.com",
           timeout_ms: 5000,
           attempts: 1,
           concurrency: 10,

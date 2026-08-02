@@ -28,6 +28,7 @@ import {
 } from "~/features/files/drivers/core/structured-adapter";
 import type { FileConfigDraft } from "~/features/files/model/types";
 import type { Translator } from "~/shared/i18n/context";
+import { DEFAULT_PROBE_URL } from "~/shared/probe/defaults";
 
 import { singBoxConfigurationStrategies } from "./strategies";
 
@@ -135,7 +136,7 @@ function singBoxGroups(): StructuredFileConfigurationAdapter["groups"] {
         ...group,
         adapterState,
         type,
-        healthCheckURL: group.healthCheckURL || "http://www.gstatic.com/generate_204",
+        healthCheckURL: group.healthCheckURL || DEFAULT_PROBE_URL,
         healthCheckInterval: group.healthCheckInterval || "5m",
       };
     },
@@ -296,12 +297,12 @@ function defaultGroups(preset: string, locale: ConfigNamingLocale): ConfigMap[] 
       { type: "selector", tag: anchor, outbounds: [auto, ...(["hk", "tw", "jp", "sg", "us"] as const).map((id) => configRegionName(id, locale)), other, "$nodes", "direct"], default: auto },
       ...(["hk", "tw", "jp", "sg", "us"] as const).map((id) => ({ type: "selector", tag: configRegionName(id, locale), outbounds: ["$nodes"] })),
       { type: "selector", tag: other, outbounds: ["$nodes"] },
-      { type: "urltest", tag: auto, outbounds: ["$nodes"], url: "http://www.gstatic.com/generate_204", interval: "5m" },
+      { type: "urltest", tag: auto, outbounds: ["$nodes"], url: DEFAULT_PROBE_URL, interval: "5m" },
     ];
   }
   return [
     { type: "selector", tag: anchor, outbounds: [auto, fallback, "$nodes", "direct"], default: auto },
-    { type: "urltest", tag: auto, outbounds: ["$nodes"], url: "http://www.gstatic.com/generate_204", interval: "5m" },
+    { type: "urltest", tag: auto, outbounds: ["$nodes"], url: DEFAULT_PROBE_URL, interval: "5m" },
     { type: "selector", tag: fallback, outbounds: ["$nodes"] },
   ];
 }

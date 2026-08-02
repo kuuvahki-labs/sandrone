@@ -22,6 +22,7 @@ func TestDefaultSettingsContainsWholeProject(t *testing.T) {
 	require.Equal(t, "auto", got.Appearance.Locale)
 	require.False(t, got.Subscriptions.AutoLoadTraffic)
 	require.Equal(t, 60, got.CacheDefaults.SubscriptionTrafficTTLSeconds)
+	require.Equal(t, "https://cp.cloudflare.com", got.ProbeDefaults.URL)
 }
 
 func TestStoredAndPublicSettingsOmitStartupAuthenticationAndMCPTransport(t *testing.T) {

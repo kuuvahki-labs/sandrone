@@ -95,7 +95,7 @@ func singBoxWebDefaultSpec(t *testing.T, autoMembers []any) *domain.FileSpec {
 					{"type": "selector", "tag": "Proxy", "outbounds": []any{"Auto", "$nodes", "direct", "block"}},
 					{
 						"type": "urltest", "tag": "Auto", "outbounds": autoMembers,
-						"url": "http://www.gstatic.com/generate_204", "interval": "5m",
+						"url": "https://cp.cloudflare.com", "interval": "5m",
 					},
 					{"type": "selector", "tag": "Ad Block", "outbounds": []any{"block", "direct", "Proxy"}},
 					{"type": "selector", "tag": "Private", "outbounds": []any{"direct", "Proxy", "Auto", "block"}},

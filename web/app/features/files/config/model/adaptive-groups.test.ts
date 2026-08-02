@@ -448,7 +448,7 @@ describe("adaptive sing-box group generation", () => {
       tag: "Japan",
       type: "urltest",
       outbounds: ["JP-01", "東京-02"],
-      url: "https://www.gstatic.com/generate_204",
+      url: "https://cp.cloudflare.com",
       interval: "5m",
       tolerance: 50,
    }]);
@@ -602,7 +602,7 @@ describe("adaptive sing-box group reconciliation", () => {
       tag: "Hong Kong",
       type: "urltest",
       outbounds: ["HK-02", "HK-01"],
-      url: "https://www.gstatic.com/generate_204",
+      url: "https://cp.cloudflare.com",
       interval: "5m",
       tolerance: 50,
    });

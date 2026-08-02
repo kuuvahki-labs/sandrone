@@ -90,6 +90,14 @@ func TestExplicitURLTestSelectsRequestedCore(t *testing.T) {
 	require.Equal(t, "mihomo", result.Results[0].Core)
 }
 
+func TestURLTestUsesCloudflareDefaultTarget(t *testing.T) {
+	target := probe.URLTestTarget(domain.ProbeRequest{
+		Method: domain.ProbeURLTest,
+	})
+
+	require.Equal(t, "https://cp.cloudflare.com", target)
+}
+
 func TestTCPConnectDialFailure(t *testing.T) {
 	engine := probe.New(probe.WithDialer(failingDialer{}))
 	result, err := engine.Probe(context.Background(), domain.ProbeRequest{

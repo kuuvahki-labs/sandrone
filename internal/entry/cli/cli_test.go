@@ -57,7 +57,7 @@ func TestProbeHelpDocumentsHealthCheckMethods(t *testing.T) {
 		"--ntp-server",
 		"--expected-status",
 		"--cache-ttl",
-		"http://www.gstatic.com/generate_204",
+		"https://cp.cloudflare.com",
 		"200-299",
 	} {
 		require.Contains(t, help, want)

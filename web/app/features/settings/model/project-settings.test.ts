@@ -10,6 +10,7 @@ describe("project settings model", () => {
   it("defaults automatic subscription traffic to disabled", () => {
     expect(defaultProjectSettings.subscriptions.auto_load_traffic).toBe(false);
     expect(defaultProjectSettings.appearance.locale).toBe("auto");
+    expect(defaultProjectSettings.probe_defaults.url).toBe("https://cp.cloudflare.com");
   });
 
   it("completes nested groups without losing defaults", () => {
