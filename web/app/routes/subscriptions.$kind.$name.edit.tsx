@@ -98,7 +98,7 @@ export default function SubscriptionEditRoute() {
       definitionPending={definitionPending}
       onBack={() => navigate("/subscriptions")}
       onCopySource={subscriptionActions.copySubscriptionSource}
-      onPreview={() => navigate(subscriptionPreviewPath(kind || item.kind, item.name))}
+      onPreview={() => navigate(subscriptionPreviewPath(kind || item.kind, item.name, "edit"))}
       onSave={(form) => subscriptionActions.saveSubscriptionEdit(item, form, definition)}
       onShare={() => shareDialog.open({ kind: "subscription", name: item.name })}
       scriptFiles={files.items.map(({ name, title }) => ({ name, title }))}

@@ -197,6 +197,7 @@ describe("React Router app subscription workflows", () => {
     expect(within(await screen.findByRole("group", { name: "基本信息" })).getByRole("textbox", { name: "内容" })).toHaveValue("ss://converted");
     await user.click(screen.getByRole("button", { name: "预览订阅" }));
     await waitFor(() => expect(router.state.location.pathname).toBe("/subscriptions/local/provider/preview"));
+    expect(router.state.location.search).toBe("?from=edit");
   });
 
   it("preserves newer local edits across a pending type-changing save refresh", async () => {
@@ -252,7 +253,7 @@ describe("React Router app subscription workflows", () => {
 
     await waitFor(() => expect(router.state.location.pathname).toBe("/subscriptions/local/provider/edit"));
     expect(within(await screen.findByRole("group", { name: "基本信息" })).getByRole("textbox", { name: "内容" })).toHaveValue("ss://newer");
-    expect(screen.getByRole("button", { name: "分享订阅" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "分享订阅" })).toHaveAttribute("aria-disabled", "true");
   });
 
   it("does not persist display-only auto format when saving remote edits", async () => {
@@ -319,7 +320,7 @@ describe("React Router app subscription workflows", () => {
       return jsonResponse({ ok: true });
     });
     vi.stubGlobal("fetch", fetchMock);
-    renderApp("/subscriptions/remote/provider/edit");
+    const { router } = renderApp("/subscriptions/remote/provider/edit");
 
     const sourceInput = await screen.findByRole("textbox", { name: "订阅地址" });
     expect(sourceInput).toHaveValue("https://example.com/sub");
@@ -335,10 +336,40 @@ describe("React Router app subscription workflows", () => {
     await user.click(screen.getByRole("button", { name: "预览订阅" }));
 
     expect(await screen.findByRole("heading", { name: "节点预览" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "返回" }));
+    expect(router.state.location.search).toBe("?from=edit");
+    await user.click(screen.getByRole("button", { name: "返回编辑" }));
 
     expect(await screen.findByRole("textbox", { name: "订阅地址" })).toHaveValue("https://example.com/updated");
     expect(requests.filter((request) => request.url.endsWith("/v1/subscriptions/provider") && request.init?.method === "GET").length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("opens a subscription preview from the list and returns to the list", async () => {
+    const user = userEvent.setup();
+    const { router } = renderApp("/subscriptions");
+
+    await screen.findByRole("heading", { name: "我的订阅" });
+    await user.click(screen.getByRole("button", { name: "provider 更多操作" }));
+    await user.click(screen.getByRole("menuitem", { name: "预览订阅" }));
+
+    expect(await screen.findByRole("heading", { name: "节点预览" })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/subscriptions/remote/provider/preview");
+    expect(router.state.location.search).toBe("?from=list");
+
+    await user.click(screen.getByRole("button", { name: "返回订阅列表" }));
+    expect(await screen.findByRole("heading", { name: "我的订阅" })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/subscriptions");
+  });
+
+  it("does not preview unsaved subscription edits", async () => {
+    const { router } = renderApp("/subscriptions/remote/provider/edit");
+
+    const displayName = await screen.findByRole("textbox", { name: "显示名称" });
+    fireEvent.change(displayName, { target: { value: "updated" } });
+
+    const preview = screen.getByRole("button", { name: "预览订阅" });
+    expect(preview).toHaveAttribute("aria-disabled", "true");
+    expect(preview).toHaveAccessibleDescription("请先保存修改，再预览已保存版本");
+    expect(router.state.location.pathname).toBe("/subscriptions/remote/provider/edit");
   });
 
 });

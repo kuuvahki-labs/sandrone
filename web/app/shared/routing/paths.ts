@@ -1,5 +1,6 @@
 export type SubscriptionCreateType = "remote" | "local" | "collection";
 export type FileCreateSource = string;
+export type ResourcePreviewOrigin = "edit" | "list";
 
 export function subscriptionResourcePath(kind: SubscriptionCreateType, name: string): string {
   return `/subscriptions/${kind}/${encodeURIComponent(name)}`;
@@ -9,8 +10,8 @@ export function subscriptionEditPath(kind: SubscriptionCreateType, name: string)
   return `${subscriptionResourcePath(kind, name)}/edit`;
 }
 
-export function subscriptionPreviewPath(kind: SubscriptionCreateType, name: string): string {
-  return `${subscriptionResourcePath(kind, name)}/preview`;
+export function subscriptionPreviewPath(kind: SubscriptionCreateType, name: string, origin?: ResourcePreviewOrigin): string {
+  return withPreviewOrigin(`${subscriptionResourcePath(kind, name)}/preview`, origin);
 }
 
 export function subscriptionNewPath(type: SubscriptionCreateType): string {
@@ -29,8 +30,12 @@ export function fileEditPath(name: string): string {
   return `${fileResourcePath(name)}/edit`;
 }
 
-export function filePreviewPath(name: string): string {
-  return `${fileResourcePath(name)}/preview`;
+export function filePreviewPath(name: string, origin?: ResourcePreviewOrigin): string {
+  return withPreviewOrigin(`${fileResourcePath(name)}/preview`, origin);
+}
+
+export function resourcePreviewOrigin(value: string | null | undefined): ResourcePreviewOrigin {
+  return value === "list" ? "list" : "edit";
 }
 
 export function sourceNameFromUrl(url: string): string {
@@ -62,4 +67,8 @@ export function decodeResourceRouteParam(value = ""): string | null {
 
 export function subscriptionKind(value = ""): SubscriptionCreateType | null {
   return value === "remote" || value === "local" || value === "collection" ? value : null;
+}
+
+function withPreviewOrigin(path: string, origin?: ResourcePreviewOrigin): string {
+  return origin ? `${path}?from=${origin}` : path;
 }

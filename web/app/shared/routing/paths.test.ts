@@ -4,8 +4,11 @@ import {
   decodeResourceRouteParam,
   decodeRouteParam,
   fileNewPath,
+  filePreviewPath,
   fileResourcePath,
+  resourcePreviewOrigin,
   subscriptionNewPath,
+  subscriptionPreviewPath,
   subscriptionResourcePath,
 } from "./paths";
 
@@ -34,5 +37,17 @@ describe("route path helpers", () => {
     expect(subscriptionResourcePath("remote", "default/sub")).toBe("/subscriptions/remote/default%2Fsub");
     expect(fileResourcePath("default.yaml")).toBe("/files/default.yaml");
     expect(decodeRouteParam("name%20with%20space")).toBe("name with space");
+  });
+
+  it("builds and parses closed preview origins", () => {
+    expect(filePreviewPath("default.yaml")).toBe("/files/default.yaml/preview");
+    expect(filePreviewPath("default.yaml", "list")).toBe("/files/default.yaml/preview?from=list");
+    expect(filePreviewPath("default.yaml", "edit")).toBe("/files/default.yaml/preview?from=edit");
+    expect(subscriptionPreviewPath("remote", "provider", "list"))
+      .toBe("/subscriptions/remote/provider/preview?from=list");
+    expect(resourcePreviewOrigin("list")).toBe("list");
+    expect(resourcePreviewOrigin("edit")).toBe("edit");
+    expect(resourcePreviewOrigin(null)).toBe("edit");
+    expect(resourcePreviewOrigin("https://example.com")).toBe("edit");
   });
 });

@@ -8,7 +8,7 @@ import { FileDriverIcon } from "~/features/files/editor/file-driver-icon";
 import { FilesPage } from "~/features/files/pages/files-page";
 import { useShareDialog } from "~/features/shares/components/share-dialog-context";
 import { useI18n } from "~/shared/i18n/context";
-import { fileEditPath, fileNewPath } from "~/shared/routing/paths";
+import { fileEditPath, fileNewPath, filePreviewPath } from "~/shared/routing/paths";
 
 export default function FilesRoute() {
   const navigate = useNavigate();
@@ -35,6 +35,7 @@ export default function FilesRoute() {
       items={files.items}
       onDelete={(item) => app.requestDelete({ kind: "files", name: item.name, label: t("nav.files"), onDeleted: files.reload })}
       onEdit={(item) => navigate(fileEditPath(item.name))}
+      onPreview={(item) => navigate(filePreviewPath(item.name, "list"))}
       onShare={(item) => shareDialog.open({ kind: "file", name: item.name })}
     />
   );

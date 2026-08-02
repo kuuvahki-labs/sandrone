@@ -268,17 +268,24 @@ describe("config file workbench integration", { timeout: 20_000 }, () => {
     );
 
     const share = screen.getByRole("button", { name: "Share file" });
+    const preview = screen.getByRole("button", { name: "Preview file" });
     expect(share).toBeEnabled();
+    expect(preview).toBeEnabled();
 
     await user.click(screen.getByRole("button", { name: "Local" }));
-    expect(share).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Share file" })).toHaveAttribute("aria-disabled", "true");
+    const disabledPreview = screen.getByRole("button", { name: "Preview file" });
+    expect(disabledPreview).toHaveAttribute("aria-disabled", "true");
+    expect(disabledPreview).toHaveAccessibleDescription("Save changes before previewing the persisted version");
 
     await user.click(screen.getByRole("button", { name: "Save file" }));
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(share).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Share file" })).toBeEnabled());
+    expect(screen.getByRole("button", { name: "Preview file" })).toBeEnabled();
 
     await user.click(screen.getByRole("button", { name: "Delete processor" }));
-    expect(share).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Share file" })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("button", { name: "Preview file" })).toHaveAttribute("aria-disabled", "true");
   });
 });
 

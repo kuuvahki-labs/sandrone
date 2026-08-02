@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -9,9 +9,11 @@ import { FilePreviewPage } from "./file-preview-page";
 import { FilesPage } from "./files-page";
 
 const pageActions = {
+  backLabel: "返回编辑",
   fileName: "default.txt",
   onBack: vi.fn(),
   onRefresh: vi.fn(),
+  onShare: vi.fn(),
 };
 
 describe("FilePreviewPage", () => {
@@ -113,19 +115,24 @@ describe("FilePreviewPage", () => {
   it("keeps loading, failure, and refresh behavior", async () => {
     const user = userEvent.setup();
     const onRefresh = vi.fn();
+    const onShare = vi.fn();
     const { rerender } = render(
-      <FilePreviewPage fileName="default.txt" pending onBack={vi.fn()} onRefresh={onRefresh} />,
+      <FilePreviewPage backLabel="返回编辑" fileName="default.txt" pending onBack={vi.fn()} onRefresh={onRefresh} onShare={onShare} />,
     );
 
     expect(screen.getByRole("heading", { name: "正在生成" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "刷新文件预览" })).toBeDisabled();
 
-    rerender(<FilePreviewPage failed fileName="default.txt" onBack={vi.fn()} onRefresh={onRefresh} />);
+    rerender(<FilePreviewPage backLabel="返回文件列表" failed fileName="default.txt" onBack={vi.fn()} onRefresh={onRefresh} onShare={onShare} />);
     expect(screen.getByRole("heading", { name: "生成失败" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "分享文件" })).toBeEnabled();
 
+    await user.click(screen.getByRole("button", { name: "分享文件" }));
     await user.click(screen.getByRole("button", { name: "刷新文件预览" }));
+    expect(onShare).toHaveBeenCalledTimes(1);
     expect(onRefresh).toHaveBeenCalledTimes(1);
   });
+
 });
 
 describe("FilesPage", () => {
@@ -142,6 +149,7 @@ describe("FilesPage", () => {
     const onCreateRemote = vi.fn();
     const onDelete = vi.fn();
     const onEdit = vi.fn();
+    const onPreview = vi.fn();
     const onShare = vi.fn();
     render(
       <FilesPage
@@ -149,6 +157,7 @@ describe("FilesPage", () => {
         items={items}
         onDelete={onDelete}
         onEdit={onEdit}
+        onPreview={onPreview}
         onShare={onShare}
       />,
     );
@@ -163,16 +172,19 @@ describe("FilesPage", () => {
     await user.click(await screen.findByRole("menuitem", { name: "远程" }));
     await user.click(screen.getByRole("button", { name: "编辑：default.yaml" }));
     await user.click(screen.getByRole("button", { name: "default.yaml 更多操作" }));
-    await user.click(screen.getByRole("menuitem", { name: "编辑" }));
+    expect(within(screen.getByRole("menu")).getAllByRole("menuitem").map((item) => item.textContent))
+      .toEqual(["预览", "分享", "删除"]);
+    expect(screen.queryByRole("menuitem", { name: "编辑" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("menuitem", { name: "预览文件" }));
     await user.click(screen.getByRole("button", { name: "default.yaml 更多操作" }));
-    await user.click(screen.getByRole("menuitem", { name: "分享" }));
+    await user.click(screen.getByRole("menuitem", { name: "分享文件" }));
     await user.click(screen.getByRole("button", { name: "default.yaml 更多操作" }));
     await user.click(screen.getByRole("menuitem", { name: "删除" }));
 
     expect(onCreateRemote).toHaveBeenCalledTimes(1);
-    expect(onEdit).toHaveBeenCalledTimes(2);
-    expect(onEdit).toHaveBeenNthCalledWith(1, items[0]);
-    expect(onEdit).toHaveBeenNthCalledWith(2, items[0]);
+    expect(onEdit).toHaveBeenCalledOnce();
+    expect(onEdit).toHaveBeenCalledWith(items[0]);
+    expect(onPreview).toHaveBeenCalledWith(items[0]);
     expect(onShare).toHaveBeenCalledWith(items[0]);
     expect(onDelete).toHaveBeenCalledWith(items[0]);
   });

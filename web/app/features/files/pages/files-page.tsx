@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
-import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import SearchIcon from "@mui/icons-material/Search";
 import ShareOutlinedIcon from "@mui/icons-material/ShareOutlined";
+import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import Chip from "@mui/material/Chip";
 import InputAdornment from "@mui/material/InputAdornment";
 import List from "@mui/material/List";
@@ -27,10 +27,11 @@ export interface FilesPageProps {
   items: FileItem[];
   onDelete: (item: FileItem) => void;
   onEdit: (item: FileItem) => void;
+  onPreview: (item: FileItem) => void;
   onShare: (item: FileItem) => void;
 }
 
-export function FilesPage({ createActions, items, onDelete, onEdit, onShare }: FilesPageProps) {
+export function FilesPage({ createActions, items, onDelete, onEdit, onPreview, onShare }: FilesPageProps) {
   const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [queryFocused, setQueryFocused] = useState(false);
@@ -99,7 +100,7 @@ export function FilesPage({ createActions, items, onDelete, onEdit, onShare }: F
         <List aria-label={t("files.list")} className="grid gap-3 p-0">
           {filtered.map((item) => (
             <DestinationListItem
-              actions={fileActions(item, { onDelete, onEdit, onShare }, t)}
+              actions={fileActions(item, { onDelete, onPreview, onShare }, t)}
               actionTitle={item.name}
               icon={fileIcon(item)}
               key={item.name}
@@ -150,18 +151,20 @@ function fileActions(
   item: FileItem,
   handlers: {
     onDelete: (item: FileItem) => void;
-    onEdit: (item: FileItem) => void;
+    onPreview: (item: FileItem) => void;
     onShare: (item: FileItem) => void;
   },
   t: Translator,
 ): DestinationListAction[] {
   return [
     {
-      icon: <EditOutlinedIcon aria-hidden fontSize="small" />,
-      label: t("actions.edit"),
-      onSelect: () => handlers.onEdit(item),
+      accessibleLabel: t("files.actions.preview"),
+      icon: <VisibilityOutlinedIcon aria-hidden fontSize="small" />,
+      label: t("common.preview"),
+      onSelect: () => handlers.onPreview(item),
     },
     {
+      accessibleLabel: t("files.actions.share"),
       icon: <ShareOutlinedIcon aria-hidden fontSize="small" />,
       label: t("nav.shares"),
       onSelect: () => handlers.onShare(item),

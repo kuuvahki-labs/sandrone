@@ -2,6 +2,7 @@ import { useId, useState } from "react";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import ShareOutlinedIcon from "@mui/icons-material/ShareOutlined";
 import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
 import CardActionArea from "@mui/material/CardActionArea";
@@ -26,15 +27,17 @@ type StatusColor = "success" | "warning" | "error" | "info";
 const maxSummaryChanges = 3;
 
 export interface SubscriptionPreviewPageProps {
+  backLabel: string;
   failed?: boolean;
   item: SubscriptionItem;
   pending?: boolean;
   preview?: SubscriptionPreview;
   onBack: () => void;
   onRefresh: () => void;
+  onShare: () => void;
 }
 
-export function SubscriptionPreviewPage({ failed = false, pending = false, preview, onBack, onRefresh }: SubscriptionPreviewPageProps) {
+export function SubscriptionPreviewPage({ backLabel, failed = false, pending = false, preview, onBack, onRefresh, onShare }: SubscriptionPreviewPageProps) {
   const { t } = useI18n();
   const [filter, setFilter] = useState<PreviewFilter>("all");
   const nodes = preview?.nodes ?? [];
@@ -44,9 +47,10 @@ export function SubscriptionPreviewPage({ failed = false, pending = false, previ
   return (
     <section className="grid gap-6">
       <PageHeader
-        backAction={{ label: t("actions.back"), onSelect: onBack }}
+        backAction={{ label: backLabel, onSelect: onBack }}
         label=""
         primaryAction={{ accessibleLabel: t("subscriptions.preview.refresh"), disabled: pending, icon: <RefreshIcon aria-hidden fontSize="small" />, label: t("actions.refresh"), onSelect: onRefresh }}
+        secondaryActions={[{ accessibleLabel: t("subscriptions.actions.share"), icon: <ShareOutlinedIcon aria-hidden fontSize="small" />, label: t("actions.share"), onSelect: onShare }]}
         sticky
         title={t("subscriptions.preview.title")}
       />

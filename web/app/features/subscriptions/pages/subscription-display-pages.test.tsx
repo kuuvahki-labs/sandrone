@@ -18,6 +18,13 @@ import {
 import { SubscriptionPreviewPage } from "./subscription-preview-page";
 import { SubscriptionsPage } from "./subscriptions-page";
 
+const previewPageActions = {
+  backLabel: "返回编辑",
+  onBack: noop,
+  onRefresh: noop,
+  onShare: noop,
+};
+
 describe("SubscriptionPreviewPage", () => {
   it("keeps the summary warning metric raw while grouping the warning list", () => {
     const repeatedWarnings: SubscriptionPreview = {
@@ -37,7 +44,7 @@ describe("SubscriptionPreviewPage", () => {
       }],
     };
 
-    render(<SubscriptionPreviewPage item={subscriptions[0]} onBack={noop} onRefresh={noop} preview={repeatedWarnings} />);
+    render(<SubscriptionPreviewPage {...previewPageActions} item={subscriptions[0]} preview={repeatedWarnings} />);
 
     const summary = screen.getByLabelText("预览统计");
     expect(within(summary).getAllByText(/^\d+$/).map((node) => node.textContent)).toEqual(["2", "1", "1", "2"]);
@@ -72,7 +79,7 @@ describe("SubscriptionPreviewPage", () => {
         },
       } as SubscriptionPreviewWarning],
     };
-    render(<SubscriptionPreviewPage item={subscriptions[0]} onBack={noop} onRefresh={noop} preview={previewWithWarning} />);
+    render(<SubscriptionPreviewPage {...previewPageActions} item={subscriptions[0]} preview={previewWithWarning} />);
 
     expect(screen.getByRole("heading", { name: "节点预览" })).toBeInTheDocument();
     const summary = screen.getByLabelText("预览统计");
@@ -161,7 +168,7 @@ describe("SubscriptionPreviewPage", () => {
       }],
     };
 
-    render(<SubscriptionPreviewPage item={subscriptions[0]} onBack={noop} onRefresh={noop} preview={previewWithMetadata} />);
+    render(<SubscriptionPreviewPage {...previewPageActions} item={subscriptions[0]} preview={previewWithMetadata} />);
 
     await user.click(screen.getByRole("button", { name: /node-a/ }));
 
@@ -190,7 +197,7 @@ describe("SubscriptionPreviewPage", () => {
   });
   it("puts name changes first in modified node diffs", async () => {
     const user = userEvent.setup();
-    render(<SubscriptionPreviewPage item={subscriptions[0]} onBack={noop} onRefresh={noop} preview={allStatusSubscriptionPreview} />);
+    render(<SubscriptionPreviewPage {...previewPageActions} item={subscriptions[0]} preview={allStatusSubscriptionPreview} />);
 
     await user.click(screen.getByRole("button", { name: /after-node/ }));
 
@@ -203,6 +210,24 @@ describe("SubscriptionPreviewPage", () => {
     expect(detailBlock.querySelector('[data-diff-line="removed"]')).toBeInTheDocument();
     expect(detailBlock.querySelector('[data-diff-line="added"]')).toBeInTheDocument();
     expect(Array.from(detailBlock.querySelectorAll('[data-diff-line="unchanged"]')).some((line) => line.textContent?.includes('"type"'))).toBe(true);
+  });
+
+  it("keeps persisted subscription actions available after preview failure", async () => {
+    const user = userEvent.setup();
+    const onShare = vi.fn();
+    render(
+      <SubscriptionPreviewPage
+        {...previewPageActions}
+        backLabel="返回订阅列表"
+        failed
+        item={subscriptions[0]}
+        onShare={onShare}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "分享订阅" })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "分享订阅" }));
+    expect(onShare).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -217,6 +242,7 @@ describe("SubscriptionsPage", () => {
       subscriptions[2],
     ];
     const onEdit = vi.fn();
+    const onPreview = vi.fn();
     render(
       <SubscriptionsPage
         createActions={[
@@ -227,6 +253,7 @@ describe("SubscriptionsPage", () => {
         items={items}
         onDelete={noop}
         onEdit={onEdit}
+        onPreview={onPreview}
         onShare={noop}
       />,
     );
@@ -246,13 +273,19 @@ describe("SubscriptionsPage", () => {
     expect(screen.queryByText("default")).not.toBeInTheDocument();
     fireEvent.change(searchbox, { target: { value: "" } });
 
+    await user.click(screen.getByRole("button", { name: "编辑：default" }));
     await user.click(screen.getByRole("button", { name: "default 更多操作" }));
+    expect(within(screen.getByRole("menu")).getAllByRole("menuitem").map((item) => item.textContent))
+      .toEqual(["预览", "分享", "删除"]);
+    expect(screen.queryByRole("menuitem", { name: "编辑" })).not.toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "刷新" })).not.toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "诊断" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("menuitem", { name: "编辑" }));
+    await user.click(screen.getByRole("menuitem", { name: "预览订阅" }));
     expect(onEdit).toHaveBeenCalledWith(items[3]);
+    expect(onPreview).toHaveBeenCalledWith(items[3]);
   });
-  it("renders subscription traffic on the list page", () => {
+  it("renders subscription traffic and keeps its service portal ordered", async () => {
+    const user = userEvent.setup();
     const trafficWithUsage = {
       ...subscriptionTraffic,
       traffic: {
@@ -278,6 +311,7 @@ describe("SubscriptionsPage", () => {
         trafficByKey={{ "remote:provider": trafficWithUsage }}
         onDelete={noop}
         onEdit={noop}
+        onPreview={noop}
         onShare={noop}
       />,
     );
@@ -289,5 +323,8 @@ describe("SubscriptionsPage", () => {
     const progress = within(list).getByRole("progressbar", { name: trafficSummary });
     expect(progress).toHaveAttribute("aria-valuenow", "30");
     expect(within(list).getByRole("button", { name: "provider 更多操作" })).toBeInTheDocument();
+    await user.click(within(list).getByRole("button", { name: "provider 更多操作" }));
+    expect(within(screen.getByRole("menu")).getAllByRole("menuitem").map((item) => item.textContent))
+      .toEqual(["预览", "服务面板", "分享", "删除"]);
   });
 });

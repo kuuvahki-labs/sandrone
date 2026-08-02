@@ -1,8 +1,9 @@
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import Button from "@mui/material/Button";
 import IconButton from "@mui/material/IconButton";
 import Paper from "@mui/material/Paper";
+import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import useMediaQuery from "@mui/material/useMediaQuery";
 
@@ -151,6 +152,7 @@ export interface PageHeaderBackAction {
 export interface PageHeaderAction {
   accessibleLabel?: string;
   disabled?: boolean;
+  disabledReason?: string;
   icon?: ReactNode;
   label: string;
   onSelect?: () => void;
@@ -160,8 +162,11 @@ export interface PageHeaderAction {
 }
 
 function PageHeaderActionButton({ action, compact = false }: { action: PageHeaderAction; compact?: boolean }) {
-  return (
+  const reasonId = useId();
+  const button = (
     <Button
+      aria-hidden={action.disabled && action.disabledReason ? true : undefined}
+      aria-describedby={action.disabledReason ? reasonId : undefined}
       aria-label={action.accessibleLabel}
       color={action.tone === "danger" ? "error" : "primary"}
       disabled={action.disabled}
@@ -174,12 +179,33 @@ function PageHeaderActionButton({ action, compact = false }: { action: PageHeade
       {action.label}
     </Button>
   );
+  if (!action.disabled || !action.disabledReason) {
+    return button;
+  }
+  return (
+    <>
+      <Tooltip describeChild title={action.disabledReason}>
+        <span
+          aria-describedby={reasonId}
+          aria-disabled="true"
+          aria-label={action.accessibleLabel ?? action.label}
+          className="inline-flex"
+          role="button"
+          tabIndex={0}
+        >
+          {button}
+        </span>
+      </Tooltip>
+      <span className="sr-only" id={reasonId}>{action.disabledReason}</span>
+    </>
+  );
 }
 
 function toDestinationListAction(action: PageHeaderAction): DestinationListAction {
   return {
     accessibleLabel: action.accessibleLabel,
     disabled: action.disabled,
+    disabledReason: action.disabledReason,
     icon: action.icon,
     label: action.label,
     onSelect: action.onSelect ?? (() => undefined),

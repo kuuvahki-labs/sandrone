@@ -86,7 +86,7 @@ export default function FileEditRoute() {
       loadSubscriptionPreview={loadSubscriptionPreview}
       loadRuleSetCatalog={loadRuleSetCatalog}
       onBack={() => navigate("/files")}
-      onPreview={() => navigate(filePreviewPath(item.name))}
+      onPreview={() => navigate(filePreviewPath(item.name, "edit"))}
       onSave={(form) => fileActions.saveFileEdit(item, form, detail)}
       onShare={() => shareDialog.open({ kind: "file", name: item.name })}
       scriptFiles={files.items.map(({ name, title }) => ({ name, title }))}

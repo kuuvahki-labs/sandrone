@@ -1,4 +1,5 @@
 import RefreshIcon from "@mui/icons-material/Refresh";
+import ShareOutlinedIcon from "@mui/icons-material/ShareOutlined";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import Typography from "@mui/material/Typography";
@@ -10,15 +11,17 @@ import { CodeBlock } from "~/shared/ui/code-editor";
 import { PageHeader } from "~/shared/ui/page";
 
 export interface FilePreviewPageProps {
+  backLabel: string;
   failed?: boolean;
   fileName: string;
   pending?: boolean;
   preview?: FilePreview;
   onBack: () => void;
   onRefresh: () => void;
+  onShare: () => void;
 }
 
-export function FilePreviewPage({ failed = false, fileName, pending = false, preview, onBack, onRefresh }: FilePreviewPageProps) {
+export function FilePreviewPage({ backLabel, failed = false, fileName, pending = false, preview, onBack, onRefresh, onShare }: FilePreviewPageProps) {
   const { t } = useI18n();
 
   return (
@@ -30,9 +33,10 @@ export function FilePreviewPage({ failed = false, fileName, pending = false, pre
       }
     >
       <PageHeader
-        backAction={{ label: t("actions.back"), onSelect: onBack }}
+        backAction={{ label: backLabel, onSelect: onBack }}
         label=""
         primaryAction={{ accessibleLabel: t("files.preview.refresh"), disabled: pending, icon: <RefreshIcon aria-hidden fontSize="small" />, label: t("actions.refresh"), onSelect: onRefresh }}
+        secondaryActions={[{ accessibleLabel: t("files.actions.share"), icon: <ShareOutlinedIcon aria-hidden fontSize="small" />, label: t("actions.share"), onSelect: onShare }]}
         sticky
         title={t("files.preview.title")}
       />

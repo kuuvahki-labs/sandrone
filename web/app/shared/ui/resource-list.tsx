@@ -19,6 +19,7 @@ import { useI18n } from "~/shared/i18n/context";
 export interface DestinationListAction {
   accessibleLabel?: string;
   disabled?: boolean;
+  disabledReason?: string;
   icon?: ReactNode;
   label: string;
   onSelect: () => void;
@@ -51,23 +52,41 @@ export function ActionMenu({ actions, buttonSize, label }: { actions: Destinatio
         id={menuId}
         anchorEl={anchor}
         open={Boolean(anchor)}
+        slotProps={{ list: { disabledItemsFocusable: true } }}
         onClose={() => setAnchor(null)}
       >
-        {actions.map((action) => (
-          <MenuItem
-            aria-label={action.accessibleLabel}
-            disabled={action.disabled}
-            key={action.accessibleLabel ?? action.label}
-            sx={action.tone === "danger" ? { color: "error.main" } : undefined}
-            onClick={() => {
-              setAnchor(null);
-              action.onSelect();
-            }}
-          >
-            {action.icon}
-            {action.label}
-          </MenuItem>
-        ))}
+        {actions.map((action) => {
+          const key = action.accessibleLabel ?? action.label;
+          const item = (
+            <MenuItem
+              aria-description={action.disabledReason}
+              aria-disabled={action.disabled || undefined}
+              aria-label={action.accessibleLabel}
+              disabled={action.disabled && !action.disabledReason}
+              key={key}
+              sx={{
+                ...(action.tone === "danger" ? { color: "error.main" } : {}),
+                ...(action.disabled ? { color: "text.disabled", cursor: "default" } : {}),
+              }}
+              onClick={(event) => {
+                if (action.disabled) {
+                  event.preventDefault();
+                  return;
+                }
+                setAnchor(null);
+                action.onSelect();
+              }}
+            >
+              {action.icon}
+              {action.label}
+            </MenuItem>
+          );
+          return action.disabledReason ? (
+            <Tooltip describeChild key={key} placement="left" title={action.disabledReason}>
+              {item}
+            </Tooltip>
+          ) : item;
+        })}
       </Menu>
     </>
   );

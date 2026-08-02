@@ -72,6 +72,36 @@ describe("shared UI primitives", () => {
     expect(screen.queryByRole("button", { name: "更多操作" })).not.toBeInTheDocument();
   });
 
+  it("explains why a disabled page-header action is unavailable", async () => {
+    const user = userEvent.setup();
+    const onPreview = vi.fn();
+    render(
+      <PageHeader
+        label=""
+        secondaryActions={[{
+          accessibleLabel: "预览文件",
+          disabled: true,
+          disabledReason: "请先保存修改，再预览已保存版本",
+          label: "预览",
+          onSelect: onPreview,
+        }]}
+        title="编辑文件"
+      />,
+    );
+
+    const preview = screen.getByRole("button", { name: "预览文件" });
+    expect(preview).toHaveAttribute("aria-disabled", "true");
+    expect(preview.querySelector("button")).toBeDisabled();
+
+    await user.tab();
+    expect(preview).toHaveFocus();
+    expect(preview).toHaveAccessibleDescription("请先保存修改，再预览已保存版本");
+    await user.hover(preview);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("请先保存修改，再预览已保存版本");
+    await user.click(preview);
+    expect(onPreview).not.toHaveBeenCalled();
+  });
+
   it("puts multiple secondary actions in the mobile compact overflow menu", async () => {
     vi.stubGlobal("matchMedia", vi.fn((query: string) => ({
       matches: query === "(max-width:819px)",
@@ -84,6 +114,7 @@ describe("shared UI primitives", () => {
       dispatchEvent: vi.fn(),
     })));
     const user = userEvent.setup();
+    const onPreview = vi.fn();
 
     try {
       render(
@@ -91,7 +122,13 @@ describe("shared UI primitives", () => {
           label=""
           primaryAction={{ label: "保存", variant: "contained" }}
           secondaryActions={[
-            { label: "预览", onSelect: vi.fn() },
+            {
+              accessibleLabel: "预览文件",
+              disabled: true,
+              disabledReason: "请先保存修改，再预览已保存版本",
+              label: "预览",
+              onSelect: onPreview,
+            },
             { label: "分享", onSelect: vi.fn() },
           ]}
           sticky
@@ -100,7 +137,13 @@ describe("shared UI primitives", () => {
       );
 
       await user.click(screen.getByRole("button", { name: "更多操作" }));
-      expect(screen.getByRole("menuitem", { name: "预览" })).toBeInTheDocument();
+      const preview = screen.getByRole("menuitem", { name: "预览文件" });
+      expect(preview).toHaveAttribute("aria-disabled", "true");
+      expect(preview).toHaveAccessibleDescription("请先保存修改，再预览已保存版本");
+      await user.hover(preview);
+      expect(await screen.findByRole("tooltip")).toHaveTextContent("请先保存修改，再预览已保存版本");
+      await user.click(preview);
+      expect(onPreview).not.toHaveBeenCalled();
       expect(screen.getByRole("menuitem", { name: "分享" })).toBeInTheDocument();
     } finally {
       vi.unstubAllGlobals();

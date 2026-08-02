@@ -14,6 +14,10 @@ import {
   isEditSessionSaving,
   startEditSessionSave,
 } from "~/shared/resources/edit-session";
+import {
+  persistedResourceActionBlocker,
+  persistedResourceActionDisabledReason,
+} from "~/shared/resources/persisted-resource-actions";
 import type { ResourceOption } from "~/shared/resources/types";
 import type { SubscriptionCreateType } from "~/shared/routing/paths";
 import { DiscardChangesDialog } from "~/shared/ui/dialogs";
@@ -52,6 +56,13 @@ export function SubscriptionEditPage({
   const savingRef = useRef(false);
   const dirty = isEditSessionDirty(editSession);
   const saving = isEditSessionSaving(editSession);
+  const actionBlocker = persistedResourceActionBlocker({
+    dirty,
+    loading: definitionPending,
+    saving,
+  });
+  const previewDisabledReason = persistedResourceActionDisabledReason("preview", actionBlocker, t);
+  const shareDisabledReason = persistedResourceActionDisabledReason("share", actionBlocker, t);
   const markDirty = useCallback(() => {
     const changed = changeEditSession(editSessionRef.current);
     editSessionRef.current = changed;
@@ -101,8 +112,8 @@ export function SubscriptionEditPage({
           label=""
           primaryAction={{ accessibleLabel: t("subscriptions.save"), disabled: definitionPending || saving, icon: <SaveIcon aria-hidden fontSize="small" />, label: t("actions.save"), type: "submit", variant: "contained" }}
           secondaryActions={[
-            ...(onPreview ? [{ accessibleLabel: t("subscriptions.actions.preview"), disabled: definitionPending, icon: <VisibilityOutlinedIcon aria-hidden fontSize="small" />, label: t("common.preview"), onSelect: onPreview }] : []),
-            ...(onShare ? [{ accessibleLabel: t("subscriptions.actions.share"), disabled: definitionPending || dirty || saving, icon: <ShareOutlinedIcon aria-hidden fontSize="small" />, label: t("actions.share"), onSelect: onShare }] : []),
+            ...(onPreview ? [{ accessibleLabel: t("subscriptions.actions.preview"), disabled: Boolean(previewDisabledReason), disabledReason: previewDisabledReason, icon: <VisibilityOutlinedIcon aria-hidden fontSize="small" />, label: t("common.preview"), onSelect: onPreview }] : []),
+            ...(onShare ? [{ accessibleLabel: t("subscriptions.actions.share"), disabled: Boolean(shareDisabledReason), disabledReason: shareDisabledReason, icon: <ShareOutlinedIcon aria-hidden fontSize="small" />, label: t("actions.share"), onSelect: onShare }] : []),
           ]}
           sticky
           title={t("subscriptions.edit.title")}

@@ -2,11 +2,11 @@ import { useMemo, useState } from "react";
 import AccountTreeOutlinedIcon from "@mui/icons-material/AccountTreeOutlined";
 import CloudDownloadOutlinedIcon from "@mui/icons-material/CloudDownloadOutlined";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
-import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import LinkOutlinedIcon from "@mui/icons-material/LinkOutlined";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import SearchIcon from "@mui/icons-material/Search";
 import ShareOutlinedIcon from "@mui/icons-material/ShareOutlined";
+import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import Chip from "@mui/material/Chip";
 import InputAdornment from "@mui/material/InputAdornment";
 import List from "@mui/material/List";
@@ -33,6 +33,7 @@ export interface SubscriptionsPageProps {
   trafficByKey?: Record<string, SubscriptionTraffic | null>;
   onDelete: (item: SubscriptionItem) => void;
   onEdit: (item: SubscriptionItem) => void;
+  onPreview: (item: SubscriptionItem) => void;
   onShare: (item: SubscriptionItem) => void;
 }
 
@@ -43,6 +44,7 @@ export function SubscriptionsPage({
   trafficByKey,
   onDelete,
   onEdit,
+  onPreview,
   onShare,
 }: SubscriptionsPageProps) {
   const { t } = useI18n();
@@ -109,7 +111,7 @@ export function SubscriptionsPage({
             const traffic = trafficByKey?.[trafficKey] ?? null;
             return (
               <DestinationListItem
-                actions={subscriptionActions(item, traffic, { onDelete, onEdit, onShare }, t)}
+                actions={subscriptionActions(item, traffic, { onDelete, onPreview, onShare }, t)}
                 actionTitle={item.name}
                 icon={subscriptionIcon(item.kind)}
                 key={`${item.kind}:${item.name}`}
@@ -165,7 +167,7 @@ function subscriptionActions(
   traffic: SubscriptionTraffic | null,
   handlers: {
     onDelete: (item: SubscriptionItem) => void;
-    onEdit: (item: SubscriptionItem) => void;
+    onPreview: (item: SubscriptionItem) => void;
     onShare: (item: SubscriptionItem) => void;
   },
   t: Translator,
@@ -173,9 +175,10 @@ function subscriptionActions(
   const appUrl = subscriptionAppUrl(traffic);
   return [
     {
-      icon: <EditOutlinedIcon aria-hidden fontSize="small" />,
-      label: t("actions.edit"),
-      onSelect: () => handlers.onEdit(item),
+      accessibleLabel: t("subscriptions.actions.preview"),
+      icon: <VisibilityOutlinedIcon aria-hidden fontSize="small" />,
+      label: t("common.preview"),
+      onSelect: () => handlers.onPreview(item),
     },
     ...(appUrl ? [{
       icon: <OpenInNewIcon aria-hidden fontSize="small" />,
@@ -183,6 +186,7 @@ function subscriptionActions(
       onSelect: () => window.open(appUrl, "_blank", "noopener,noreferrer"),
     }] satisfies DestinationListAction[] : []),
     {
+      accessibleLabel: t("subscriptions.actions.share"),
       icon: <ShareOutlinedIcon aria-hidden fontSize="small" />,
       label: t("nav.shares"),
       onSelect: () => handlers.onShare(item),

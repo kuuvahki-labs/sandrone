@@ -619,9 +619,11 @@ describe("application dependency graph", () => {
       "core/app-layout.tsx",
       "core/routing/subscriptions-route.tsx",
       "routes/files.$name.edit.tsx",
+      "routes/files.$name.preview.tsx",
       "routes/files.new.tsx",
       "routes/files.tsx",
       "routes/subscriptions.$kind.$name.edit.tsx",
+      "routes/subscriptions.$kind.$name.preview.tsx",
       "routes/subscriptions.new.tsx",
     ]);
   });

@@ -125,6 +125,41 @@ const subscriptionPreview = {
   ],
 };
 
+function settingsEnvelope(themeMode: "dark" | "light" = "dark") {
+  const settings = {
+    schema_version: 1,
+    http: { listen: "127.0.0.1:1137" },
+    mcp: { path: "/mcp", allow_management_tools: false, max_output_bytes: 1048576 },
+    webui: { static_dir: "" },
+    log: { level: "info" },
+    remote_defaults: { user_agent: "sandrone/0.1.0", timeout_ms: 15000 },
+    probe_defaults: {
+      method: "url_test",
+      core: "sing-box",
+      url: "https://cp.cloudflare.com",
+      ntp_server: "time.apple.com",
+      timeout_ms: 5000,
+      attempts: 1,
+      concurrency: 10,
+      cache_ttl_seconds: 0,
+    },
+    cache_defaults: {
+      remote_fetch_ttl_seconds: 0,
+      subscription_traffic_ttl_seconds: 60,
+      subscription_render_ttl_seconds: 0,
+      file_render_ttl_seconds: 0,
+    },
+    appearance: { theme_mode: themeMode, locale: "zh-CN" },
+    subscriptions: { auto_load_traffic: false },
+  };
+  return {
+    settings,
+    effective: settings,
+    overrides: {},
+    restart_required: [],
+  };
+}
+
 test.beforeEach(async ({ page }) => {
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"], { origin: "http://127.0.0.1:4173" });
   await page.route("**/v1/subscriptions", async (route) => {
@@ -153,40 +188,7 @@ test.beforeEach(async ({ page }) => {
     await route.fulfill({ json: { shares: manifest.shares } });
   });
   await page.route("**/v1/settings", async (route) => {
-    const settings = {
-      schema_version: 1,
-      http: { listen: "127.0.0.1:1137" },
-      mcp: { path: "/mcp", allow_management_tools: false, max_output_bytes: 1048576 },
-      webui: { static_dir: "" },
-      log: { level: "info" },
-      remote_defaults: { user_agent: "sandrone/0.1.0", timeout_ms: 15000 },
-      probe_defaults: {
-        method: "url_test",
-        core: "sing-box",
-        url: "https://cp.cloudflare.com",
-        ntp_server: "time.apple.com",
-        timeout_ms: 5000,
-        attempts: 1,
-        concurrency: 10,
-        cache_ttl_seconds: 0,
-      },
-      cache_defaults: {
-        remote_fetch_ttl_seconds: 0,
-        subscription_traffic_ttl_seconds: 60,
-        subscription_render_ttl_seconds: 0,
-        file_render_ttl_seconds: 0,
-      },
-      appearance: { theme_mode: "dark", locale: "zh-CN" },
-      subscriptions: { auto_load_traffic: false },
-    };
-    await route.fulfill({
-      json: {
-        settings,
-        effective: settings,
-        overrides: {},
-        restart_required: [],
-      },
-    });
+    await route.fulfill({ json: settingsEnvelope() });
   });
   await page.route("**/v1/subscriptions/provider/preview", async (route) => {
     await route.fulfill({ json: subscriptionPreview });
@@ -328,9 +330,12 @@ for (const route of routes) {
       });
       expect(searchBounds.label?.x ?? 0, "subscription search label should not overlap the search icon").toBeGreaterThanOrEqual((searchBounds.icon?.x ?? 0) + (searchBounds.icon?.width ?? 0) + 4);
       await page.getByRole("button", { name: "provider 更多操作" }).click();
-      await expect(page.getByRole("menuitem", { name: "编辑" })).toBeVisible();
+      await expect(page.getByRole("menuitem", { name: "预览订阅" })).toBeVisible();
+      await expect(page.getByRole("menuitem", { name: "分享订阅" })).toBeVisible();
+      await expect(page.getByRole("menuitem", { name: "删除" })).toBeVisible();
+      await expect(page.getByRole("menuitem", { name: "编辑" })).toHaveCount(0);
       if (testInfo.project.name === "mobile") {
-        await page.getByRole("menuitem", { name: "分享" }).click();
+        await page.getByRole("menuitem", { name: "分享订阅" }).click();
         const create = page.getByRole("dialog", { name: "创建分享链接" });
         await create.getByRole("button", { name: "保存分享链接" }).click();
 
@@ -354,8 +359,10 @@ for (const route of routes) {
     }
     if (route.path === "/files") {
       await page.getByRole("button", { name: "default.yaml 更多操作" }).click();
-      await expect(page.getByRole("menuitem", { name: "编辑" })).toBeVisible();
-      await expect(page.getByRole("menuitem", { name: "分享" })).toBeVisible();
+      await expect(page.getByRole("menuitem", { name: "预览文件" })).toBeVisible();
+      await expect(page.getByRole("menuitem", { name: "分享文件" })).toBeVisible();
+      await expect(page.getByRole("menuitem", { name: "删除" })).toBeVisible();
+      await expect(page.getByRole("menuitem", { name: "编辑" })).toHaveCount(0);
       await page.keyboard.press("Escape");
     }
     if ([
@@ -729,7 +736,7 @@ test("subscription preview JSON stays inside the viewport and uses theme colors"
   const previewCard = page.getByRole("button", { name: `${previewAfterName} 节点详情` });
   await expect(previewCard).toBeVisible();
   if (testInfo.project.name === "mobile") {
-    const backButton = page.getByRole("button", { name: "返回" });
+    const backButton = page.getByRole("button", { name: "返回编辑" });
     const backBox = await backButton.boundingBox();
     expect(backBox?.x, "mobile preview back button should stay left aligned").toBeLessThanOrEqual(32);
     expect(backBox?.width, "mobile preview back button should not stretch across the viewport").toBeLessThan(160);
@@ -760,6 +767,10 @@ for (const mode of ["dark", "light"] as const) {
   test(`/${mode} color scheme renders main destinations`, async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "desktop", "color-scheme navigation is viewport-independent");
 
+    await page.unroute("**/v1/settings");
+    await page.route("**/v1/settings", async (route) => {
+      await route.fulfill({ json: settingsEnvelope(mode) });
+    });
     await page.addInitScript((selectedMode) => {
       localStorage.setItem("sandrone.locale", "zh-CN");
       localStorage.setItem("sandrone.publicBaseUrl", "https://example.com");

@@ -165,17 +165,18 @@ describe("React Router app file workflows", () => {
       if (url.includes("/v1/files/default.yaml?response=json")) return jsonResponse(filePreview);
       return jsonResponse({ ok: true });
     }));
-    renderApp("/files/default.yaml/edit");
+    const { router } = renderApp("/files/default.yaml/edit");
 
     await user.click(await screen.findByRole("button", { name: "预览文件" }));
 
     expect(await screen.findByRole("heading", { name: "文件预览" })).toBeInTheDocument();
+    expect(router.state.location.search).toBe("?from=edit");
     const previewBlock = screen.getByRole("region", { name: "最终文件内容" });
     expect(previewBlock).toHaveTextContent("proxies: []");
     const previewRequest = requests.find((request) => request.url.endsWith("/v1/files/default.yaml?response=json"));
     expect(previewRequest).toBeDefined();
     expect(previewRequest?.init?.method).toBe("GET");
-    await user.click(screen.getByRole("button", { name: "返回" }));
+    await user.click(screen.getByRole("button", { name: "返回编辑" }));
 
     expect(await screen.findByRole("heading", { name: "编辑文件" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "远程地址" })).toHaveValue("https://example.com/base.yaml");
@@ -183,6 +184,42 @@ describe("React Router app file workflows", () => {
       request.url.endsWith("/v1/files/default.yaml?mode=spec")
       && (request.init?.method ?? "GET") === "GET"
     )).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("opens a file preview from the list and returns to the list", async () => {
+    const user = userEvent.setup();
+    const { router } = renderApp("/files");
+
+    await screen.findByRole("heading", { name: "我的文件" });
+    await user.click(screen.getByRole("button", { name: "default.yaml 更多操作" }));
+    await user.click(screen.getByRole("menuitem", { name: "预览文件" }));
+
+    expect(await screen.findByRole("heading", { name: "文件预览" })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/files/default.yaml/preview");
+    expect(router.state.location.search).toBe("?from=list");
+
+    await user.click(screen.getByRole("button", { name: "返回文件列表" }));
+    expect(await screen.findByRole("heading", { name: "我的文件" })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/files");
+  });
+
+  it("does not preview unsaved file edits", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const resourceResponse = resourceListResponse(url, resources, init);
+      if (resourceResponse) return resourceResponse;
+      if (url.includes("/v1/files/default.yaml?mode=spec")) return jsonResponse(fileSpec);
+      return jsonResponse({ ok: true });
+    }));
+    const { router } = renderApp("/files/default.yaml/edit");
+
+    const remoteURL = await screen.findByRole("textbox", { name: "远程地址" });
+    fireEvent.change(remoteURL, { target: { value: "https://example.com/changed.yaml" } });
+
+    const preview = screen.getByRole("button", { name: "预览文件" });
+    expect(preview).toHaveAttribute("aria-disabled", "true");
+    expect(preview).toHaveAccessibleDescription("请先保存修改，再预览已保存版本");
+    expect(router.state.location.pathname).toBe("/files/default.yaml/edit");
   });
 
   it("opens an unregistered future-client file read-only without posting and still previews it", async () => {

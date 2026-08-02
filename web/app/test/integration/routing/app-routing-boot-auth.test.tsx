@@ -54,7 +54,7 @@ describe("React Router app boot and auth workflows", () => {
 
     await screen.findByRole("heading", { name: "我的文件" });
     await user.click(screen.getByRole("button", { name: "default.yaml 更多操作" }));
-    await user.click(screen.getByRole("menuitem", { name: "分享" }));
+    await user.click(screen.getByRole("menuitem", { name: "分享文件" }));
     const shareDialog = screen.getByRole("dialog", { name: "创建分享链接" });
     await user.click(within(shareDialog).getByRole("button", { name: "保存分享链接" }));
 

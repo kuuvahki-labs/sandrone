@@ -19,12 +19,14 @@ describe("SubscriptionEditPage", () => {
     const onSave = vi.fn((_form: FormData) => new Promise<boolean>((resolve) => {
       resolveSave = resolve;
     }));
+    const onPreview = vi.fn();
     const onShare = vi.fn();
     render(
       <SubscriptionEditPage
         definition={remoteSubscriptionDefinition}
         item={subscriptions[0]}
         onBack={noop}
+        onPreview={onPreview}
         onSave={onSave}
         onShare={onShare}
         sources={subscriptions}
@@ -32,14 +34,19 @@ describe("SubscriptionEditPage", () => {
     );
 
     const share = screen.getByRole("button", { name: "分享订阅" });
+    const preview = screen.getByRole("button", { name: "预览订阅" });
     expect(share).toHaveTextContent(/^分享$/);
     expect(share).toBeEnabled();
+    expect(preview).toBeEnabled();
     await user.click(screen.getByRole("button", { name: "远程" }));
     expect(share).toBeEnabled();
 
     const displayName = screen.getByRole("textbox", { name: "显示名称" });
     fireEvent.change(displayName, { target: { value: "updated" } });
-    expect(share).toBeDisabled();
+    expect(screen.getByRole("button", { name: "分享订阅" })).toHaveAttribute("aria-disabled", "true");
+    const dirtyPreview = screen.getByRole("button", { name: "预览订阅" });
+    expect(dirtyPreview).toHaveAttribute("aria-disabled", "true");
+    expect(dirtyPreview).toHaveAccessibleDescription("请先保存修改，再预览已保存版本");
 
     const form = displayName.closest("form");
     if (!form) throw new Error("expected subscription edit form");
@@ -47,10 +54,13 @@ describe("SubscriptionEditPage", () => {
     fireEvent.submit(form);
     expect(onSave).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("button", { name: "保存订阅" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "预览订阅" }))
+      .toHaveAccessibleDescription("保存完成后即可预览");
     await act(async () => resolveSave(true));
-    expect(share).toBeEnabled();
+    expect(screen.getByRole("button", { name: "分享订阅" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "预览订阅" })).toBeEnabled();
 
-    await user.click(share);
+    await user.click(screen.getByRole("button", { name: "分享订阅" }));
     expect(onShare).toHaveBeenCalledTimes(1);
   });
   it("keeps sharing disabled when save reports an in-band failure", async () => {
@@ -66,13 +76,12 @@ describe("SubscriptionEditPage", () => {
       />,
     );
 
-    const share = screen.getByRole("button", { name: "分享订阅" });
     fireEvent.change(screen.getByRole("textbox", { name: "显示名称" }), {
       target: { value: "invalid" },
     });
     await user.click(screen.getByRole("button", { name: "保存订阅" }));
 
-    expect(share).toBeDisabled();
+    expect(screen.getByRole("button", { name: "分享订阅" })).toHaveAttribute("aria-disabled", "true");
   });
   it("switches remote edits across local and collection modes without stale fields", async () => {
     const user = userEvent.setup();
@@ -84,7 +93,7 @@ describe("SubscriptionEditPage", () => {
 
     await user.click(screen.getByRole("button", { name: "本地" }));
 
-    expect(screen.getByRole("button", { name: "分享订阅" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "分享订阅" })).toHaveAttribute("aria-disabled", "true");
     expect(screen.getByRole("button", { name: "本地" })).toHaveAttribute("aria-pressed", "true");
     await user.click(screen.getByRole("button", { name: "返回" }));
     const dialog = screen.getByRole("dialog", { name: "放弃修改？" });

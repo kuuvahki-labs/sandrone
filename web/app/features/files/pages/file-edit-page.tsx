@@ -18,6 +18,10 @@ import {
   isEditSessionSaving,
   startEditSessionSave,
 } from "~/shared/resources/edit-session";
+import {
+  persistedResourceActionBlocker,
+  persistedResourceActionDisabledReason,
+} from "~/shared/resources/persisted-resource-actions";
 import type { ResourceOption } from "~/shared/resources/types";
 import { CodeBlock } from "~/shared/ui/code-editor";
 import { DiscardChangesDialog } from "~/shared/ui/dialogs";
@@ -46,6 +50,13 @@ export function FileEditPage({ detail, detailPending = false, item, loadRuleSetC
   const savingRef = useRef(false);
   const dirty = isEditSessionDirty(editSession);
   const saving = isEditSessionSaving(editSession);
+  const actionBlocker = persistedResourceActionBlocker({
+    dirty,
+    loading: detailPending,
+    saving,
+  });
+  const previewDisabledReason = persistedResourceActionDisabledReason("preview", actionBlocker, t);
+  const shareDisabledReason = persistedResourceActionDisabledReason("share", actionBlocker, t);
   const meta = detail?.meta ?? (item.description ? { description: item.description } : {});
   const driver = fileDriver(detail?.kind ?? item.kind);
   const markDirty = useCallback(() => {
@@ -111,8 +122,8 @@ export function FileEditPage({ detail, detailPending = false, item, loadRuleSetC
           label=""
           primaryAction={{ accessibleLabel: t("files.actions.save"), disabled: detailPending || saving || !valid, icon: <SaveIcon aria-hidden fontSize="small" />, label: t("actions.save"), type: "submit", variant: "contained" }}
           secondaryActions={[
-            { accessibleLabel: t("files.actions.preview"), disabled: detailPending, icon: <VisibilityIcon aria-hidden fontSize="small" />, label: t("common.preview"), onSelect: onPreview },
-            { accessibleLabel: t("files.actions.share"), disabled: detailPending || dirty || saving, icon: <ShareOutlinedIcon aria-hidden fontSize="small" />, label: t("actions.share"), onSelect: onShare },
+            { accessibleLabel: t("files.actions.preview"), disabled: Boolean(previewDisabledReason), disabledReason: previewDisabledReason, icon: <VisibilityIcon aria-hidden fontSize="small" />, label: t("common.preview"), onSelect: onPreview },
+            { accessibleLabel: t("files.actions.share"), disabled: Boolean(shareDisabledReason), disabledReason: shareDisabledReason, icon: <ShareOutlinedIcon aria-hidden fontSize="small" />, label: t("actions.share"), onSelect: onShare },
           ]}
           sticky
           title={t("files.edit.title")}

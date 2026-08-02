@@ -11,7 +11,7 @@ import { useSubscriptionTrafficByKey } from "~/features/subscriptions/data/use-s
 import type { SubscriptionItem } from "~/features/subscriptions/model/types";
 import { SubscriptionsPage } from "~/features/subscriptions/pages/subscriptions-page";
 import { useI18n } from "~/shared/i18n/context";
-import { subscriptionEditPath, subscriptionNewPath } from "~/shared/routing/paths";
+import { subscriptionEditPath, subscriptionNewPath, subscriptionPreviewPath } from "~/shared/routing/paths";
 
 export function SubscriptionsRoute() {
   const navigate = useNavigate();
@@ -57,6 +57,7 @@ export function SubscriptionsRoute() {
       trafficByKey={autoLoadTraffic ? trafficByKey : undefined}
       onDelete={(item) => app.requestDelete({ kind: "subscriptions", name: item.name, label: t("nav.subscriptions"), onDeleted: subscriptions.reload })}
       onEdit={(item) => navigate(subscriptionEditPath(item.kind, item.name))}
+      onPreview={(item) => navigate(subscriptionPreviewPath(item.kind, item.name, "list"))}
       onShare={(item) => shareDialog.open({ kind: "subscription", name: item.name })}
     />
   );

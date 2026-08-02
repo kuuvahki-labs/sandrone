@@ -154,7 +154,7 @@ describe("React Router app share and delete workflows", () => {
 
     await screen.findByRole("heading", { name: "我的文件" });
     await user.click(screen.getByRole("button", { name: "default.yaml 更多操作" }));
-    await user.click(screen.getByRole("menuitem", { name: "分享" }));
+    await user.click(screen.getByRole("menuitem", { name: "分享文件" }));
     const sheet = screen.getByRole("dialog", { name: "创建分享链接" });
     expect(within(sheet).getByRole("textbox", { name: "名称" })).toHaveValue("default.yaml");
     expect(within(sheet).getByRole("textbox", { name: "分享目标" })).toHaveValue("default.yaml");
