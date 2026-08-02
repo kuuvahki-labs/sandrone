@@ -176,7 +176,7 @@ describe("React Router app file workflows", () => {
     const previewRequest = requests.find((request) => request.url.endsWith("/v1/files/default.yaml?response=json"));
     expect(previewRequest).toBeDefined();
     expect(previewRequest?.init?.method).toBe("GET");
-    await user.click(screen.getByRole("button", { name: "返回编辑" }));
+    await user.click(screen.getByRole("button", { name: "返回" }));
 
     expect(await screen.findByRole("heading", { name: "编辑文件" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "远程地址" })).toHaveValue("https://example.com/base.yaml");
@@ -198,7 +198,7 @@ describe("React Router app file workflows", () => {
     expect(router.state.location.pathname).toBe("/files/default.yaml/preview");
     expect(router.state.location.search).toBe("?from=list");
 
-    await user.click(screen.getByRole("button", { name: "返回文件列表" }));
+    await user.click(screen.getByRole("button", { name: "返回" }));
     expect(await screen.findByRole("heading", { name: "我的文件" })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/files");
   });

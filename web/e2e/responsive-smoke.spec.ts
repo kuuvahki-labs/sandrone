@@ -736,7 +736,7 @@ test("subscription preview JSON stays inside the viewport and uses theme colors"
   const previewCard = page.getByRole("button", { name: `${previewAfterName} 节点详情` });
   await expect(previewCard).toBeVisible();
   if (testInfo.project.name === "mobile") {
-    const backButton = page.getByRole("button", { name: "返回编辑" });
+    const backButton = page.getByRole("button", { name: "返回" });
     const backBox = await backButton.boundingBox();
     expect(backBox?.x, "mobile preview back button should stay left aligned").toBeLessThanOrEqual(32);
     expect(backBox?.width, "mobile preview back button should not stretch across the viewport").toBeLessThan(160);

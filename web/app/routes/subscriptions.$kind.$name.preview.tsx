@@ -37,7 +37,7 @@ export default function SubscriptionPreviewRoute() {
 
   return (
     <SubscriptionPreviewPage
-      backLabel={backToList ? t("subscriptions.actions.backToList") : t("actions.backToEdit")}
+      backLabel={t("actions.back")}
       failed={failed}
       item={item}
       key={`${item.kind}:${item.name}`}

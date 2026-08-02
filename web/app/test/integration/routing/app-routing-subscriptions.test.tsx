@@ -337,7 +337,7 @@ describe("React Router app subscription workflows", () => {
 
     expect(await screen.findByRole("heading", { name: "节点预览" })).toBeInTheDocument();
     expect(router.state.location.search).toBe("?from=edit");
-    await user.click(screen.getByRole("button", { name: "返回编辑" }));
+    await user.click(screen.getByRole("button", { name: "返回" }));
 
     expect(await screen.findByRole("textbox", { name: "订阅地址" })).toHaveValue("https://example.com/updated");
     expect(requests.filter((request) => request.url.endsWith("/v1/subscriptions/provider") && request.init?.method === "GET").length).toBeGreaterThanOrEqual(2);
@@ -355,7 +355,7 @@ describe("React Router app subscription workflows", () => {
     expect(router.state.location.pathname).toBe("/subscriptions/remote/provider/preview");
     expect(router.state.location.search).toBe("?from=list");
 
-    await user.click(screen.getByRole("button", { name: "返回订阅列表" }));
+    await user.click(screen.getByRole("button", { name: "返回" }));
     expect(await screen.findByRole("heading", { name: "我的订阅" })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/subscriptions");
   });

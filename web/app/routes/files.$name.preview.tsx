@@ -36,7 +36,7 @@ export default function FilePreviewRoute() {
 
   return (
     <FilePreviewPage
-      backLabel={backToList ? t("files.actions.backToList") : t("actions.backToEdit")}
+      backLabel={t("actions.back")}
       failed={failed}
       fileName={item.name}
       key={item.name}
