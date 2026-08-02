@@ -118,6 +118,23 @@ parser 识别到字段但没有稳定 IR 抽象时，将原始值保存在 `Node
 raw 字段会产生 `render_lossy_field`。`json-nodes` 会原样承载 `raw`，适合诊断
 或保存规范化 IR。
 
+少数上游字段在严格值域内与 Sandrone 当前语义等价，因此 parser 会把它们作为
+无操作兼容项消费而不产生 `parse_unknown_field`：
+
+- URI TLS 查询参数 `disable_sni` 映射到 `TLS.DisableSNI`，包括显式
+  `0`/`false`；TUIC 同时接受 `allowInsecure`、
+  `allow_insecure`、`allow-insecure`、`skip-cert-verify` 和 `insecure`；
+- VLESS/TCP 仅接受 `quicSecurity=none`；其它值以及 TCP 上的 `mode`、`spx`
+  仍保留到 `raw` 并告警；
+- Mihomo Hysteria2 仅接受布尔值 `udp: true`，gRPC 仅接受
+  `grpc-mode: gun`；`udp: false`、非法 UDP 值、其它 gRPC mode 和
+  `dialer-proxy` 仍保留到 `raw` 并告警；
+- sing-box SOCKS 仅接受字符串或数值 `version: 5`；`4`、`4a` 和其它值仍
+  保留到 `raw` 并告警。
+
+这些边界只表示当前输入与既有 IR 语义等价，不新增 IR 字段，也不代表 parser
+支持同名上游能力的其它取值。
+
 ### `lossy`
 
 字段已进入稳定 IR，但目标 renderer 无法等价表达。可选字段通常保留节点并产生

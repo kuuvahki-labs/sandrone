@@ -31,6 +31,12 @@ func applyTLSQuery(node *domain.NodeIR, values url.Values) {
 		}
 		node.TLS.InsecureSkipVerify = shared.BoolValue(insecure)
 	}
+	if disableSNI := values.Get("disable_sni"); disableSNI != "" {
+		if node.TLS == nil {
+			node.TLS = &domain.TLSOptions{}
+		}
+		node.TLS.DisableSNI = shared.BoolValue(disableSNI)
+	}
 	if alpn := values.Get("alpn"); alpn != "" {
 		if node.TLS == nil {
 			node.TLS = &domain.TLSOptions{}
@@ -220,12 +226,16 @@ func queryValuesAreEmpty(values url.Values, key string) bool {
 }
 
 func queryValuesAreNoopHeaderType(values url.Values, key string) bool {
+	return queryValuesEqualFold(values, key, "none")
+}
+
+func queryValuesEqualFold(values url.Values, key, want string) bool {
 	raw, ok := values[key]
 	if !ok {
 		return false
 	}
 	for _, value := range raw {
-		if strings.ToLower(strings.TrimSpace(value)) != "none" {
+		if !strings.EqualFold(strings.TrimSpace(value), want) {
 			return false
 		}
 	}

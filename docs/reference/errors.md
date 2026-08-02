@@ -178,6 +178,11 @@ endpoint 级限制以 [HTTP API 参考](http-api/README.md)为准。
 `node_context`、`field`、`source`、`target`。`node_index` 是源批次中的
 0-based 序号，使用指针表示，因此数值 `0` 不会被省略。
 
+展示层可以按 `code + message + field + source + target` 聚合同类 warning，
+但聚合只是一种派生视图：原始条数不能改写，每个 occurrence 及其完整结构化
+内容仍须可查看。`node`、`node_index`、`node_context` 和其它可能含敏感上下文
+的字段不参与分组；分组与组内 occurrence 均应保持服务端首次出现顺序。
+
 当前内建 warning code 分组如下：
 
 - 解析：`parse_line_skipped`、`parse_line_failed`、

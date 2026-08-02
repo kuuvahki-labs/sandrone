@@ -636,6 +636,77 @@ proxies:
 	}
 }
 
+func TestParseMihomoHysteria2UDPCompatibilityBoundary(t *testing.T) {
+	parser := mihomo.NewParser()
+	nodes, source, err := parser.Parse(context.Background(), []byte(`
+proxies:
+  - name: udp-true
+    type: hysteria2
+    server: true.example.com
+    port: 443
+    password: secret
+    udp: true
+  - name: udp-false
+    type: hysteria2
+    server: false.example.com
+    port: 443
+    password: secret
+    udp: false
+  - name: udp-invalid
+    type: hysteria2
+    server: invalid.example.com
+    port: 443
+    password: secret
+    udp: enabled
+`))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 3)
+	require.NotContains(t, nodes[0].Raw, "mihomo.udp")
+	require.Contains(t, nodes[1].Raw, "mihomo.udp")
+	require.Contains(t, nodes[2].Raw, "mihomo.udp")
+	require.Len(t, source.Warnings, 2)
+	require.Equal(t, "mihomo.udp", source.Warnings[0].Field)
+	require.Equal(t, "udp-false", source.Warnings[0].Node)
+	require.Equal(t, "mihomo.udp", source.Warnings[1].Field)
+	require.Equal(t, "udp-invalid", source.Warnings[1].Node)
+}
+
+func TestParseMihomoGRPCModeCompatibilityBoundary(t *testing.T) {
+	parser := mihomo.NewParser()
+	nodes, source, err := parser.Parse(context.Background(), []byte(`
+proxies:
+  - name: grpc-gun
+    type: vless
+    server: gun.example.com
+    port: 443
+    uuid: 11111111-1111-1111-1111-111111111111
+    network: grpc
+    grpc-opts:
+      grpc-service-name: service
+      grpc-mode: gun
+  - name: grpc-multi
+    type: vless
+    server: multi.example.com
+    port: 443
+    uuid: 11111111-1111-1111-1111-111111111112
+    network: grpc
+    grpc-opts:
+      grpc-service-name: service
+      grpc-mode: multi
+    dialer-proxy: upstream
+`))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 2)
+	require.NotContains(t, nodes[0].Raw, "mihomo.grpc-opts.grpc-mode")
+	require.Contains(t, nodes[1].Raw, "mihomo.grpc-opts.grpc-mode")
+	require.Contains(t, nodes[1].Raw, "mihomo.dialer-proxy")
+	require.Len(t, source.Warnings, 2)
+	require.Equal(t, "mihomo.dialer-proxy", source.Warnings[0].Field)
+	require.Equal(t, "mihomo.grpc-opts.grpc-mode", source.Warnings[1].Field)
+}
+
 func TestParseMihomoSingleProxyDocumentAndFallbackName(t *testing.T) {
 	parser := mihomo.NewParser()
 	nodes, source, err := parser.Parse(context.Background(), []byte(`

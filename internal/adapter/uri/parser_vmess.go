@@ -91,6 +91,9 @@ func vmessAEADKnownQueryFields(node domain.NodeIR, values url.Values, xhttpExtra
 		if key, value := vmessAEADFirstQueryField(values, "allowInsecure", "allow_insecure", "allow-insecure", "skip-cert-verify", "insecure"); vmessAEADBoolQueryIsValid(value) {
 			known[key] = true
 		}
+		if value := values.Get("disable_sni"); vmessAEADBoolQueryIsValid(value) {
+			known["disable_sni"] = true
+		}
 		if values.Get("alpn") != "" && len(tls.ALPN) > 0 {
 			known["alpn"] = true
 		}

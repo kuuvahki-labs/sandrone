@@ -135,6 +135,9 @@ func parseMihomoProxy(proxy map[string]any, nodeIndex int) (domain.NodeIR, []dom
 		parseMihomoWireGuard(&node, proxy)
 	}
 	known := mihomoKnownFields(node.Type)
+	if node.Type == domain.NodeTypeHysteria2 && isExplicitTrue(proxy["udp"]) {
+		known["udp"] = true
+	}
 	shared.AddUnknownRaw(node.Raw, "mihomo.", proxy, known)
 	warnings := unknownWarnings(node, node.Raw, "mihomo", nodeIndex, mihomoWarningNodeContext(node, proxy))
 	if len(node.Raw) == 0 {
@@ -264,9 +267,13 @@ func parseMihomoTransport(node *domain.NodeIR, proxy map[string]any) {
 	case "grpc":
 		opts := shared.AnyMapValue(proxy["grpc-opts"])
 		node.Transport.ServiceName = shared.StringValue(opts["grpc-service-name"])
-		preserveNestedMihomoRaw(node, "grpc-opts", opts, map[string]bool{
+		known := map[string]bool{
 			"grpc-service-name": true, "max-connections": true, "min-streams": true, "max-streams": true,
-		})
+		}
+		if strings.EqualFold(strings.TrimSpace(shared.StringValue(opts["grpc-mode"])), "gun") {
+			known["grpc-mode"] = true
+		}
+		preserveNestedMihomoRaw(node, "grpc-opts", opts, known)
 	case "h2":
 		opts := shared.AnyMapValue(proxy["h2-opts"])
 		node.Transport.Type = "http"
@@ -550,6 +557,11 @@ func mihomoKnownFields(nodeType domain.NodeType) map[string]bool {
 		add("private-key", "ip", "ipv6", "peers", "public-key", "pre-shared-key", "allowed-ips", "reserved", "mtu", "workers", "persistent-keepalive", "udp")
 	}
 	return common
+}
+
+func isExplicitTrue(value any) bool {
+	enabled, ok := value.(bool)
+	return ok && enabled
 }
 
 func preserveNestedMihomoRaw(node *domain.NodeIR, parent string, opts map[string]any, known map[string]bool) {

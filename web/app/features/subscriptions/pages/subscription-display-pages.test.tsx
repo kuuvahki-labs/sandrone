@@ -19,6 +19,33 @@ import { SubscriptionPreviewPage } from "./subscription-preview-page";
 import { SubscriptionsPage } from "./subscriptions-page";
 
 describe("SubscriptionPreviewPage", () => {
+  it("keeps the summary warning metric raw while grouping the warning list", () => {
+    const repeatedWarnings: SubscriptionPreview = {
+      ...subscriptionPreview,
+      warnings: [{
+        code: "parse_unknown_field",
+        field: "uri.query.mode",
+        message: "field preserved in NodeIR Raw",
+        node: "node-a",
+        source: "uri-list",
+      }, {
+        code: "parse_unknown_field",
+        field: "uri.query.mode",
+        message: "field preserved in NodeIR Raw",
+        node: "node-b",
+        source: "uri-list",
+      }],
+    };
+
+    render(<SubscriptionPreviewPage item={subscriptions[0]} onBack={noop} onRefresh={noop} preview={repeatedWarnings} />);
+
+    const summary = screen.getByLabelText("预览统计");
+    expect(within(summary).getAllByText(/^\d+$/).map((node) => node.textContent)).toEqual(["2", "1", "1", "2"]);
+    const warningRegion = screen.getByRole("region", { name: "预览警告" });
+    expect(within(warningRegion).getByText("1 组警告 · 2 条记录")).toBeInTheDocument();
+    expect(within(warningRegion).getByText("2 个节点或位置受到影响")).toBeInTheDocument();
+  });
+
   it("renders source preview cards with filters and expandable details", async () => {
     const user = userEvent.setup();
     const previewWithWarning = {

@@ -308,6 +308,54 @@ func TestParseSingBoxUnknownFieldsGoToRaw(t *testing.T) {
 	}
 }
 
+func TestParseSingBoxSOCKSVersionCompatibilityBoundary(t *testing.T) {
+	parser := singbox.NewParser()
+	nodes, source, err := parser.Parse(context.Background(), []byte(`{
+  "outbounds": [
+    {
+      "type": "socks",
+      "tag": "string-five",
+      "server": "string-five.example.com",
+      "server_port": 1080,
+      "version": "5"
+    },
+    {
+      "type": "socks",
+      "tag": "numeric-five",
+      "server": "numeric-five.example.com",
+      "server_port": 1080,
+      "version": 5
+    },
+    {
+      "type": "socks",
+      "tag": "four",
+      "server": "four.example.com",
+      "server_port": 1080,
+      "version": "4"
+    },
+    {
+      "type": "socks",
+      "tag": "four-a",
+      "server": "four-a.example.com",
+      "server_port": 1080,
+      "version": "4a"
+    }
+  ]
+}`))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 4)
+	require.NotContains(t, nodes[0].Raw, "sing-box.version")
+	require.NotContains(t, nodes[1].Raw, "sing-box.version")
+	require.JSONEq(t, `"4"`, string(nodes[2].Raw["sing-box.version"]))
+	require.JSONEq(t, `"4a"`, string(nodes[3].Raw["sing-box.version"]))
+	require.Len(t, source.Warnings, 2)
+	require.Equal(t, "sing-box.version", source.Warnings[0].Field)
+	require.Equal(t, "four", source.Warnings[0].Node)
+	require.Equal(t, "sing-box.version", source.Warnings[1].Field)
+	require.Equal(t, "four-a", source.Warnings[1].Node)
+}
+
 func TestParseSingBoxSingleOutboundDocument(t *testing.T) {
 	parser := singbox.NewParser()
 	nodes, source, err := parser.Parse(context.Background(), []byte(`{

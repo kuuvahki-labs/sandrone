@@ -130,6 +130,11 @@ func parseOutbound(outbound map[string]any, nodeIndex int) (domain.NodeIR, []dom
 		parseSingBoxWireGuard(&node, outbound)
 	}
 	known := singBoxKnownFields(node.Type)
+	if node.Type == domain.NodeTypeSOCKS {
+		if version, err := shared.IntValue(outbound["version"]); err == nil && version == 5 {
+			known["version"] = true
+		}
+	}
 	shared.AddUnknownRaw(node.Raw, "sing-box.", outbound, known)
 	warnings := unknownWarnings(node, node.Raw, "sing-box", nodeIndex, singBoxWarningNodeContext(node, outbound))
 	if len(node.Raw) == 0 {

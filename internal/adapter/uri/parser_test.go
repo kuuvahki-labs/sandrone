@@ -1883,6 +1883,56 @@ func TestParseURIQueryFingerprintFields(t *testing.T) {
 	}
 }
 
+func TestParseTUICTLSCompatibilityAliases(t *testing.T) {
+	p := uri.NewParser()
+	for _, alias := range []string{
+		"allowInsecure",
+		"allow_insecure",
+		"allow-insecure",
+		"skip-cert-verify",
+		"insecure",
+	} {
+		t.Run(alias, func(t *testing.T) {
+			raw := "tuic://11111111-1111-1111-1111-111111111111:secret@example.com:443?security=tls&" + alias + "=1#tuic"
+
+			nodes, source, err := p.Parse(context.Background(), []byte(raw))
+
+			require.NoError(t, err)
+			require.Len(t, nodes, 1)
+			require.NotNil(t, nodes[0].TLS)
+			require.True(t, nodes[0].TLS.InsecureSkipVerify)
+			require.NotContains(t, nodes[0].Raw, "uri.query."+alias)
+			require.Empty(t, source.Warnings)
+		})
+	}
+}
+
+func TestParseTUICDisableSNIExplicitBoolean(t *testing.T) {
+	p := uri.NewParser()
+	for _, tc := range []struct {
+		value string
+		want  bool
+	}{
+		{value: "1", want: true},
+		{value: "true", want: true},
+		{value: "0", want: false},
+		{value: "false", want: false},
+	} {
+		t.Run(tc.value, func(t *testing.T) {
+			raw := "tuic://11111111-1111-1111-1111-111111111111:secret@example.com:443?disable_sni=" + tc.value + "#tuic"
+
+			nodes, source, err := p.Parse(context.Background(), []byte(raw))
+
+			require.NoError(t, err)
+			require.Len(t, nodes, 1)
+			require.NotNil(t, nodes[0].TLS)
+			require.Equal(t, tc.want, nodes[0].TLS.DisableSNI)
+			require.NotContains(t, nodes[0].Raw, "uri.query.disable_sni")
+			require.Empty(t, source.Warnings)
+		})
+	}
+}
+
 func TestParseVLESSQueryTLSRealityTransportAndRaw(t *testing.T) {
 	p := uri.NewParser()
 	raw := "vless://11111111-1111-1111-1111-111111111111@example.com:443?encryption=none&security=reality&sni=sni.example.com&allowInsecure=1&alpn=h2,%20http/1.1&public-key=pk&short-id=sid&type=h2&host=cdn.example.com&path=%2Fh2&mode=packet-up&extra=value#vless"
@@ -1969,6 +2019,30 @@ func TestParseVLESSDefaultTCPCompatibilityQueryIsSilent(t *testing.T) {
 	require.Empty(t, got.Transport.Headers)
 	require.NotContains(t, got.Raw, "uri.query.headerType")
 	require.Empty(t, source.Warnings)
+}
+
+func TestParseVLESSTCPQUICSecurityCompatibilityBoundary(t *testing.T) {
+	p := uri.NewParser()
+
+	nodes, source, err := p.Parse(context.Background(), []byte(
+		"vless://11111111-1111-1111-1111-111111111111@example.com:443?encryption=none&type=tcp&quicSecurity=none&mode=multi&spx=%2F#vless",
+	))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	require.NotContains(t, nodes[0].Raw, "uri.query.quicSecurity")
+	require.Contains(t, nodes[0].Raw, "uri.query.mode")
+	require.Contains(t, nodes[0].Raw, "uri.query.spx")
+	require.Equal(t, []string{"uri.query.mode", "uri.query.spx"}, warningFields(source.Warnings))
+
+	nodes, source, err = p.Parse(context.Background(), []byte(
+		"vless://11111111-1111-1111-1111-111111111111@example.com:443?encryption=none&type=tcp&quicSecurity=aes-128-gcm#vless",
+	))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	require.JSONEq(t, `"aes-128-gcm"`, string(nodes[0].Raw["uri.query.quicSecurity"]))
+	require.Equal(t, []string{"uri.query.quicSecurity"}, warningFields(source.Warnings))
 }
 
 func TestParseVLESSEmptyPQVQueryIsSilent(t *testing.T) {
