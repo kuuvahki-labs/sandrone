@@ -39,7 +39,7 @@ function renderProcessorBuilder({
 }
 
 describe("ProcessorBuilder", () => {
-  it("projects persisted rename and probe processors into the complete ordered chain", async () => {
+  it("appends missing quick settings without reordering persisted processors", async () => {
     const user = userEvent.setup();
     const { serializedProcessors } = renderProcessorBuilder({
       defaultValue: [
@@ -85,7 +85,6 @@ describe("ProcessorBuilder", () => {
     expect(within(probeGroup).getByRole("combobox", { name: "失败处理" })).toHaveTextContent("丢弃");
 
     expect(serializedProcessors()).toEqual([
-      { type: "quick_settings", stage: "nodes" },
       {
         name: "入口重命名",
         type: "rename",
@@ -109,10 +108,27 @@ describe("ProcessorBuilder", () => {
           fail_mode: "drop",
         },
       },
+      { type: "quick_settings", stage: "nodes" },
     ]);
   });
 
-  it("adds probe defaults before the information-node filter preset", async () => {
+  it("preserves the persisted position of quick settings", () => {
+    const { serializedProcessors } = renderProcessorBuilder({
+      defaultValue: [
+        { type: "rename", stage: "nodes", params: { mode: "prefix", value: "source-" } },
+        { type: "quick_settings", stage: "nodes", params: { udp: "enabled" } },
+        { type: "sort", stage: "nodes", params: { by: "+name" } },
+      ],
+    });
+
+    expect(serializedProcessors()).toEqual([
+      { type: "rename", stage: "nodes", params: { mode: "prefix", value: "source-" } },
+      { type: "quick_settings", stage: "nodes", params: { udp: "enabled" } },
+      { type: "sort", stage: "nodes", params: { by: "+name" } },
+    ]);
+  });
+
+  it("appends the information-node filter preset after an existing probe", async () => {
     const user = userEvent.setup();
     const { serializedProcessors } = renderProcessorBuilder();
 
@@ -158,17 +174,6 @@ describe("ProcessorBuilder", () => {
     expect(serializedProcessors()).toEqual([
       { type: "quick_settings", stage: "nodes" },
       {
-        name: "过滤信息节点",
-        type: "filter",
-        stage: "nodes",
-        params: {
-          action: "drop",
-          field: "name",
-          match: "regex",
-          pattern: "(?i)(网址|流量|时间|应急|过期|bandwidth|expire)",
-        },
-      },
-      {
         type: "probe",
         stage: "nodes",
         params: {
@@ -180,6 +185,17 @@ describe("ProcessorBuilder", () => {
           concurrency: 10,
           cache_ttl_seconds: 0,
           fail_mode: "keep",
+        },
+      },
+      {
+        name: "过滤信息节点",
+        type: "filter",
+        stage: "nodes",
+        params: {
+          action: "drop",
+          field: "name",
+          match: "regex",
+          pattern: "(?i)(网址|流量|时间|应急|过期|bandwidth|expire)",
         },
       },
     ]);
@@ -311,7 +327,6 @@ describe("ProcessorBuilder", () => {
     fireEvent.change(argsInput, { target: { value: "in=zh\nflag=true\nthreshold=2" } });
 
     expect(serializedProcessors()).toEqual([
-      { type: "quick_settings", stage: "nodes" },
       {
         type: "script",
         stage: "nodes",
@@ -324,6 +339,7 @@ describe("ProcessorBuilder", () => {
         },
       },
       { type: "custom", stage: "nodes", params: { enabled: false, threshold: 3 } },
+      { type: "quick_settings", stage: "nodes" },
     ]);
   });
 });

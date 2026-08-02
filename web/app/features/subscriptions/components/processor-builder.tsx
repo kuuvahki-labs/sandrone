@@ -196,12 +196,10 @@ function processorLabel(type: string, t: Translator): string {
 
 function draftProcessors(processors: ProcessorDetail[]): ProcessorDraft[] {
   const drafts = processors.map(draftFromProcessor);
-  const quickSettingsIndex = drafts.findIndex((draft) => draft.type === "quick_settings");
-  if (quickSettingsIndex === -1) {
-    return [draftFromProcessor({ type: "quick_settings" }, -1), ...drafts];
+  if (!drafts.some((draft) => draft.type === "quick_settings")) {
+    return [...drafts, draftFromProcessor({ type: "quick_settings" }, -1)];
   }
-  const quickSettings = drafts[quickSettingsIndex];
-  return [quickSettings, ...drafts.slice(0, quickSettingsIndex), ...drafts.slice(quickSettingsIndex + 1)];
+  return drafts;
 }
 
 function draftFromProcessor(processor: ProcessorDetail, index: number): ProcessorDraft {
@@ -290,9 +288,7 @@ function addSubscriptionProcessorDrafts(type: string, current: ProcessorDraft[],
       pattern: informationNodePattern,
     },
   };
-  const probeIndex = current.findIndex((draft) => draft.type === "probe");
-  if (probeIndex < 0) return [...current, preset];
-  return [...current.slice(0, probeIndex), preset, ...current.slice(probeIndex)];
+  return [...current, preset];
 }
 
 function filterActionOptions(t: Translator) {

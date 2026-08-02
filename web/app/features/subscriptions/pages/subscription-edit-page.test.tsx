@@ -123,13 +123,13 @@ describe("SubscriptionEditPage", () => {
     expect(savedLocal.get("timeout_ms")).toBeNull();
     expect(savedLocal.getAll("subscriptions")).toEqual([]);
     expect(JSON.parse(String(savedLocal.get("processors")))).toEqual([
-      { type: "quick_settings", stage: "nodes" },
       {
         name: "入口重命名",
         type: "rename",
         stage: "nodes",
         params: { mode: "prefix", value: "source-" },
       },
+      { type: "quick_settings", stage: "nodes" },
     ]);
 
     await user.click(screen.getByRole("button", { name: "组合" }));
@@ -152,13 +152,13 @@ describe("SubscriptionEditPage", () => {
     expect(savedCollection.get("proxy")).toBeNull();
     expect(savedCollection.get("timeout_ms")).toBeNull();
     expect(JSON.parse(String(savedCollection.get("processors")))).toEqual([
-      { type: "quick_settings", stage: "nodes" },
       {
         name: "入口重命名",
         type: "rename",
         stage: "nodes",
         params: { mode: "prefix", value: "source-" },
       },
+      { type: "quick_settings", stage: "nodes" },
     ]);
   });
   it("prefills and orders the full remote-source editing workflow", async () => {
@@ -179,7 +179,7 @@ describe("SubscriptionEditPage", () => {
     expect(screen.getByText("基本信息")).toBeInTheDocument();
     expect(screen.getByText("处理链")).toBeInTheDocument();
     const quickSettingsGroup = screen.getByRole("group", { name: "处理器 快捷设置" });
-    expect(within(quickSettingsGroup).getByText("处理器 1")).toBeInTheDocument();
+    expect(within(quickSettingsGroup).getByText("处理器 2")).toBeInTheDocument();
     expect(within(quickSettingsGroup).queryByRole("textbox", { name: "名称" })).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "第 1 个处理器类型" })).not.toBeInTheDocument();
     const renamedProcessorGroup = screen.getByRole("group", { name: "处理器 入口重命名" });
@@ -188,7 +188,7 @@ describe("SubscriptionEditPage", () => {
     expect(within(renamedProcessorGroup).queryByRole("textbox", { name: "名称" })).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "第 2 个处理器类型" })).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "第 1 个处理器阶段" })).not.toBeInTheDocument();
-    await user.click(screen.getAllByRole("button", { name: "编辑名称" })[1]);
+    await user.click(screen.getAllByRole("button", { name: "编辑名称" })[0]);
     expect(within(renamedProcessorGroup).getByRole("textbox", { name: "名称" })).toHaveValue("入口重命名");
     expect(screen.getByRole("combobox", { name: "重命名方式" })).toHaveTextContent("添加前缀");
     expect(screen.getByRole("textbox", { name: "内容" })).toHaveValue("source-");
