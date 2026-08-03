@@ -141,7 +141,8 @@ describe("React Router app subscription workflows", () => {
     });
     await user.click(screen.getByRole("button", { name: "保存订阅" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("remote fetch failed");
+    const errorMessage = await screen.findByText("remote fetch failed");
+    expect(errorMessage.closest('[role="alert"]')).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "订阅地址" })).toHaveValue("https://example.com/sub");
   });
 

@@ -129,7 +129,6 @@ describe("SubscriptionEditPage", () => {
         stage: "nodes",
         params: { mode: "prefix", value: "source-" },
       },
-      { type: "quick_settings", stage: "nodes" },
     ]);
 
     await user.click(screen.getByRole("button", { name: "组合" }));
@@ -158,7 +157,6 @@ describe("SubscriptionEditPage", () => {
         stage: "nodes",
         params: { mode: "prefix", value: "source-" },
       },
-      { type: "quick_settings", stage: "nodes" },
     ]);
   });
   it("prefills and orders the full remote-source editing workflow", async () => {
@@ -178,9 +176,7 @@ describe("SubscriptionEditPage", () => {
     expect(screen.queryByRole("textbox", { name: "处理器 JSON" })).not.toBeInTheDocument();
     expect(screen.getByText("基本信息")).toBeInTheDocument();
     expect(screen.getByText("处理链")).toBeInTheDocument();
-    const quickSettingsGroup = screen.getByRole("group", { name: "处理器 快捷设置" });
-    expect(within(quickSettingsGroup).getByText("处理器 2")).toBeInTheDocument();
-    expect(within(quickSettingsGroup).queryByRole("textbox", { name: "名称" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "处理器 快捷设置" })).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "第 1 个处理器类型" })).not.toBeInTheDocument();
     const renamedProcessorGroup = screen.getByRole("group", { name: "处理器 入口重命名" });
     expect(within(renamedProcessorGroup).getByRole("heading", { name: "入口重命名" })).toBeInTheDocument();

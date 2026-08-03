@@ -39,7 +39,14 @@ function renderProcessorBuilder({
 }
 
 describe("ProcessorBuilder", () => {
-  it("appends missing quick settings without reordering persisted processors", async () => {
+  it("keeps an empty processor chain empty", () => {
+    const { serializedProcessors } = renderProcessorBuilder();
+
+    expect(screen.queryByRole("group", { name: "处理器 快捷设置" })).not.toBeInTheDocument();
+    expect(serializedProcessors()).toEqual([]);
+  });
+
+  it("does not append quick settings to persisted processors", async () => {
     const user = userEvent.setup();
     const { serializedProcessors } = renderProcessorBuilder({
       defaultValue: [
@@ -108,7 +115,6 @@ describe("ProcessorBuilder", () => {
           fail_mode: "drop",
         },
       },
-      { type: "quick_settings", stage: "nodes" },
     ]);
   });
 
@@ -151,7 +157,6 @@ describe("ProcessorBuilder", () => {
     expect(within(probeGroup).queryByText(/默认/)).not.toBeInTheDocument();
 
     expect(serializedProcessors()).toEqual([
-      { type: "quick_settings", stage: "nodes" },
       {
         type: "probe",
         stage: "nodes",
@@ -168,11 +173,10 @@ describe("ProcessorBuilder", () => {
       },
     ]);
 
-    await selectMuiOption(user, screen.getByRole("combobox", { name: "类型" }), "过滤信息节点（预设）");
+    await selectMuiOption(user, screen.getByRole("combobox", { name: "类型" }), "过滤信息节点");
     await user.click(screen.getByRole("button", { name: "添加处理器" }));
 
     expect(serializedProcessors()).toEqual([
-      { type: "quick_settings", stage: "nodes" },
       {
         type: "probe",
         stage: "nodes",
@@ -195,13 +199,13 @@ describe("ProcessorBuilder", () => {
           action: "drop",
           field: "name",
           match: "regex",
-          pattern: "(?i)(网址|流量|时间|应急|过期|bandwidth|expire)",
+          pattern: "(?i)(网址|官网|流量|剩余|时间|应急|套餐|订阅|公告|重置|过期|到期|bandwidth|traffic|quota|reset|expire|expiry|expiration)",
         },
       },
     ]);
   });
 
-  it("seeds quick settings before visual filter edits and flat rename additions", async () => {
+  it("starts without quick settings and appends visual processors in order", async () => {
     const user = userEvent.setup();
     const onDirty = vi.fn();
     const { serializedProcessors } = renderProcessorBuilder({ onDirty });
@@ -219,20 +223,16 @@ describe("ProcessorBuilder", () => {
     expect(within(listbox).queryByRole("option", { name: "清理名称" })).not.toBeInTheDocument();
     await user.click(options[0]);
 
-    const quickSettingsGroup = screen.getByRole("group", { name: "处理器 快捷设置" });
-    expect(within(quickSettingsGroup).getByText("处理器 1")).toBeInTheDocument();
-    expect(within(quickSettingsGroup).queryByRole("textbox", { name: "名称" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "处理器 快捷设置" })).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "第 1 个处理器类型" })).not.toBeInTheDocument();
-    expect(serializedProcessors()).toEqual([
-      { type: "quick_settings", stage: "nodes" },
-    ]);
+    expect(serializedProcessors()).toEqual([]);
 
     await user.click(addProcessor);
     expect(onDirty).toHaveBeenCalled();
     expect(screen.queryByRole("combobox", { name: "第 1 个处理器阶段" })).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "第 2 个处理器类型" })).not.toBeInTheDocument();
     const filterGroup = screen.getByRole("group", { name: "处理器 过滤" });
-    expect(within(filterGroup).getByText("处理器 2")).toBeInTheDocument();
+    expect(within(filterGroup).getByText("处理器 1")).toBeInTheDocument();
     await user.click(within(filterGroup).getByRole("button", { name: "编辑名称" }));
     const filterName = within(filterGroup).getByRole("textbox", { name: "名称" });
     expect(filterName).toHaveValue("");
@@ -251,7 +251,6 @@ describe("ProcessorBuilder", () => {
     });
 
     expect(serializedProcessors()).toEqual([
-      { type: "quick_settings", stage: "nodes" },
       { name: "按 server 过滤", type: "filter", stage: "nodes", params: { action: "keep", field: "server", match: "regex", pattern: "example\\.com" } },
     ]);
 
@@ -263,9 +262,18 @@ describe("ProcessorBuilder", () => {
     expect(within(renameGroup).queryByRole("combobox", { name: /名称操作/ })).not.toBeInTheDocument();
 
     expect(serializedProcessors()).toEqual([
-      { type: "quick_settings", stage: "nodes" },
       { name: "按 server 过滤", type: "filter", stage: "nodes", params: { action: "keep", field: "server", match: "regex", pattern: "example\\.com" } },
       { type: "rename", stage: "nodes", params: { trim: true } },
+    ]);
+
+    await selectMuiOption(user, newType, "快捷设置");
+    await user.click(addProcessor);
+    const quickSettingsGroup = screen.getByRole("group", { name: "处理器 快捷设置" });
+    expect(within(quickSettingsGroup).getByText("处理器 3")).toBeInTheDocument();
+    expect(serializedProcessors()).toEqual([
+      { name: "按 server 过滤", type: "filter", stage: "nodes", params: { action: "keep", field: "server", match: "regex", pattern: "example\\.com" } },
+      { type: "rename", stage: "nodes", params: { trim: true } },
+      { type: "quick_settings", stage: "nodes" },
     ]);
   });
 
@@ -339,7 +347,6 @@ describe("ProcessorBuilder", () => {
         },
       },
       { type: "custom", stage: "nodes", params: { enabled: false, threshold: 3 } },
-      { type: "quick_settings", stage: "nodes" },
     ]);
   });
 });

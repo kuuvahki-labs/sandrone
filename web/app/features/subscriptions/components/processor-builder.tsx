@@ -34,7 +34,8 @@ import { ProbeURLField } from "~/shared/ui/probe-url-field";
 
 const fields = ["name", "type", "server"];
 const fieldOptions = fields.map((field) => ({ value: field, label: field }));
-const informationNodePattern = "(?i)(网址|流量|时间|应急|过期|bandwidth|expire)";
+const informationNodePattern =
+  "(?i)(网址|官网|流量|剩余|时间|应急|套餐|订阅|公告|重置|过期|到期|bandwidth|traffic|quota|reset|expire|expiry|expiration)";
 const probeRuntimeDefaults = {
   method: "url_test",
   core: "sing-box",
@@ -195,11 +196,7 @@ function processorLabel(type: string, t: Translator): string {
 }
 
 function draftProcessors(processors: ProcessorDetail[]): ProcessorDraft[] {
-  const drafts = processors.map(draftFromProcessor);
-  if (!drafts.some((draft) => draft.type === "quick_settings")) {
-    return [...drafts, draftFromProcessor({ type: "quick_settings" }, -1)];
-  }
-  return drafts;
+  return processors.map(draftFromProcessor);
 }
 
 function draftFromProcessor(processor: ProcessorDetail, index: number): ProcessorDraft {
