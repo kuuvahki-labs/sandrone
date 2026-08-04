@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import AddIcon from "@mui/icons-material/Add";
+import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
+import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
-import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
-import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
 import Collapse from "@mui/material/Collapse";
@@ -193,10 +193,10 @@ export function ProcessorEditorList({
                         </IconButton>
                       </Tooltip>
                       <IconButton aria-label={t("processor.moveUp")} disabled={index === 0} size="small" type="button" onClick={() => moveProcessor(index, -1)}>
-                        <KeyboardArrowUpIcon aria-hidden fontSize="small" />
+                        <ArrowUpwardIcon aria-hidden fontSize="small" />
                       </IconButton>
                       <IconButton aria-label={t("processor.moveDown")} disabled={index === drafts.length - 1} size="small" type="button" onClick={() => moveProcessor(index, 1)}>
-                        <KeyboardArrowDownIcon aria-hidden fontSize="small" />
+                        <ArrowDownwardIcon aria-hidden fontSize="small" />
                       </IconButton>
                       <IconButton aria-label={t("processor.delete")} color="error" size="small" type="button" onClick={() => removeProcessor(draft.id)}>
                         <DeleteOutlinedIcon aria-hidden fontSize="small" />
