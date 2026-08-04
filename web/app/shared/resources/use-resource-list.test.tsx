@@ -84,7 +84,7 @@ describe("useResourceList", () => {
     expect(showNotice).not.toHaveBeenCalled();
   });
 
-  it("clears items and reports the latest Error message", async () => {
+  it("keeps the last successful items and reports a later Error", async () => {
     const load = vi.fn()
       .mockResolvedValueOnce({ values: ["initial"] })
       .mockRejectedValueOnce(new Error("request failed"));
@@ -96,7 +96,7 @@ describe("useResourceList", () => {
       await result.current.reload();
     });
 
-    expect(result.current.items).toEqual([]);
+    expect(result.current.items).toEqual(["initial"]);
     expect(result.current.loading).toBe(false);
     expect(showNotice).toHaveBeenCalledOnce();
     expect(showNotice).toHaveBeenCalledWith("request failed", "error");
@@ -114,7 +114,7 @@ describe("useResourceList", () => {
       await result.current.reload();
     });
 
-    expect(result.current.items).toEqual([]);
+    expect(result.current.items).toEqual(["initial"]);
     expect(showNotice).toHaveBeenCalledWith("service unavailable", "error");
   });
 

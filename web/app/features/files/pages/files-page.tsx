@@ -25,13 +25,14 @@ import {
 export interface FilesPageProps {
   createActions: CreateSpeedDialAction[];
   items: FileItem[];
+  loaded?: boolean;
   onDelete: (item: FileItem) => void;
   onEdit: (item: FileItem) => void;
   onPreview: (item: FileItem) => void;
   onShare: (item: FileItem) => void;
 }
 
-export function FilesPage({ createActions, items, onDelete, onEdit, onPreview, onShare }: FilesPageProps) {
+export function FilesPage({ createActions, items, loaded = true, onDelete, onEdit, onPreview, onShare }: FilesPageProps) {
   const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [queryFocused, setQueryFocused] = useState(false);
@@ -59,10 +60,10 @@ export function FilesPage({ createActions, items, onDelete, onEdit, onPreview, o
         label=""
         metrics={(
           <div aria-label={t("files.summary")} className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            <Metric label={t("files.metric.files")} value={items.length} />
-            <Metric label={t("files.metric.local")} value={localCount} />
-            <Metric label={t("files.metric.remote")} value={remoteCount} />
-            <Metric label={t("files.metric.config")} value={configCount} />
+            <Metric label={t("files.metric.files")} value={loaded ? items.length : undefined} />
+            <Metric label={t("files.metric.local")} value={loaded ? localCount : undefined} />
+            <Metric label={t("files.metric.remote")} value={loaded ? remoteCount : undefined} />
+            <Metric label={t("files.metric.config")} value={loaded ? configCount : undefined} />
           </div>
         )}
         title={t("files.title")}
@@ -116,9 +117,9 @@ export function FilesPage({ createActions, items, onDelete, onEdit, onPreview, o
             />
           ))}
         </List>
-      ) : (
+      ) : loaded ? (
         <EmptyState title={t("files.empty")} />
-      )}
+      ) : null}
       <CreateSpeedDial actions={createActions} ariaLabel={t("files.create")} />
     </section>
   );

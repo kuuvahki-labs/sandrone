@@ -13,12 +13,12 @@ import {
   type DestinationListAction,
 } from "~/shared/ui/resource-list";
 
-export function Metric({ label, value }: { label: string; value: string | number }) {
+export function Metric({ label, value }: { label: string; value?: string | number | null }) {
   return (
     <Paper variant="outlined" className="min-w-0 p-4">
       <div className="grid gap-1">
         <Typography className="break-words" component="strong" variant="h5">
-          {value}
+          {value ?? "-"}
         </Typography>
         <Typography color="text.secondary" variant="body2">
           {label}

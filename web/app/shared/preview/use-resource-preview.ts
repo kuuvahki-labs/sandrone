@@ -38,8 +38,11 @@ export function useResourcePreview<TPreview>(resourceKey: string | undefined, lo
     setPending(true);
     setFailed(false);
     void loadPreview().then((result) => {
+      if (result === null) {
+        setFailed(true);
+        return;
+      }
       setPreview(result);
-      setFailed(result === null);
     }).finally(() => {
       setPending(false);
     });

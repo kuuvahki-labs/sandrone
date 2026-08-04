@@ -33,6 +33,7 @@ export default function FilesRoute() {
         }),
       ]}
       items={files.items}
+      loaded={files.loaded}
       onDelete={(item) => app.requestDelete({ kind: "files", name: item.name, label: t("nav.files"), onDeleted: files.reload })}
       onEdit={(item) => navigate(fileEditPath(item.name))}
       onPreview={(item) => navigate(filePreviewPath(item.name, "list"))}

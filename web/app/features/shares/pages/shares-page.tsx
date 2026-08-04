@@ -21,12 +21,13 @@ import {
 
 export interface SharesPageProps {
   items: ShareItem[];
+  loaded?: boolean;
   onCopy: (item: ShareItem, format?: ShareCopyFormat) => Promise<CopyShareResult>;
   onCopyUrl: (url: string) => Promise<CopyShareResult>;
   onDelete: (item: ShareItem) => void;
 }
 
-export function SharesPage({ items, onCopy, onCopyUrl, onDelete }: SharesPageProps) {
+export function SharesPage({ items, loaded = true, onCopy, onCopyUrl, onDelete }: SharesPageProps) {
   const { t } = useI18n();
   const [manualCopyUrl, setManualCopyUrl] = useState<string | null>(null);
   const publicUrlElements = useRef(new Map<string, HTMLElement>());
@@ -41,10 +42,10 @@ export function SharesPage({ items, onCopy, onCopyUrl, onDelete }: SharesPagePro
         title={t("shares.title")}
         metrics={(
           <div aria-label={t("shares.summary")} className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            <Metric label={t("shares.metric.valid")} value={validCount} />
-            <Metric label={t("shares.metric.upcoming")} value={upcomingCount} />
-            <Metric label={t("shares.metric.expired")} value={expiredCount} />
-            <Metric label={t("shares.metric.exhausted")} value={exhaustedCount} />
+            <Metric label={t("shares.metric.valid")} value={loaded ? validCount : undefined} />
+            <Metric label={t("shares.metric.upcoming")} value={loaded ? upcomingCount : undefined} />
+            <Metric label={t("shares.metric.expired")} value={loaded ? expiredCount : undefined} />
+            <Metric label={t("shares.metric.exhausted")} value={loaded ? exhaustedCount : undefined} />
           </div>
         )}
       />
@@ -101,9 +102,9 @@ export function SharesPage({ items, onCopy, onCopyUrl, onDelete }: SharesPagePro
             />
           ))}
         </List>
-      ) : (
+      ) : loaded ? (
         <EmptyState title={t("shares.empty")} />
-      )}
+      ) : null}
       {manualCopyUrl ? (
         <ManualCopyDialog
           url={manualCopyUrl}

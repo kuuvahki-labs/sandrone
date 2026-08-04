@@ -7,6 +7,7 @@ export type ResourceErrorNotice = (message: string, severity: "error") => void;
 
 export interface ResourceListState<T> {
   items: T[];
+  loaded: boolean;
   loading: boolean;
   reload: () => Promise<void>;
 }
@@ -24,6 +25,7 @@ export function useResourceList<T>({
 }): ResourceListState<T> {
   const generation = useRef(0);
   const [items, setItems] = useState<T[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const reload = useCallback(async () => {
@@ -34,11 +36,13 @@ export function useResourceList<T>({
       const nextItems = map(await load());
       if (generation.current === currentGeneration) {
         setItems(nextItems);
+        setLoaded(true);
       }
     } catch (error) {
-      if (generation.current === currentGeneration && !(error instanceof ApiError && error.status === 401)) {
-        setItems([]);
-        showNotice(error instanceof Error ? error.message : t("errors.serviceUnavailable"), "error");
+      if (generation.current === currentGeneration) {
+        if (!(error instanceof ApiError && error.status === 401)) {
+          showNotice(error instanceof Error ? error.message : t("errors.serviceUnavailable"), "error");
+        }
       }
     } finally {
       if (generation.current === currentGeneration) {
@@ -54,5 +58,5 @@ export function useResourceList<T>({
     };
   }, [reload]);
 
-  return { items, loading, reload };
+  return { items, loaded, loading, reload };
 }

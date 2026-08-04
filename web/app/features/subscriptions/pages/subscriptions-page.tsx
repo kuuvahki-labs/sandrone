@@ -30,6 +30,7 @@ export interface SubscriptionsPageProps {
   createActions: CreateSpeedDialAction[];
   getTrafficKey?: (item: SubscriptionItem) => string;
   items: SubscriptionItem[];
+  loaded?: boolean;
   trafficByKey?: Record<string, SubscriptionTraffic | null>;
   onDelete: (item: SubscriptionItem) => void;
   onEdit: (item: SubscriptionItem) => void;
@@ -41,6 +42,7 @@ export function SubscriptionsPage({
   createActions,
   getTrafficKey = defaultTrafficKey,
   items,
+  loaded = true,
   trafficByKey,
   onDelete,
   onEdit,
@@ -66,10 +68,10 @@ export function SubscriptionsPage({
         title={t("subscriptions.title")}
         metrics={(
           <div aria-label={t("subscriptions.summary")} className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            <Metric label={t("subscriptions.metric.total")} value={summary.total} />
-            <Metric label={t("subscriptions.metric.collection")} value={summary.collections} />
-            <Metric label={t("subscriptions.metric.remote")} value={summary.remote} />
-            <Metric label={t("subscriptions.metric.local")} value={summary.local} />
+            <Metric label={t("subscriptions.metric.total")} value={loaded ? summary.total : undefined} />
+            <Metric label={t("subscriptions.metric.collection")} value={loaded ? summary.collections : undefined} />
+            <Metric label={t("subscriptions.metric.remote")} value={loaded ? summary.remote : undefined} />
+            <Metric label={t("subscriptions.metric.local")} value={loaded ? summary.local : undefined} />
           </div>
         )}
       />
@@ -135,9 +137,9 @@ export function SubscriptionsPage({
             );
           })}
         </List>
-      ) : (
+      ) : loaded ? (
         <EmptyState title={t("subscriptions.empty")} />
-      )}
+      ) : null}
       <CreateSpeedDial actions={createActions} ariaLabel={t("subscriptions.create")} />
     </section>
   );

@@ -54,6 +54,7 @@ export function SubscriptionsRoute() {
       ]}
       getTrafficKey={subscriptionTrafficKey}
       items={subscriptions.items}
+      loaded={subscriptions.loaded}
       trafficByKey={autoLoadTraffic ? trafficByKey : undefined}
       onDelete={(item) => app.requestDelete({ kind: "subscriptions", name: item.name, label: t("nav.subscriptions"), onDeleted: subscriptions.reload })}
       onEdit={(item) => navigate(subscriptionEditPath(item.kind, item.name))}

@@ -26,6 +26,7 @@ export default function SharesRoute() {
   return (
     <SharesPage
       items={shares.items}
+      loaded={shares.loaded}
       onCopy={shareActions.copyShare}
       onCopyUrl={shareActions.copyShareUrl}
       onDelete={(item) => app.requestDelete({ kind: "shares", name: item.id, label: t("shares.resourceLabel"), onDeleted: shares.reload })}

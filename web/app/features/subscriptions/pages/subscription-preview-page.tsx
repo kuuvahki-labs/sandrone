@@ -42,7 +42,6 @@ export function SubscriptionPreviewPage({ backLabel, failed = false, pending = f
   const [filter, setFilter] = useState<PreviewFilter>("all");
   const nodes = preview?.nodes ?? [];
   const visibleNodes = filter === "all" ? nodes : nodes.filter((node) => node.status === filter);
-  const counts = preview?.statusCounts ?? { added: 0, modified: 0, removed: 0, unchanged: 0 };
 
   return (
     <section className="grid gap-6">
@@ -56,10 +55,10 @@ export function SubscriptionPreviewPage({ backLabel, failed = false, pending = f
       />
 
       <div aria-label={t("subscriptions.preview.summary")} className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <Metric label={t("subscriptions.preview.metricBefore")} value={preview?.beforeCount ?? "-"} />
-        <Metric label={t("subscriptions.preview.metricAfter")} value={preview?.afterCount ?? "-"} />
-        <Metric label={t("subscriptions.preview.metricRemoved")} value={counts.removed} />
-        <Metric label={t("subscriptions.preview.metricWarnings")} value={preview?.warnings.length ?? 0} />
+        <Metric label={t("subscriptions.preview.metricBefore")} value={preview?.beforeCount} />
+        <Metric label={t("subscriptions.preview.metricAfter")} value={preview?.afterCount} />
+        <Metric label={t("subscriptions.preview.metricRemoved")} value={preview?.statusCounts.removed} />
+        <Metric label={t("subscriptions.preview.metricWarnings")} value={preview?.warnings.length} />
       </div>
 
       {pending && !preview ? (
