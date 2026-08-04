@@ -363,6 +363,8 @@ func parseTUIC(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 	applyTLSQuery(&node, values)
 	if node.TLS == nil {
 		node.TLS = &domain.TLSOptions{Enabled: true}
+	} else {
+		node.TLS.Enabled = true
 	}
 	node.Raw = map[string]json.RawMessage{}
 	preserveURIQuery(&node, values, map[string]bool{

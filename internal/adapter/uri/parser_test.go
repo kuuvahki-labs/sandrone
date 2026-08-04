@@ -1907,6 +1907,22 @@ func TestParseTUICTLSCompatibilityAliases(t *testing.T) {
 	}
 }
 
+func TestParseTUICEnablesMandatoryTLSWhenOptionsCreateTLS(t *testing.T) {
+	p := uri.NewParser()
+	raw := "tuic://11111111-1111-1111-1111-111111111111:secret@example.com:443?sni=sni.example.com&alpn=h3&allow_insecure=1#tuic"
+
+	nodes, source, err := p.Parse(context.Background(), []byte(raw))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	require.NotNil(t, nodes[0].TLS)
+	require.True(t, nodes[0].TLS.Enabled)
+	require.Equal(t, "sni.example.com", nodes[0].TLS.ServerName)
+	require.Equal(t, []string{"h3"}, nodes[0].TLS.ALPN)
+	require.True(t, nodes[0].TLS.InsecureSkipVerify)
+	require.Empty(t, source.Warnings)
+}
+
 func TestParseTUICDisableSNIExplicitBoolean(t *testing.T) {
 	p := uri.NewParser()
 	for _, tc := range []struct {
