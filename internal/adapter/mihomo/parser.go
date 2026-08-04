@@ -88,7 +88,6 @@ func parseMihomoProxy(proxy map[string]any, nodeIndex int) (domain.NodeIR, []dom
 	if port, err := shared.Uint16Value(proxy["port"]); err == nil {
 		node.Port = port
 	}
-	node.Network = shared.StringValue(proxy["network"])
 	node.Username = firstNonEmpty(shared.StringValue(proxy["username"]), shared.StringValue(proxy["user"]))
 	node.Password = shared.StringValue(proxy["password"])
 	node.UUID = shared.StringValue(proxy["uuid"])
@@ -244,6 +243,15 @@ func parseMihomoTransport(node *domain.NodeIR, proxy map[string]any) {
 	if network == "" {
 		return
 	}
+	if !mihomoNodeUsesV2RayTransport(node.Type) {
+		shared.AddRaw(node.Raw, "mihomo.network", proxy["network"])
+		return
+	}
+	if !mihomoSupportsSourceTransport(node.Type, network) {
+		shared.AddRaw(node.Raw, "mihomo.network", proxy["network"])
+		node.Transport = &domain.TransportOptions{Type: "tcp"}
+		return
+	}
 	node.Transport = &domain.TransportOptions{Type: network}
 	switch network {
 	case "ws":
@@ -306,6 +314,36 @@ func parseMihomoTransport(node *domain.NodeIR, proxy map[string]any) {
 		shared.AddKnownFields(known, "path", "host", "headers")
 		preserveNestedMihomoRaw(node, "xhttp-opts", opts, known)
 	}
+}
+
+func mihomoNodeUsesV2RayTransport(nodeType domain.NodeType) bool {
+	switch nodeType {
+	case domain.NodeTypeVMess, domain.NodeTypeVLESS, domain.NodeTypeTrojan:
+		return true
+	default:
+		return false
+	}
+}
+
+func mihomoSupportsSourceTransport(nodeType domain.NodeType, transportType string) bool {
+	switch nodeType {
+	case domain.NodeTypeVMess:
+		switch transportType {
+		case "tcp", "ws", "grpc", "h2", "http", "mkcp", "mekya":
+			return true
+		}
+	case domain.NodeTypeVLESS:
+		switch transportType {
+		case "tcp", "ws", "grpc", "h2", "http", "xhttp":
+			return true
+		}
+	case domain.NodeTypeTrojan:
+		switch transportType {
+		case "tcp", "ws", "grpc":
+			return true
+		}
+	}
+	return false
 }
 
 func parseMihomoMux(node *domain.NodeIR, proxy map[string]any) {
@@ -516,47 +554,6 @@ func parseMihomoWireGuard(node *domain.NodeIR, proxy map[string]any) {
 			Reserved:     uint8SliceValue(peerMap["reserved"]),
 		})
 	}
-}
-
-func mihomoKnownFields(nodeType domain.NodeType) map[string]bool {
-	common := shared.KnownFields(
-		"name", "type", "server", "port", "username", "user",
-		"password", "uuid", "cipher", "method", "network",
-		"tls", "sni", "servername", "skip-cert-verify", "fingerprint", "client-fingerprint",
-		"alpn", "ech-opts", "reality-opts", "ws-opts", "grpc-opts",
-		"h2-opts", "http-opts", "xhttp-opts", "mux", "udp-over-tcp",
-		"udp-over-tcp-version", "plugin", "plugin-opts", "headers",
-		"flow", "encryption", "packet-encoding", "tfo",
-		"country", "delay",
-	)
-	add := func(keys ...string) {
-		shared.AddKnownFields(common, keys...)
-	}
-	switch nodeType {
-	case domain.NodeTypeShadowsocks, domain.NodeTypeTrojan, domain.NodeTypeSOCKS:
-		add("udp")
-	case domain.NodeTypeShadowsocksR:
-		add("udp", "protocol", "protocol-param", "obfs", "obfs-param")
-	case domain.NodeTypeSnell:
-		add("udp", "psk", "version", "reuse", "client-fingerprint", "obfs-opts")
-	case domain.NodeTypeAnyTLS:
-		add("idle-session-check-interval", "idle-session-timeout", "min-idle-session")
-	case domain.NodeTypeVMess:
-		add("alterId", "udp", "xudp", "packet-addr")
-	case domain.NodeTypeVLESS:
-		add("udp", "xudp", "packet-addr")
-	case domain.NodeTypeHysteria:
-		add("ports", "server-ports", "protocol", "obfs-protocol", "up", "up-speed", "down", "down-speed", "auth", "auth-str", "obfs", "hop-interval", "fast-open")
-	case domain.NodeTypeHysteria2:
-		add("ports", "server-ports", "hop-interval", "up", "down", "obfs", "obfs-password", "auth", "realm-opts", "bbr-profile", "udp-mtu", "cwnd", "masquerade")
-	case domain.NodeTypeTUIC:
-		add("token", "congestion-controller", "udp-relay-mode", "reduce-rtt", "heartbeat-interval", "udp-over-stream", "udp-over-stream-version", "fast-open")
-	case domain.NodeTypeMieru:
-		add("port-range", "transport", "udp", "multiplexing", "handshake-mode", "traffic-pattern")
-	case domain.NodeTypeWireGuard:
-		add("private-key", "ip", "ipv6", "peers", "public-key", "pre-shared-key", "allowed-ips", "reserved", "mtu", "workers", "persistent-keepalive", "udp")
-	}
-	return common
 }
 
 func isExplicitTrue(value any) bool {

@@ -153,6 +153,10 @@ renderer 跳过整个节点并产生 `render_node_skipped`。
   两者不可互换。
 - `dialer.udp_relay` 是 Sandrone 的显式 UDP 转发策略。sing-box 的
   `network` 是 TCP/UDP 协议选择器，不是等价字段。
+- canonical `NodeIR.network` 只接受 `tcp`/`udp`，与
+  `NodeIR.transport.type` 相互独立。Mihomo 的 VMess/VLESS/Trojan
+  `network` 和 URI 的 `type`/`net`/`transport` 都解析到后者；输出到无法表达
+  TCP/UDP 协议选择器的格式时报告有损字段，不借用同名字段改写语义。
 - WebSocket early-data、gRPC、xHTTP、Reality、ECH、multiplex、UDP-over-TCP
   都是独立字段族；某个 renderer 支持 transport 基础字段，并不表示它支持该族
   的所有扩展。

@@ -58,6 +58,9 @@ func (r *Renderer) RenderWithReport(_ context.Context, nodes []domain.NodeIR, _ 
 }
 
 func nodeToSingBox(node domain.NodeIR) (map[string]any, bool, map[string]bool, []domain.Warning, error) {
+	if node.Network != "" && node.Network != "tcp" && node.Network != "udp" {
+		return nil, false, nil, nil, domain.NewError(domain.CodeRenderFailed, "network must be tcp or udp")
+	}
 	switch node.Type {
 	case domain.NodeTypeShadowsocks:
 		return renderSS(node)

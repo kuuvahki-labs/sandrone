@@ -129,6 +129,19 @@ func TestURICapabilityDeclaresVLESSPacketEncodingRoundtrip(t *testing.T) {
 	require.NotContains(t, irFields(capability.Lossy), "packet_encoding")
 }
 
+func TestMihomoAndURIRenderCapabilitiesDeclareCanonicalNetworkLoss(t *testing.T) {
+	t.Parallel()
+
+	for _, format := range []string{"mihomo-proxies", "uri-list"} {
+		capability := shared.CapabilityFor(format, shared.DirectionRender, []domain.NodeType{
+			domain.NodeTypeVMess,
+			domain.NodeTypeVLESS,
+			domain.NodeTypeTrojan,
+		}, false)
+		require.Contains(t, irFields(capability.Lossy), "network", format)
+	}
+}
+
 func TestMieruCapabilities(t *testing.T) {
 	mihomo := shared.CapabilityFor("mihomo-proxies", shared.DirectionRender, []domain.NodeType{domain.NodeTypeMieru}, false)
 	for _, field := range []string{

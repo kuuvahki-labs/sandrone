@@ -13,6 +13,9 @@
   `subscriptions` 和 `settings`，由对应 driver 严格解码。
 - file-stage processor 按声明顺序执行。
 - Web 改动遵守 [web/AGENTS.md](web/AGENTS.md)。
+- 修改任一 adapter 的解析或渲染时，不能只验证当前格式；必须以 canonical
+  `NodeIR` 语义为边界，按[贡献指南](CONTRIBUTING.md#选择验证范围)全局检查其它输入、
+  输出、校验、能力声明和跨格式测试。
 - 先跑相关窄测；交付前运行与范围匹配的门禁，默认全仓门禁为 `make check`。
 - 一个事实只在 canonical 文档完整说明；其他位置只链接。
 - 删除功能时同步删除专属实现、测试、fixture、示例和文档，并用 `rg` 确认旧标识

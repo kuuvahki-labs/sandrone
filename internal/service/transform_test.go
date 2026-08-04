@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -118,6 +119,36 @@ proxies:
 	require.Equal(t, uint16(8388), warning.NodeContext.Port)
 	require.Equal(t, "secret", warning.NodeContext.Raw["password"])
 	require.Equal(t, "value", warning.NodeContext.Raw["private-thing"])
+}
+
+func TestServiceConvertMihomoWebSocketToSingBoxKeepsTransportSeparateFromNetwork(t *testing.T) {
+	svc := service.New()
+
+	result, err := svc.Convert(context.Background(), domain.ConvertRequest{
+		FromFormat: "mihomo",
+		ToFormat:   "sing-box-outbounds",
+		Content: []byte(`
+proxies:
+  - name: trojan-ws
+    type: trojan
+    server: example.com
+    port: 443
+    password: secret
+    network: ws
+    ws-opts:
+      path: /ws
+    tls: true
+`),
+	})
+
+	require.NoError(t, err)
+	var doc struct {
+		Outbounds []map[string]any `json:"outbounds"`
+	}
+	require.NoError(t, json.Unmarshal(result.Body, &doc))
+	require.Len(t, doc.Outbounds, 1)
+	require.NotContains(t, doc.Outbounds[0], "network")
+	require.Equal(t, "ws", doc.Outbounds[0]["transport"].(map[string]any)["type"])
 }
 
 func TestServiceConvertRemoteAutoDetectsBase64Subscription(t *testing.T) {

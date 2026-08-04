@@ -192,10 +192,10 @@ proxies:
 			yaml: `
 proxies:
   - name: h2-node
-    type: trojan
+    type: vmess
     server: example.com
     port: 443
-    password: secret
+    uuid: 11111111-1111-1111-1111-111111111111
     network: h2
     h2-opts:
       host:
@@ -278,14 +278,67 @@ proxies:
 			require.NoError(t, err)
 			if tc.name == "http-xhttp" {
 				require.Len(t, nodes, 2)
+				require.Empty(t, nodes[0].Network)
+				require.Empty(t, nodes[1].Network)
 				tc.check(t, nodes[0])
 				tc.check(t, nodes[1])
 				return
 			}
 			require.Len(t, nodes, 1)
+			require.Empty(t, nodes[0].Network)
 			tc.check(t, nodes[0])
 		})
 	}
+}
+
+func TestParseMihomoDoesNotPromoteNetworkForProtocolsWithoutTransportField(t *testing.T) {
+	parser := mihomo.NewParser()
+	nodes, source, err := parser.Parse(context.Background(), []byte(`
+proxies:
+  - name: ss-network
+    type: ss
+    server: example.com
+    port: 8388
+    cipher: aes-128-gcm
+    password: secret
+    network: udp
+`))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	require.Empty(t, nodes[0].Network)
+	require.Nil(t, nodes[0].Transport)
+	require.Contains(t, nodes[0].Raw, "mihomo.network")
+	require.Len(t, source.Warnings, 1)
+	require.Equal(t, "mihomo.network", source.Warnings[0].Field)
+}
+
+func TestParseMihomoUnsupportedProtocolTransportFallsBackToTCPAndPreservesRaw(t *testing.T) {
+	parser := mihomo.NewParser()
+	nodes, source, err := parser.Parse(context.Background(), []byte(`
+proxies:
+  - name: trojan-h2
+    type: trojan
+    server: example.com
+    port: 443
+    password: secret
+    network: h2
+    h2-opts:
+      path: /ignored
+`))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	require.Empty(t, nodes[0].Network)
+	require.NotNil(t, nodes[0].Transport)
+	require.Equal(t, "tcp", nodes[0].Transport.Type)
+	require.Contains(t, nodes[0].Raw, "mihomo.network")
+	require.Contains(t, nodes[0].Raw, "mihomo.h2-opts")
+	require.Len(t, source.Warnings, 2)
+	require.ElementsMatch(t, []string{"mihomo.network", "mihomo.h2-opts"}, []string{
+		source.Warnings[0].Field,
+		source.Warnings[1].Field,
+	})
 }
 
 func TestParseMihomoTLSFingerprintSplit(t *testing.T) {

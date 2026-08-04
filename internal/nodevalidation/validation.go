@@ -90,6 +90,9 @@ func validateNode(node domain.NodeIR, index int, stage Stage, target string) []d
 	if !outerEndpointOptional && !portRangeConfigured && node.Port == 0 {
 		add("node_validation_invalid", "port", "port must be between 1 and 65535")
 	}
+	if node.Network != "" && node.Network != "tcp" && node.Network != "udp" {
+		add("node_validation_invalid", "network", "network must be tcp or udp")
+	}
 
 	switch node.Type {
 	case domain.NodeTypeShadowsocks:

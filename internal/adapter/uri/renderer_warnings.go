@@ -22,20 +22,17 @@ func structuredLossWarnings(node domain.NodeIR, target string) []domain.Warning 
 	if node.UDPOverTCP != nil {
 		add("udp_over_tcp")
 	}
+	if node.Network != "" {
+		add("network")
+	}
 	switch node.Type {
 	case domain.NodeTypeShadowsocks:
-		if node.Network != "" {
-			add("network")
-		}
 		if len(node.PluginOptions) > 0 && node.Plugin == "" {
 			add("plugin_options")
 		}
 		addTLSLossWarnings(node, target, "none", &warnings)
 		addTransportLossWarnings(node, target, false, &warnings)
 	case domain.NodeTypeShadowsocksR:
-		if node.Network != "" {
-			add("network")
-		}
 		addTLSLossWarnings(node, target, "none", &warnings)
 		addTransportLossWarnings(node, target, false, &warnings)
 	case domain.NodeTypeVMess:
@@ -66,9 +63,6 @@ func structuredLossWarnings(node domain.NodeIR, target string) []domain.Warning 
 		addTLSLossWarnings(node, target, "query", &warnings)
 		addTransportLossWarnings(node, target, false, &warnings)
 	case domain.NodeTypeSOCKS:
-		if node.Network != "" {
-			add("network")
-		}
 		addTLSLossWarnings(node, target, "none", &warnings)
 		addTransportLossWarnings(node, target, false, &warnings)
 	case domain.NodeTypeHTTP:
@@ -77,9 +71,6 @@ func structuredLossWarnings(node domain.NodeIR, target string) []domain.Warning 
 		}
 		if node.Path != "" {
 			add("path")
-		}
-		if node.Network != "" {
-			add("network")
 		}
 		addTLSLossWarnings(node, target, "http", &warnings)
 		addTransportLossWarnings(node, target, false, &warnings)

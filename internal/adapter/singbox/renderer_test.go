@@ -68,6 +68,37 @@ func TestRenderSingBoxTransportAndWireGuard(t *testing.T) {
 	}
 }
 
+func TestRenderSingBoxSkipsNonCanonicalNetwork(t *testing.T) {
+	r := singbox.NewRenderer()
+	nodes := []domain.NodeIR{
+		{
+			Name: "valid", Type: domain.NodeTypeTrojan, Server: "example.com", Port: 443,
+			Password: "secret", Network: "tcp", TLS: &domain.TLSOptions{Enabled: true},
+		},
+		{
+			Name: "invalid", Type: domain.NodeTypeTrojan, Server: "example.org", Port: 443,
+			Password: "secret", Network: "ws", TLS: &domain.TLSOptions{Enabled: true},
+			Transport: &domain.TransportOptions{Type: "websocket", Path: "/ws"},
+		},
+	}
+
+	out, report, err := r.RenderWithReport(context.Background(), nodes, domain.RenderOptions{})
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	if report.SuccessCount != 1 || len(report.Warnings) != 1 || report.Warnings[0].Code != "render_node_skipped" {
+		t.Fatalf("unexpected report: %#v", report)
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(out, &doc); err != nil {
+		t.Fatalf("json: %v", err)
+	}
+	outbounds := doc["outbounds"].([]any)
+	if len(outbounds) != 1 || outbounds[0].(map[string]any)["network"] != "tcp" {
+		t.Fatalf("unexpected outbounds: %#v", outbounds)
+	}
+}
+
 func TestRenderSingBoxHysteriaFromOfficialURIUsesCanonicalObfsPassword(t *testing.T) {
 	nodes, _, err := uriadapter.NewParser().Parse(context.Background(), []byte(
 		"hysteria://hy.example.com:8443?protocol=wechat-video&auth=secret&upmbps=100&downmbps=200&obfs=xplus&obfsParam=obfs-pass#hy",

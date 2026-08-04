@@ -356,28 +356,29 @@ func shadowrocketSupportedFieldNames(nodeType domain.NodeType) []string {
 }
 
 func mihomoLossyFieldNames(nodeType domain.NodeType) []string {
+	common := []string{"network"}
 	tlsECHAdvanced := []string{"tls.ech.dns", "tls.ech.force_query"}
 	switch nodeType {
 	case domain.NodeTypeShadowsocks:
-		return []string{"transport.type"}
+		return fields(common, "transport.type")
 	case domain.NodeTypeVMess, domain.NodeTypeVLESS, domain.NodeTypeTrojan:
-		return fields(tlsECHAdvanced, "multiplex", "transport.type")
+		return fieldGroups(common, tlsECHAdvanced, []string{"multiplex", "transport.type"})
 	case domain.NodeTypeHysteria:
-		return []string{"dialer.udp_relay", "hysteria.quic", "transport.type"}
+		return fields(common, "dialer.udp_relay", "hysteria.quic", "transport.type")
 	case domain.NodeTypeHysteria2:
-		return []string{"dialer.udp_relay", "hysteria.up_mbps", "hysteria.down_mbps", "hysteria.quic", "transport.type"}
+		return fields(common, "dialer.udp_relay", "hysteria.up_mbps", "hysteria.down_mbps", "hysteria.quic", "transport.type")
 	case domain.NodeTypeTUIC:
-		return []string{"dialer.udp_relay", "tuic.zero_rtt_handshake", "tuic.heartbeat", "transport.type"}
+		return fields(common, "dialer.udp_relay", "tuic.zero_rtt_handshake", "tuic.heartbeat", "transport.type")
 	case domain.NodeTypeSOCKS:
-		return []string{"udp_over_tcp", "transport.type"}
+		return fields(common, "udp_over_tcp", "transport.type")
 	case domain.NodeTypeHTTP:
-		return []string{"dialer.udp_relay", "path", "transport.type"}
+		return fields(common, "dialer.udp_relay", "path", "transport.type")
 	case domain.NodeTypeWireGuard:
-		return []string{"wireguard.peers.persistent_keepalive", "transport.type"}
+		return fields(common, "wireguard.peers.persistent_keepalive", "transport.type")
 	case domain.NodeTypeAnyTLS:
-		return fields(tlsECHAdvanced, "tls.reality")
+		return fieldGroups(common, tlsECHAdvanced, []string{"tls.reality"})
 	default:
-		return tlsECHAdvanced
+		return fields(common, tlsECHAdvanced...)
 	}
 }
 
@@ -407,10 +408,10 @@ func singBoxLossyFieldNames(nodeType domain.NodeType) []string {
 }
 
 func uriLossyFieldNames(nodeType domain.NodeType) []string {
-	common := []string{"dialer.tfo", "dialer.udp_relay", "multiplex", "udp_over_tcp"}
+	common := []string{"dialer.tfo", "dialer.udp_relay", "multiplex", "udp_over_tcp", "network"}
 	switch nodeType {
 	case domain.NodeTypeShadowsocks:
-		return fieldGroups(common, []string{"network", "plugin_options"}, uriTLSLossFields("none"), uriTransportLossFields(false))
+		return fieldGroups(common, []string{"plugin_options"}, uriTLSLossFields("none"), uriTransportLossFields(false))
 	case domain.NodeTypeVMess:
 		return fieldGroups(common, []string{"packet_encoding"}, uriTLSLossFields("vmess"), uriTransportLossFields(true))
 	case domain.NodeTypeVLESS:
@@ -434,9 +435,9 @@ func uriLossyFieldNames(nodeType domain.NodeType) []string {
 	case domain.NodeTypeMieru:
 		return common
 	case domain.NodeTypeSOCKS:
-		return fieldGroups(common, []string{"network"}, uriTLSLossFields("none"), uriTransportLossFields(false))
+		return fieldGroups(common, uriTLSLossFields("none"), uriTransportLossFields(false))
 	case domain.NodeTypeHTTP:
-		return fieldGroups(common, []string{"headers", "path", "network"}, uriTLSLossFields("http"), uriTransportLossFields(false))
+		return fieldGroups(common, []string{"headers", "path"}, uriTLSLossFields("http"), uriTransportLossFields(false))
 	default:
 		return nil
 	}

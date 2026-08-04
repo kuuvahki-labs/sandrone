@@ -425,6 +425,32 @@ func TestRenderURIVLESSWithReality(t *testing.T) {
 	require.Contains(t, string(out), "type=h2")
 }
 
+func TestRenderURIReportsCanonicalNetworkAsLossyForV2RayProtocols(t *testing.T) {
+	nodes := []domain.NodeIR{
+		{
+			Name: "vmess", Type: domain.NodeTypeVMess, Server: "example.com", Port: 443,
+			UUID: "11111111-1111-1111-1111-111111111111", Network: "tcp",
+		},
+		{
+			Name: "vless", Type: domain.NodeTypeVLESS, Server: "example.com", Port: 443,
+			UUID: "11111111-1111-1111-1111-111111111112", Encryption: "none", Network: "udp",
+		},
+		{
+			Name: "trojan", Type: domain.NodeTypeTrojan, Server: "example.com", Port: 443,
+			Password: "secret", Network: "tcp", TLS: &domain.TLSOptions{Enabled: true},
+		},
+	}
+
+	out, report, err := uri.NewRenderer().RenderWithReport(context.Background(), nodes, domain.RenderOptions{})
+	require.NoError(t, err)
+	require.Len(t, strings.Split(string(out), "\n"), 3)
+	require.Len(t, report.Warnings, 3)
+	for _, warning := range report.Warnings {
+		require.Equal(t, "network", warning.Field)
+		require.Equal(t, "render_lossy_field", warning.Code)
+	}
+}
+
 func TestRenderURIWithPlugin(t *testing.T) {
 	r := uri.NewRenderer()
 	out, err := r.Render(context.Background(), []domain.NodeIR{{

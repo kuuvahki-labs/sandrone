@@ -13,9 +13,6 @@ func baseProxy(node domain.NodeIR, typ string) map[string]any {
 		"server": node.Server,
 		"port":   int(node.Port),
 	}
-	if node.Network != "" && typ != "vmess" && typ != "vless" && typ != "trojan" {
-		out["network"] = node.Network
-	}
 	applyMihomoDialer(out, node)
 	return out
 }

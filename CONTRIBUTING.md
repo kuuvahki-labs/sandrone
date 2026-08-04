@@ -78,7 +78,13 @@ make test PKGS=./internal/service TESTFLAGS='-run ^TestName$'
 
 按变更类型选择额外覆盖：
 
-- adapter：parse/render 单元测试、能力或 warning 断言，以及必要的 golden fixture。
+- adapter：修改任一格式的 parser 或 renderer 时，不得只按当前格式局部推导。
+  先确认来源字段与 canonical `NodeIR` 字段的语义是否真正等价，再沿
+  “来源格式 → `NodeIR` → 所有目标格式”检查全部受影响路径，包括其它 parser、
+  renderer、`nodevalidation`、capability catalog，以及 raw/lossy/skip warning。
+  字段同名不代表语义相同；共享 IR 语义发生变化时，除当前 adapter 的
+  parse/render 单元测试、能力断言和必要的 golden fixture 外，至少补一条跨格式
+  转换测试。
 - processor、service、store、entrypoint：在最接近公开或层间契约的位置测试；文件流不要只依赖 renderer golden。
 - probe：默认门禁覆盖 sing-box；修改 Mihomo backend 时额外运行
   `go test -mod=readonly -tags probe_mihomo ./internal/probe ./internal/service`。
@@ -133,6 +139,7 @@ PR 描述应包含行为变化、相关 issue、验证命令、文档更新和�
 提交前确认：
 
 - [ ] 改动遵守架构与依赖边界。
+- [ ] adapter 变更已评估所有输入、输出、IR 校验、能力声明和跨格式影响。
 - [ ] 测试覆盖最接近的行为契约。
 - [ ] 已运行 `make check`，或在 PR 中说明未运行原因。
 - [ ] Web、probe 或集成改动已运行对应专项检查。

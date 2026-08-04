@@ -974,7 +974,7 @@ func TestRenderMihomoHysteriaHopIntervalVariants(t *testing.T) {
 	}
 }
 
-func TestRenderMihomoBaseProxyKeepsNetworkForSimpleProtocols(t *testing.T) {
+func TestRenderMihomoReportsCanonicalNetworkAsLossy(t *testing.T) {
 	r := mihomo.NewRenderer()
 	nodes := []domain.NodeIR{{
 		Name:     "ss",
@@ -985,17 +985,20 @@ func TestRenderMihomoBaseProxyKeepsNetworkForSimpleProtocols(t *testing.T) {
 		Password: "secret",
 		Network:  "udp",
 	}}
-	out, _, err := r.RenderWithReport(context.Background(), nodes, domain.RenderOptions{Format: "mihomo-proxies"})
+	out, report, err := r.RenderWithReport(context.Background(), nodes, domain.RenderOptions{Format: "mihomo-proxies"})
 	if err != nil {
 		t.Fatalf("render: %v", err)
+	}
+	if len(report.Warnings) != 1 || report.Warnings[0].Field != "network" {
+		t.Fatalf("expected network loss warning: %#v", report.Warnings)
 	}
 	var doc map[string]any
 	if err := yaml.Unmarshal(out, &doc); err != nil {
 		t.Fatalf("yaml: %v", err)
 	}
 	proxy := doc["proxies"].([]any)[0].(map[string]any)
-	if proxy["network"] != "udp" {
-		t.Fatalf("unexpected proxy: %#v", proxy)
+	if proxy["network"] != nil {
+		t.Fatalf("canonical network must not be rendered as mihomo transport: %#v", proxy)
 	}
 }
 

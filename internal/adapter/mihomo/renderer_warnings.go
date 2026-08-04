@@ -10,6 +10,9 @@ func mihomoStructuredLossWarnings(node domain.NodeIR) []domain.Warning {
 	add := func(field, message string) {
 		warnings = append(warnings, shared.RenderLossyWarning(node, "mihomo-proxies", field, message))
 	}
+	if node.Network != "" {
+		add("network", "mihomo network is a transport selector and cannot represent the canonical tcp/udp protocol selector")
+	}
 	if node.Dialer != nil && node.Dialer.UDPRelay != nil && !mihomoSupportsUDPRelay(node.Type) {
 		add("dialer.udp_relay", "mihomo proxy schema for "+string(node.Type)+" does not expose a udp relay field")
 	}

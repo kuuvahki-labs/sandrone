@@ -88,6 +88,31 @@ func TestValidateRejectsProtocolSpecificRequiredFields(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsNonCanonicalNetwork(t *testing.T) {
+	t.Parallel()
+
+	node := domain.NodeIR{
+		Name:     "trojan-ws",
+		Type:     domain.NodeTypeTrojan,
+		Server:   "example.com",
+		Port:     443,
+		Password: "secret",
+		Network:  "ws",
+		TLS:      &domain.TLSOptions{Enabled: true},
+		Transport: &domain.TransportOptions{
+			Type: "websocket",
+		},
+	}
+
+	result := nodevalidation.Validate([]domain.NodeIR{node}, nodevalidation.StageProbe, "sing-box")
+
+	require.Empty(t, result.Nodes)
+	require.Equal(t, 1, result.Counts.Invalid)
+	require.Len(t, result.Issues, 1)
+	require.Equal(t, "network", result.Issues[0].Field)
+	require.Equal(t, "node_validation_invalid", result.Issues[0].Code)
+}
+
 func TestValidateAnyTLSRequiresTLSAndWholeSecondDurations(t *testing.T) {
 	t.Parallel()
 
