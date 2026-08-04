@@ -43,6 +43,7 @@ describe("ProcessorBuilder", () => {
     const { serializedProcessors } = renderProcessorBuilder();
 
     expect(screen.queryByRole("group", { name: "处理器 快捷设置" })).not.toBeInTheDocument();
+    expect(screen.queryByText("未配置处理器。")).not.toBeInTheDocument();
     expect(serializedProcessors()).toEqual([]);
   });
 

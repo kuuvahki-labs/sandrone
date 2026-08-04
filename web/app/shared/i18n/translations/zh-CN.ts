@@ -346,7 +346,6 @@ export const zhCN = {
   "processors.filter.regex": "正则",
   "processors.filter.value": "匹配值",
   "processors.nameOperation": "名称处理",
-  "processors.notConfigured": "未配置处理器。",
   "processors.probe": "测活",
   "processors.probe.annotate": "写入测活元数据",
   "processors.probe.attempts": "尝试次数",

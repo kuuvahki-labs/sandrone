@@ -5,7 +5,6 @@ import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
-import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
 import Collapse from "@mui/material/Collapse";
 import Divider from "@mui/material/Divider";
@@ -76,7 +75,6 @@ type ProcessorEditorListProps = {
   defaultType: string;
   defaultValue?: ProcessorDetail[];
   draftProcessors?: (processors: ProcessorDetail[]) => ProcessorDraft[];
-  emptyMessage?: string;
   paramsEditor: (props: ProcessorParamsEditorProps) => ReactNode;
   processorOptions: SelectOption[];
   serializeDraft: (draft: ProcessorDraft) => ProcessorDetail;
@@ -91,7 +89,6 @@ export function ProcessorEditorList({
   defaultType,
   defaultValue = [],
   draftProcessors,
-  emptyMessage,
   paramsEditor,
   processorOptions,
   serializeDraft,
@@ -217,8 +214,6 @@ export function ProcessorEditorList({
             );
           })}
         </div>
-      ) : emptyMessage ? (
-        <Alert severity="info" variant="outlined">{emptyMessage}</Alert>
       ) : null}
 
       <Paper className="p-4" variant="outlined">

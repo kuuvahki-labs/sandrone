@@ -348,7 +348,6 @@ export const enUS: Record<TranslationKey, string> = {
   "processors.filter.regex": "Regex",
   "processors.filter.value": "Match values",
   "processors.nameOperation": "Name handling",
-  "processors.notConfigured": "No processors configured.",
   "processors.probe": "Health check",
   "processors.probe.annotate": "Write health metadata",
   "processors.probe.attempts": "Attempts",

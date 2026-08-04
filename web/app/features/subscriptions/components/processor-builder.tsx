@@ -64,7 +64,6 @@ export function ProcessorBuilder({ defaultValue = [], onDirty, scriptFiles = [] 
       defaultType="filter"
       defaultValue={defaultValue}
       draftProcessors={draftProcessors}
-      emptyMessage={t("processors.notConfigured")}
       paramsEditor={ParamsEditor}
       processorOptions={options}
       serializeDraft={(draft) => serializeDraft(draft, t)}
