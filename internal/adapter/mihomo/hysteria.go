@@ -1,6 +1,7 @@
 package mihomo
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/shared"
@@ -11,28 +12,29 @@ func renderHysteria(node domain.NodeIR) (map[string]any, map[string]bool, []doma
 	if node.Server == "" || node.Port == 0 {
 		return nil, nil, nil, domain.NewError(domain.CodeRenderFailed, "missing hysteria fields")
 	}
-	out := baseProxy(node, "hysteria")
 	hy := node.Hysteria
 	if hy == nil {
 		hy = &domain.HysteriaOptions{}
 	}
+	if err := shared.ValidateCanonicalHysteriaBandwidth(hy); err != nil {
+		return nil, nil, nil, domain.WrapError(domain.CodeRenderFailed, "invalid hysteria bandwidth", err)
+	}
+	out := baseProxy(node, "hysteria")
 	if len(hy.ServerPorts) > 0 {
 		out["ports"] = strings.Join(hy.ServerPorts, ",")
 	}
 	if hy.Protocol != "" {
 		out["protocol"] = hy.Protocol
 	}
-	if hy.Up != "" {
+	if hy.UpMbps > 0 {
+		out["up"] = strconv.Itoa(hy.UpMbps) + " Mbps"
+	} else {
 		out["up"] = hy.Up
 	}
-	if hy.UpMbps != 0 {
-		out["up-speed"] = hy.UpMbps
-	}
-	if hy.Down != "" {
+	if hy.DownMbps > 0 {
+		out["down"] = strconv.Itoa(hy.DownMbps) + " Mbps"
+	} else {
 		out["down"] = hy.Down
-	}
-	if hy.DownMbps != 0 {
-		out["down-speed"] = hy.DownMbps
 	}
 	if hy.Auth != "" {
 		out["auth"] = hy.Auth

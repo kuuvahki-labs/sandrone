@@ -24,11 +24,7 @@ func (p *Parser) Parse(_ context.Context, in []byte) ([]domain.NodeIR, *domain.S
 	decoder.UseNumber()
 	var nodes []domain.NodeIR
 	if err := decoder.Decode(&nodes); err == nil {
-		for i := range nodes {
-			if nodes[i].SourceFormat == "" {
-				nodes[i].SourceFormat = "json-nodes"
-			}
-		}
+		normalizeLegacyHysteriaBandwidth(nodes)
 		return nodes, &domain.SourceInfo{Format: "json-nodes"}, nil
 	}
 	decoder = json.NewDecoder(bytes.NewReader(in))
@@ -39,12 +35,17 @@ func (p *Parser) Parse(_ context.Context, in []byte) ([]domain.NodeIR, *domain.S
 	if err := decoder.Decode(&doc); err != nil {
 		return nil, &domain.SourceInfo{Format: "json-nodes"}, domain.WrapError(domain.CodeParseFailed, "parse json nodes", err)
 	}
-	for i := range doc.Nodes {
-		if doc.Nodes[i].SourceFormat == "" {
-			doc.Nodes[i].SourceFormat = "json-nodes"
-		}
-	}
+	normalizeLegacyHysteriaBandwidth(doc.Nodes)
 	return doc.Nodes, &domain.SourceInfo{Format: "json-nodes"}, nil
+}
+
+func normalizeLegacyHysteriaBandwidth(nodes []domain.NodeIR) {
+	for i := range nodes {
+		if nodes[i].SourceFormat == "" {
+			nodes[i].SourceFormat = "json-nodes"
+		}
+		nodes[i].Warnings = append(nodes[i].Warnings, shared.NormalizeLegacyHysteriaBandwidth(&nodes[i])...)
+	}
 }
 
 type Renderer struct{}

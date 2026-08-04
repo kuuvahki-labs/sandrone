@@ -2,9 +2,11 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
+	"github.com/kuuvahki-labs/sandrone/internal/adapter/shared"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
 
@@ -15,15 +17,19 @@ func (s *Service) resolveNodeInput(ctx context.Context, input domain.NodeInput, 
 func (s *Service) resolveNodeInputWithSubscriptionState(ctx context.Context, input domain.NodeInput, req domain.FileRequest, subscriptionState *subscriptionResolveState) (*domain.NodeSet, error) {
 	switch strings.ToLower(input.Type) {
 	case "inline_nodes":
+		nodes, warnings := normalizeInlineNodes(input.Nodes)
 		return &domain.NodeSet{
-			Nodes: append([]domain.NodeIR{}, input.Nodes...),
-			Meta:  cloneStringMap(input.Meta),
+			Nodes:    nodes,
+			Warnings: warnings,
+			Meta:     cloneStringMap(input.Meta),
 		}, nil
 	case "inline":
 		if len(input.Nodes) > 0 {
+			nodes, warnings := normalizeInlineNodes(input.Nodes)
 			return &domain.NodeSet{
-				Nodes: append([]domain.NodeIR{}, input.Nodes...),
-				Meta:  cloneStringMap(input.Meta),
+				Nodes:    nodes,
+				Warnings: warnings,
+				Meta:     cloneStringMap(input.Meta),
 			}, nil
 		}
 		if input.Format == "" {
@@ -61,6 +67,27 @@ func (s *Service) resolveNodeInputWithSubscriptionState(ctx context.Context, inp
 	default:
 		return nil, domain.NewError(domain.CodeNotImplemented, fmt.Sprintf("node input type %q not implemented", input.Type))
 	}
+}
+
+func normalizeInlineNodes(nodes []domain.NodeIR) ([]domain.NodeIR, []domain.Warning) {
+	out := make([]domain.NodeIR, len(nodes))
+	copy(out, nodes)
+	warnings := []domain.Warning{}
+	for i := range out {
+		if out[i].Hysteria != nil {
+			hysteria := *out[i].Hysteria
+			out[i].Hysteria = &hysteria
+		}
+		if out[i].Raw != nil {
+			raw := make(map[string]json.RawMessage, len(out[i].Raw))
+			for key, value := range out[i].Raw {
+				raw[key] = append(json.RawMessage(nil), value...)
+			}
+			out[i].Raw = raw
+		}
+		warnings = append(warnings, shared.NormalizeLegacyHysteriaBandwidth(&out[i])...)
+	}
+	return out, warnings
 }
 
 func (s *Service) resolveSubscriptionNodeInput(ctx context.Context, input domain.NodeInput, req domain.FileRequest, subscriptionState *subscriptionResolveState) (*domain.NodeSet, error) {

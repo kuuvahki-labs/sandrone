@@ -144,7 +144,12 @@ sing-box 和 Mihomo，省略 core 时默认 sing-box。
 - `sort: duration`：存活节点在前并按延迟升序；失败节点在后，平局保持输入顺序。
 
 runner 返回的结果数必须与输入节点数相同。probe report warning 会并入 processor
-warning；runner 错误直接终止链。
+warning；runner 错误直接终止链。使用 sing-box core 时，核心目标不能表达的节点
+由 runner 在原位置返回 `probe_invalid_target`，而不是让可探测的同批节点失败；
+因此 `fail_mode` 在 runner 返回后按节点结果执行。这个 node-level isolation 保证
+目前不适用于 Mihomo，其 runner 错误仍会终止 processor 链。Hysteria v1 的
+canonical 字段与单位边界见
+[Hysteria v1 带宽规范化](capabilities.md#hysteria-v1-带宽规范化)，本页不重复定义。
 
 ### nodes script
 

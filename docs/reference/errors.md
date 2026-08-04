@@ -186,7 +186,8 @@ endpoint 级限制以 [HTTP API 参考](http-api/README.md)为准。
 当前内建 warning code 分组如下：
 
 - 解析：`parse_line_skipped`、`parse_line_failed`、
-  `parse_proxy_skipped`、`parse_outbound_skipped`、`parse_unknown_field`。
+  `parse_proxy_skipped`、`parse_outbound_skipped`、`parse_unknown_field`、
+  `parse_implicit_bandwidth_unit`。
 - 渲染：`render_lossy_field`、`render_node_skipped`、
   `uri_profile_unsupported`。
 - 节点验证与输入：`node_validation_dropped`、`node_input_not_found`、
@@ -201,6 +202,11 @@ endpoint 级限制以 [HTTP API 参考](http-api/README.md)为准。
 
 `probe_expected_status_unsupported` 当前由 `tcp_connect` 在收到
 `expected_status` 时产生；它是 warning，不是批次错误。
+
+`parse_implicit_bandwidth_unit` 表示兼容输入中的 Hysteria v1 裸数需要按来源假定
+单位；它记录解析采用的兼容假设，不表示节点被丢弃。canonical 字段、各输入来源
+的默认单位和何时产生该 warning 见
+[Hysteria v1 带宽规范化](capabilities.md#hysteria-v1-带宽规范化)。
 
 ## Report
 

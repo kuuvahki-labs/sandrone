@@ -2,11 +2,13 @@ package mihomo_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/mihomo"
+	"github.com/kuuvahki-labs/sandrone/internal/adapter/shared"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
 
@@ -641,6 +643,126 @@ proxies:
 	require.Equal(t, 20, nodes[0].Hysteria.UpMbps)
 	require.Empty(t, nodes[0].Hysteria.Down)
 	require.Equal(t, 100, nodes[0].Hysteria.DownMbps)
+}
+
+func TestParseMihomoNormalizesHysteriaBandwidth(t *testing.T) {
+	parser := mihomo.NewParser()
+	nodes, _, err := parser.Parse(context.Background(), []byte(`
+proxies:
+  - {name: bare, type: hysteria, server: bare.example, port: 443, up: "11", down: "55", auth-str: secret}
+  - {name: units, type: hysteria, server: units.example, port: 443, up: "640 KBps", down: "1 Gbps", auth-str: secret}
+  - {name: compat, type: hysteria, server: compat.example, port: 443, up: "11 Mbps", down: "55 Mbps", up-speed: 20, down-speed: 100, auth-str: secret}
+`))
+	require.NoError(t, err)
+	require.Len(t, nodes, 3)
+
+	require.Empty(t, nodes[0].Hysteria.Up)
+	require.Equal(t, 11, nodes[0].Hysteria.UpMbps)
+	require.Empty(t, nodes[0].Hysteria.Down)
+	require.Equal(t, 55, nodes[0].Hysteria.DownMbps)
+
+	require.Equal(t, "640 KBps", nodes[1].Hysteria.Up)
+	require.Zero(t, nodes[1].Hysteria.UpMbps)
+	require.Empty(t, nodes[1].Hysteria.Down)
+	require.Equal(t, 1000, nodes[1].Hysteria.DownMbps)
+
+	require.Empty(t, nodes[2].Hysteria.Up)
+	require.Equal(t, 20, nodes[2].Hysteria.UpMbps)
+	require.Empty(t, nodes[2].Hysteria.Down)
+	require.Equal(t, 100, nodes[2].Hysteria.DownMbps)
+}
+
+func TestParseMihomoPreservesInvalidHysteriaBandwidthAsRaw(t *testing.T) {
+	parser := mihomo.NewParser()
+	nodes, source, err := parser.Parse(context.Background(), []byte(`
+proxies:
+  - {name: invalid, type: hysteria, server: invalid.example, port: 443, up: fast, auth-str: secret}
+  - {name: negative-compat, type: hysteria, server: negative.example, port: 443, up: "11", up-speed: -1, auth-str: secret}
+  - {name: zero-compat, type: hysteria, server: zero.example, port: 443, up: "12", down: "34", up-speed: 0, down-speed: 0, auth-str: secret}
+`))
+	require.NoError(t, err)
+	require.NotNil(t, source)
+	require.Len(t, nodes, 3)
+
+	require.Empty(t, nodes[0].Hysteria.Up)
+	require.Zero(t, nodes[0].Hysteria.UpMbps)
+	require.JSONEq(t, `"fast"`, string(nodes[0].Raw["mihomo.up"]))
+
+	require.Empty(t, nodes[1].Hysteria.Up)
+	require.Equal(t, 11, nodes[1].Hysteria.UpMbps)
+	require.JSONEq(t, `-1`, string(nodes[1].Raw["mihomo.up-speed"]))
+
+	require.Empty(t, nodes[2].Hysteria.Up)
+	require.Equal(t, 12, nodes[2].Hysteria.UpMbps)
+	require.Empty(t, nodes[2].Hysteria.Down)
+	require.Equal(t, 34, nodes[2].Hysteria.DownMbps)
+	require.NotContains(t, nodes[2].Raw, "mihomo.up-speed")
+	require.NotContains(t, nodes[2].Raw, "mihomo.down-speed")
+
+	require.Condition(t, func() bool {
+		for _, warning := range source.Warnings {
+			if warning.Code == "parse_unknown_field" {
+				return true
+			}
+		}
+		return false
+	})
+}
+
+func TestParseMihomoChecksHysteriaCompatibilityMbpsBound(t *testing.T) {
+	max := shared.MaxHysteriaMbps()
+	if max == int(^uint(0)>>1) {
+		t.Skip("max+1 is not representable as int on this platform")
+	}
+	parser := mihomo.NewParser()
+	nodes, source, err := parser.Parse(context.Background(), []byte(fmt.Sprintf(`
+proxies:
+  - {name: max, type: hysteria, server: max.example, port: 443, up-speed: %d, down-speed: %d}
+  - {name: over, type: hysteria, server: over.example, port: 443, up-speed: %d, down-speed: %d}
+`, max, max, max+1, max)))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 2)
+	require.Equal(t, &domain.HysteriaOptions{UpMbps: max, DownMbps: max}, nodes[0].Hysteria)
+	require.Zero(t, nodes[1].Hysteria.UpMbps)
+	require.Equal(t, max, nodes[1].Hysteria.DownMbps)
+	require.JSONEq(t, fmt.Sprint(max+1), string(nodes[1].Raw["mihomo.up-speed"]))
+	require.Contains(t, warningFieldNames(source.Warnings), "mihomo.up-speed")
+}
+
+func TestParseMihomoValidatesShadowedNativeHysteriaBandwidth(t *testing.T) {
+	max := shared.MaxHysteriaMbps()
+	if max == int(^uint(0)>>1) {
+		t.Skip("max+1 is not representable as int on this platform")
+	}
+	parser := mihomo.NewParser()
+	nodes, source, err := parser.Parse(context.Background(), []byte(fmt.Sprintf(`
+proxies:
+  - {name: invalid-native, type: hysteria, server: invalid-native.example, port: 443, up: fast, up-speed: 20, down-speed: 100}
+  - {name: fractional-compat, type: hysteria, server: fractional.example, port: 443, up: "11", up-speed: 1.5, down-speed: 100}
+  - {name: zero-compat, type: hysteria, server: zero.example, port: 443, up: "12", up-speed: 0, down-speed: 100}
+  - {name: over-compat, type: hysteria, server: over.example, port: 443, up: "13", up-speed: %d, down-speed: 100}
+`, max+1)))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 4)
+	require.Equal(t, 20, nodes[0].Hysteria.UpMbps)
+	require.JSONEq(t, `"fast"`, string(nodes[0].Raw["mihomo.up"]))
+	require.Equal(t, 11, nodes[1].Hysteria.UpMbps)
+	require.JSONEq(t, `1.5`, string(nodes[1].Raw["mihomo.up-speed"]))
+	require.Equal(t, 12, nodes[2].Hysteria.UpMbps)
+	require.NotContains(t, nodes[2].Raw, "mihomo.up-speed")
+	require.Equal(t, 13, nodes[3].Hysteria.UpMbps)
+	require.JSONEq(t, fmt.Sprint(max+1), string(nodes[3].Raw["mihomo.up-speed"]))
+	require.ElementsMatch(t, []string{"mihomo.up", "mihomo.up-speed", "mihomo.up-speed"}, warningFieldNames(source.Warnings))
+}
+
+func warningFieldNames(warnings []domain.Warning) []string {
+	fields := make([]string, 0, len(warnings))
+	for _, warning := range warnings {
+		fields = append(fields, warning.Field)
+	}
+	return fields
 }
 
 func TestParseMihomoRejectsInvalidYAML(t *testing.T) {

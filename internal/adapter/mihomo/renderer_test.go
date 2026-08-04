@@ -6,12 +6,14 @@ import (
 	"strings"
 	"testing"
 
+	mihomoutils "github.com/metacubex/mihomo/common/utils"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/jsonnodes"
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/mihomo"
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/shared"
+	"github.com/kuuvahki-labs/sandrone/internal/adapter/singbox"
 	uriadapter "github.com/kuuvahki-labs/sandrone/internal/adapter/uri"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
@@ -27,7 +29,7 @@ func TestRenderMihomoRenderWrapper(t *testing.T) {
 	}
 }
 
-func TestRenderMihomoHysteriaFromOfficialURIUsesCanonicalObfsPassword(t *testing.T) {
+func TestRenderMihomoHysteriaBandwidthFromOfficialURIUsesNativeRates(t *testing.T) {
 	nodes, _, err := uriadapter.NewParser().Parse(context.Background(), []byte(
 		"hysteria://hy.example.com:8443?protocol=wechat-video&auth=secret&upmbps=100&downmbps=200&obfs=xplus&obfsParam=obfs-pass#hy",
 	))
@@ -44,12 +46,114 @@ func TestRenderMihomoHysteriaFromOfficialURIUsesCanonicalObfsPassword(t *testing
 	require.Len(t, doc.Proxies, 1)
 	require.Equal(t, "wechat-video", doc.Proxies[0]["protocol"])
 	require.Equal(t, "obfs-pass", doc.Proxies[0]["obfs"])
-	require.Equal(t, 100, doc.Proxies[0]["up-speed"])
-	require.Equal(t, 200, doc.Proxies[0]["down-speed"])
+	require.Equal(t, "100 Mbps", doc.Proxies[0]["up"])
+	require.Equal(t, "200 Mbps", doc.Proxies[0]["down"])
+	require.NotContains(t, doc.Proxies[0], "up-speed")
+	require.NotContains(t, doc.Proxies[0], "down-speed")
+	require.Equal(t, uint64(12_500_000), mihomoutils.StringToBps(doc.Proxies[0]["up"].(string)))
+	require.Equal(t, uint64(25_000_000), mihomoutils.StringToBps(doc.Proxies[0]["down"].(string)))
+}
+
+func TestRenderMihomoHysteriaBandwidthUsesNativeMbps(t *testing.T) {
+	out, report, err := mihomo.NewRenderer().RenderWithReport(context.Background(), []domain.NodeIR{{
+		Name: "hy", Type: domain.NodeTypeHysteria, Server: "example.com", Port: 8443,
+		Hysteria: &domain.HysteriaOptions{AuthString: "secret", UpMbps: 55, DownMbps: 100},
+	}}, domain.RenderOptions{Format: "mihomo-proxies"})
+
+	require.NoError(t, err)
+	require.Equal(t, 1, report.SuccessCount)
+	var doc struct {
+		Proxies []map[string]any `yaml:"proxies"`
+	}
+	require.NoError(t, yaml.Unmarshal(out, &doc))
+	require.Equal(t, "55 Mbps", doc.Proxies[0]["up"])
+	require.Equal(t, "100 Mbps", doc.Proxies[0]["down"])
+	require.NotContains(t, doc.Proxies[0], "up-speed")
+	require.NotContains(t, doc.Proxies[0], "down-speed")
+	require.Equal(t, uint64(6_875_000), mihomoutils.StringToBps(doc.Proxies[0]["up"].(string)))
+	require.Equal(t, uint64(12_500_000), mihomoutils.StringToBps(doc.Proxies[0]["down"].(string)))
+}
+
+func TestRenderMihomoHysteriaBandwidthPreservesSingBoxBps(t *testing.T) {
+	nodes, _, err := singbox.NewParser().Parse(context.Background(), []byte(`{
+		"outbounds":[{"type":"hysteria","tag":"hy","server":"example.com","server_port":8443,"auth_str":"secret","up":55,"down":100}]
+	}`))
+	require.NoError(t, err)
+
+	out, report, err := mihomo.NewRenderer().RenderWithReport(context.Background(), nodes, domain.RenderOptions{Format: "mihomo-proxies"})
+
+	require.NoError(t, err)
+	require.Equal(t, 1, report.SuccessCount)
+	var doc struct {
+		Proxies []map[string]any `yaml:"proxies"`
+	}
+	require.NoError(t, yaml.Unmarshal(out, &doc))
+	require.Equal(t, "55 Bps", doc.Proxies[0]["up"])
+	require.Equal(t, "100 Bps", doc.Proxies[0]["down"])
+	require.Equal(t, uint64(55), mihomoutils.StringToBps(doc.Proxies[0]["up"].(string)))
+	require.Equal(t, uint64(100), mihomoutils.StringToBps(doc.Proxies[0]["down"].(string)))
+}
+
+func TestRenderMihomoHysteriaBandwidthPreservesExplicitUnits(t *testing.T) {
+	out, report, err := mihomo.NewRenderer().RenderWithReport(context.Background(), []domain.NodeIR{{
+		Name: "hy", Type: domain.NodeTypeHysteria, Server: "example.com", Port: 8443,
+		Hysteria: &domain.HysteriaOptions{AuthString: "secret", Up: "55 Bps", Down: "640 KBps"},
+	}}, domain.RenderOptions{Format: "mihomo-proxies"})
+
+	require.NoError(t, err)
+	require.Equal(t, 1, report.SuccessCount)
+	var doc struct {
+		Proxies []map[string]any `yaml:"proxies"`
+	}
+	require.NoError(t, yaml.Unmarshal(out, &doc))
+	require.Equal(t, "55 Bps", doc.Proxies[0]["up"])
+	require.Equal(t, "640 KBps", doc.Proxies[0]["down"])
+}
+
+func TestRenderMihomoHysteriaBandwidthSkipsInvalidNode(t *testing.T) {
+	out, report, err := mihomo.NewRenderer().RenderWithReport(context.Background(), []domain.NodeIR{
+		{Name: "valid", Type: domain.NodeTypeHTTP, Server: "valid.example", Port: 8080},
+		{
+			Name: "invalid", Type: domain.NodeTypeHysteria, Server: "invalid.example", Port: 8443,
+			Hysteria: &domain.HysteriaOptions{AuthString: "secret", Up: "55", DownMbps: 100},
+		},
+	}, domain.RenderOptions{Format: "mihomo-proxies"})
+
+	require.NoError(t, err)
+	require.Equal(t, 1, report.SuccessCount)
+	require.Len(t, report.Warnings, 1)
+	require.Equal(t, "render_node_skipped", report.Warnings[0].Code)
+	require.Equal(t, "invalid", report.Warnings[0].Node)
+	var doc struct {
+		Proxies []map[string]any `yaml:"proxies"`
+	}
+	require.NoError(t, yaml.Unmarshal(out, &doc))
+	require.Len(t, doc.Proxies, 1)
+	require.Equal(t, "valid", doc.Proxies[0]["name"])
+}
+
+func TestRenderMihomoHysteriaBandwidthSkipsDirectOverBoundMbps(t *testing.T) {
+	max := shared.MaxHysteriaMbps()
+	if max == int(^uint(0)>>1) {
+		t.Skip("max+1 is not representable as int on this platform")
+	}
+	out, report, err := mihomo.NewRenderer().RenderWithReport(context.Background(), []domain.NodeIR{
+		{
+			Name: "over", Type: domain.NodeTypeHysteria, Server: "over.example", Port: 8443,
+			Hysteria: &domain.HysteriaOptions{UpMbps: max + 1, DownMbps: max},
+		},
+		{Name: "valid", Type: domain.NodeTypeHTTP, Server: "valid.example", Port: 8080},
+	}, domain.RenderOptions{Format: "mihomo-proxies"})
+
+	require.NoError(t, err)
+	require.Equal(t, 1, report.SuccessCount)
+	require.Len(t, report.Warnings, 1)
+	require.Equal(t, "over", report.Warnings[0].Node)
+	require.NotContains(t, string(out), "over.example")
 }
 
 func TestRenderMihomoHysteriaMigratesLegacyJSONObfsPassword(t *testing.T) {
-	nodes, _, err := jsonnodes.NewParser().Parse(context.Background(), []byte(`[{"name":"hy","type":"hysteria","server":"hy.example.com","port":8443,"hysteria":{"auth_str":"secret","obfs":"legacy-password"}}]`))
+	nodes, _, err := jsonnodes.NewParser().Parse(context.Background(), []byte(`[{"name":"hy","type":"hysteria","server":"hy.example.com","port":8443,"hysteria":{"auth_str":"secret","obfs":"legacy-password","up_mbps":20,"down_mbps":100}}]`))
 	require.NoError(t, err)
 
 	out, report, err := mihomo.NewRenderer().RenderWithReport(context.Background(), nodes, domain.RenderOptions{})
@@ -663,6 +767,8 @@ func TestRenderMihomoHysteriaHopInterval(t *testing.T) {
 		Hysteria: &domain.HysteriaOptions{
 			HopInterval: "30s",
 			AuthString:  "secret",
+			UpMbps:      20,
+			DownMbps:    100,
 		},
 	}}
 	out, _, err := r.RenderWithReport(context.Background(), nodes, domain.RenderOptions{Format: "mihomo-proxies"})
@@ -674,7 +780,7 @@ func TestRenderMihomoHysteriaHopInterval(t *testing.T) {
 	}
 }
 
-func TestRenderMihomoHysteriaMbpsAsStashCompatSpeeds(t *testing.T) {
+func TestRenderMihomoHysteriaBandwidthUsesNativeMbpsLegacyCase(t *testing.T) {
 	r := mihomo.NewRenderer()
 	nodes := []domain.NodeIR{{
 		Name:   "hy",
@@ -696,8 +802,14 @@ func TestRenderMihomoHysteriaMbpsAsStashCompatSpeeds(t *testing.T) {
 		t.Fatalf("yaml: %v", err)
 	}
 	proxy := doc["proxies"].([]any)[0].(map[string]any)
-	if proxy["up-speed"] != 20 || proxy["down-speed"] != 100 {
+	if proxy["up"] != "20 Mbps" || proxy["down"] != "100 Mbps" {
 		t.Fatalf("unexpected hysteria speeds: %#v", proxy)
+	}
+	if _, exists := proxy["up-speed"]; exists {
+		t.Fatalf("unexpected compatibility upload speed: %#v", proxy)
+	}
+	if _, exists := proxy["down-speed"]; exists {
+		t.Fatalf("unexpected compatibility download speed: %#v", proxy)
 	}
 }
 
@@ -944,6 +1056,8 @@ func TestRenderMihomoHysteriaHopIntervalVariants(t *testing.T) {
 			Hysteria: &domain.HysteriaOptions{
 				AuthString:  "secret",
 				HopInterval: " 45 ",
+				UpMbps:      20,
+				DownMbps:    100,
 			},
 		},
 		{
@@ -954,6 +1068,8 @@ func TestRenderMihomoHysteriaHopIntervalVariants(t *testing.T) {
 			Hysteria: &domain.HysteriaOptions{
 				AuthString:  "secret",
 				HopInterval: "fast",
+				UpMbps:      20,
+				DownMbps:    100,
 			},
 		},
 	}
@@ -1052,6 +1168,8 @@ func TestRenderMihomoDialerTFO(t *testing.T) {
 			Port:   8443,
 			Hysteria: &domain.HysteriaOptions{
 				AuthString: "secret",
+				UpMbps:     20,
+				DownMbps:   100,
 			},
 			Dialer: &domain.DialerOptions{TFO: true},
 		},
@@ -1196,8 +1314,8 @@ func allProtocolNodes() []domain.NodeIR {
 			Port:   8443,
 			TLS:    &domain.TLSOptions{Enabled: true, ServerName: "hy.example.com"},
 			Hysteria: &domain.HysteriaOptions{
-				Up:           "20 Mbps",
-				Down:         "100 Mbps",
+				UpMbps:       20,
+				DownMbps:     100,
 				AuthString:   "secret",
 				Obfs:         "xplus",
 				ObfsPassword: "obfs",

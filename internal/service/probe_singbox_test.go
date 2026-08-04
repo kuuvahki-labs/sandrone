@@ -103,6 +103,66 @@ func TestServiceSingBoxURLTestRejectsUnexpectedStatus(t *testing.T) {
 	require.Contains(t, result.Results[0].Error, "200/201")
 }
 
+func TestServiceSingBoxProbeIsolatesInvalidHysteriaBandwidth(t *testing.T) {
+	targetHit := make(chan struct{}, 1)
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodHead, r.Method)
+		select {
+		case targetHit <- struct{}{}:
+		default:
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer target.Close()
+
+	proxyAddr, closeProxy := startSingBoxConnectProxy(t, target.Listener.Addr().String())
+	defer closeProxy()
+	proxyHost, proxyPort := splitSingBoxHostPort(t, proxyAddr)
+
+	svc := service.New()
+	result, err := svc.Probe(context.Background(), domain.ProbeRequest{
+		Input: domain.NodeInput{
+			Type: "inline_nodes",
+			Nodes: []domain.NodeIR{
+				{
+					Name: "invalid-hysteria", Type: domain.NodeTypeHysteria,
+					Server: "invalid.example", Port: 443,
+					TLS:      &domain.TLSOptions{Enabled: true},
+					Hysteria: &domain.HysteriaOptions{Up: "fast", DownMbps: 100},
+				},
+				{
+					Name: "valid-http", Type: domain.NodeTypeHTTP,
+					Server: proxyHost, Port: proxyPort,
+				},
+			},
+		},
+		Method:         domain.ProbeURLTest,
+		Core:           "sing-box",
+		URL:            target.URL,
+		ExpectedStatus: "200-299",
+		TimeoutMS:      2000,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.Results, 2)
+	require.Equal(t, "invalid-hysteria", result.Results[0].NodeName)
+	require.False(t, result.Results[0].Alive)
+	require.Equal(t, string(domain.CodeProbeInvalidTarget), result.Results[0].ErrorCode)
+	require.Equal(t, "valid-http", result.Results[1].NodeName)
+	require.True(t, result.Results[1].Alive)
+	warningCodes := make([]string, 0, len(result.Report.Warnings))
+	for _, warning := range result.Report.Warnings {
+		warningCodes = append(warningCodes, warning.Code)
+	}
+	require.Contains(t, warningCodes, "parse_unknown_field")
+	require.Contains(t, warningCodes, "render_node_skipped")
+	select {
+	case <-targetHit:
+	case <-time.After(time.Second):
+		t.Fatal("sing-box did not probe the valid HTTP node")
+	}
+}
+
 func TestServiceSingBoxURLTestRejectsInvalidExpectedStatus(t *testing.T) {
 	targetHit := make(chan struct{}, 1)
 	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

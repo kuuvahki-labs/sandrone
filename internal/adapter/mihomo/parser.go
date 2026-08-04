@@ -450,15 +450,13 @@ func parseMihomoHysteria(node *domain.NodeIR, proxy map[string]any) {
 	node.Hysteria = &domain.HysteriaOptions{
 		ServerPorts:  firstStringSlice(proxy["ports"], proxy["server-ports"]),
 		Protocol:     firstNonEmpty(shared.StringValue(proxy["protocol"]), shared.StringValue(proxy["obfs-protocol"])),
-		Up:           shared.StringValue(proxy["up"]),
-		Down:         shared.StringValue(proxy["down"]),
-		UpMbps:       intValueZero(proxy["up-speed"]),
-		DownMbps:     intValueZero(proxy["down-speed"]),
 		Auth:         shared.StringValue(proxy["auth"]),
 		AuthString:   shared.StringValue(proxy["auth-str"]),
 		ObfsPassword: shared.StringValue(proxy["obfs"]),
 		HopInterval:  intString(proxy["hop-interval"]),
 	}
+	applyMihomoHysteriaRate(node, proxy["up"], proxy["up-speed"], "up", "up-speed", &node.Hysteria.Up, &node.Hysteria.UpMbps)
+	applyMihomoHysteriaRate(node, proxy["down"], proxy["down-speed"], "down", "down-speed", &node.Hysteria.Down, &node.Hysteria.DownMbps)
 }
 
 func parseMihomoHysteria2(node *domain.NodeIR, proxy map[string]any) {

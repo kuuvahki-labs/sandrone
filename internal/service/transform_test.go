@@ -29,6 +29,20 @@ func TestServiceParseURISubscription(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, result.Nodes, 2)
 }
+
+func TestServiceParseAggregatesURIListFallbackHysteriaWarningsOnce(t *testing.T) {
+	svc := service.New()
+	content := `{"name":"fallback-hy","type":"hysteria","server":"fallback.example","port":8443,"tls":{"enabled":true},"hysteria":{"up":"55","down":"100"}}`
+
+	result, err := svc.Parse(context.Background(), domain.ParseRequest{Format: "uri-list", Content: []byte(content)})
+
+	require.NoError(t, err)
+	require.Len(t, result.Nodes, 1)
+	require.Equal(t, &domain.HysteriaOptions{UpMbps: 55, DownMbps: 100}, result.Nodes[0].Hysteria)
+	require.Len(t, result.Nodes[0].Warnings, 2)
+	require.Equal(t, []string{"parse_implicit_bandwidth_unit", "parse_implicit_bandwidth_unit"}, warningCodes(result.Report.Warnings))
+}
+
 func TestServiceParseAndRenderRegistry(t *testing.T) {
 	svc := service.New()
 	parsed, err := svc.Parse(context.Background(), domain.ParseRequest{

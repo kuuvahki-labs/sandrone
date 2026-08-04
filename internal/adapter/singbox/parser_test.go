@@ -3,10 +3,12 @@ package singbox_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/kuuvahki-labs/sandrone/internal/adapter/shared"
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/singbox"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
@@ -454,6 +456,155 @@ func TestParseSingBoxWireGuardDeprecatedCompatibilityFieldsStayRaw(t *testing.T)
 	require.Contains(t, got.Raw, "sing-box.pre_shared_key")
 	require.Contains(t, got.Raw, "sing-box.allowed_ips")
 	require.NotEmpty(t, source.Warnings)
+}
+
+func TestParseSingBoxNormalizesHysteriaBandwidth(t *testing.T) {
+	parser := singbox.NewParser()
+	nodes, _, err := parser.Parse(context.Background(), []byte(`{"outbounds":[
+  {"type":"hysteria","tag":"bytes","server":"bytes.example","server_port":443,"up":55,"down":100,"auth_str":"secret"},
+  {"type":"hysteria","tag":"units","server":"units.example","server_port":443,"up":"640 KBps","down":"1 Gbps","auth_str":"secret"},
+  {"type":"hysteria","tag":"precedence","server":"precedence.example","server_port":443,"up":"55 Mbps","down":"100 Mbps","up_mbps":20,"down_mbps":30,"auth_str":"secret"}
+]}`))
+	require.NoError(t, err)
+	require.Len(t, nodes, 3)
+
+	require.Equal(t, "55 Bps", nodes[0].Hysteria.Up)
+	require.Zero(t, nodes[0].Hysteria.UpMbps)
+	require.Equal(t, "100 Bps", nodes[0].Hysteria.Down)
+	require.Zero(t, nodes[0].Hysteria.DownMbps)
+
+	require.Equal(t, "640 KBps", nodes[1].Hysteria.Up)
+	require.Zero(t, nodes[1].Hysteria.UpMbps)
+	require.Empty(t, nodes[1].Hysteria.Down)
+	require.Equal(t, 1000, nodes[1].Hysteria.DownMbps)
+
+	require.Empty(t, nodes[2].Hysteria.Up)
+	require.Equal(t, 55, nodes[2].Hysteria.UpMbps)
+	require.Empty(t, nodes[2].Hysteria.Down)
+	require.Equal(t, 100, nodes[2].Hysteria.DownMbps)
+}
+
+func TestParseSingBoxDecodesHysteriaAuthAndPreservesInvalidWireValue(t *testing.T) {
+	parser := singbox.NewParser()
+	nodes, source, err := parser.Parse(context.Background(), []byte(`{"outbounds":[
+		{"type":"hysteria","tag":"binary-auth","server":"binary.example","server_port":443,"up_mbps":55,"down_mbps":100,"auth":"c2VjcmV0"},
+		{"type":"hysteria","tag":"string-auth","server":"string.example","server_port":443,"up_mbps":55,"down_mbps":100,"auth_str":"secret"},
+		{"type":"hysteria","tag":"invalid-auth","server":"invalid.example","server_port":443,"up_mbps":55,"down_mbps":100,"auth":"not-base64"}
+	]}`))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 3)
+	require.Equal(t, "secret", nodes[0].Hysteria.Auth)
+	require.Empty(t, nodes[0].Hysteria.AuthString)
+	require.Empty(t, nodes[0].Raw)
+	require.Empty(t, nodes[1].Hysteria.Auth)
+	require.Equal(t, "secret", nodes[1].Hysteria.AuthString)
+	require.Empty(t, nodes[1].Raw)
+	require.Empty(t, nodes[2].Hysteria.Auth)
+	require.Empty(t, nodes[2].Hysteria.AuthString)
+	require.JSONEq(t, `"not-base64"`, string(nodes[2].Raw["sing-box.auth"]))
+	require.Len(t, source.Warnings, 1)
+	warning := source.Warnings[0]
+	require.Equal(t, "parse_unknown_field", warning.Code)
+	require.Equal(t, "field preserved in NodeIR Raw", warning.Message)
+	require.Equal(t, "invalid-auth", warning.Node)
+	require.Equal(t, "sing-box.auth", warning.Field)
+	require.Equal(t, "sing-box", warning.Source)
+	require.NotNil(t, warning.NodeIndex)
+	require.NotNil(t, warning.NodeContext)
+}
+
+func TestParseSingBoxPreservesInvalidHysteriaBandwidthAsRaw(t *testing.T) {
+	parser := singbox.NewParser()
+	nodes, source, err := parser.Parse(context.Background(), []byte(`{"outbounds":[
+  {"type":"hysteria","tag":"invalid-explicit","server":"invalid.example","server_port":443,"up":"fast","up_mbps":20,"auth_str":"secret"},
+  {"type":"hysteria","tag":"invalid-fallback","server":"fallback.example","server_port":443,"up_mbps":-1,"auth_str":"secret"},
+  {"type":"hysteria","tag":"zero-fallback","server":"zero.example","server_port":443,"up_mbps":0,"down_mbps":0,"auth_str":"secret"}
+]}`))
+	require.NoError(t, err)
+	require.NotNil(t, source)
+	require.Len(t, nodes, 3)
+
+	require.Empty(t, nodes[0].Hysteria.Up)
+	require.Zero(t, nodes[0].Hysteria.UpMbps)
+	require.JSONEq(t, `"fast"`, string(nodes[0].Raw["sing-box.up"]))
+	require.NotContains(t, nodes[0].Raw, "sing-box.up_mbps")
+
+	require.Empty(t, nodes[1].Hysteria.Up)
+	require.Zero(t, nodes[1].Hysteria.UpMbps)
+	require.JSONEq(t, `-1`, string(nodes[1].Raw["sing-box.up_mbps"]))
+
+	require.Empty(t, nodes[2].Hysteria.Up)
+	require.Zero(t, nodes[2].Hysteria.UpMbps)
+	require.Empty(t, nodes[2].Hysteria.Down)
+	require.Zero(t, nodes[2].Hysteria.DownMbps)
+	require.NotContains(t, nodes[2].Raw, "sing-box.up_mbps")
+	require.NotContains(t, nodes[2].Raw, "sing-box.down_mbps")
+
+	require.Condition(t, func() bool {
+		for _, warning := range source.Warnings {
+			if warning.Code == "parse_unknown_field" {
+				return true
+			}
+		}
+		return false
+	})
+}
+
+func TestParseSingBoxChecksHysteriaCompatibilityMbpsBound(t *testing.T) {
+	max := shared.MaxHysteriaMbps()
+	if max == int(^uint(0)>>1) {
+		t.Skip("max+1 is not representable as int on this platform")
+	}
+	parser := singbox.NewParser()
+	nodes, source, err := parser.Parse(context.Background(), []byte(fmt.Sprintf(`{"outbounds":[
+  {"type":"hysteria","tag":"max","server":"max.example","server_port":443,"up_mbps":%d,"down_mbps":%d},
+  {"type":"hysteria","tag":"over","server":"over.example","server_port":443,"up_mbps":%d,"down_mbps":%d}
+]}`, max, max, max+1, max)))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 2)
+	require.Equal(t, &domain.HysteriaOptions{UpMbps: max, DownMbps: max}, nodes[0].Hysteria)
+	require.Zero(t, nodes[1].Hysteria.UpMbps)
+	require.Equal(t, max, nodes[1].Hysteria.DownMbps)
+	require.JSONEq(t, fmt.Sprint(max+1), string(nodes[1].Raw["sing-box.up_mbps"]))
+	require.Contains(t, warningFieldNames(source.Warnings), "sing-box.up_mbps")
+}
+
+func TestParseSingBoxValidatesShadowedCompatibilityHysteriaBandwidth(t *testing.T) {
+	max := shared.MaxHysteriaMbps()
+	if max == int(^uint(0)>>1) {
+		t.Skip("max+1 is not representable as int on this platform")
+	}
+	parser := singbox.NewParser()
+	nodes, source, err := parser.Parse(context.Background(), []byte(fmt.Sprintf(`{"outbounds":[
+  {"type":"hysteria","tag":"negative","server":"negative.example","server_port":443,"up":"55 Bps","up_mbps":-1,"down_mbps":100},
+  {"type":"hysteria","tag":"fractional","server":"fractional.example","server_port":443,"up":"56 Bps","up_mbps":1.5,"down_mbps":100},
+  {"type":"hysteria","tag":"zero","server":"zero.example","server_port":443,"up":"57 Bps","up_mbps":0,"down_mbps":100},
+  {"type":"hysteria","tag":"over","server":"over.example","server_port":443,"up":"58 Bps","up_mbps":%d,"down_mbps":100},
+  {"type":"hysteria","tag":"valid-shadow","server":"valid.example","server_port":443,"up":"59 Bps","up_mbps":20,"down_mbps":100}
+]}`, max+1)))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 5)
+	for index, want := range []string{"55 Bps", "56 Bps", "57 Bps", "58 Bps", "59 Bps"} {
+		require.Equal(t, want, nodes[index].Hysteria.Up)
+		require.Zero(t, nodes[index].Hysteria.UpMbps)
+	}
+	require.JSONEq(t, `-1`, string(nodes[0].Raw["sing-box.up_mbps"]))
+	require.JSONEq(t, `1.5`, string(nodes[1].Raw["sing-box.up_mbps"]))
+	require.NotContains(t, nodes[2].Raw, "sing-box.up_mbps")
+	require.JSONEq(t, fmt.Sprint(max+1), string(nodes[3].Raw["sing-box.up_mbps"]))
+	require.NotContains(t, nodes[4].Raw, "sing-box.up_mbps")
+	require.ElementsMatch(t, []string{"sing-box.up_mbps", "sing-box.up_mbps", "sing-box.up_mbps"}, warningFieldNames(source.Warnings))
+}
+
+func warningFieldNames(warnings []domain.Warning) []string {
+	fields := make([]string, 0, len(warnings))
+	for _, warning := range warnings {
+		fields = append(fields, warning.Field)
+	}
+	return fields
 }
 
 func TestParseSingBoxHysteria2RealmAndQUIC(t *testing.T) {

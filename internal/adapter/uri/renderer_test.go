@@ -11,6 +11,7 @@ import (
 
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/mihomo"
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/shared"
+	"github.com/kuuvahki-labs/sandrone/internal/adapter/singbox"
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/uri"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
@@ -517,6 +518,99 @@ func TestRenderURIHysteriaOfficialFields(t *testing.T) {
 	require.Equal(t, "xplus", query.Get("obfs"))
 	require.Equal(t, "obfs-pass", query.Get("obfsParam"))
 	require.Empty(t, query.Get("up"))
+}
+
+func TestRenderURIHysteriaBandwidthConvertsExactExplicitRates(t *testing.T) {
+	out, report, err := uri.NewRenderer().RenderWithReport(context.Background(), []domain.NodeIR{{
+		Name: "hy", Type: domain.NodeTypeHysteria, Server: "example.com", Port: 8443,
+		Hysteria: &domain.HysteriaOptions{Up: "125 KBps", Down: "250 KBps"},
+	}}, domain.RenderOptions{})
+
+	require.NoError(t, err)
+	require.Equal(t, 1, report.SuccessCount)
+	parsed, err := url.Parse(strings.TrimSpace(string(out)))
+	require.NoError(t, err)
+	require.Equal(t, "1", parsed.Query().Get("upmbps"))
+	require.Equal(t, "2", parsed.Query().Get("downmbps"))
+	for _, warning := range report.Warnings {
+		require.NotContains(t, []string{"hysteria.up", "hysteria.down"}, warning.Field)
+	}
+}
+
+func TestRenderURIHysteriaCrossFormatBandwidth(t *testing.T) {
+	t.Run("Mihomo bare rates remain Mbps", func(t *testing.T) {
+		nodes, _, err := mihomo.NewParser().Parse(context.Background(), []byte(`
+proxies:
+  - {name: hy, type: hysteria, server: example.com, port: 8443, up: "55", down: "100", auth-str: secret}
+`))
+		require.NoError(t, err)
+
+		query, report := renderHysteriaURIQuery(t, nodes)
+		require.Equal(t, "55", query.Get("upmbps"))
+		require.Equal(t, "100", query.Get("downmbps"))
+		require.Empty(t, hysteriaBandwidthWarningFields(report))
+	})
+
+	t.Run("sing-box numeric Bps omits inexact direction", func(t *testing.T) {
+		nodes, _, err := singbox.NewParser().Parse(context.Background(), []byte(`{
+			"outbounds":[{"type":"hysteria","tag":"hy","server":"example.com","server_port":8443,"auth_str":"secret","up":55,"down":125000}]
+		}`))
+		require.NoError(t, err)
+
+		query, report := renderHysteriaURIQuery(t, nodes)
+		require.Empty(t, query.Get("upmbps"))
+		require.Equal(t, "1", query.Get("downmbps"))
+		require.Equal(t, []string{"hysteria.up"}, hysteriaBandwidthWarningFields(report))
+	})
+
+	t.Run("URI Mbps remains exact", func(t *testing.T) {
+		nodes, _, err := uri.NewParser().Parse(context.Background(), []byte(
+			"hysteria://example.com:8443?auth_str=secret&up=55&down=100#hy",
+		))
+		require.NoError(t, err)
+
+		query, report := renderHysteriaURIQuery(t, nodes)
+		require.Equal(t, "55", query.Get("upmbps"))
+		require.Equal(t, "100", query.Get("downmbps"))
+		require.Empty(t, hysteriaBandwidthWarningFields(report))
+	})
+}
+
+func TestRenderURIHysteriaBandwidthLossDoesNotDropOtherFields(t *testing.T) {
+	query, report := renderHysteriaURIQuery(t, []domain.NodeIR{{
+		Name: "hy", Type: domain.NodeTypeHysteria, Server: "example.com", Port: 8443,
+		TLS: &domain.TLSOptions{ServerName: "sni.example.com"},
+		Hysteria: &domain.HysteriaOptions{
+			Protocol: "wechat-video", AuthString: "secret", Up: "55 Bps", DownMbps: 2,
+		},
+	}})
+
+	require.Equal(t, "secret", query.Get("auth"))
+	require.Equal(t, "wechat-video", query.Get("protocol"))
+	require.Equal(t, "sni.example.com", query.Get("peer"))
+	require.Empty(t, query.Get("upmbps"))
+	require.Equal(t, "2", query.Get("downmbps"))
+	require.Equal(t, []string{"hysteria.up"}, hysteriaBandwidthWarningFields(report))
+}
+
+func renderHysteriaURIQuery(t *testing.T, nodes []domain.NodeIR) (url.Values, domain.RenderReport) {
+	t.Helper()
+	out, report, err := uri.NewRenderer().RenderWithReport(context.Background(), nodes, domain.RenderOptions{})
+	require.NoError(t, err)
+	require.Equal(t, 1, report.SuccessCount)
+	parsed, err := url.Parse(strings.TrimSpace(string(out)))
+	require.NoError(t, err)
+	return parsed.Query(), report
+}
+
+func hysteriaBandwidthWarningFields(report domain.RenderReport) []string {
+	fields := []string{}
+	for _, warning := range report.Warnings {
+		if warning.Code == "render_lossy_field" && (warning.Field == "hysteria.up" || warning.Field == "hysteria.down") {
+			fields = append(fields, warning.Field)
+		}
+	}
+	return fields
 }
 
 func TestRenderURIHysteria2OfficialFields(t *testing.T) {

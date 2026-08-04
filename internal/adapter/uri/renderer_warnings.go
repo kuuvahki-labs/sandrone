@@ -268,10 +268,10 @@ func addHysteriaLossWarnings(node domain.NodeIR, target string, hysteria2 bool, 
 			add("hysteria.auth_str")
 		}
 	} else {
-		if hy.Up != "" {
+		if _, exact := shared.ExactHysteriaMbps(hy.Up); hy.Up != "" && !exact {
 			add("hysteria.up")
 		}
-		if hy.Down != "" {
+		if _, exact := shared.ExactHysteriaMbps(hy.Down); hy.Down != "" && !exact {
 			add("hysteria.down")
 		}
 	}

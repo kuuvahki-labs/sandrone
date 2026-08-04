@@ -78,6 +78,93 @@ func TestRenderHysteriaFromOfficialURIKeepsProtocolAndObfsPasswordDistinct(t *te
 	require.Equal(t, "[Proxy]\nhysteria = hysteria, hy.example.com, 8443, auth=hy-secret, obfsParam=hy-obfs, protocol=wechat-video, peer=hy-sni.example.com, upmbps=100, downmbps=200\n", string(out))
 }
 
+func TestRenderShadowrocketHysteriaBandwidthConvertsExactExplicitRates(t *testing.T) {
+	out, report, err := shadowrocket.NewRenderer().RenderWithReport(context.Background(), []domain.NodeIR{{
+		Name: "hy", Type: domain.NodeTypeHysteria, Server: "example.com", Port: 8443,
+		TLS:      &domain.TLSOptions{Enabled: true},
+		Hysteria: &domain.HysteriaOptions{Up: "125 KBps", Down: "250 KBps"},
+	}}, domain.RenderOptions{})
+
+	require.NoError(t, err)
+	require.Equal(t, 1, report.SuccessCount)
+	require.Contains(t, string(out), ", upmbps=1, downmbps=2\n")
+	for _, warning := range report.Warnings {
+		require.NotContains(t, []string{"hysteria.up", "hysteria.down"}, warning.Field)
+	}
+}
+
+func TestRenderShadowrocketHysteriaCrossFormatBandwidth(t *testing.T) {
+	t.Run("Mihomo bare rates remain Mbps", func(t *testing.T) {
+		nodes, _, err := mihomo.NewParser().Parse(context.Background(), []byte(`
+proxies:
+  - {name: hy, type: hysteria, server: example.com, port: 8443, up: "55", down: "100", auth-str: secret, sni: sni.example.com}
+`))
+		require.NoError(t, err)
+
+		out, report := renderShadowrocketHysteria(t, nodes)
+		require.Contains(t, out, ", upmbps=55, downmbps=100\n")
+		require.Empty(t, hysteriaBandwidthWarningFields(report.Warnings))
+	})
+
+	t.Run("sing-box numeric Bps omits inexact direction", func(t *testing.T) {
+		nodes, _, err := singbox.NewParser().Parse(context.Background(), []byte(`{
+			"outbounds":[{"type":"hysteria","tag":"hy","server":"example.com","server_port":8443,"auth_str":"secret","up":55,"down":125000,"tls":{"enabled":true}}]
+		}`))
+		require.NoError(t, err)
+
+		out, report := renderShadowrocketHysteria(t, nodes)
+		require.NotContains(t, out, "upmbps=")
+		require.Contains(t, out, ", downmbps=1\n")
+		require.Equal(t, []string{"hysteria.up"}, hysteriaBandwidthWarningFields(report.Warnings))
+	})
+
+	t.Run("URI Mbps remains exact", func(t *testing.T) {
+		nodes, _, err := uriadapter.NewParser().Parse(context.Background(), []byte(
+			"hysteria://example.com:8443?auth_str=secret&up=55&down=100#hy",
+		))
+		require.NoError(t, err)
+
+		out, report := renderShadowrocketHysteria(t, nodes)
+		require.Contains(t, out, ", upmbps=55, downmbps=100\n")
+		require.Empty(t, hysteriaBandwidthWarningFields(report.Warnings))
+	})
+}
+
+func TestRenderShadowrocketHysteriaBandwidthLossDoesNotDropOtherFields(t *testing.T) {
+	out, report := renderShadowrocketHysteria(t, []domain.NodeIR{{
+		Name: "hy", Type: domain.NodeTypeHysteria, Server: "example.com", Port: 8443,
+		TLS: &domain.TLSOptions{Enabled: true, ServerName: "sni.example.com"},
+		Hysteria: &domain.HysteriaOptions{
+			Protocol: "wechat-video", AuthString: "secret", Up: "55 Bps", DownMbps: 2,
+		},
+	}})
+
+	require.Contains(t, out, "auth=secret")
+	require.Contains(t, out, "protocol=wechat-video")
+	require.Contains(t, out, "peer=sni.example.com")
+	require.NotContains(t, out, "upmbps=")
+	require.Contains(t, out, ", downmbps=2\n")
+	require.Equal(t, []string{"hysteria.up"}, hysteriaBandwidthWarningFields(report.Warnings))
+}
+
+func renderShadowrocketHysteria(t *testing.T, nodes []domain.NodeIR) (string, domain.RenderReport) {
+	t.Helper()
+	out, report, err := shadowrocket.NewRenderer().RenderWithReport(context.Background(), nodes, domain.RenderOptions{})
+	require.NoError(t, err)
+	require.Equal(t, 1, report.SuccessCount)
+	return string(out), report
+}
+
+func hysteriaBandwidthWarningFields(warnings []domain.Warning) []string {
+	fields := []string{}
+	for _, warning := range warnings {
+		if warning.Code == "render_lossy_field" && (warning.Field == "hysteria.up" || warning.Field == "hysteria.down") {
+			fields = append(fields, warning.Field)
+		}
+	}
+	return fields
+}
+
 func TestRenderHysteriaFromOfficialURIDefaultsProtocolToUDP(t *testing.T) {
 	t.Parallel()
 

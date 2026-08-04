@@ -269,9 +269,13 @@ func renderHysteriaURI(node domain.NodeIR) (string, []domain.Warning, error) {
 		}
 		if node.Hysteria.UpMbps != 0 {
 			q.Set("upmbps", strconv.Itoa(node.Hysteria.UpMbps))
+		} else if upMbps, ok := shared.ExactHysteriaMbps(node.Hysteria.Up); ok {
+			q.Set("upmbps", strconv.Itoa(upMbps))
 		}
 		if node.Hysteria.DownMbps != 0 {
 			q.Set("downmbps", strconv.Itoa(node.Hysteria.DownMbps))
+		} else if downMbps, ok := shared.ExactHysteriaMbps(node.Hysteria.Down); ok {
+			q.Set("downmbps", strconv.Itoa(downMbps))
 		}
 	}
 	applyHysteriaURIQueryTLS(q, node)

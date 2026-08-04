@@ -2,6 +2,8 @@ package service_test
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -9,6 +11,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 
+	"github.com/kuuvahki-labs/sandrone/internal/adapter/shared"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/probe"
 	"github.com/kuuvahki-labs/sandrone/internal/service"
@@ -49,6 +52,74 @@ func TestServiceProbeInlineNodes(t *testing.T) {
 	require.True(t, result.Results[0].Alive)
 	require.NotNil(t, result.Report.Probe)
 	require.Equal(t, 1, result.Report.Probe.SuccessCount)
+}
+
+func TestServiceProbeNormalizesInlineHysteriaBandwidthWithoutMutatingInput(t *testing.T) {
+	for _, inputType := range []string{"inline_nodes", "inline"} {
+		t.Run(inputType, func(t *testing.T) {
+			callerNodes := []domain.NodeIR{{
+				Name: "inline", Type: domain.NodeTypeHysteria, Server: "inline.example", Port: 8443,
+				TLS:      &domain.TLSOptions{Enabled: true},
+				Hysteria: &domain.HysteriaOptions{Up: "55", Down: "100"},
+				Raw:      map[string]json.RawMessage{"caller": json.RawMessage(`"value"`)},
+			}}
+			var captured domain.HysteriaOptions
+			svc := service.New(service.WithProbeEngine(fakeProbeEngine{probe: func(_ context.Context, _ domain.ProbeRequest, nodes []domain.NodeIR, _ ...probe.Payload) (*domain.ProbeResult, error) {
+				require.Len(t, nodes, 1)
+				captured = *nodes[0].Hysteria
+				nodes[0].Name = "mutated by engine"
+				nodes[0].Hysteria.UpMbps = 999
+				nodes[0].Raw["caller"][1] = 'X'
+				nodes[0].Raw["engine"] = json.RawMessage(`true`)
+				return &domain.ProbeResult{}, nil
+			}}))
+
+			result, err := svc.Probe(context.Background(), domain.ProbeRequest{
+				Input:  domain.NodeInput{Type: inputType, Nodes: callerNodes},
+				Method: domain.ProbeTCPConnect,
+			})
+
+			require.NoError(t, err)
+			require.Equal(t, domain.HysteriaOptions{UpMbps: 55, DownMbps: 100}, captured)
+			require.Len(t, result.Report.Warnings, 2)
+			for _, warning := range result.Report.Warnings {
+				require.Equal(t, "parse_implicit_bandwidth_unit", warning.Code)
+			}
+			require.Equal(t, "inline", callerNodes[0].Name)
+			require.Equal(t, &domain.HysteriaOptions{Up: "55", Down: "100"}, callerNodes[0].Hysteria)
+			require.JSONEq(t, `"value"`, string(callerNodes[0].Raw["caller"]))
+			require.NotContains(t, callerNodes[0].Raw, "engine")
+		})
+	}
+}
+
+func TestServiceProbeNormalizesInlineHysteriaOverBoundMbps(t *testing.T) {
+	max := shared.MaxHysteriaMbps()
+	if max == int(^uint(0)>>1) {
+		t.Skip("max+1 is not representable as int on this platform")
+	}
+	callerNodes := []domain.NodeIR{{
+		Name: "inline", Type: domain.NodeTypeHysteria, Server: "inline.example", Port: 8443,
+		TLS:      &domain.TLSOptions{Enabled: true},
+		Hysteria: &domain.HysteriaOptions{Up: "20", UpMbps: max + 1, DownMbps: max},
+	}}
+	var captured domain.NodeIR
+	svc := service.New(service.WithProbeEngine(fakeProbeEngine{probe: func(_ context.Context, _ domain.ProbeRequest, nodes []domain.NodeIR, _ ...probe.Payload) (*domain.ProbeResult, error) {
+		require.Len(t, nodes, 1)
+		captured = nodes[0]
+		return &domain.ProbeResult{}, nil
+	}}))
+
+	result, err := svc.Probe(context.Background(), domain.ProbeRequest{
+		Input: domain.NodeInput{Type: "inline_nodes", Nodes: callerNodes}, Method: domain.ProbeTCPConnect,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, 20, captured.Hysteria.UpMbps)
+	require.Equal(t, max, captured.Hysteria.DownMbps)
+	require.JSONEq(t, fmt.Sprint(max+1), string(captured.Raw["json-nodes.hysteria.up"]))
+	require.Equal(t, []string{"parse_implicit_bandwidth_unit", "parse_unknown_field"}, warningCodes(result.Report.Warnings))
+	require.Equal(t, &domain.HysteriaOptions{Up: "20", UpMbps: max + 1, DownMbps: max}, callerNodes[0].Hysteria)
 }
 
 func TestServiceProbeRejectsInvalidTypedNodesBeforeBackend(t *testing.T) {

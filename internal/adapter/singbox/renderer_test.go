@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/jsonnodes"
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/shared"
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/singbox"
@@ -130,7 +132,7 @@ func TestRenderSingBoxHysteriaFromOfficialURIUsesCanonicalObfsPassword(t *testin
 }
 
 func TestRenderSingBoxHysteriaMigratesLegacyJSONObfsPassword(t *testing.T) {
-	nodes, _, err := jsonnodes.NewParser().Parse(context.Background(), []byte(`[{"name":"hy","type":"hysteria","server":"hy.example.com","port":8443,"hysteria":{"auth_str":"secret","obfs":"legacy-password"}}]`))
+	nodes, _, err := jsonnodes.NewParser().Parse(context.Background(), []byte(`[{"name":"hy","type":"hysteria","server":"hy.example.com","port":8443,"hysteria":{"auth_str":"secret","obfs":"legacy-password","up_mbps":20,"down_mbps":100}}]`))
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -143,6 +145,26 @@ func TestRenderSingBoxHysteriaMigratesLegacyJSONObfsPassword(t *testing.T) {
 	if report.SuccessCount != 1 || !strings.Contains(string(out), `"obfs": "legacy-password"`) {
 		t.Fatalf("unexpected output/report: %s %#v", out, report)
 	}
+}
+
+func TestRenderSingBoxHysteriaBandwidthSkipsDirectOverBoundMbps(t *testing.T) {
+	max := shared.MaxHysteriaMbps()
+	if max == int(^uint(0)>>1) {
+		t.Skip("max+1 is not representable as int on this platform")
+	}
+	out, report, err := singbox.NewRenderer().RenderWithReport(context.Background(), []domain.NodeIR{
+		{
+			Name: "over", Type: domain.NodeTypeHysteria, Server: "over.example", Port: 8443,
+			Hysteria: &domain.HysteriaOptions{UpMbps: max + 1, DownMbps: max},
+		},
+		{Name: "valid", Type: domain.NodeTypeHTTP, Server: "valid.example", Port: 8080},
+	}, domain.RenderOptions{Format: "sing-box-outbounds"})
+
+	require.NoError(t, err)
+	require.Equal(t, 1, report.SuccessCount)
+	require.Len(t, report.Warnings, 1)
+	require.Equal(t, "over", report.Warnings[0].Node)
+	require.NotContains(t, string(out), "over.example")
 }
 
 func TestRenderSingBoxDialerTFO(t *testing.T) {
@@ -430,6 +452,8 @@ func TestRenderSingBoxHysteriaQUIC(t *testing.T) {
 		Hysteria: &domain.HysteriaOptions{
 			AuthString: "secret",
 			QUIC:       map[string]any{"init_stream_receive_window": 8388608},
+			UpMbps:     20,
+			DownMbps:   100,
 		},
 	}}
 	out, report, err := r.RenderWithReport(context.Background(), nodes, domain.RenderOptions{Format: "sing-box-outbounds"})
@@ -454,6 +478,8 @@ func TestRenderSingBoxHysteriaWarnsWhenProtocolCannotBeRepresented(t *testing.T)
 		Hysteria: &domain.HysteriaOptions{
 			Protocol:   "wechat-video",
 			AuthString: "secret",
+			UpMbps:     20,
+			DownMbps:   100,
 		},
 	}}
 
@@ -548,7 +574,12 @@ func TestRenderSingBoxHTTPTransport(t *testing.T) {
 
 func TestRenderSingBoxAllProtocols(t *testing.T) {
 	r := singbox.NewRenderer()
-	out, report, err := r.RenderWithReport(context.Background(), allProtocolNodes(), domain.RenderOptions{Format: "sing-box-outbounds"})
+	nodes := allProtocolNodes()
+	nodes[4].Hysteria.Up = ""
+	nodes[4].Hysteria.Down = ""
+	nodes[4].Hysteria.UpMbps = 20
+	nodes[4].Hysteria.DownMbps = 100
+	out, report, err := r.RenderWithReport(context.Background(), nodes, domain.RenderOptions{Format: "sing-box-outbounds"})
 	if err != nil {
 		t.Fatalf("render: %v", err)
 	}

@@ -3,6 +3,7 @@ package shadowrocket
 import (
 	"slices"
 
+	"github.com/kuuvahki-labs/sandrone/internal/adapter/shared"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
 
@@ -96,10 +97,10 @@ func hysteriaLossWarnings(node domain.NodeIR, hysteria2 bool) []domain.Warning {
 	if hy.HopInterval != "" {
 		add("hysteria.hop_interval")
 	}
-	if hy.Up != "" {
+	if _, exact := shared.ExactHysteriaMbps(hy.Up); hy.Up != "" && (hysteria2 || !exact) {
 		add("hysteria.up")
 	}
-	if hy.Down != "" {
+	if _, exact := shared.ExactHysteriaMbps(hy.Down); hy.Down != "" && (hysteria2 || !exact) {
 		add("hysteria.down")
 	}
 	if hysteria2 {

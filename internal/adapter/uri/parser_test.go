@@ -3,12 +3,16 @@ package uri_test
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"net/url"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/kuuvahki-labs/sandrone/internal/adapter/jsonnodes"
+	"github.com/kuuvahki-labs/sandrone/internal/adapter/shared"
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/uri"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
@@ -1520,6 +1524,75 @@ func TestParseBase64SubscriptionWithJSONAndYAMLLines(t *testing.T) {
 	require.Equal(t, domain.NodeTypeHTTP, nodes[1].Type)
 }
 
+func TestParseListNormalizesLegacyHysteriaFallbackNodes(t *testing.T) {
+	tests := []struct {
+		name       string
+		line       string
+		wantSource string
+		want       domain.HysteriaOptions
+		warnings   int
+	}{
+		{
+			name:       "JSON node",
+			line:       `{"name":"json-hy","type":"hysteria","server":"json.example","port":8443,"hysteria":{"up":"55","down":"100"}}`,
+			wantSource: "json-nodes", want: domain.HysteriaOptions{UpMbps: 55, DownMbps: 100}, warnings: 2,
+		},
+		{
+			name:       "wrapped JSON nodes",
+			line:       `{"nodes":[{"name":"wrapped-hy","type":"hysteria","server":"wrapped.example","port":8443,"hysteria":{"up":"55","down":"100"}}]}`,
+			wantSource: "json-nodes", want: domain.HysteriaOptions{UpMbps: 55, DownMbps: 100}, warnings: 2,
+		},
+		{
+			name:       "YAML node",
+			line:       `{name: yaml-hy, type: hysteria, server: yaml.example, port: 8443, hysteria: {up: "55", down: "100"}}`,
+			wantSource: "yaml-node", want: domain.HysteriaOptions{UpMbps: 55, DownMbps: 100}, warnings: 2,
+		},
+		{
+			name:       "sing-box provenance",
+			line:       `{"name":"sing-box-hy","type":"hysteria","server":"sing-box.example","port":8443,"source_format":"sing-box","hysteria":{"up":"55","down":"100"}}`,
+			wantSource: "sing-box", want: domain.HysteriaOptions{Up: "55 Bps", Down: "100 Bps"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			nodes, source, err := uri.NewParser().ParseList(context.Background(), []byte(test.line))
+			require.NoError(t, err)
+			require.Len(t, nodes, 1)
+			require.Equal(t, test.wantSource, nodes[0].SourceFormat)
+			require.Equal(t, test.want, *nodes[0].Hysteria)
+			require.Len(t, nodes[0].Warnings, test.warnings)
+			require.Empty(t, source.Warnings, "normalization warnings belong to the node")
+			for _, warning := range nodes[0].Warnings {
+				require.Equal(t, nodes[0].Name, warning.Node)
+			}
+
+			out, err := jsonnodes.NewRenderer().Render(context.Background(), nodes, domain.RenderOptions{})
+			require.NoError(t, err)
+			var rendered []map[string]any
+			require.NoError(t, json.Unmarshal(out, &rendered))
+			hysteria := rendered[0]["hysteria"].(map[string]any)
+			for _, direction := range []string{"up", "down"} {
+				if text, ok := hysteria[direction].(string); ok {
+					require.NotRegexp(t, `^[0-9]+$`, text)
+				}
+			}
+		})
+	}
+}
+
+func TestParseListBase64NormalizesLegacyHysteriaFallbackNode(t *testing.T) {
+	line := `{"name":"wrapped-hy","type":"hysteria","server":"wrapped.example","port":8443,"hysteria":{"up":"55","down":"100"}}`
+	encoded := base64.StdEncoding.EncodeToString([]byte(line + "\n"))
+
+	nodes, source, err := uri.NewParser().ParseList(context.Background(), []byte(encoded))
+
+	require.NoError(t, err)
+	require.Equal(t, &domain.HysteriaOptions{UpMbps: 55, DownMbps: 100}, nodes[0].Hysteria)
+	require.Len(t, nodes[0].Warnings, 2)
+	require.Empty(t, source.Warnings)
+}
+
 func TestParseListSkipsVMessZeroPortPlaceholder(t *testing.T) {
 	p := uri.NewParser()
 	placeholderDoc := `{"v":"2","ps":"更新于:02-07 04:00 -by BuLink.xyz- 以下节点不计流量","add":"使用前记得更新订阅","port":"0","id":"6a3bcc08-9c77-4c02-844b-4a694c4f2fea","aid":"0","net":"tcp","type":"none","host":"","path":"","tls":""}`
@@ -1813,6 +1886,137 @@ func TestParseHysteriaOfficialURIFields(t *testing.T) {
 	require.Equal(t, "xplus", got.Hysteria.Obfs)
 	require.Equal(t, "obfs-pass", got.Hysteria.ObfsPassword)
 	require.NotContains(t, got.Raw, "uri.query.protocol")
+}
+
+func TestParseHysteriaBandwidth(t *testing.T) {
+	tests := []struct {
+		name         string
+		raw          string
+		want         domain.HysteriaOptions
+		wantRawKey   string
+		wantRawValue string
+		implicit     int
+	}{
+		{
+			name:     "bare values use Mbps",
+			raw:      "hysteria://example.com:8443?auth=secret&up=55&down=100#bare",
+			want:     domain.HysteriaOptions{Auth: "secret", UpMbps: 55, DownMbps: 100},
+			implicit: 2,
+		},
+		{
+			name: "explicit units are canonicalized",
+			raw:  "hysteria://example.com:8443?auth=secret&up=640KBps&down=1Gbps#units",
+			want: domain.HysteriaOptions{Auth: "secret", Up: "640 KBps", DownMbps: 1000},
+		},
+		{
+			name:         "invalid explicit value is preserved",
+			raw:          "hysteria://example.com:8443?auth=secret&up=bad&downmbps=100#invalid",
+			want:         domain.HysteriaOptions{Auth: "secret", DownMbps: 100},
+			wantRawKey:   "uri.query.up",
+			wantRawValue: `"bad"`,
+		},
+		{
+			name:         "invalid compatibility value falls back to explicit value",
+			raw:          "hysteria://example.com:8443?auth=secret&upmbps=-1&up=20Mbps&downmbps=100#invalid-compat",
+			want:         domain.HysteriaOptions{Auth: "secret", UpMbps: 20, DownMbps: 100},
+			wantRawKey:   "uri.query.upmbps",
+			wantRawValue: `"-1"`,
+		},
+		{
+			name: "zero compatibility value is absent",
+			raw:  "hysteria://example.com:8443?auth=secret&upmbps=0&up=20Mbps&downmbps=100#zero-compat",
+			want: domain.HysteriaOptions{Auth: "secret", UpMbps: 20, DownMbps: 100},
+		},
+		{
+			name:         "fractional compatibility value is preserved",
+			raw:          "hysteria://example.com:8443?auth=secret&upmbps=1.5&up=20Mbps&downmbps=100#fractional-compat",
+			want:         domain.HysteriaOptions{Auth: "secret", UpMbps: 20, DownMbps: 100},
+			wantRawKey:   "uri.query.upmbps",
+			wantRawValue: `"1.5"`,
+		},
+		{
+			name:         "compatibility winner preserves invalid explicit value",
+			raw:          "hysteria://example.com:8443?auth=secret&upmbps=20&up=bad&downmbps=100#shadowed-invalid",
+			want:         domain.HysteriaOptions{Auth: "secret", UpMbps: 20, DownMbps: 100},
+			wantRawKey:   "uri.query.up",
+			wantRawValue: `"bad"`,
+		},
+	}
+
+	parser := uri.NewParser()
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			nodes, source, err := parser.Parse(context.Background(), []byte(test.raw))
+			require.NoError(t, err)
+			require.Len(t, nodes, 1)
+			require.Equal(t, test.want, *nodes[0].Hysteria)
+
+			implicit := 0
+			for _, warning := range source.Warnings {
+				if warning.Code == "parse_implicit_bandwidth_unit" {
+					implicit++
+					require.Equal(t, "bare Hysteria bandwidth assumed to be Mbps", warning.Message)
+					require.Equal(t, "uri", warning.Source)
+				}
+			}
+			require.Equal(t, test.implicit, implicit)
+			if test.wantRawKey == "" {
+				require.Empty(t, nodes[0].Raw)
+				return
+			}
+			require.JSONEq(t, test.wantRawValue, string(nodes[0].Raw[test.wantRawKey]))
+			unknown := source.Warnings[0]
+			require.Equal(t, "parse_unknown_field", unknown.Code)
+			require.Equal(t, "field preserved in NodeIR Raw", unknown.Message)
+			require.Equal(t, nodes[0].Name, unknown.Node)
+			require.Equal(t, test.wantRawKey, unknown.Field)
+			require.Equal(t, "uri", unknown.Source)
+			require.NotNil(t, unknown.NodeContext)
+		})
+	}
+}
+
+func TestParseHysteriaBase64BandwidthMatchesURI(t *testing.T) {
+	parser := uri.NewParser()
+	raw := "hysteria://example.com:8443?auth=secret&up=55&down=100#bare"
+
+	direct, directSource, err := parser.Parse(context.Background(), []byte(raw))
+	require.NoError(t, err)
+	wrapper := base64.StdEncoding.EncodeToString([]byte(raw + "\n"))
+	wrapped, wrappedSource, err := parser.ParseList(context.Background(), []byte(wrapper))
+	require.NoError(t, err)
+
+	require.Equal(t, direct[0].Hysteria, wrapped[0].Hysteria)
+	require.Equal(t, direct[0].Raw, wrapped[0].Raw)
+	require.Len(t, directSource.Warnings, 2)
+	require.Len(t, wrappedSource.Warnings, 2)
+	for _, warning := range wrappedSource.Warnings {
+		require.Equal(t, "parse_implicit_bandwidth_unit", warning.Code)
+	}
+}
+
+func TestParseHysteriaChecksCompatibilityMbpsBound(t *testing.T) {
+	max := shared.MaxHysteriaMbps()
+	if max == int(^uint(0)>>1) {
+		t.Skip("max+1 is not representable as int on this platform")
+	}
+	parser := uri.NewParser()
+
+	nodes, source, err := parser.Parse(context.Background(), []byte(fmt.Sprintf(
+		"hysteria://example.com:8443?upmbps=%d&downmbps=%d#max", max, max,
+	)))
+	require.NoError(t, err)
+	require.Equal(t, &domain.HysteriaOptions{UpMbps: max, DownMbps: max}, nodes[0].Hysteria)
+	require.Empty(t, source.Warnings)
+
+	nodes, source, err = parser.Parse(context.Background(), []byte(fmt.Sprintf(
+		"hysteria://example.com:8443?upmbps=%d&downmbps=%d#over", max+1, max,
+	)))
+	require.NoError(t, err)
+	require.Zero(t, nodes[0].Hysteria.UpMbps)
+	require.Equal(t, max, nodes[0].Hysteria.DownMbps)
+	require.JSONEq(t, fmt.Sprintf("%q", fmt.Sprint(max+1)), string(nodes[0].Raw["uri.query.upmbps"]))
+	require.Contains(t, warningFields(source.Warnings), "uri.query.upmbps")
 }
 
 func TestParseHysteria2OfficialURIFields(t *testing.T) {

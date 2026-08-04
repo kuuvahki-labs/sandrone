@@ -171,16 +171,9 @@ func parseHysteria(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 		AuthString:   shared.QueryFirst(values, "auth_str", "auth-str", "authString"),
 		Obfs:         values.Get("obfs"),
 		ObfsPassword: shared.QueryFirst(values, "obfsParam", "obfs-param", "obfs-password", "obfs_password"),
-		Up:           values.Get("up"),
-		Down:         values.Get("down"),
 		HopInterval:  shared.QueryFirst(values, "hop_interval", "hop-interval"),
 	}
-	if upMbps, err := strconv.Atoi(values.Get("upmbps")); err == nil && upMbps > 0 {
-		node.Hysteria.UpMbps = upMbps
-	}
-	if downMbps, err := strconv.Atoi(values.Get("downmbps")); err == nil && downMbps > 0 {
-		node.Hysteria.DownMbps = downMbps
-	}
+	knownRates := shared.NormalizeURIHysteriaBandwidth(&node, source, values)
 	applyTLSQuery(&node, values)
 	applyHysteriaParseQueryTLS(&node, values)
 	if node.TLS == nil {
@@ -189,16 +182,19 @@ func parseHysteria(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 		node.TLS.Enabled = true
 	}
 	node.Raw = map[string]json.RawMessage{}
-	preserveURIQuery(&node, values, map[string]bool{
+	known := map[string]bool{
 		"protocol": true,
 		"auth":     true, "auth_str": true, "auth-str": true, "authString": true,
 		"obfs": true, "obfsParam": true, "obfs-param": true, "obfs-password": true, "obfs_password": true,
-		"up": true, "down": true, "upmbps": true, "downmbps": true,
 		"hop_interval": true, "hop-interval": true,
 		"security": true, "tls": true, "sni": true, "servername": true, "serverName": true, "alpn": true,
 		"peer": true, "insecure": true, "allowInsecure": true, "allow_insecure": true, "allow-insecure": true, "skip-cert-verify": true, "disable_sni": true,
 		"fp": true, "fingerprint": true, "pinSHA256": true, "pcs": true,
-	})
+	}
+	for key, value := range knownRates {
+		known[key] = value
+	}
+	preserveURIQuery(&node, values, known)
 	return node, source, nil
 }
 

@@ -3,6 +3,8 @@ package singbox
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/shared"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
@@ -187,22 +189,33 @@ func renderHysteria(node domain.NodeIR) (map[string]any, bool, map[string]bool, 
 	if node.Server == "" || node.Port == 0 {
 		return nil, false, nil, nil, domain.NewError(domain.CodeRenderFailed, "missing hysteria fields")
 	}
-	out := baseOutbound(node, "hysteria")
 	hy := node.Hysteria
 	if hy == nil {
 		hy = &domain.HysteriaOptions{}
 	}
+	if err := shared.ValidateCanonicalHysteriaBandwidth(hy); err != nil {
+		return nil, false, nil, nil, domain.WrapError(domain.CodeRenderFailed, "invalid hysteria bandwidth", err)
+	}
+	up, err := singBoxRepresentableHysteriaRate(hy.Up)
+	if err != nil {
+		return nil, false, nil, nil, domain.WrapError(domain.CodeRenderFailed, "hysteria upload bandwidth is not representable by sing-box", err)
+	}
+	down, err := singBoxRepresentableHysteriaRate(hy.Down)
+	if err != nil {
+		return nil, false, nil, nil, domain.WrapError(domain.CodeRenderFailed, "hysteria download bandwidth is not representable by sing-box", err)
+	}
+	out := baseOutbound(node, "hysteria")
 	if len(hy.ServerPorts) > 0 {
 		out["server_ports"] = hy.ServerPorts
 	}
 	if hy.HopInterval != "" {
 		out["hop_interval"] = hy.HopInterval
 	}
-	if hy.Up != "" {
-		out["up"] = hy.Up
+	if up != "" {
+		out["up"] = up
 	}
-	if hy.Down != "" {
-		out["down"] = hy.Down
+	if down != "" {
+		out["down"] = down
 	}
 	if hy.UpMbps != 0 {
 		out["up_mbps"] = hy.UpMbps
@@ -221,7 +234,7 @@ func renderHysteria(node domain.NodeIR) (map[string]any, bool, map[string]bool, 
 		out["obfs"] = obfsPassword
 	}
 	if hy.Auth != "" {
-		out["auth"] = hy.Auth
+		out["auth"] = []byte(hy.Auth)
 	}
 	if hy.AuthString != "" {
 		out["auth_str"] = hy.AuthString
@@ -232,6 +245,21 @@ func renderHysteria(node domain.NodeIR) (map[string]any, bool, map[string]bool, 
 		warnings = append(warnings, lossyWarning(node, "hysteria.quic", "sing-box v1.13.14 hysteria outbound schema has no QUIC tuning fields represented by NodeIR"))
 	}
 	return out, false, nil, warnings, nil
+}
+
+func singBoxRepresentableHysteriaRate(rate string) (string, error) {
+	valueText, isBitsPerSecond := strings.CutSuffix(rate, " bps")
+	if !isBitsPerSecond {
+		return rate, nil
+	}
+	value, err := strconv.ParseUint(valueText, 10, 64)
+	if err != nil {
+		return "", err
+	}
+	if value%8 != 0 {
+		return "", fmt.Errorf("%q cannot be converted losslessly to bytes per second", rate)
+	}
+	return strconv.FormatUint(value/8, 10) + " Bps", nil
 }
 
 func renderHysteria2(node domain.NodeIR) (map[string]any, bool, map[string]bool, []domain.Warning, error) {

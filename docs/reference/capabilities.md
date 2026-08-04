@@ -163,6 +163,52 @@ renderer 跳过整个节点并产生 `render_node_skipped`。
 - parser 保留的 `NodeIR.warnings`、`source_format`、`tags`、`meta` 和 `raw`
   只有 `json-nodes` 能完整表达；其它 renderer 按字段能力产生 warning。
 
+### Hysteria v1 带宽规范化
+
+可渲染的 canonical Hysteria v1 节点对上传、下载各使用且只使用一种表示：
+
+| 方向 | 显式单位字符串 | 整数 Mbps |
+| --- | --- | --- |
+| 上传 | `hysteria.up` | `hysteria.up_mbps` |
+| 下载 | `hysteria.down` | `hysteria.down_mbps` |
+
+同一方向不能同时填两个字段，也不能两个都为空。`*_mbps` 必须是正整数，且不能
+超过 platform `int` 与 `math.MaxUint64 / 1,000,000` 两者中的较小值；这个界限保证
+后续换算为 bit/s 不会溢出。字符串必须是“正整数、一个 ASCII 空格、单位”的
+canonical 形式，例如 `55 Bps` 或 `640 KBps`。单位区分大小写，使用十进制倍率：
+
+| 单位 | 每单位 bit rate |
+| --- | --- |
+| `bps`、`Kbps`、`Mbps`、`Gbps`、`Tbps` | `1`、`1,000`、`1,000,000`、`1,000,000,000`、`1,000,000,000,000` bit/s |
+| `Bps`、`KBps`、`MBps`、`GBps`、`TBps` | 对应 byte/s，换算为上一行同级单位的 8 倍 bit/s |
+
+能够无损换成整数 Mbps 的显式速率会提升到 `*_mbps`，例如 `125 KBps` 变成
+`1` Mbps；不能整除的速率保留显式单位字符串。裸数的含义只由输入格式决定：
+
+| 输入字段 | 裸数假定 | 诊断 |
+| --- | --- | --- |
+| Mihomo Hysteria `up` / `down` | Mbps | 无；`up-speed` / `down-speed` 是显式 Mbps 兼容字段，只有正整数值才优先；`0` 视为未设置，非法值保留到 `raw` 后回退到原生字段 |
+| sing-box Hysteria JSON-number `up` / `down` | Bps | 无；`up_mbps` / `down_mbps` 是显式 Mbps 兼容字段，仅在原生字段为空时使用 |
+| Hysteria URI `up` / `down` | Mbps | `parse_implicit_bandwidth_unit`；正整数 `upmbps` / `downmbps` 优先且不需要假定 |
+| legacy `json-nodes` 或 inline node | `source_format` 为 sing-box 时是 Bps；为 Mihomo/URI、`json-nodes`、缺失或未知时是 Mbps | 只有 `source_format` 为 `json-nodes`、缺失或未知，且实际采用裸数字符串时产生 `parse_implicit_bandwidth_unit` |
+
+legacy JSON/inline 同一方向同时带字符串和 `*_mbps` 时也按来源消歧：sing-box
+provenance 的非空字符串优先；其它 provenance 的正整数 `*_mbps` 优先，没有正整数
+兼容值时才采用字符串。
+
+显式单位输入不需要单位假定。不能规范化的源值保留在 `raw` 并产生
+`parse_unknown_field`，不会以歧义裸数进入 canonical 字段。
+
+目标输出继续服从同一语义：Mihomo 用带显式单位的原生 `up` / `down`。canonical
+层支持 lowercase `bps`，但 locked sing-box rate decoder 不支持这个单位；sing-box
+renderer 会把能被 8 整除的值无损转换为 `Bps`（例如 `56 bps` 变成 `7 Bps`），
+不能整除时只跳过该节点并产生 `render_node_skipped`。其它可到达 renderer 的显式
+单位与整数 Mbps 按目标原生字段输出并保持互斥。URI 和 Shadowrocket 只表达整数
+Mbps，因此只转换可精确换算的显式速率，其余方向省略并产生
+`render_lossy_field`。Mihomo 和 sing-box renderer 遇到缺方向、双字段、超出安全
+Mbps 界限或其它无效 canonical 速率时只跳过该节点，不会使仍可渲染的同批节点
+失败。
+
 ## 各 renderer 的关键边界
 
 ### `mihomo-proxies`

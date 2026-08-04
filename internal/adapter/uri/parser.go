@@ -306,6 +306,7 @@ func normalizeLineNodes(nodes []domain.NodeIR, sourceFormat string) ([]domain.No
 		if nodes[i].SourceFormat == "" {
 			nodes[i].SourceFormat = sourceFormat
 		}
+		nodes[i].Warnings = append(nodes[i].Warnings, shared.NormalizeLegacyHysteriaBandwidth(&nodes[i])...)
 	}
 	return nodes, nil
 }

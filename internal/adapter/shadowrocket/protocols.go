@@ -212,9 +212,13 @@ func renderHysteria(node domain.NodeIR) ([]string, emittedFields, []domain.Warni
 	}
 	if node.Hysteria.UpMbps != 0 {
 		parts = append(parts, "upmbps="+strconv.Itoa(node.Hysteria.UpMbps))
+	} else if upMbps, ok := shared.ExactHysteriaMbps(node.Hysteria.Up); ok {
+		parts = append(parts, "upmbps="+strconv.Itoa(upMbps))
 	}
 	if node.Hysteria.DownMbps != 0 {
 		parts = append(parts, "downmbps="+strconv.Itoa(node.Hysteria.DownMbps))
+	} else if downMbps, ok := shared.ExactHysteriaMbps(node.Hysteria.Down); ok {
+		parts = append(parts, "downmbps="+strconv.Itoa(downMbps))
 	}
 	emitted := emittedFields{
 		"hysteria.protocol": true, "hysteria.auth": true, "hysteria.auth_str": true,

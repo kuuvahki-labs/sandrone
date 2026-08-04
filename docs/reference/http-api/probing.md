@@ -92,6 +92,14 @@ error。混合 method/core 时 `report.probe.dimensions` 分组给出各组
 `report` 还可以带完整 dependencies、source refs、render diagnostics 与
 warnings；字段语义以[错误与诊断的 Report 章节](../errors.md#report)为准。
 
+需要核心配置的 probe 会先按目标 renderer 构造 payload。对 sing-box core，不能
+由 sing-box renderer 表达的节点不会让其它节点的 payload 解码失败：runner 保留
+原输入顺序与结果基数，并把该项返回为 `probe_invalid_target`，其余可表达节点继续
+探测。这样 node-stage probe processor 能在 runner 返回后按 `fail_mode` 处理失败
+项。这个 node-level isolation 保证目前不适用于 Mihomo；Mihomo 目标不兼容节点仍
+可能使整批 probe 失败。Hysteria v1 的具体字段与单位边界只在
+[Hysteria v1 带宽规范化](../capabilities.md#hysteria-v1-带宽规范化)定义。
+
 ### 失败与受控网络副作用
 
 - `input` 无法解析、资源缺失、节点全部无效、method/core/target 无效，
