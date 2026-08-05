@@ -41,7 +41,7 @@ func singBoxSupportsNetwork(nodeType domain.NodeType) bool {
 }
 
 func applyTLS(out map[string]any, node domain.NodeIR) {
-	if node.TLS == nil {
+	if node.TLS == nil || !node.TLS.Enabled {
 		return
 	}
 	tls := map[string]any{}

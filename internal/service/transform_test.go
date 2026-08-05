@@ -99,6 +99,29 @@ func TestServiceConvertRunsParseAndRender(t *testing.T) {
 	require.NotContains(t, string(result.Body), "us-a")
 	require.NotEmpty(t, result.Report.SourceRefs)
 }
+
+func TestServiceConvertVLESSSecurityNoneToSingBoxOmitsTLS(t *testing.T) {
+	svc := service.New()
+
+	result, err := svc.Convert(context.Background(), domain.ConvertRequest{
+		FromFormat: "uri-list",
+		ToFormat:   "sing-box-outbounds",
+		Content: []byte(
+			"vless://00000000-0000-0000-0000-000000000000@example.com:443" +
+				"?security=none&type=tcp&sni=ignored.example&allowInsecure=1#plain-vless",
+		),
+	})
+
+	require.NoError(t, err)
+	var doc struct {
+		Outbounds []map[string]any `json:"outbounds"`
+	}
+	require.NoError(t, json.Unmarshal(result.Body, &doc))
+	require.Len(t, doc.Outbounds, 1)
+	require.Equal(t, "vless", doc.Outbounds[0]["type"])
+	require.NotContains(t, doc.Outbounds[0], "tls")
+}
+
 func TestServiceConvertPreservesMihomoParserWarningContext(t *testing.T) {
 	svc := service.New()
 
@@ -514,7 +537,8 @@ proxies:
       "server": "example.com",
       "server_port": 443,
       "uuid": "11111111-1111-1111-1111-111111111111",
-      "password": "secret"
+      "password": "secret",
+      "tls": {"enabled": true}
     }
   ]
 }`),

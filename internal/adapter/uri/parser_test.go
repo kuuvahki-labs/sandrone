@@ -2178,6 +2178,17 @@ func TestParseVLESSQueryTLSRealityTransportAndRaw(t *testing.T) {
 	require.JSONEq(t, `"value"`, string(got.Raw["uri.query.extra"]))
 }
 
+func TestParseVLESSExplicitNoneIgnoresTLSModifiers(t *testing.T) {
+	p := uri.NewParser()
+	raw := "vless://11111111-1111-1111-1111-111111111111@example.com:443?encryption=none&security=none&sni=sni.example.com&allowInsecure=1#vless"
+
+	nodes, _, err := p.Parse(context.Background(), []byte(raw))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	require.Nil(t, nodes[0].TLS)
+}
+
 func TestParseVLESSWebSocketEarlyDataPath(t *testing.T) {
 	p := uri.NewParser()
 	raw := "vless://11111111-1111-1111-1111-111111111111@example.com:443?encryption=none&type=ws&path=%2Fdo%3Fed%3D2048#vless"

@@ -132,7 +132,7 @@ func TestRenderSingBoxHysteriaFromOfficialURIUsesCanonicalObfsPassword(t *testin
 }
 
 func TestRenderSingBoxHysteriaMigratesLegacyJSONObfsPassword(t *testing.T) {
-	nodes, _, err := jsonnodes.NewParser().Parse(context.Background(), []byte(`[{"name":"hy","type":"hysteria","server":"hy.example.com","port":8443,"hysteria":{"auth_str":"secret","obfs":"legacy-password","up_mbps":20,"down_mbps":100}}]`))
+	nodes, _, err := jsonnodes.NewParser().Parse(context.Background(), []byte(`[{"name":"hy","type":"hysteria","server":"hy.example.com","port":8443,"tls":{"enabled":true},"hysteria":{"auth_str":"secret","obfs":"legacy-password","up_mbps":20,"down_mbps":100}}]`))
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -155,6 +155,7 @@ func TestRenderSingBoxHysteriaBandwidthSkipsDirectOverBoundMbps(t *testing.T) {
 	out, report, err := singbox.NewRenderer().RenderWithReport(context.Background(), []domain.NodeIR{
 		{
 			Name: "over", Type: domain.NodeTypeHysteria, Server: "over.example", Port: 8443,
+			TLS:      &domain.TLSOptions{Enabled: true},
 			Hysteria: &domain.HysteriaOptions{UpMbps: max + 1, DownMbps: max},
 		},
 		{Name: "valid", Type: domain.NodeTypeHTTP, Server: "valid.example", Port: 8080},
@@ -177,6 +178,7 @@ func TestRenderSingBoxDialerTFO(t *testing.T) {
 			Port:     8443,
 			Password: "secret",
 			Dialer:   &domain.DialerOptions{TFO: true},
+			TLS:      &domain.TLSOptions{Enabled: true},
 		},
 		{
 			Name:   "wg",
@@ -374,6 +376,7 @@ func TestRenderSingBoxLossWarningsCoveredByCapability(t *testing.T) {
 			Port:     443,
 			Token:    "legacy-token",
 			Password: "secret",
+			TLS:      &domain.TLSOptions{Enabled: true},
 			TUIC: &domain.TUICOptions{
 				ReduceRTT:            true,
 				UDPOverStreamVersion: 2,
@@ -449,6 +452,7 @@ func TestRenderSingBoxHysteriaQUIC(t *testing.T) {
 		Type:   domain.NodeTypeHysteria,
 		Server: "example.com",
 		Port:   8443,
+		TLS:    &domain.TLSOptions{Enabled: true},
 		Hysteria: &domain.HysteriaOptions{
 			AuthString: "secret",
 			QUIC:       map[string]any{"init_stream_receive_window": 8388608},
@@ -475,6 +479,7 @@ func TestRenderSingBoxHysteriaWarnsWhenProtocolCannotBeRepresented(t *testing.T)
 		Type:   domain.NodeTypeHysteria,
 		Server: "example.com",
 		Port:   8443,
+		TLS:    &domain.TLSOptions{Enabled: true},
 		Hysteria: &domain.HysteriaOptions{
 			Protocol:   "wechat-video",
 			AuthString: "secret",
@@ -639,6 +644,80 @@ func TestRenderSingBoxSkipsBadNodeWithWarning(t *testing.T) {
 	outbounds := doc["outbounds"].([]any)
 	if len(outbounds) != 1 || outbounds[0].(map[string]any)["tag"] != "vless" {
 		t.Fatalf("unexpected outbounds: %#v", outbounds)
+	}
+}
+
+func TestRenderSingBoxOmitsDisabledTLSOptions(t *testing.T) {
+	out, _, err := singbox.NewRenderer().RenderWithReport(context.Background(), []domain.NodeIR{{
+		Name:   "vless",
+		Type:   domain.NodeTypeVLESS,
+		Server: "example.com",
+		Port:   443,
+		UUID:   "11111111-1111-1111-1111-111111111111",
+		TLS: &domain.TLSOptions{
+			ServerName:         "sni.example.com",
+			InsecureSkipVerify: true,
+		},
+	}}, domain.RenderOptions{Format: "sing-box-outbounds"})
+	require.NoError(t, err)
+
+	var doc map[string]any
+	require.NoError(t, json.Unmarshal(out, &doc))
+	outbound := doc["outbounds"].([]any)[0].(map[string]any)
+	require.NotContains(t, outbound, "tls")
+}
+
+func TestRenderSingBoxRejectsRequiredTLSProtocolsWithoutEnabledTLS(t *testing.T) {
+	protocols := []struct {
+		name string
+		node domain.NodeIR
+	}{
+		{
+			name: "hysteria",
+			node: domain.NodeIR{
+				Name: "hysteria", Type: domain.NodeTypeHysteria, Server: "example.com", Port: 443,
+				Hysteria: &domain.HysteriaOptions{AuthString: "secret", UpMbps: 20, DownMbps: 100},
+			},
+		},
+		{
+			name: "hysteria2",
+			node: domain.NodeIR{
+				Name: "hysteria2", Type: domain.NodeTypeHysteria2, Server: "example.com", Port: 443,
+				Password: "secret",
+			},
+		},
+		{
+			name: "tuic",
+			node: domain.NodeIR{
+				Name: "tuic", Type: domain.NodeTypeTUIC, Server: "example.com", Port: 443,
+				UUID: "11111111-1111-1111-1111-111111111111", Password: "secret",
+			},
+		},
+	}
+	tlsOptions := []struct {
+		name string
+		tls  *domain.TLSOptions
+	}{
+		{name: "missing"},
+		{name: "disabled", tls: &domain.TLSOptions{ServerName: "sni.example.com", InsecureSkipVerify: true}},
+	}
+
+	for _, protocol := range protocols {
+		for _, tlsOption := range tlsOptions {
+			t.Run(protocol.name+"/"+tlsOption.name, func(t *testing.T) {
+				node := protocol.node
+				node.TLS = tlsOption.tls
+
+				out, report, err := singbox.NewRenderer().RenderWithReport(context.Background(), []domain.NodeIR{node}, domain.RenderOptions{Format: "sing-box-outbounds"})
+
+				require.Error(t, err)
+				require.True(t, domain.IsCode(err, domain.CodeRenderFailed), "unexpected error: %v", err)
+				require.Empty(t, out)
+				require.Zero(t, report.SuccessCount)
+				require.Len(t, report.Warnings, 1)
+				require.Equal(t, "render_node_skipped", report.Warnings[0].Code)
+			})
+		}
 	}
 }
 
@@ -863,6 +942,7 @@ func TestRenderSingBoxHysteria2RealmAndLossyRates(t *testing.T) {
 		Server:   "example.com",
 		Port:     8443,
 		Password: "secret",
+		TLS:      &domain.TLSOptions{Enabled: true},
 		Hysteria: &domain.HysteriaOptions{
 			Up:   "20 Mbps",
 			Down: "100 Mbps",

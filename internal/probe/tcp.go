@@ -45,6 +45,7 @@ func (b *TCPBackend) Probe(ctx context.Context, backendReq BackendRequest, nodes
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			defer recoverProbeWorkerPanic(&results[i], req, node, string(domain.CodeProbeTCPFailed))
 			select {
 			case sem <- struct{}{}:
 				defer func() { <-sem }()

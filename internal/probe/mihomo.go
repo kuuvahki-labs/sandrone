@@ -77,6 +77,7 @@ func (b *MihomoBackend) Probe(ctx context.Context, backendReq BackendRequest, no
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			defer recoverProbeWorkerPanic(&results[i], req, node, string(domain.CodeProbeCoreAPIFailed))
 			select {
 			case sem <- struct{}{}:
 				defer func() { <-sem }()

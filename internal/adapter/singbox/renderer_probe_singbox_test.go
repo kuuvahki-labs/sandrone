@@ -20,6 +20,7 @@ import (
 func TestRenderSingBoxHysteriaMbpsBandwidthIsAcceptedByLockedCore(t *testing.T) {
 	out, report, err := singbox.NewRenderer().RenderWithReport(context.Background(), []domain.NodeIR{{
 		Name: "hy", Type: domain.NodeTypeHysteria, Server: "example.com", Port: 8443,
+		TLS:      &domain.TLSOptions{Enabled: true},
 		Hysteria: &domain.HysteriaOptions{AuthString: "secret", UpMbps: 55, DownMbps: 100},
 	}}, domain.RenderOptions{Format: "sing-box-outbounds"})
 
@@ -36,6 +37,7 @@ func TestRenderSingBoxHysteriaMbpsBandwidthIsAcceptedByLockedCore(t *testing.T) 
 func TestRenderSingBoxHysteriaExplicitBandwidthIsAcceptedByLockedCore(t *testing.T) {
 	out, report, err := singbox.NewRenderer().RenderWithReport(context.Background(), []domain.NodeIR{{
 		Name: "hy", Type: domain.NodeTypeHysteria, Server: "example.com", Port: 8443,
+		TLS:      &domain.TLSOptions{Enabled: true},
 		Hysteria: &domain.HysteriaOptions{AuthString: "secret", Up: "55 Bps", Down: "640 KBps"},
 	}}, domain.RenderOptions{Format: "sing-box-outbounds"})
 
@@ -89,6 +91,7 @@ func TestRenderSingBoxHysteriaCanonicalBandwidthMatrixIsAcceptedByLockedCore(t *
 		t.Run(test.name, func(t *testing.T) {
 			out, report, err := singbox.NewRenderer().RenderWithReport(context.Background(), []domain.NodeIR{{
 				Name: "hy", Type: domain.NodeTypeHysteria, Server: "example.com", Port: 8443,
+				TLS:      &domain.TLSOptions{Enabled: true},
 				Hysteria: &test.hysteria,
 			}}, domain.RenderOptions{Format: "sing-box-outbounds"})
 
@@ -120,6 +123,7 @@ func TestRenderSingBoxHysteriaUnrepresentableLowercaseBpsSkipsOnlyThatNode(t *te
 	out, report, err := singbox.NewRenderer().RenderWithReport(context.Background(), []domain.NodeIR{
 		{
 			Name: "unrepresentable", Type: domain.NodeTypeHysteria, Server: "invalid.example", Port: 8443,
+			TLS:      &domain.TLSOptions{Enabled: true},
 			Hysteria: &domain.HysteriaOptions{Up: "55 bps", Down: "56 bps"},
 		},
 		{Name: "valid", Type: domain.NodeTypeHTTP, Server: "valid.example", Port: 8080},
@@ -139,6 +143,7 @@ func TestRenderSingBoxHysteriaInvalidBandwidthSkipsOnlyInvalidNode(t *testing.T)
 	out, report, err := singbox.NewRenderer().RenderWithReport(context.Background(), []domain.NodeIR{
 		{
 			Name: "invalid", Type: domain.NodeTypeHysteria, Server: "invalid.example", Port: 8443,
+			TLS:      &domain.TLSOptions{Enabled: true},
 			Hysteria: &domain.HysteriaOptions{AuthString: "secret", Up: "55", DownMbps: 100},
 		},
 		{Name: "valid", Type: domain.NodeTypeHTTP, Server: "valid.example", Port: 8080},
@@ -161,7 +166,7 @@ func TestRenderSingBoxHysteriaInvalidBandwidthSkipsOnlyInvalidNode(t *testing.T)
 func TestRenderSingBoxHysteriaMihomoBareBandwidthUsesMbps(t *testing.T) {
 	nodes, _, err := mihomo.NewParser().Parse(context.Background(), []byte(`
 proxies:
-  - {name: hy, type: hysteria, server: example.com, port: 8443, up: "55", down: "100", auth-str: secret}
+  - {name: hy, type: hysteria, server: example.com, port: 8443, up: "55", down: "100", auth-str: secret, tls: true}
 `))
 	require.NoError(t, err)
 
@@ -212,7 +217,8 @@ func TestRenderSingBoxHysteriaAuthVariantsUseDistinctLockedFields(t *testing.T) 
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			out, report, err := singbox.NewRenderer().RenderWithReport(context.Background(), []domain.NodeIR{{
-				Name: "hy", Type: domain.NodeTypeHysteria, Server: "example.com", Port: 8443, Hysteria: test.hysteria,
+				Name: "hy", Type: domain.NodeTypeHysteria, Server: "example.com", Port: 8443,
+				TLS: &domain.TLSOptions{Enabled: true}, Hysteria: test.hysteria,
 			}}, domain.RenderOptions{Format: "sing-box-outbounds"})
 
 			require.NoError(t, err)
@@ -227,7 +233,7 @@ func TestRenderSingBoxHysteriaAuthVariantsUseDistinctLockedFields(t *testing.T) 
 
 func TestRenderSingBoxHysteriaAuthRoundTripPreservesDecodedBytes(t *testing.T) {
 	nodes, _, err := singbox.NewParser().Parse(context.Background(), []byte(`{
-		"outbounds":[{"type":"hysteria","tag":"hy","server":"example.com","server_port":8443,"auth":"c2VjcmV0","up_mbps":55,"down_mbps":100}]
+		"outbounds":[{"type":"hysteria","tag":"hy","server":"example.com","server_port":8443,"auth":"c2VjcmV0","up_mbps":55,"down_mbps":100,"tls":{"enabled":true}}]
 	}`))
 	require.NoError(t, err)
 

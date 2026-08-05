@@ -88,6 +88,38 @@ func TestValidateRejectsProtocolSpecificRequiredFields(t *testing.T) {
 	}
 }
 
+func TestValidateTUICRequiresEnabledTLS(t *testing.T) {
+	t.Parallel()
+
+	validCredentials := domain.NodeIR{
+		Name: "tuic", Type: domain.NodeTypeTUIC, Server: "example.com", Port: 443,
+		UUID: "11111111-1111-1111-1111-111111111111", Password: "secret",
+	}
+	tests := []struct {
+		name string
+		tls  *domain.TLSOptions
+	}{
+		{name: "missing"},
+		{name: "disabled", tls: &domain.TLSOptions{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			node := validCredentials
+			node.TLS = tt.tls
+
+			result := nodevalidation.Validate([]domain.NodeIR{node}, nodevalidation.StageNormalized, "")
+
+			require.Empty(t, result.Nodes)
+			require.Equal(t, 1, result.Counts.Invalid)
+			require.Len(t, result.Issues, 1)
+			require.Equal(t, "node_validation_required", result.Issues[0].Code)
+			require.Equal(t, "tls", result.Issues[0].Field)
+		})
+	}
+}
+
 func TestValidateRejectsNonCanonicalNetwork(t *testing.T) {
 	t.Parallel()
 

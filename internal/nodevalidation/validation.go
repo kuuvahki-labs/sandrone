@@ -119,6 +119,9 @@ func validateNode(node domain.NodeIR, index int, stage Stage, target string) []d
 		}
 	case domain.NodeTypeTUIC:
 		validateTUIC(node, add)
+		if node.TLS == nil || !node.TLS.Enabled {
+			add("node_validation_required", "tls", "TLS must be enabled")
+		}
 	case domain.NodeTypeMieru:
 		required("username", node.Username)
 		required("password", node.Password)

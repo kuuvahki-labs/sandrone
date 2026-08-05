@@ -186,7 +186,7 @@ func renderAnyTLS(node domain.NodeIR) (map[string]any, bool, map[string]bool, []
 }
 
 func renderHysteria(node domain.NodeIR) (map[string]any, bool, map[string]bool, []domain.Warning, error) {
-	if node.Server == "" || node.Port == 0 {
+	if node.Server == "" || node.Port == 0 || node.TLS == nil || !node.TLS.Enabled {
 		return nil, false, nil, nil, domain.NewError(domain.CodeRenderFailed, "missing hysteria fields")
 	}
 	hy := node.Hysteria
@@ -263,7 +263,7 @@ func singBoxRepresentableHysteriaRate(rate string) (string, error) {
 }
 
 func renderHysteria2(node domain.NodeIR) (map[string]any, bool, map[string]bool, []domain.Warning, error) {
-	if node.Server == "" || node.Port == 0 {
+	if node.Server == "" || node.Port == 0 || node.TLS == nil || !node.TLS.Enabled {
 		return nil, false, nil, nil, domain.NewError(domain.CodeRenderFailed, "missing hysteria2 fields")
 	}
 	out := baseOutbound(node, "hysteria2")
@@ -319,7 +319,7 @@ func renderHysteria2(node domain.NodeIR) (map[string]any, bool, map[string]bool,
 }
 
 func renderTUIC(node domain.NodeIR) (map[string]any, bool, map[string]bool, []domain.Warning, error) {
-	if node.Server == "" || node.Port == 0 {
+	if node.Server == "" || node.Port == 0 || node.TLS == nil || !node.TLS.Enabled {
 		return nil, false, nil, nil, domain.NewError(domain.CodeRenderFailed, "missing tuic fields")
 	}
 	out := baseOutbound(node, "tuic")

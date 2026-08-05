@@ -38,3 +38,16 @@ func TestAnyTLSURIRoundTrip(t *testing.T) {
 	require.Equal(t, "anytls.example.com:443", parsed.Host)
 	require.Equal(t, "30s", parsed.Query().Get("idle-session-check-interval"))
 }
+
+func TestParseAnyTLSExplicitNoneRetainsTLSModifiers(t *testing.T) {
+	raw := "anytls://secret@example.com:443?security=none&sni=sni.example.com&allowInsecure=1#anytls"
+
+	nodes, _, err := uriadapter.NewParser().Parse(context.Background(), []byte(raw))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	require.NotNil(t, nodes[0].TLS)
+	require.True(t, nodes[0].TLS.Enabled)
+	require.Equal(t, "sni.example.com", nodes[0].TLS.ServerName)
+	require.True(t, nodes[0].TLS.InsecureSkipVerify)
+}

@@ -100,6 +100,7 @@ func (b *SingBoxBackend) Probe(ctx context.Context, backendReq BackendRequest, n
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			defer recoverProbeWorkerPanic(&results[i], req, node, string(domain.CodeProbeCoreAPIFailed))
 			select {
 			case sem <- struct{}{}:
 				defer func() { <-sem }()
@@ -214,6 +215,7 @@ func (b *SingBoxNTPBackend) Probe(ctx context.Context, backendReq BackendRequest
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			defer recoverProbeWorkerPanic(&results[i], req, node, string(domain.CodeProbeUDPNTPFailed))
 			select {
 			case sem <- struct{}{}:
 				defer func() { <-sem }()

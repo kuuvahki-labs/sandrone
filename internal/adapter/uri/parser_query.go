@@ -13,6 +13,9 @@ import (
 
 func applyTLSQuery(node *domain.NodeIR, values url.Values) {
 	security := strings.ToLower(shared.QueryFirst(values, "security", "tls"))
+	if node.Type == domain.NodeTypeVLESS && security == "none" {
+		return
+	}
 	if security == "tls" || security == "reality" || security == "true" {
 		if node.TLS == nil {
 			node.TLS = &domain.TLSOptions{}

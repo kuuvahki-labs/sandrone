@@ -65,6 +65,7 @@ func allProtocolNodes() []domain.NodeIR {
 			Server:   "hy2.example.com",
 			Port:     8443,
 			Password: "secret",
+			TLS:      &domain.TLSOptions{Enabled: true, ServerName: "hy2.example.com"},
 			Hysteria: &domain.HysteriaOptions{
 				Obfs:         "salamander",
 				ObfsPassword: "obfs",

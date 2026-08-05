@@ -131,6 +131,72 @@ func TestTCPConnectDialFailure(t *testing.T) {
 	require.Equal(t, uint16(443), result.Report.Warnings[0].NodeContext.Port)
 }
 
+func TestTCPConnectWorkerPanicBecomesSanitizedFailureAndBatchContinues(t *testing.T) {
+	const sensitivePanic = "secret-node-credential"
+	dialer := &panicFirstDialer{panicValue: sensitivePanic}
+	engine := probe.New(probe.WithDialer(dialer))
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	result, err := engine.Probe(ctx, domain.ProbeRequest{
+		Method:      domain.ProbeTCPConnect,
+		Concurrency: 1,
+	}, []domain.NodeIR{
+		{Name: "first", Server: "first.example", Port: 443},
+		{Name: "second", Server: "second.example", Port: 443},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.Results, 2)
+	require.Equal(t, int32(2), atomic.LoadInt32(&dialer.calls))
+	aliveCount := 0
+	failedCount := 0
+	for _, nodeResult := range result.Results {
+		require.Equal(t, "tcp_connect", nodeResult.Backend)
+		if nodeResult.Alive {
+			aliveCount++
+			continue
+		}
+		failedCount++
+		require.Equal(t, "probe_tcp_failed", nodeResult.ErrorCode)
+		require.Equal(t, "probe worker panicked", nodeResult.Error)
+		require.NotContains(t, nodeResult.Error, sensitivePanic)
+	}
+	require.Equal(t, 1, aliveCount)
+	require.Equal(t, 1, failedCount)
+	require.Equal(t, 1, result.Report.Probe.SuccessCount)
+	require.Equal(t, 1, result.Report.Probe.FailureCount)
+	require.Equal(t, map[string]int{"probe_tcp_failed": 1}, result.Report.Probe.ErrorCounts)
+	require.Len(t, result.Report.Warnings, 1)
+	require.Equal(t, "probe_tcp_failed: probe worker panicked", result.Report.Warnings[0].Message)
+	require.NotContains(t, result.Report.Warnings[0].Message, sensitivePanic)
+}
+
+func TestTCPConnectWorkerPanicFromClockUsesReliableRecoveryTimestamp(t *testing.T) {
+	const sensitivePanic = "secret-clock-value"
+	backend := probe.NewTCPBackend(failingDialer{}, func() time.Time {
+		panic(sensitivePanic)
+	})
+
+	result, err := backend.Probe(context.Background(), probe.BackendRequest{
+		Probe: domain.ProbeRequest{Method: domain.ProbeTCPConnect},
+	}, []domain.NodeIR{{Name: "clock-panics", Server: "example.com", Port: 443}})
+
+	require.NoError(t, err)
+	require.Len(t, result.Results, 1)
+	require.False(t, result.Results[0].Alive)
+	require.Equal(t, "probe_tcp_failed", result.Results[0].ErrorCode)
+	require.Equal(t, "probe worker panicked", result.Results[0].Error)
+	require.NotContains(t, result.Results[0].Error, sensitivePanic)
+	require.False(t, result.Results[0].CheckedAt.IsZero())
+	require.Equal(t, "tcp_connect", result.Results[0].Backend)
+	require.Equal(t, 0, result.Report.Probe.SuccessCount)
+	require.Equal(t, 1, result.Report.Probe.FailureCount)
+	require.Equal(t, map[string]int{"probe_tcp_failed": 1}, result.Report.Probe.ErrorCounts)
+	require.Len(t, result.Report.Warnings, 1)
+	require.Equal(t, "probe_tcp_failed: probe worker panicked", result.Report.Warnings[0].Message)
+	require.NotContains(t, result.Report.Warnings[0].Message, sensitivePanic)
+}
+
 func TestTCPConnectRetriesAttempts(t *testing.T) {
 	dialer := &countingDialer{failures: 1}
 	engine := probe.New(probe.WithDialer(dialer))
@@ -280,6 +346,18 @@ type failingDialer struct{}
 
 func (failingDialer) DialContext(context.Context, string, string) (net.Conn, error) {
 	return nil, errors.New("connection refused")
+}
+
+type panicFirstDialer struct {
+	calls      int32
+	panicValue string
+}
+
+func (d *panicFirstDialer) DialContext(context.Context, string, string) (net.Conn, error) {
+	if atomic.AddInt32(&d.calls, 1) == 1 {
+		panic(d.panicValue)
+	}
+	return pipeConn(), nil
 }
 
 type trackingDialer struct {
