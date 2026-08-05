@@ -59,7 +59,11 @@ checkout_repository_branch \
   master \
   ios-rule-script
 
-"${GO:-go}" run "$repo_root/internal/tools/ruleset-catalog-gen" \
+go_command=${GO:-go}
+host_goos=$($go_command env GOHOSTOS)
+host_goarch=$($go_command env GOHOSTARCH)
+
+GOOS="$host_goos" GOARCH="$host_goarch" "$go_command" run "$repo_root/internal/tools/ruleset-catalog-gen" \
   -output "$work_dir/catalog.json.gz" \
   -metacubex-meta-paths "$work_dir/meta-rules-dat-meta.paths" \
   -metacubex-sing-paths "$work_dir/meta-rules-dat-sing.paths" \
