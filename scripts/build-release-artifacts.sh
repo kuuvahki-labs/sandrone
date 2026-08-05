@@ -1,0 +1,76 @@
+#!/bin/sh
+set -eu
+
+: "${VERSION:?VERSION is required}"
+: "${REVISION:?REVISION is required}"
+
+release_targets=${RELEASE_TARGETS-"linux/amd64 linux/arm64"}
+output_dir=${OUTPUT_DIR-dist}
+make_command=${MAKE-make}
+
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+repo_root=$(CDPATH='' cd -- "$script_dir/.." && pwd)
+
+if [ "$(VERSION="$VERSION" sh "$script_dir/validate-build-version.sh")" != ok ]; then
+	printf '%s\n' 'VERSION must contain only ASCII letters, digits, dots, plus signs, and hyphens' >&2
+	exit 2
+fi
+if [ "$(REVISION="$REVISION" sh "$script_dir/validate-build-revision.sh")" != ok ]; then
+	printf '%s\n' 'REVISION must be a complete 40- or 64-character hexadecimal Git object ID' >&2
+	exit 2
+fi
+
+# RELEASE_TARGETS is a space-separated list by contract.
+# shellcheck disable=SC2086
+set -- $release_targets
+if [ "$#" -eq 0 ]; then
+	printf '%s\n' 'release target list must not be empty' >&2
+	exit 2
+fi
+for target do
+	case "$target" in
+		linux/amd64 | linux/arm64) ;;
+		*)
+			printf 'unsupported release target %s\n' "$target" >&2
+			exit 2
+			;;
+	esac
+done
+
+staging_dir=$(mktemp -d "${TMPDIR:-/tmp}/sandrone-release-artifacts.XXXXXX")
+cleanup() {
+	rm -rf "$staging_dir"
+}
+trap cleanup 0 1 2 15
+artifact_dir=$staging_dir/artifacts
+mkdir -p "$artifact_dir"
+
+cd "$repo_root"
+VERSION="$VERSION" REVISION="$REVISION" "$make_command" ruleset-catalog
+
+for target do
+	goos=${target%/*}
+	goarch=${target#*/}
+	package_dir=$staging_dir/package-$goos-$goarch
+	mkdir -p "$package_dir"
+	CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" \
+		"$make_command" build-check \
+		"BUILD_BIN=$package_dir/sandrone" \
+		"VERSION=$VERSION" \
+		"REVISION=$REVISION"
+	cp "$repo_root/LICENSE" "$package_dir/LICENSE"
+	tar -czf "$artifact_dir/sandrone_${VERSION}_${goos}_${goarch}.tar.gz" \
+		-C "$package_dir" sandrone LICENSE
+done
+
+(
+	cd "$artifact_dir"
+	LC_ALL=C
+	export LC_ALL
+	for archive in *.tar.gz; do
+		sha256sum "$archive"
+	done
+) >"$artifact_dir/checksums.txt"
+
+mkdir -p "$output_dir"
+mv "$artifact_dir"/* "$output_dir"/

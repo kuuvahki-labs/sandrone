@@ -16,8 +16,7 @@ version_file=${VERSION_FILE-"$script_dir/../internal/buildinfo/VERSION"}
 version=$(tr -d '\r\n' <"$version_file")
 VERSION=$version
 export VERSION
-if [ "$(sh "$script_dir/validate-build-version.sh")" != "ok" ] || [ -z "$version" ]; then
-  printf 'invalid release version %s\n' "$version" >&2
+if ! sh "$script_dir/validate-release-version.sh"; then
   exit 1
 fi
 

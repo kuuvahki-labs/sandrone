@@ -131,30 +131,106 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Build container image
+      - name: Resolve image metadata
+        id: image-metadata
         shell: bash
         run: |
-          image_tag=ci
+          version="$(tr -d '\r\n' < internal/buildinfo/VERSION)"
+          tags="${IMAGE}:ci"
           if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            image_tag="${GITHUB_REF_NAME}"
+            git fetch --force --tags origin
+            tags="$(./scripts/container-image-tags.sh)"
           fi
-          make image SANDRONE_IMAGE="${IMAGE}:${image_tag}" REVISION="${GITHUB_SHA}"
+          {
+            echo "version=${version}"
+            echo 'tags<<EOF'
+            echo "${tags}"
+            echo EOF
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Log in to GHCR
         if: github.event_name == 'push' && github.ref_type == 'tag'
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push container image
-        if: github.event_name == 'push' && github.ref_type == 'tag'
+      - name: Build container image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name == 'push' && github.ref_type == 'tag' }}
+          tags: ${{ steps.image-metadata.outputs.tags }}
+          build-args: |
+            VERSION=${{ steps.image-metadata.outputs.version }}
+            REVISION=${{ github.sha }}
+          labels: |
+            org.opencontainers.image.version=${{ steps.image-metadata.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
+
+  release:
+    name: GitHub Release
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    needs:
+      - container-image
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.2
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Build Web UI assets
+        run: make build-webui
+
+      - name: Build release artifacts
+        run: make release-artifacts REVISION="${GITHUB_SHA}"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          source_image="${IMAGE}:${GITHUB_REF_NAME}"
-          git fetch --force --tags origin
-          publish_tags="$(./scripts/container-image-tags.sh)"
-          while IFS= read -r tag; do
-            [[ -n "${tag}" ]] || continue
-            if [[ "${tag}" != "${source_image}" ]]; then
-              docker tag "${source_image}" "${tag}"
+          version="$(tr -d '\r\n' < internal/buildinfo/VERSION)"
+          artifacts=(
+            "dist/sandrone_${version}_linux_amd64.tar.gz"
+            "dist/sandrone_${version}_linux_arm64.tar.gz"
+            "dist/checksums.txt"
+          )
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" "${artifacts[@]}" --clobber
+          else
+            prerelease_flag=""
+            if [[ ! "${GITHUB_REF_NAME}" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+              prerelease_flag="--prerelease"
             fi
-            docker push "${tag}"
-          done <<< "${publish_tags}"
+            gh release create "${GITHUB_REF_NAME}" "${artifacts[@]}" --verify-tag --generate-notes ${prerelease_flag}
+          fi

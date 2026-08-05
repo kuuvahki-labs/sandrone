@@ -359,6 +359,157 @@ func TestMakeBuildWithoutRevisionForcesDevVersion(t *testing.T) {
 	}
 }
 
+func TestReleaseArtifactsTargetUsesCanonicalScript(t *testing.T) {
+	makefile, err := os.ReadFile(filepath.Join("..", "..", "Makefile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(makefile)
+	validatedLine := "VALIDATED_TARGETS := help check ci fmt fmt-check vet test test-webui test-webui-e2e build build-bin build-check build-webui image lint ruleset-catalog release-artifacts"
+	if !strings.Contains(content, validatedLine) {
+		t.Errorf("Makefile does not validate release-artifacts")
+	}
+	wantTarget := "release-artifacts:\n\tVERSION=\"$(BUILD_VERSION)\" REVISION=\"$(BUILD_REVISION)\" ./scripts/build-release-artifacts.sh\n"
+	if count := strings.Count(content, wantTarget); count != 1 {
+		t.Fatalf("Makefile contains %d canonical release-artifacts recipes, want 1", count)
+	}
+}
+
+func TestBuildReleaseArtifactsProducesCanonicalArchive(t *testing.T) {
+	repo, script, makeLog := newReleaseArtifactFixture(t)
+	outputDir := filepath.Join(repo, "output")
+	revision := "0123456789abcdef0123456789abcdef01234567"
+	output, err := runCommandEnv(repo, []string{
+		"PATH=" + os.Getenv("PATH"),
+		"VERSION=1.2.3",
+		"REVISION=" + revision,
+		"RELEASE_TARGETS=linux/arm64",
+		"OUTPUT_DIR=" + outputDir,
+		"MAKE=" + script,
+		"MAKE_LOG=" + makeLog,
+	}, "sh", filepath.Join(repo, "scripts", "build-release-artifacts.sh"))
+	if err != nil {
+		t.Fatalf("build release artifacts: %v\n%s", err, output)
+	}
+
+	archiveName := "sandrone_1.2.3_linux_arm64.tar.gz"
+	archive := filepath.Join(outputDir, archiveName)
+	listing, err := runCommand(repo, "tar", "-tzf", archive)
+	if err != nil {
+		t.Fatalf("list release archive: %v\n%s", err, listing)
+	}
+	if got, want := strings.Fields(string(listing)), []string{"sandrone", "LICENSE"}; strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("archive entries = %q, want %q", got, want)
+	}
+	checksumOutput, err := runCommand(outputDir, "sha256sum", "-c", "checksums.txt")
+	if err != nil {
+		t.Fatalf("verify release checksums: %v\n%s", err, checksumOutput)
+	}
+	if got, want := string(checksumOutput), archiveName+": OK\n"; got != want {
+		t.Fatalf("checksum output = %q, want %q", got, want)
+	}
+	entries, err := os.ReadDir(outputDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := len(entries), 2; got != want {
+		t.Fatalf("output file count = %d, want %d", got, want)
+	}
+	makeCalls, err := os.ReadFile(makeLog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(makeCalls)), "\n")
+	if got, want := len(lines), 2; got != want {
+		t.Fatalf("make call count = %d, want %d:\n%s", got, want, makeCalls)
+	}
+	if got, want := lines[0], "|||ruleset-catalog"; got != want {
+		t.Errorf("ruleset catalog call = %q, want %q", got, want)
+	}
+	if !strings.HasPrefix(lines[1], "0|linux|arm64|build-check BUILD_BIN=") {
+		t.Errorf("build call does not use the linux/arm64 static environment:\n%s", lines[1])
+	}
+	for _, want := range []string{" VERSION=1.2.3", " REVISION=" + revision} {
+		if !strings.Contains(lines[1], want) {
+			t.Errorf("build call does not contain %q:\n%s", want, lines[1])
+		}
+	}
+}
+
+func TestBuildReleaseArtifactsRejectsUnsupportedTarget(t *testing.T) {
+	repo, script, makeLog := newReleaseArtifactFixture(t)
+	outputDir := filepath.Join(repo, "output")
+	output, err := runCommandEnv(repo, []string{
+		"PATH=" + os.Getenv("PATH"),
+		"VERSION=1.2.3",
+		"REVISION=0123456789abcdef0123456789abcdef01234567",
+		"RELEASE_TARGETS=darwin/arm64",
+		"OUTPUT_DIR=" + outputDir,
+		"MAKE=" + script,
+		"MAKE_LOG=" + makeLog,
+	}, "sh", filepath.Join(repo, "scripts", "build-release-artifacts.sh"))
+	if err == nil {
+		t.Fatalf("unsupported release target succeeded:\n%s", output)
+	}
+	if want := "unsupported release target darwin/arm64"; !strings.Contains(string(output), want) {
+		t.Fatalf("unsupported target output does not contain %q:\n%s", want, output)
+	}
+	if entries, readErr := os.ReadDir(outputDir); readErr == nil && len(entries) != 0 {
+		t.Fatalf("unsupported target left %d final output files", len(entries))
+	} else if readErr != nil && !os.IsNotExist(readErr) {
+		t.Fatal(readErr)
+	}
+}
+
+func newReleaseArtifactFixture(t *testing.T) (repo, makeScript, makeLog string) {
+	t.Helper()
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo = t.TempDir()
+	for _, name := range []string{
+		"LICENSE",
+		filepath.Join("scripts", "build-release-artifacts.sh"),
+		filepath.Join("scripts", "validate-build-revision.sh"),
+		filepath.Join("scripts", "validate-build-version.sh"),
+	} {
+		content, readErr := os.ReadFile(filepath.Join(root, name))
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		target := filepath.Join(repo, name)
+		if mkdirErr := os.MkdirAll(filepath.Dir(target), 0o700); mkdirErr != nil {
+			t.Fatal(mkdirErr)
+		}
+		if writeErr := os.WriteFile(target, content, 0o700); writeErr != nil {
+			t.Fatal(writeErr)
+		}
+	}
+	makeLog = filepath.Join(repo, "make.log")
+	makeScript = filepath.Join(repo, "fake-make")
+	fakeMake := `#!/bin/sh
+set -eu
+printf '%s|%s|%s|%s\n' "${CGO_ENABLED-}" "${GOOS-}" "${GOARCH-}" "$*" >>"$MAKE_LOG"
+if [ "$1" = build-check ]; then
+  build_bin=
+  for argument do
+    case "$argument" in
+      BUILD_BIN=*) build_bin=${argument#BUILD_BIN=} ;;
+    esac
+  done
+  [ -n "$build_bin" ]
+  mkdir -p "$(dirname "$build_bin")"
+  printf '%s\n' sandrone-binary >"$build_bin"
+  chmod 0755 "$build_bin"
+fi
+`
+	if err := os.WriteFile(makeScript, []byte(fakeMake), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	return repo, makeScript, makeLog
+}
+
 func workflowTriggerBlock(t *testing.T, workflow string) string {
 	t.Helper()
 
@@ -384,13 +535,38 @@ func workflowNamedStep(t *testing.T, workflow, name string) string {
 	}
 	start := strings.Index(workflow, marker)
 	body := workflow[start+len(marker):]
-	if end := strings.Index(body, "\n      - name: "); end >= 0 {
-		body = body[:end]
-	}
+	body = workflowIndentedBody(body, 6)
 	return strings.TrimRight(marker+body, "\n")
 }
 
-func TestContainerWorkflowWiresBuildIdentityAndReleasePolicy(t *testing.T) {
+func workflowIndentedBody(body string, parentIndent int) string {
+	offset := 0
+	for _, line := range strings.Split(body, "\n") {
+		if line != "" {
+			indent := len(line) - len(strings.TrimLeft(line, " "))
+			if indent <= parentIndent {
+				return strings.TrimRight(body[:offset], "\n")
+			}
+		}
+		offset += len(line) + 1
+	}
+	return strings.TrimRight(body, "\n")
+}
+
+func workflowNamedJob(t *testing.T, workflow, name string) string {
+	t.Helper()
+
+	marker := "  " + name + ":\n"
+	if count := strings.Count(workflow, marker); count != 1 {
+		t.Fatalf("workflow contains %d %q jobs, want 1", count, name)
+	}
+	start := strings.Index(workflow, marker)
+	body := workflow[start+len(marker):]
+	body = workflowIndentedBody(body, 2)
+	return strings.TrimRight(marker+body, "\n")
+}
+
+func TestBuildMetadataContracts(t *testing.T) {
 	root := filepath.Join("..", "..")
 	dockerfile, err := os.ReadFile(filepath.Join(root, "Dockerfile"))
 	if err != nil {
@@ -399,6 +575,28 @@ func TestContainerWorkflowWiresBuildIdentityAndReleasePolicy(t *testing.T) {
 	workflow, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "ci.yml"))
 	if err != nil {
 		t.Fatal(err)
+	}
+	buildReference, err := os.ReadFile(filepath.Join(root, "docs", "reference", "build-info.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, want := range []string{
+		"sandrone_<version>_linux_amd64.tar.gz",
+		"sandrone_<version>_linux_arm64.tar.gz",
+		"checksums.txt",
+		"sha256sum -c checksums.txt",
+		"linux/amd64",
+		"linux/arm64",
+		"发布版本不允许加号",
+		"最多 127 个字符",
+		"只有推送与规范版本匹配的 `v<version>` Git tag 才会发布",
+		"稳定版本才同时更新 `latest`",
+		"预发布 tag 只发布自己的同名 tag",
+	} {
+		if !strings.Contains(string(buildReference), want) {
+			t.Errorf("build reference does not contain %q", want)
+		}
 	}
 
 	for _, want := range []string{
@@ -426,51 +624,101 @@ func TestContainerWorkflowWiresBuildIdentityAndReleasePolicy(t *testing.T) {
   workflow_dispatch:`; got != want {
 		t.Errorf("workflow trigger block =\n%s\nwant:\n%s", got, want)
 	}
-	if got, want := workflowNamedStep(t, workflowText, "Build container image"), `      - name: Build container image
+	containerJob := workflowNamedJob(t, workflowText, "container-image")
+	if got, want := workflowNamedStep(t, containerJob, "Resolve image metadata"), `      - name: Resolve image metadata
+        id: image-metadata
         shell: bash
         run: |
-          image_tag=ci
+          version="$(tr -d '\r\n' < internal/buildinfo/VERSION)"
+          tags="${IMAGE}:ci"
           if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            image_tag="${GITHUB_REF_NAME}"
+            git fetch --force --tags origin
+            tags="$(./scripts/container-image-tags.sh)"
           fi
-          make image SANDRONE_IMAGE="${IMAGE}:${image_tag}" REVISION="${GITHUB_SHA}"`; got != want {
-		t.Errorf("Build container image step =\n%s\nwant:\n%s", got, want)
+          {
+            echo "version=${version}"
+            echo 'tags<<EOF'
+            echo "${tags}"
+            echo EOF
+          } >> "${GITHUB_OUTPUT}"`; got != want {
+		t.Errorf("Resolve image metadata step =\n%s\nwant:\n%s", got, want)
 	}
-	if got, want := workflowNamedStep(t, workflowText, "Log in to GHCR"), `      - name: Log in to GHCR
+	if got, want := workflowNamedStep(t, containerJob, "Log in to GHCR"), `      - name: Log in to GHCR
         if: github.event_name == 'push' && github.ref_type == 'tag'
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin`; got != want {
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}`; got != want {
 		t.Errorf("Log in to GHCR step =\n%s\nwant:\n%s", got, want)
 	}
-	if got, want := workflowNamedStep(t, workflowText, "Push container image"), `      - name: Push container image
-        if: github.event_name == 'push' && github.ref_type == 'tag'
-        shell: bash
-        run: |
-          source_image="${IMAGE}:${GITHUB_REF_NAME}"
-          git fetch --force --tags origin
-          publish_tags="$(./scripts/container-image-tags.sh)"
-          while IFS= read -r tag; do
-            [[ -n "${tag}" ]] || continue
-            if [[ "${tag}" != "${source_image}" ]]; then
-              docker tag "${source_image}" "${tag}"
-            fi
-            docker push "${tag}"
-          done <<< "${publish_tags}"`; got != want {
-		t.Errorf("Push container image step =\n%s\nwant:\n%s", got, want)
+	if got, want := workflowNamedStep(t, containerJob, "Build container image"), `      - name: Build container image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name == 'push' && github.ref_type == 'tag' }}
+          tags: ${{ steps.image-metadata.outputs.tags }}
+          build-args: |
+            VERSION=${{ steps.image-metadata.outputs.version }}
+            REVISION=${{ github.sha }}
+          labels: |
+            org.opencontainers.image.version=${{ steps.image-metadata.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}`; got != want {
+		t.Errorf("Build container image step =\n%s\nwant:\n%s", got, want)
 	}
-	if strings.Contains(workflowText, "sha-") {
-		t.Error("container workflow must not create or publish sha-* image tags")
+	for _, forbidden := range []string{"make image", "docker tag", "docker push", "sha-"} {
+		if strings.Contains(containerJob, forbidden) {
+			t.Errorf("container workflow must not contain %q", forbidden)
+		}
 	}
 	for _, want := range []string{
+		`uses: docker/setup-qemu-action@v3`,
+		`uses: docker/setup-buildx-action@v3`,
 		`needs:`,
 		`- go`,
 		`- web`,
 		`- build-webui`,
+		`packages: write`,
 		`fetch-depth: 0`,
 		`group: container-image-${{ github.event_name == 'push' && 'publish' || github.run_id }}`,
+		`cancel-in-progress: false`,
 		`queue: max`,
 	} {
-		if !strings.Contains(workflowText, want) {
+		if !strings.Contains(containerJob, want) {
 			t.Errorf("container workflow does not contain %q", want)
+		}
+	}
+
+	releaseJob := workflowNamedJob(t, workflowText, "release")
+	for _, want := range []string{
+		`if: github.event_name == 'push' && github.ref_type == 'tag'`,
+		"needs:\n      - container-image",
+		"permissions:\n      contents: write",
+		`uses: actions/checkout@v4`,
+		`fetch-depth: 0`,
+		`uses: actions/setup-go@v5`,
+		`go-version-file: go.mod`,
+		`uses: pnpm/action-setup@v4`,
+		`version: 11.5.2`,
+		`uses: actions/setup-node@v4`,
+		`node-version-file: .node-version`,
+		`run: make build-webui`,
+		`make release-artifacts REVISION="${GITHUB_SHA}"`,
+		`GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}`,
+		`version="$(tr -d '\r\n' < internal/buildinfo/VERSION)"`,
+		`artifacts=(`,
+		`"dist/sandrone_${version}_linux_amd64.tar.gz"`,
+		`"dist/sandrone_${version}_linux_arm64.tar.gz"`,
+		`"dist/checksums.txt"`,
+		`if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then`,
+		`gh release upload "${GITHUB_REF_NAME}" "${artifacts[@]}" --clobber`,
+		`if [[ ! "${GITHUB_REF_NAME}" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then`,
+		`prerelease_flag="--prerelease"`,
+		`gh release create "${GITHUB_REF_NAME}" "${artifacts[@]}" --verify-tag --generate-notes ${prerelease_flag}`,
+	} {
+		if !strings.Contains(releaseJob, want) {
+			t.Errorf("release job does not contain %q", want)
 		}
 	}
 }
@@ -617,6 +865,39 @@ func TestContainerImageTagsFollowReleasePolicy(t *testing.T) {
 		output, err := run(t, "push", "tag", "v0.1.0", "0.2.0")
 		if err == nil {
 			t.Fatalf("mismatched release tag was accepted:\n%s", output)
+		}
+	})
+
+	t.Run("release version rejects build metadata", func(t *testing.T) {
+		output, err := run(t, "push", "tag", "v0.2.0+build", "0.2.0+build")
+		if err == nil {
+			t.Fatalf("release version with build metadata was accepted:\n%s", output)
+		}
+		if want := "release VERSION must contain only ASCII letters, digits, dots, and hyphens"; !strings.Contains(string(output), want) {
+			t.Fatalf("release version error = %q, want it to contain %q", output, want)
+		}
+	})
+
+	t.Run("release version accepts 127 characters", func(t *testing.T) {
+		version := strings.Repeat("a", 127)
+		output, err := run(t, "push", "tag", "v"+version, version)
+		if err != nil {
+			t.Fatalf("127-character release version was rejected: %v\n%s", err, output)
+		}
+		want := "example.test/sandrone:v" + version + "\n"
+		if got := string(output); got != want {
+			t.Fatalf("127-character release tags = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("release version rejects 128 characters", func(t *testing.T) {
+		version := strings.Repeat("a", 128)
+		output, err := run(t, "push", "tag", "v"+version, version)
+		if err == nil {
+			t.Fatalf("128-character release version was accepted:\n%s", output)
+		}
+		if want := "release VERSION must be at most 127 characters"; !strings.Contains(string(output), want) {
+			t.Fatalf("release version error = %q, want it to contain %q", output, want)
 		}
 	})
 

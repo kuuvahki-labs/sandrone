@@ -20,6 +20,7 @@ sandrone
 !skills/sandrone/
 !skills/sandrone/**
 /data/
+/dist/
 /internal/entry/cli/data/
 web/.pnpm-store/
 

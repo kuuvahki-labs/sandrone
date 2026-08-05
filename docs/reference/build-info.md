@@ -51,7 +51,36 @@ make image SANDRONE_IMAGE=ghcr.io/kuuvahki-labs/sandrone:v0.1.0
 `make image` 默认生成 `ghcr.io/kuuvahki-labs/sandrone:local`。干净 worktree
 会向二进制和 OCI labels 传入规范版本及当前 HEAD；dirty worktree 或无 Git
 目录与裸 Docker 构建一样改用 `dev`，不会输出看似正式但不可追溯的版本。
-`SANDRONE_IMAGE` 同时是 Make 的构建 tag 和 Compose 的运行镜像覆盖变量。
+`SANDRONE_IMAGE` 同时是 Make 的构建 tag 和 Compose 的运行镜像覆盖变量。本地
+`make image` 始终使用当前 Docker daemon 的单一平台，不创建多架构 manifest。
+
+## GitHub Release
+
+只有推送与规范版本匹配的 `v<version>` Git tag 才会发布。例如
+`internal/buildinfo/VERSION` 为 `0.1.0` 时，发布 tag 必须是 `v0.1.0`。分支 push、
+pull request 和手动 CI 都不会创建 GitHub Release，也不会上传发布附件。
+
+发布版本采用比本地构建身份更严格的规则：只允许 ASCII 字母、数字、点和连字符，
+发布版本不允许加号，并且最多 127 个字符。CI 会添加 `v` 前缀，因此完整 OCI tag
+最多 128 个字符。这个限制只适用于发布；本地构建身份仍可使用加号表达 build
+metadata。
+
+每个 GitHub Release 固定包含以下三个附件：
+
+- `sandrone_<version>_linux_amd64.tar.gz`，用于 `linux/amd64`；
+- `sandrone_<version>_linux_arm64.tar.gz`，用于 `linux/arm64`；
+- `checksums.txt`，包含上述两个压缩包的 SHA-256 校验值。
+
+两个压缩包都只包含 `sandrone` 可执行文件和 `LICENSE`。下载三个附件到同一目录
+后执行：
+
+```sh
+sha256sum -c checksums.txt
+```
+
+纯 `vMAJOR.MINOR.PATCH` tag 创建正式 Release；其他与版本文件匹配的 tag（例如
+`v0.1.0-rc.1`）创建 prerelease。重新运行同一个 tag 的发布任务会替换同名附件，
+不会创建第二个 Release。
 
 ## 容器身份
 
@@ -65,12 +94,15 @@ docker run --rm sandrone:dev --version
 # sandrone version dev
 ```
 
-需要可追溯镜像时使用干净 worktree 执行 `make image`。CI 同样调用该 target：
+需要本地可追溯镜像时，在干净 worktree 中执行 `make image`。CI 使用 Buildx 构建
+同时包含 `linux/amd64` 和 `linux/arm64` 的 GHCR manifest；Docker pull 或 run 会
+按宿主机架构自动选择对应镜像：
 
-- pull request、main 和手动 CI 只构建未发布的 `:ci` 镜像；
-- `v<version>` Git tag 构建并推送保留 `v` 的同名镜像 tag，例如 `v0.1.0`；
-- 只有版本顺序最高、格式为 `vMAJOR.MINOR.PATCH` 的稳定版本才同时更新
-  `latest`；预发布 tag 只发布自己的同名 tag；
+- pull request、main 和手动 CI 只验证 `:ci` 镜像，不推送到 GHCR；
+- 只有 `v<version>` Git tag push 才推送双架构镜像，并保留 `v` 的同名镜像 tag，
+  例如 `ghcr.io/kuuvahki-labs/sandrone:v0.1.0`；
+- 只有版本顺序最高、格式为 `vMAJOR.MINOR.PATCH` 的稳定版本才同时更新 `latest`；
+- 预发布 tag 只发布自己的同名 tag；
 - CI 不创建或发布 `sha-*` 镜像 tag，需要精确复现时使用镜像 digest。
 
 容器发布任务使用同一 FIFO 队列串行执行，最多保留 100 个 pending 任务。发布
