@@ -39,6 +39,12 @@ export interface ConfigTemplateRuleEntry {
   ruleID: string;
 }
 
+interface ConfigTemplateRuleException {
+  moduleID: ConfigGroupID;
+  requiresModuleID: ConfigGroupID;
+  ruleID: string;
+}
+
 export interface ConfigTemplateBlueprint {
   enabled: ReadonlySet<string>;
   groups: readonly ConfigTemplateModule[];
@@ -70,7 +76,7 @@ export interface ConfigTemplateStrategy {
 
 const MODULES: readonly ConfigTemplateModule[] = [
   module("select"), module("auto", "url-test"), module("ad", "reject-first", ["category-ads-all"]),
-  module("private", "direct-first", ["private", "private-ip"]), module("cn", "direct-first", ["geolocation-cn", "cn-ip"]),
+  module("private", "direct-first", ["private", "private-ip"]), module("cn", "direct-first", ["cn", "cn-ip"]),
   module("global", "select", ["geolocation-!cn"]), module("final"), module("ai", "select", ["openai", "anthropic", "category-ai-chat-!cn"]),
   module("youtube", "select", ["youtube"]), module("google", "select", ["google", "google-ip"]), module("microsoft", "select", ["microsoft", "onedrive"]),
   module("apple", "select", ["apple", "icloud"]), module("telegram", "select", ["telegram", "telegram-ip"]), module("twitter", "select", ["twitter", "twitter-ip"]),
@@ -109,9 +115,15 @@ const GROUP_ORDER: readonly ConfigGroupID[] = [
   "payment", "crypto", "education", "news", "shopping", "private", "cn", "global", "final",
 ];
 const RULE_ORDER: readonly ConfigGroupID[] = [
-  "ad", "private", "ai", "cn", "youtube", "education", "cloud", "google", "telegram", "github", "microsoft", "apple", "twitter", "meta",
+  "ad", "private", "ai", "youtube", "education", "cloud", "google", "telegram", "github", "microsoft", "apple", "twitter", "meta",
   "discord", "social-other", "netflix", "disney", "streaming-west", "streaming-asia", "steam", "gaming-pc", "gaming-console", "dev-tools",
-  "storage", "payment", "crypto", "news", "shopping", "global",
+  "storage", "payment", "crypto", "news", "shopping", "cn", "global",
+];
+const RULE_EXCEPTIONS: readonly ConfigTemplateRuleException[] = [
+  { moduleID: "cn", requiresModuleID: "microsoft", ruleID: "microsoft@cn" },
+  { moduleID: "cn", requiresModuleID: "apple", ruleID: "apple-cn" },
+  { moduleID: "cn", requiresModuleID: "steam", ruleID: "steam@cn" },
+  { moduleID: "cn", requiresModuleID: "gaming-pc", ruleID: "category-games@cn" },
 ];
 
 export function createConfigTemplateStrategy(
@@ -126,10 +138,16 @@ export function createConfigTemplateStrategy(
     const groups = GROUP_ORDER
       .filter((moduleID) => enabled.has(moduleID))
       .map(requiredModule);
+    const ruleExceptions = RULE_EXCEPTIONS
+      .filter((item) => enabled.has(item.moduleID) && enabled.has(item.requiresModuleID))
+      .map((item) => ({ module: requiredModule(item.moduleID), ruleID: item.ruleID }));
     const ruleEntries = RULE_ORDER
       .filter((moduleID) => enabled.has(moduleID))
       .map(requiredModule)
-      .flatMap((item) => item.rules.map((ruleID) => ({ module: item, ruleID })));
+      .flatMap((item) => [
+        ...item.rules.map((ruleID) => ({ module: item, ruleID })),
+        ...(item.id === "private" ? ruleExceptions : []),
+      ]);
     return dialect.materialize({ enabled, groups, namingLocale, ruleEntries });
   };
   const recognize = (config: FileConfigDraft): ConfigTemplateRecognition => {

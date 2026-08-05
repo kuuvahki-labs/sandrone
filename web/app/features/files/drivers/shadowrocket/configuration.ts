@@ -280,7 +280,9 @@ function shadowrocketRules(): StructuredFileConfigurationAdapter["rules"] {
       ...rule,
       type,
       value: type === "final" ? "" : rule.value,
-      noResolve: NO_RESOLVE_TYPES.has(type) ? rule.noResolve : false,
+      noResolve: type === "geoip" || type === "ip-cidr"
+        ? rule.noResolve ?? true
+        : NO_RESOLVE_TYPES.has(type) ? rule.noResolve : false,
     }),
     typeOptions: shadowrocketRuleTypeOptions,
     validateComponent: validRuleComponent,

@@ -289,7 +289,7 @@ function materializeMihomoTemplate(
     };
   });
   const rules = blueprint.ruleEntries.map(({ module, ruleID }) => (
-    `RULE-SET,${ruleID},${configGroupName(module.id, blueprint.namingLocale)}${ruleID.endsWith("-ip") ? ",no-resolve" : ""}`
+    `RULE-SET,${ruleID},${configGroupName(module.id, blueprint.namingLocale)}${ruleID.endsWith("-ip") && ruleID !== "cn-ip" ? ",no-resolve" : ""}`
   ));
   rules.push(`MATCH,${configGroupName("final", blueprint.namingLocale)}`);
   return {

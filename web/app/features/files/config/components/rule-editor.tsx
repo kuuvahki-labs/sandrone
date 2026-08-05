@@ -270,6 +270,7 @@ export function RuleListEditor({ adapter, defaultExpanded = false, groups, issue
                 options={options}
                 policyOptions={policyOptions}
                 rule={rule}
+                ruleSets={ruleSets}
                 ruleSetNames={ruleSetNames}
                 total={rules.length}
                 ui={ui}
@@ -300,7 +301,7 @@ export function RuleListEditor({ adapter, defaultExpanded = false, groups, issue
   );
 }
 
-function SortableRuleRow({ adapter, focusFirstField, id, index, onDelete, onMove, onOpenChange, onUpdate, open, options, policyOptions, rule, ruleSetNames, total, ui }: {
+function SortableRuleRow({ adapter, focusFirstField, id, index, onDelete, onMove, onOpenChange, onUpdate, open, options, policyOptions, rule, ruleSets, ruleSetNames, total, ui }: {
   adapter: StructuredFileConfigurationAdapter;
   focusFirstField: boolean;
   id: string;
@@ -313,6 +314,7 @@ function SortableRuleRow({ adapter, focusFirstField, id, index, onDelete, onMove
   options: { label: string; value: string }[];
   policyOptions: ReturnType<typeof policyReferenceOptions>;
   rule: RuleDraft;
+  ruleSets: RuleSetDraft[];
   ruleSetNames: string[];
   total: number;
   ui: Readonly<StructuredConfigurationFieldSlots>;
@@ -345,7 +347,13 @@ function SortableRuleRow({ adapter, focusFirstField, id, index, onDelete, onMove
           <div className={hasValue ? "grid gap-3 md:grid-cols-[minmax(8rem,0.55fr)_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-center" : "grid gap-3 md:grid-cols-[minmax(8rem,0.55fr)_minmax(0,1fr)_minmax(0,1fr)] md:items-center"}>
             <SelectField focusOnMount={focusFirstField} label={t("files.config.behavior")} options={options} size="small" value={rule.type} onChange={(value) => onUpdate(adapter.rules.transitionType(rule, value))} />
             {hasValue ? referencesRuleSet ? (
-              <SelectField label={t("files.config.ruleValue")} options={currentRuleSetNames.map((value) => ({ label: value, value }))} size="small" value={rule.value} onChange={(value) => onUpdate({ value })} />
+              <SelectField label={t("files.config.ruleValue")} options={currentRuleSetNames.map((value) => ({ label: value, value }))} size="small" value={rule.value} onChange={(value) => {
+                const behavior = ruleSets.find((ruleSet) => ruleSet.name === value)?.behavior;
+                const noResolve = rule.type === "rule-set" && adapter.rules.supportsNoResolve(rule.type)
+                  ? behavior === "ipcidr" ? true : behavior === "domain" || behavior === "domain-set" ? false : undefined
+                  : undefined;
+                onUpdate(noResolve === undefined ? { value } : { value, noResolve });
+              }} />
             ) : (
               <TextField fullWidth required label={t("files.config.ruleValue")} size="small" value={rule.value} onChange={(event) => onUpdate({ value: event.target.value })} />
             ) : <TextField disabled fullWidth label={t("files.config.ruleValue")} placeholder={t("files.config.ruleValueNotRequired")} size="small" value="" />}

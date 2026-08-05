@@ -122,6 +122,28 @@ describe("config rule editors", () => {
     expect(screen.getAllByRole("button", { name: /展开规则/ })).toHaveLength(2);
   });
 
+  it("defaults no-resolve from the selected Mihomo IP rule set behavior", async () => {
+    const user = userEvent.setup();
+    const config = initialConfig("mihomo", {
+      groups: [{ name: "Proxy", type: "select", proxies: ["$nodes", "DIRECT"] }],
+      rule_sets: [
+        { name: "domains", type: "http", behavior: "domain", format: "mrs", interval: 86400, url: "https://example.com/domains.mrs" },
+        { name: "addresses", type: "http", behavior: "ipcidr", format: "mrs", interval: 86400, url: "https://example.com/addresses.mrs" },
+      ],
+      rules: ["RULE-SET,domains,DIRECT", "MATCH,Proxy"],
+    });
+    render(<RuleHarness initial={config.rules} ruleSets={config.ruleSets} />);
+
+    await user.click(screen.getByRole("button", { name: "展开规则 1" }));
+    const first = screen.getByRole("group", { name: "规则 1" });
+    expect(within(first).getByRole("checkbox", { name: "no-resolve" })).not.toBeChecked();
+
+    await user.click(within(first).getByRole("combobox", { name: /匹配值|Rule value/i }));
+    await user.click(screen.getByRole("option", { name: "addresses" }));
+
+    expect(within(first).getByRole("checkbox", { name: "no-resolve" })).toBeChecked();
+  });
+
   it("keeps Shadowrocket rule sets remote-only with exact reference types", async () => {
     const user = userEvent.setup();
     const config = initialConfig("shadowrocket", {

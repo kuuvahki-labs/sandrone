@@ -283,7 +283,12 @@ function mihomoRules(): StructuredFileConfigurationAdapter["rules"] {
     requiresValue: (type) => type !== "match",
     serialize: serializeMihomoRules,
     supportsNoResolve: (type) => type === "rule-set" || type === "geoip",
-    transitionType: (rule, type) => ({ ...rule, type, value: type === "match" ? "" : rule.value, noResolve: type === "rule-set" || type === "geoip" ? rule.noResolve : false }),
+    transitionType: (rule, type) => ({
+      ...rule,
+      type,
+      value: type === "match" ? "" : rule.value,
+      noResolve: type === "geoip" ? rule.noResolve ?? true : type === "rule-set" ? rule.noResolve : false,
+    }),
     typeOptions: mihomoRuleTypeOptions,
     validateComponent: (value) => typeof value === "string" && Boolean(value.trim()),
   };

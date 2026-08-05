@@ -48,6 +48,7 @@ const ADAPTIVE_TYPE_OPTIONS = [
   { value: "load-balance", label: "load-balance" },
 ] as const;
 const RULE_BASE = "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket";
+const UNSUPPORTED_TEMPLATE_RULES = new Set(["apple-cn", "category-games@cn", "microsoft@cn"]);
 
 const relations = shadowrocketRelations();
 const adaptive = shadowrocketAdaptive(shadowrocketAdaptiveDialect(relations));
@@ -370,18 +371,19 @@ function materializeShadowrocketTemplate(
       ? { name, type: "url-test", proxies: targets, interval: 300, timeout: 5, tolerance: 50 }
       : { name, type: "select", proxies: targets };
   });
-  const ruleEntries = blueprint.ruleEntries.filter(({ ruleID }) => canonicalRuleID(ruleID) === ruleID);
-  const ruleSets = ruleEntries.map(({ ruleID }) => {
-    const artifact = ruleArtifact(ruleID);
+  const ruleEntries = blueprint.ruleEntries
+    .filter(({ ruleID }) => canonicalRuleID(ruleID) === ruleID && !UNSUPPORTED_TEMPLATE_RULES.has(ruleID))
+    .flatMap(({ module, ruleID }) => ruleArtifacts(ruleID).map((artifact) => ({ artifact, module })));
+  const ruleSets = ruleEntries.map(({ artifact }) => {
     return {
-      name: ruleID,
+      name: artifact.id,
       type: artifact.type,
-      url: `${RULE_BASE}/${artifact.name}/${artifact.name}.list`,
+      url: `${RULE_BASE}/${artifact.name}/${artifact.filename}`,
     };
   });
-  const rules = ruleEntries.map(({ module, ruleID }) => {
-    const type = ruleArtifact(ruleID).type === "domain-set" ? "DOMAIN-SET" : "RULE-SET";
-    return `${type},${ruleID},${configGroupName(module.id, blueprint.namingLocale)}${type === "RULE-SET" && ruleID.endsWith("-ip") ? ",no-resolve" : ""}`;
+  const rules = ruleEntries.map(({ artifact, module }) => {
+    const type = artifact.type === "domain-set" ? "DOMAIN-SET" : "RULE-SET";
+    return `${type},${artifact.id},${configGroupName(module.id, blueprint.namingLocale)}`;
   });
   rules.push(`FINAL,${configGroupName("final", blueprint.namingLocale)}`);
   return {
@@ -394,7 +396,7 @@ function materializeShadowrocketTemplate(
 }
 
 const ARTIFACT_NAMES: Readonly<Record<string, string>> = {
-  private: "Lan", "geolocation-cn": "China", "geolocation-!cn": "Global",
+  private: "Lan", cn: "China", "geolocation-cn": "China", "geolocation-!cn": "Global",
   openai: "OpenAI", anthropic: "Anthropic", youtube: "YouTube", google: "Google", microsoft: "Microsoft",
   onedrive: "OneDrive", apple: "Apple", icloud: "iCloud", github: "GitHub", gitlab: "GitLab", atlassian: "Atlassian",
   telegram: "Telegram", twitter: "Twitter", facebook: "Facebook", instagram: "Instagram", whatsapp: "Whatsapp",
@@ -402,7 +404,7 @@ const ARTIFACT_NAMES: Readonly<Record<string, string>> = {
   pinterest: "Pinterest", tumblr: "Tumblr", netflix: "Netflix", disney: "Disney", hbo: "HBO", hulu: "Hulu",
   primevideo: "AmazonPrimeVideo", "apple-tvplus": "AppleTV", spotify: "Spotify", twitch: "Twitch", dazn: "DAZN",
   bahamut: "Bahamut", biliintl: "BiliBiliIntl", niconico: "Niconico", abema: "Abema", viu: "ViuTV", kktv: "KKTV",
-  steam: "Steam", epicgames: "Epic", ea: "EA", ubisoft: "Ubisoft", blizzard: "Blizzard", gog: "Gog", riot: "Riot",
+  steam: "Steam", "steam@cn": "SteamCN", epicgames: "Epic", ea: "EA", ubisoft: "Ubisoft", blizzard: "Blizzard", gog: "Gog", riot: "Riot",
   playstation: "PlayStation", xbox: "Xbox", nintendo: "Nintendo", cloudflare: "Cloudflare", digitalocean: "DigitalOcean",
   vercel: "Vercel", docker: "Docker", npmjs: "Npmjs", jetbrains: "Jetbrains", stackexchange: "Stackexchange",
   dropbox: "Dropbox", notion: "Notion", paypal: "PayPal", stripe: "Stripe", binance: "Binance",
@@ -411,7 +413,7 @@ const ARTIFACT_NAMES: Readonly<Record<string, string>> = {
 };
 
 const RULE_ALIASES: Readonly<Record<string, string>> = {
-  "private-ip": "private", "cn-ip": "geolocation-cn", "category-ai-chat-!cn": "openai", "google-ip": "google",
+  "private-ip": "private", "cn-ip": "cn", "category-ai-chat-!cn": "openai", "google-ip": "google",
   "telegram-ip": "telegram", "twitter-ip": "twitter", "facebook-ip": "facebook", "netflix-ip": "netflix",
   "cloudflare-ip": "cloudflare", aws: "amazon", azure: "microsoft", netlify: "vercel", wise: "paypal",
   coursera: "category-scholar-!cn", udemy: "category-scholar-!cn", edx: "category-scholar-!cn",
@@ -422,10 +424,23 @@ function canonicalRuleID(ruleID: string): string {
   return RULE_ALIASES[ruleID] ?? ruleID;
 }
 
-function ruleArtifact(ruleID: string): { name: string; type: "rule-set" | "domain-set" } {
+interface ShadowrocketRuleArtifact {
+  filename: string;
+  id: string;
+  name: string;
+  type: "rule-set" | "domain-set";
+}
+
+function ruleArtifacts(ruleID: string): ShadowrocketRuleArtifact[] {
   const name = ARTIFACT_NAMES[canonicalRuleID(ruleID)];
   if (!name) throw new Error(`Unknown Shadowrocket template rule: ${ruleID}`);
-  return { name, type: "rule-set" };
+  if (ruleID === "cn") {
+    return [
+      { filename: `${name}_Domain.list`, id: "cn-domain", name, type: "domain-set" },
+      { filename: `${name}.list`, id: ruleID, name, type: "rule-set" },
+    ];
+  }
+  return [{ filename: `${name}.list`, id: ruleID, name, type: "rule-set" }];
 }
 
 function policyFilter(item: { filter: string; excludeFilter?: string }): string {

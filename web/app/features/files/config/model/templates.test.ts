@@ -18,7 +18,7 @@ const SHADOWROCKET_TEMPLATE_ARTIFACTS = new Set([
   "GitLab", "Global", "Gog", "Google", "HBO", "Hulu", "Instagram", "Jetbrains", "KKTV", "Lan", "Line",
   "LinkedIn", "Microsoft", "NYTimes", "Netflix", "Niconico", "Nintendo", "Notion", "Npmjs", "OneDrive",
   "OpenAI", "PayPal", "Pinterest", "PlayStation", "Reddit", "Riot", "Scholar", "Snap", "Spotify",
-  "Stackexchange", "Steam", "Stripe", "Telegram", "TikTok", "Tumblr", "Twitch", "Twitter", "Ubisoft", "Vercel",
+  "Stackexchange", "Steam", "SteamCN", "Stripe", "Telegram", "TikTok", "Tumblr", "Twitch", "Twitter", "Ubisoft", "Vercel",
   "ViuTV", "Whatsapp", "Wikimedia", "Xbox", "YouTube", "eBay", "iCloud",
 ]);
 
@@ -150,6 +150,119 @@ describe("config templates", () => {
    }
  });
 
+  it.each(TEMPLATE_IDS)("uses the complete China domain set in every %s template", (templateID) => {
+    const mihomo = createConfigFromTemplate("mihomo", templateID);
+    expect(mihomo.rule_sets).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        name: "cn",
+        behavior: "domain",
+        url: expect.stringMatching(/\/geosite\/cn\.mrs$/),
+      }),
+      expect.objectContaining({
+        name: "cn-ip",
+        behavior: "ipcidr",
+        url: expect.stringMatching(/\/geoip\/cn\.mrs$/),
+      }),
+    ]));
+    expect(mihomo.rule_sets?.some((ruleSet) => ruleSet.name === "geolocation-cn")).toBe(false);
+
+    const singBox = createConfigFromTemplate("sing-box", templateID);
+    expect(singBox.rule_sets).toEqual(expect.arrayContaining([
+      expect.objectContaining({ tag: "cn", url: expect.stringMatching(/\/geosite\/cn\.srs$/) }),
+      expect.objectContaining({ tag: "cn-ip", url: expect.stringMatching(/\/geoip\/cn\.srs$/) }),
+    ]));
+    expect(singBox.rule_sets?.some((ruleSet) => ruleSet.tag === "geolocation-cn")).toBe(false);
+
+    const shadowrocket = createConfigFromTemplate("shadowrocket", templateID);
+    expect(shadowrocket.rule_sets).toEqual(expect.arrayContaining([
+      {
+        name: "cn-domain",
+        type: "domain-set",
+        url: `${SHADOWROCKET_RULE_BASE}/China/China_Domain.list`,
+      },
+      {
+        name: "cn",
+        type: "rule-set",
+        url: `${SHADOWROCKET_RULE_BASE}/China/China.list`,
+      },
+    ]));
+    expect(shadowrocket.rules).toEqual(expect.arrayContaining([
+      "DOMAIN-SET,cn-domain,China",
+      "RULE-SET,cn,China",
+    ]));
+  });
+
+  it.each(TEMPLATE_IDS)("keeps China IP matching as a resolving fallback in every %s Mihomo template", (templateID) => {
+    const rules = createConfigFromTemplate("mihomo", templateID).rules ?? [];
+
+    expect(rules).toContain("RULE-SET,cn-ip,China");
+    expect(rules).not.toContain("RULE-SET,cn-ip,China,no-resolve");
+    expect(rules).toContain("RULE-SET,private-ip,Private,no-resolve");
+  });
+
+  it.each(["standard", "full"] satisfies ConfigTemplateID[])("keeps dedicated service IP rules non-resolving in the %s Mihomo template", (templateID) => {
+    expect(createConfigFromTemplate("mihomo", templateID).rules).toContain(
+      "RULE-SET,telegram-ip,Telegram,no-resolve",
+    );
+  });
+
+  it.each(CONFIG_KINDS)("places broad China routing after specific services in the %s standard template", (kind) => {
+    const config = createConfigFromTemplate(kind, "standard");
+    const rules = config.rules ?? [];
+    const policy = (rule: Record<string, unknown>): string => kind === "sing-box"
+      ? String(rule.outbound ?? "")
+      : String(rule).split(",")[2] ?? "";
+    const ruleSetID = (rule: Record<string, unknown>): string => kind === "sing-box"
+      ? String(Array.isArray(rule.rule_set) ? rule.rule_set[0] : "")
+      : String(rule).split(",")[1] ?? "";
+    const firstPolicy = (name: string): number => rules.findIndex((rule) =>
+      policy(rule as Record<string, unknown>) === name);
+    const broadChina = rules.findIndex((rule) =>
+      ruleSetID(rule as Record<string, unknown>) === "cn");
+
+    expect(firstPolicy("YouTube")).toBeGreaterThanOrEqual(0);
+    expect(broadChina).toBeGreaterThan(firstPolicy("YouTube"));
+    expect(firstPolicy("Global")).toBeGreaterThan(broadChina);
+  });
+
+  it.each(["mihomo", "sing-box"] as const)("places domestic service exceptions before broad %s service rules", (kind) => {
+    const standard = createConfigFromTemplate(kind, "standard");
+    const full = createConfigFromTemplate(kind, "full");
+    const ruleSetID = (rule: unknown): string => {
+      if (kind !== "sing-box") return String(rule).split(",")[1] ?? "";
+      const value = (rule as Record<string, unknown>).rule_set;
+      return String(Array.isArray(value) ? value[0] : "");
+    };
+    const indexOf = (config: FileConfigDraft, id: string): number =>
+      (config.rules ?? []).findIndex((rule) => ruleSetID(rule) === id);
+
+    expect(indexOf(standard, "category-ads-all")).toBeLessThan(indexOf(standard, "microsoft@cn"));
+    expect(indexOf(standard, "private-ip")).toBeLessThan(indexOf(standard, "microsoft@cn"));
+    expect(indexOf(standard, "microsoft@cn")).toBeLessThan(indexOf(standard, "microsoft"));
+    expect(indexOf(standard, "apple-cn")).toBeLessThan(indexOf(standard, "apple"));
+    expect(indexOf(standard, "steam@cn")).toBe(-1);
+    expect(indexOf(standard, "category-games@cn")).toBe(-1);
+    expect(indexOf(full, "steam@cn")).toBeLessThan(indexOf(full, "steam"));
+    expect(indexOf(full, "category-games@cn")).toBeLessThan(indexOf(full, "epicgames"));
+  });
+
+  it("uses the available SteamCN exception before Steam in the full Shadowrocket template", () => {
+    const config = createConfigFromTemplate("shadowrocket", "full");
+    const rules = config.rules as string[];
+    const steamCN = rules.indexOf("RULE-SET,steam@cn,China");
+    const steam = rules.indexOf("RULE-SET,steam,Steam");
+
+    expect(config.rule_sets).toEqual(expect.arrayContaining([
+      {
+        name: "steam@cn",
+        type: "rule-set",
+        url: `${SHADOWROCKET_RULE_BASE}/SteamCN/SteamCN.list`,
+      },
+    ]));
+    expect(steamCN).toBeGreaterThanOrEqual(0);
+    expect(steamCN).toBeLessThan(steam);
+  });
+
   it.each(TEMPLATE_IDS)("uses live Blackmatrix rule lists for the %s Shadowrocket template", (templateID) => {
     const config = createConfigFromTemplate("shadowrocket", templateID);
     const ruleTypesByName = new Map((config.rule_sets ?? []).map((ruleSet) => [ruleSet.name, ruleSet.type]));
@@ -200,7 +313,7 @@ describe("config templates", () => {
 
     expect(new Set(urls).size).toBe(urls.length);
     for (const url of urls) {
-      const match = url.match(new RegExp(`^${SHADOWROCKET_RULE_BASE}/([^/]+)/\\1\\.list$`));
+      const match = url.match(new RegExp(`^${SHADOWROCKET_RULE_BASE}/([^/]+)/\\1(?:_Domain)?\\.list$`));
       expect(match?.[1]).toEqual(expect.any(String));
       expect(SHADOWROCKET_TEMPLATE_ARTIFACTS.has(match?.[1] ?? "")).toBe(true);
       if (match?.[1]) artifacts.push(match[1]);

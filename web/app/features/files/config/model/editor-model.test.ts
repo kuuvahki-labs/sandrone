@@ -62,6 +62,17 @@ describe("file config model", () => {
     expect(defaultRuleDraft(kind, 0, "zh-CN")).toMatchObject({ value: "custom", policy: "🚀 节点选择" });
   });
 
+  it.each([
+    ["mihomo", "geoip"],
+    ["shadowrocket", "geoip"],
+    ["shadowrocket", "ip-cidr"],
+  ] as const)("defaults no-resolve on when changing a %s rule to %s", (kind, type) => {
+    const adapter = structuredAdapter(kind);
+    const rule = adapter.rules.transitionType(defaultRuleDraft(kind, 0), type);
+
+    expect(rule.noResolve).toBe(true);
+  });
+
   it.each(["mihomo", "sing-box"] as const)("reads preset-only %s group names from the shared locale catalog", (kind) => {
     const fallbackKey = "files.config.outputNames.group.fallback";
     const otherKey = "files.config.outputNames.group.other";
