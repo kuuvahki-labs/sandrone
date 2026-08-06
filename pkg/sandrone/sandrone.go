@@ -100,9 +100,6 @@ type (
 type Store interface {
 	Read(ctx context.Context, key string) ([]byte, error)
 	Write(ctx context.Context, key string, value []byte) error
-	// CompareAndSwap atomically replaces the exact old bytes. A nil oldValue
-	// matches a missing key and a nil newValue deletes the key.
-	CompareAndSwap(ctx context.Context, key string, oldValue, newValue []byte) (bool, error)
 	Delete(ctx context.Context, key string) error
 	List(ctx context.Context, prefix string) ([]Entry, error)
 	Stat(ctx context.Context, key string) (Entry, error)
@@ -300,10 +297,6 @@ func IsCode(err error, code string) bool {
 
 type storeAdapter struct {
 	Store
-}
-
-func (s storeAdapter) CompareAndSwap(ctx context.Context, key string, oldValue, newValue []byte) (bool, error) {
-	return s.Store.CompareAndSwap(ctx, key, oldValue, newValue)
 }
 
 func (s storeAdapter) List(ctx context.Context, prefix string) ([]internalstore.Entry, error) {

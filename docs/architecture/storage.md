@@ -9,7 +9,6 @@ Sandrone 不要求数据库。持久化层保存命名资源和统一项目设�
 - 本地服务可以使用文件系统目录。
 - 测试可以使用内存或只读文件系统。
 - 嵌入方可以提供自定义 Store。
-- 竞争更新有明确 CAS 契约。
 - 复合读取和维护操作在单进程内有一致性边界。
 - 备份能够搬运完整的非 cache Store，而不解释领域对象。
 
@@ -23,20 +22,11 @@ Store 不提供数据库事务、跨进程锁或自动 schema 迁移。
 | --- | --- |
 | `Read` | 读取一个 key 的完整 bytes |
 | `Write` | 覆盖写入一个 key |
-| `CompareAndSwap` | 当前 bytes 精确匹配时原子写入或删除 |
 | `Delete` | 删除一个 key |
 | `List` | 列举前缀下的 entry |
 | `Stat` | 读取单个 entry metadata |
 
-公开嵌入 API 暴露同构接口，因此自定义后端不需要 import `internal/store`。实现必须保留方法语义，不能用“先 Read 再 Write”模拟 CAS。
-
-`CompareAndSwap` 的 nil 语义是稳定契约：
-
-- `oldValue == nil` 只匹配不存在的 key。
-- `newValue == nil` 表示删除匹配的 key。
-- bytes 不匹配时返回 `swapped=false`，不是写入错误。
-
-公开分享的有界使用次数依赖 CAS 原子增加 `use_count`。如果自定义 Store 的 CAS 只在单客户端内近似实现，调用方会观察到超额消费或丢失更新。
+公开嵌入 API 暴露同构接口，因此自定义后端不需要 import `internal/store`。
 
 接口与 key 校验定义见 [`internal/store/store.go`](../../internal/store/store.go)，公开适配点见 [`pkg/sandrone/sandrone.go`](../../pkg/sandrone/sandrone.go)。
 
@@ -59,11 +49,11 @@ service 对资源名和备份条目重复应用同一 `CleanKey` 语义。Store 
 
 `FSStore` 基于 `afero.Fs` 实现 Store。运行服务通常把它放在 `afero.BasePathFs` 后，使所有 key 都限制在配置的数据目录内；测试可以替换为内存或只读 afero 文件系统。
 
-`FSStore` 用进程内读写锁保护单次方法调用。CAS 在同一个实例的独占锁内比较和写入，因此对该实例的并发调用是原子的。
+`FSStore` 用进程内读写锁保护单次方法调用。
 
 普通 `Write` 是覆盖写，不承诺临时文件 rename、fsync 或崩溃恢复。底层文件系统的 durability 和多个 Store 实例之间的协调属于部署边界。
 
-仓库只内建这一类 Store 后端。对象存储、数据库或远程 KV 由嵌入方实现同一接口，并自行满足 key、CAS、列举和 durability 契约。
+仓库只内建这一类 Store 后端。对象存储、数据库或远程 KV 由嵌入方实现同一接口，并自行满足 key、列举和 durability 契约。
 
 ## `MetaStore`
 
@@ -74,7 +64,7 @@ service 对资源名和备份条目重复应用同一 `CleanKey` 语义。Store 
 
 - subscription、file 和 share 的 JSON 编解码。
 - 资源摘要列举。
-- share 创建和消费的 CAS 更新。
+- share 的覆盖保存。
 
 每个 file 使用一个 `files/<name>.json` record 保存完整 `FileSpec`。inline
 正文留在 `source.content`，不会拆成相邻 raw key，也不会在保存时改写 source
@@ -176,11 +166,11 @@ Coordinator 提供的是单进程 isolation：
 一致性按操作类型区分：
 
 - 单 key 资源更新使用覆盖写。
-- 需要竞争语义的计数或“仅当不存在”创建必须使用 CAS。
+- share 使用相同的覆盖写语义；显式 ID 已存在时由新记录替换。
 - 删除 file 不级联删除它引用的 subscription、其它 file 或 share。
 - cache miss、损坏或写入失败不能改变权威资源。
 
-因此“没有交错观察”不等于“发生错误后必然回到旧状态”。需要强原子发布的自定义后端可以在自己的 Store/Coordinator 实现中提供更强保证，但不能削弱公开 CAS 语义。
+因此“没有交错观察”不等于“发生错误后必然回到旧状态”。需要强原子发布的自定义后端可以在自己的 Store/Coordinator 实现中提供更强保证。
 
 ## 备份与恢复边界
 
@@ -228,5 +218,5 @@ cache 被排除，因为它可重建、可能过期，也不应决定恢复后�
 - 单进程部署可以依赖 Coordinator 避免备份与普通写入交错。
 - 多进程共享 Store 时，维护窗口、写入者停止和存储级快照由外部协调。
 - 关键数据仍需独立的存储级备份；应用归档不能替代底层 durability。
-- 自定义 Store 必须通过 key 和 CAS 契约测试，再用于有竞争的 share 或恢复场景。
+- 自定义 Store 必须通过 key、列举和读写契约测试，再用于 share 或恢复场景。
 - cache 永远可以丢弃，领域资源和其它非 cache Store 数据才是恢复目标。

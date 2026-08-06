@@ -97,6 +97,6 @@ Web UI 可以内嵌或从指定静态目录提供。管理页面、HTTP API 和 
 - 新 typed file kind 通过 driver descriptor、严格 settings 解码和编译器扩展，不在公共编排中增加客户端二选一分支。
 - 新处理行为通过明确的 nodes 或 file stage 注册；开放式逻辑使用受限脚本。
 - 新入口只适配 service 请求和结果，不重新实现业务流程。
-- 新存储后端实现 Store 及其 CAS 契约；复合一致性继续由 Coordinator 边界管理。
+- 新存储后端实现 Store 读写、列举与 metadata 契约；复合一致性继续由 Coordinator 边界管理。
 
 字段与格式的当前支持范围以[格式与能力参考](../reference/capabilities.md)和运行时 capability summary 为准，架构页不维护重复清单。

@@ -33,19 +33,17 @@ export function SharesPage({ items, loaded = true, onCopy, onCopyUrl, onDelete }
   const publicUrlElements = useRef(new Map<string, HTMLElement>());
   const validCount = items.filter((item) => item.status === "valid").length;
   const upcomingCount = items.filter((item) => item.status === "upcoming").length;
-	const expiredCount = items.filter((item) => item.status === "expired").length;
-	const exhaustedCount = items.filter((item) => item.status === "exhausted").length;
+  const expiredCount = items.filter((item) => item.status === "expired").length;
   return (
     <section className="grid gap-6">
       <PageHeader
         label=""
         title={t("shares.title")}
         metrics={(
-          <div aria-label={t("shares.summary")} className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          <div aria-label={t("shares.summary")} className="grid grid-cols-2 gap-4 md:grid-cols-3">
             <Metric label={t("shares.metric.valid")} value={loaded ? validCount : undefined} />
             <Metric label={t("shares.metric.upcoming")} value={loaded ? upcomingCount : undefined} />
             <Metric label={t("shares.metric.expired")} value={loaded ? expiredCount : undefined} />
-            <Metric label={t("shares.metric.exhausted")} value={loaded ? exhaustedCount : undefined} />
           </div>
         )}
       />
@@ -65,8 +63,7 @@ export function SharesPage({ items, loaded = true, onCopy, onCopyUrl, onDelete }
               meta={(
                 <>
                   {shareStatusChip(item, t)}
-				  {item.ageRecipient ? <Chip label="age X25519" size="small" variant="outlined" /> : null}
-				  {item.maxUses ? <Chip label={t("shares.uses", { used: item.useCount ?? 0, max: item.maxUses })} size="small" variant="outlined" /> : null}
+                  {item.ageRecipient ? <Chip label="age X25519" size="small" variant="outlined" /> : null}
                   <Typography
                     className="block cursor-text break-words select-text"
                     component="code"
@@ -150,7 +147,5 @@ function shareStatusChip(item: ShareItem, t: Translator) {
       return <Chip color="info" label={t("shares.status.upcoming")} size="small" />;
     case "expired":
       return <Chip color="warning" label={t("shares.status.expired")} size="small" />;
-	case "exhausted":
-	  return <Chip color="warning" label={t("shares.status.exhausted")} size="small" />;
   }
 }

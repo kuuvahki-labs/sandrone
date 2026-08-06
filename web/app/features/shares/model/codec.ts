@@ -28,8 +28,6 @@ function shareItemFromRecord(item: Record<string, unknown>, publicBaseUrl: strin
   const validFrom = stringField(item.valid_from) || undefined;
   const validUntil = stringField(item.valid_until) || undefined;
   const ageRecipient = stringField(item.age_recipient) || undefined;
-  const maxUses = positiveNumberField(item.max_uses) || undefined;
-  const useCount = nonNegativeNumberField(item.use_count);
   const publicFilename = stringField(item.public_filename);
   const formatFilenames = stringMapField(item.format_filenames);
   const filenameSegment = publicFilename ? `/${encodeURIComponent(publicFilename)}` : "";
@@ -46,9 +44,7 @@ function shareItemFromRecord(item: Record<string, unknown>, publicBaseUrl: strin
     validFrom,
     validUntil,
     ageRecipient,
-    maxUses,
-    useCount,
-    status: shareStatus(validFrom, validUntil, maxUses, useCount),
+    status: shareStatus(validFrom, validUntil),
     publicUrl,
     formatFilenames,
   };
@@ -65,24 +61,13 @@ function shareTargetKindFromAPI(value: unknown): ShareItem["targetKind"] | undef
 function shareStatus(
   validFrom?: string,
   validUntil?: string,
-  maxUses?: number,
-  useCount = 0,
 ): ShareItem["status"] {
   const now = Date.now();
   const from = validFrom ? Date.parse(validFrom) : Number.NaN;
   const until = validUntil ? Date.parse(validUntil) : Number.NaN;
   if (Number.isFinite(from) && now < from) return "upcoming";
   if (Number.isFinite(until) && now >= until) return "expired";
-  if (maxUses && useCount >= maxUses) return "exhausted";
   return "valid";
-}
-
-function positiveNumberField(value: unknown): number {
-  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 0;
-}
-
-function nonNegativeNumberField(value: unknown): number {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : 0;
 }
 
 function stringMapField(value: unknown): Record<string, string> {

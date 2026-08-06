@@ -8,7 +8,6 @@ import (
 	"mime"
 	"os"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 	"unicode/utf8"
@@ -50,14 +49,17 @@ func TestServiceShareFileLifecycle(t *testing.T) {
 	require.Len(t, list.Shares, 1)
 	require.Equal(t, created.ID, list.Shares[0].ID)
 
+	now = now.Add(time.Minute)
 	rendered, err := svc.RenderShare(ctx, domain.ShareRenderRequest{ID: created.ID})
 	require.NoError(t, err)
 	require.Equal(t, "application/yaml", rendered.ContentType)
 	require.Equal(t, "proxies: []\n", string(rendered.Body))
 	requireInlineShareFilename(t, rendered.Headers, "default mihomo")
-	accessed, err := svc.GetShare(ctx, created.ID)
+	_, err = svc.RenderShare(ctx, domain.ShareRenderRequest{ID: created.ID})
 	require.NoError(t, err)
-	require.False(t, accessed.LastAccessedAt.IsZero())
+	stored, err := svc.GetShare(ctx, created.ID)
+	require.NoError(t, err)
+	require.Equal(t, created.UpdatedAt, stored.UpdatedAt)
 
 	require.NoError(t, svc.DeleteShare(ctx, created.ID))
 	_, err = svc.RenderShare(ctx, domain.ShareRenderRequest{ID: created.ID})
@@ -183,7 +185,7 @@ func TestServicePreservesExplicitURIListShareFormat(t *testing.T) {
 	require.Contains(t, string(rendered.Body), "ss://")
 }
 
-func TestServiceShareEncryptsForOneAgeX25519RecipientAndLimitsUses(t *testing.T) {
+func TestServiceShareEncryptsForOneAgeX25519Recipient(t *testing.T) {
 	ctx := context.Background()
 	identity, err := age.GenerateX25519Identity()
 	require.NoError(t, err)
@@ -192,11 +194,10 @@ func TestServiceShareEncryptsForOneAgeX25519RecipientAndLimitsUses(t *testing.T)
 
 	share, err := svc.CreateShare(ctx, domain.ShareCreateRequest{
 		ID: "encrypted", TargetKind: "file", TargetName: "backup.AGE.age",
-		AgeRecipient: identity.Recipient().String(), MaxUses: 1,
+		AgeRecipient: identity.Recipient().String(),
 	})
 	require.NoError(t, err)
 	require.Equal(t, identity.Recipient().String(), share.AgeRecipient)
-	require.Equal(t, 1, share.MaxUses)
 	require.Equal(t, "backup.age", share.Presentation.PublicFilename)
 
 	rendered, err := svc.RenderShare(ctx, domain.ShareRenderRequest{ID: share.ID})
@@ -210,15 +211,9 @@ func TestServiceShareEncryptsForOneAgeX25519RecipientAndLimitsUses(t *testing.T)
 	plaintext, err := io.ReadAll(reader)
 	require.NoError(t, err)
 	require.Equal(t, "secret body", string(plaintext))
-
-	stored, err := svc.GetShare(ctx, share.ID)
-	require.NoError(t, err)
-	require.Equal(t, 1, stored.UseCount)
-	_, err = svc.RenderShare(ctx, domain.ShareRenderRequest{ID: share.ID})
-	require.ErrorIs(t, err, os.ErrNotExist)
 }
 
-func TestServiceShareFilenameMismatchDoesNotConsumeUse(t *testing.T) {
+func TestServiceShareRejectsFilenameMismatch(t *testing.T) {
 	ctx := context.Background()
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
 	require.NoError(t, svc.PutFile(ctx, domain.FileSpec{
@@ -227,64 +222,26 @@ func TestServiceShareFilenameMismatchDoesNotConsumeUse(t *testing.T) {
 		Source: domain.FileSource{Type: "inline", Content: "ok"},
 	}))
 	_, err := svc.CreateShare(ctx, domain.ShareCreateRequest{
-		ID:         "limited",
+		ID:         "file-share",
 		Name:       "shadowrocket.conf",
 		TargetKind: "file",
 		TargetName: "client",
-		MaxUses:    1,
 	})
 	require.NoError(t, err)
 
 	_, err = svc.RenderShare(ctx, domain.ShareRenderRequest{
-		ID:                "limited",
+		ID:                "file-share",
 		PresentedFilename: "wrong.conf",
 	})
 	require.Error(t, err)
 	require.True(t, domain.IsCode(err, domain.CodeInvalidArgument))
 
-	stored, err := svc.GetShare(ctx, "limited")
-	require.NoError(t, err)
-	require.Zero(t, stored.UseCount)
-
 	rendered, err := svc.RenderShare(ctx, domain.ShareRenderRequest{
-		ID:                "limited",
+		ID:                "file-share",
 		PresentedFilename: "shadowrocket.conf",
 	})
 	require.NoError(t, err)
 	requireInlineShareFilename(t, rendered.Headers, "shadowrocket.conf")
-}
-
-func TestServiceShareMaxUsesIsAtomic(t *testing.T) {
-	ctx := context.Background()
-	svc := service.New(service.WithFS(afero.NewMemMapFs()))
-	require.NoError(t, svc.PutFile(ctx, domain.FileSpec{Name: "limited", Kind: domain.FileKindStatic, Source: domain.FileSource{Type: "inline", Content: "ok"}}))
-	_, err := svc.CreateShare(ctx, domain.ShareCreateRequest{ID: "limited", TargetKind: "file", TargetName: "limited", MaxUses: 3})
-	require.NoError(t, err)
-
-	var wg sync.WaitGroup
-	results := make(chan error, 20)
-	for range 20 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			_, renderErr := svc.RenderShare(ctx, domain.ShareRenderRequest{ID: "limited"})
-			results <- renderErr
-		}()
-	}
-	wg.Wait()
-	close(results)
-	successes := 0
-	for renderErr := range results {
-		if renderErr == nil {
-			successes++
-		} else {
-			require.ErrorIs(t, renderErr, os.ErrNotExist)
-		}
-	}
-	require.Equal(t, 3, successes)
-	stored, err := svc.GetShare(ctx, "limited")
-	require.NoError(t, err)
-	require.Equal(t, 3, stored.UseCount)
 }
 
 func TestServiceRenderFileShareUsesProcessedFileContent(t *testing.T) {
@@ -493,7 +450,7 @@ func TestServiceRenderSubscriptionShareAgeFilenameAndOriginalContentType(t *test
 	require.Equal(t, 1, strings.Count(strings.ToLower(filename), ".age"))
 }
 
-func TestServiceRenderShareUnknownFormatDoesNotConsumeUse(t *testing.T) {
+func TestServiceRenderShareRejectsUnknownFormat(t *testing.T) {
 	ctx := context.Background()
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
 	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
@@ -501,18 +458,15 @@ func TestServiceRenderShareUnknownFormatDoesNotConsumeUse(t *testing.T) {
 		Content: "ss://aes-128-gcm:secret@example.com:8388#node-a",
 	}))
 	_, err := svc.CreateShare(ctx, domain.ShareCreateRequest{
-		ID: "limited-subscription", TargetKind: "subscription", TargetName: "nodes", MaxUses: 1,
+		ID: "subscription-share", TargetKind: "subscription", TargetName: "nodes",
 	})
 	require.NoError(t, err)
 
-	_, err = svc.RenderShare(ctx, domain.ShareRenderRequest{ID: "limited-subscription", Format: "unknown"})
+	_, err = svc.RenderShare(ctx, domain.ShareRenderRequest{ID: "subscription-share", Format: "unknown"})
 	require.Error(t, err)
 	require.True(t, domain.IsCode(err, domain.CodeInvalidArgument))
-	stored, err := svc.GetShare(ctx, "limited-subscription")
-	require.NoError(t, err)
-	require.Zero(t, stored.UseCount)
 
-	out, err := svc.RenderShare(ctx, domain.ShareRenderRequest{ID: "limited-subscription"})
+	out, err := svc.RenderShare(ctx, domain.ShareRenderRequest{ID: "subscription-share"})
 	require.NoError(t, err)
 	requireInlineShareFilename(t, out.Headers, "nodes.txt")
 }
@@ -591,7 +545,7 @@ func TestServiceCreateShareRejectsUnsupportedTarget(t *testing.T) {
 	require.True(t, domain.IsCode(err, domain.CodeInvalidArgument))
 }
 
-func TestServiceCreateShareRejectsInvalidAgeRecipientAndDuplicateID(t *testing.T) {
+func TestServiceCreateShareRejectsInvalidAgeRecipient(t *testing.T) {
 	ctx := context.Background()
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
 	require.NoError(t, svc.PutFile(ctx, domain.FileSpec{Name: "client", Kind: domain.FileKindStatic, Source: domain.FileSource{Type: "inline", Content: "ok"}}))
@@ -599,11 +553,26 @@ func TestServiceCreateShareRejectsInvalidAgeRecipientAndDuplicateID(t *testing.T
 	_, err := svc.CreateShare(ctx, domain.ShareCreateRequest{ID: "invalid-age", TargetKind: "file", TargetName: "client", AgeRecipient: "not-an-age-key"})
 	require.Error(t, err)
 	require.True(t, domain.IsCode(err, domain.CodeInvalidArgument))
+}
 
-	_, err = svc.CreateShare(ctx, domain.ShareCreateRequest{ID: "same", TargetKind: "file", TargetName: "client"})
+func TestServiceCreateShareOverwritesDuplicateID(t *testing.T) {
+	ctx := context.Background()
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	require.NoError(t, svc.PutFile(ctx, domain.FileSpec{Name: "client", Kind: domain.FileKindStatic, Source: domain.FileSource{Type: "inline", Content: "ok"}}))
+	require.NoError(t, svc.PutFile(ctx, domain.FileSpec{Name: "replacement", Kind: domain.FileKindStatic, Source: domain.FileSource{Type: "inline", Content: "new"}}))
+
+	_, err := svc.CreateShare(ctx, domain.ShareCreateRequest{ID: "same", Name: "original", TargetKind: "file", TargetName: "client"})
 	require.NoError(t, err)
-	_, err = svc.CreateShare(ctx, domain.ShareCreateRequest{ID: "same", TargetKind: "file", TargetName: "client"})
-	require.ErrorIs(t, err, os.ErrExist)
+	_, err = svc.CreateShare(ctx, domain.ShareCreateRequest{ID: "same", Name: "updated", TargetKind: "file", TargetName: "replacement"})
+	require.NoError(t, err)
+
+	stored, err := svc.GetShare(ctx, "same")
+	require.NoError(t, err)
+	require.Equal(t, "updated", stored.Name)
+	require.Equal(t, "replacement", stored.TargetName)
+	rendered, err := svc.RenderShare(ctx, domain.ShareRenderRequest{ID: "same"})
+	require.NoError(t, err)
+	require.Equal(t, "new", string(rendered.Body))
 }
 
 func TestServiceCreateShareRejectsMissingTarget(t *testing.T) {

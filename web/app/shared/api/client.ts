@@ -20,8 +20,7 @@ export interface ShareCreateRequest {
   content_type?: string;
   valid_from?: string;
   valid_until?: string;
-	age_recipient?: string;
-	max_uses?: number;
+  age_recipient?: string;
   meta?: Record<string, string>;
 }
 

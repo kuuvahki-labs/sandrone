@@ -59,6 +59,7 @@ describe("share dialog context", () => {
     expect(within(dialog).getByRole("textbox", { name: "名称" })).toHaveValue("provider");
     expect(within(dialog).getByRole("textbox", { name: "分享目标" })).toHaveValue("provider");
     expect(within(dialog).getByRole("combobox", { name: "默认输出格式" })).toHaveValue("base64");
+    expect(within(dialog).queryByRole("spinbutton")).not.toBeInTheDocument();
     expect(observe).toHaveBeenCalledTimes(1);
 
     await user.click(screen.getByRole("button", { name: "Read identity", hidden: true }));

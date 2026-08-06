@@ -131,7 +131,6 @@ function ShareFields({ target }: { target: ShareTarget }) {
         </FormControl>
       ) : null}
       <TextField fullWidth multiline label={t("share.ageRecipient")} minRows={2} name="age_recipient" placeholder="age1..." />
-      <TextField fullWidth label={t("share.maxUses")} name="max_uses" slotProps={{ htmlInput: { min: 0 } }} type="number" />
       <div className="grid gap-2">
         <Typography component="div" variant="subtitle2">{t("share.duration.label")}</Typography>
         <div aria-label={t("share.duration.customAria")} className="grid grid-cols-3 gap-2">

@@ -40,7 +40,7 @@ func TestShareManagementAndPublicEndpoint(t *testing.T) {
 	w := httptest.NewRecorder()
 	server.Handler().ServeHTTP(w, createReq)
 	require.Equal(t, http.StatusCreated, w.Code)
-	for _, field := range []string{`"valid_from"`, `"valid_until"`, `"last_accessed_at"`} {
+	for _, field := range []string{`"valid_from"`, `"valid_until"`} {
 		require.NotContains(t, w.Body.String(), field)
 	}
 	var createResult struct {
@@ -53,7 +53,7 @@ func TestShareManagementAndPublicEndpoint(t *testing.T) {
 	server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/v1/shares", nil))
 	require.Equal(t, http.StatusOK, w.Code)
 	require.Contains(t, w.Body.String(), createResult.Share.ID)
-	for _, field := range []string{`"valid_from"`, `"valid_until"`, `"last_accessed_at"`} {
+	for _, field := range []string{`"valid_from"`, `"valid_until"`} {
 		require.NotContains(t, w.Body.String(), field)
 	}
 
@@ -61,7 +61,7 @@ func TestShareManagementAndPublicEndpoint(t *testing.T) {
 	server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/v1/shares/"+createResult.Share.ID, nil))
 	require.Equal(t, http.StatusOK, w.Code)
 	require.Contains(t, w.Body.String(), `"target_name": "default.yaml"`)
-	for _, field := range []string{`"valid_from"`, `"valid_until"`, `"last_accessed_at"`} {
+	for _, field := range []string{`"valid_from"`, `"valid_until"`} {
 		require.NotContains(t, w.Body.String(), field)
 	}
 
@@ -72,19 +72,6 @@ func TestShareManagementAndPublicEndpoint(t *testing.T) {
 	requireInlineHTTPFilename(t, w.Header(), "default mihomo")
 	require.Equal(t, "proxies: []\n", w.Body.String())
 
-	w = httptest.NewRecorder()
-	server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/v1/shares/"+createResult.Share.ID, nil))
-	require.Equal(t, http.StatusOK, w.Code)
-	require.NotContains(t, w.Body.String(), `"valid_from"`)
-	require.NotContains(t, w.Body.String(), `"valid_until"`)
-	require.Contains(t, w.Body.String(), `"last_accessed_at"`)
-	var accessedResult struct {
-		Share domain.Share `json:"share"`
-	}
-	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &accessedResult))
-	require.False(t, accessedResult.Share.LastAccessedAt.IsZero())
-
-	w = httptest.NewRecorder()
 	w = httptest.NewRecorder()
 	server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodDelete, "/v1/shares/"+createResult.Share.ID, nil))
 	require.Equal(t, http.StatusOK, w.Code)
@@ -244,7 +231,7 @@ func TestHTTPPublicShareFriendlyFilename(t *testing.T) {
 	require.Contains(t, w.Body.String(), "[Proxy]")
 }
 
-func TestHTTPPublicShareRejectsInvalidFriendlyPathWithoutConsumingUse(t *testing.T) {
+func TestHTTPPublicShareRejectsInvalidFriendlyPath(t *testing.T) {
 	ctx := context.Background()
 	rt := testRuntime(t, app.Config{})
 	require.NoError(t, rt.Service.PutFile(ctx, domain.FileSpec{
@@ -253,21 +240,20 @@ func TestHTTPPublicShareRejectsInvalidFriendlyPathWithoutConsumingUse(t *testing
 		Source: domain.FileSource{Type: "inline", Content: "ok"},
 	}))
 	_, err := rt.Service.CreateShare(ctx, domain.ShareCreateRequest{
-		ID:         "limited",
+		ID:         "file-share",
 		Name:       "client.conf",
 		TargetKind: "file",
 		TargetName: "client",
-		MaxUses:    1,
 	})
 	require.NoError(t, err)
 	server := httpapi.New(rt)
 
 	for _, path := range []string{
-		"/s/limited/wrong.conf",
-		"/s/limited/client.conf/extra",
-		"/s/limited/",
-		"/s/limited/client%2Fconf",
-		"/s/limited/client%5Cconf",
+		"/s/file-share/wrong.conf",
+		"/s/file-share/client.conf/extra",
+		"/s/file-share/",
+		"/s/file-share/client%2Fconf",
+		"/s/file-share/client%5Cconf",
 	} {
 		t.Run(path, func(t *testing.T) {
 			w := httptest.NewRecorder()
@@ -277,12 +263,8 @@ func TestHTTPPublicShareRejectsInvalidFriendlyPathWithoutConsumingUse(t *testing
 		})
 	}
 
-	stored, err := rt.Service.GetShare(ctx, "limited")
-	require.NoError(t, err)
-	require.Zero(t, stored.UseCount)
-
 	w := httptest.NewRecorder()
-	server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/s/limited/client.conf", nil))
+	server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/s/file-share/client.conf", nil))
 	require.Equal(t, http.StatusOK, w.Code)
 }
 
@@ -352,13 +334,13 @@ func TestHTTPShareListIncludesPublicFilenames(t *testing.T) {
 	}, result.Shares)
 }
 
-func TestHTTPPublicShareReturnsAgePayloadAndEnforcesMaxUses(t *testing.T) {
+func TestHTTPPublicShareReturnsAgePayloadRepeatedly(t *testing.T) {
 	ctx := context.Background()
 	identity, err := age.GenerateX25519Identity()
 	require.NoError(t, err)
 	rt := testRuntime(t, app.Config{})
 	require.NoError(t, rt.Service.PutFile(ctx, domain.FileSpec{Name: "secret", Kind: domain.FileKindStatic, Source: domain.FileSource{Type: "inline", Content: "secret"}}))
-	_, err = rt.Service.CreateShare(ctx, domain.ShareCreateRequest{ID: "encrypted", TargetKind: "file", TargetName: "secret", AgeRecipient: identity.Recipient().String(), MaxUses: 1})
+	_, err = rt.Service.CreateShare(ctx, domain.ShareCreateRequest{ID: "encrypted", TargetKind: "file", TargetName: "secret", AgeRecipient: identity.Recipient().String()})
 	require.NoError(t, err)
 	server := httpapi.New(rt)
 
@@ -376,7 +358,7 @@ func TestHTTPPublicShareReturnsAgePayloadAndEnforcesMaxUses(t *testing.T) {
 
 	w = httptest.NewRecorder()
 	server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/s/encrypted", nil))
-	require.Equal(t, http.StatusNotFound, w.Code)
+	require.Equal(t, http.StatusOK, w.Code)
 }
 
 func TestHTTPPublicSharePassesRequestArgs(t *testing.T) {

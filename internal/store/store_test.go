@@ -42,26 +42,6 @@ func TestFSStoreReadWriteListStatDelete(t *testing.T) {
 	require.True(t, os.IsNotExist(err))
 }
 
-func TestFSStoreCompareAndSwap(t *testing.T) {
-	ctx := context.Background()
-	st := store.NewFSStore(afero.NewMemMapFs())
-
-	swapped, err := st.CompareAndSwap(ctx, "state/value", nil, []byte("one"))
-	require.NoError(t, err)
-	require.True(t, swapped)
-
-	swapped, err = st.CompareAndSwap(ctx, "state/value", nil, []byte("wrong"))
-	require.NoError(t, err)
-	require.False(t, swapped)
-	swapped, err = st.CompareAndSwap(ctx, "state/value", []byte("one"), []byte("two"))
-	require.NoError(t, err)
-	require.True(t, swapped)
-
-	body, err := st.Read(ctx, "state/value")
-	require.NoError(t, err)
-	require.Equal(t, "two", string(body))
-}
-
 func TestFSStoreRejectsUnsafeKeys(t *testing.T) {
 	ctx := context.Background()
 	st := store.NewFSStore(afero.NewMemMapFs())

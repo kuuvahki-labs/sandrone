@@ -56,16 +56,6 @@ func (s *coordinatedStore) Write(ctx context.Context, key string, value []byte) 
 	})
 }
 
-func (s *coordinatedStore) CompareAndSwap(ctx context.Context, key string, oldValue, newValue []byte) (bool, error) {
-	var swapped bool
-	err := s.Update(ctx, func(resourceStore Store) error {
-		var err error
-		swapped, err = resourceStore.CompareAndSwap(ctx, key, oldValue, newValue)
-		return err
-	})
-	return swapped, err
-}
-
 func (s *coordinatedStore) Delete(ctx context.Context, key string) error {
 	return s.Update(ctx, func(resourceStore Store) error {
 		return resourceStore.Delete(ctx, key)

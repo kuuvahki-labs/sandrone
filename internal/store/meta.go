@@ -79,7 +79,7 @@ func (s *MetaStore) ListFiles(ctx context.Context) ([]domain.ResourceSummary, er
 	})
 }
 
-func (s *MetaStore) CreateShare(ctx context.Context, share domain.Share) error {
+func (s *MetaStore) PutShare(ctx context.Context, share domain.Share) error {
 	if share.ID == "" {
 		return fmt.Errorf("%w: share id is required", ErrInvalidKey)
 	}
@@ -91,51 +91,7 @@ func (s *MetaStore) CreateShare(ctx context.Context, share domain.Share) error {
 	if err != nil {
 		return err
 	}
-	swapped, err := s.store.CompareAndSwap(ctx, key, nil, body)
-	if err != nil {
-		return err
-	}
-	if !swapped {
-		return os.ErrExist
-	}
-	return nil
-}
-
-func (s *MetaStore) ConsumeShare(ctx context.Context, id string, now time.Time) (domain.Share, error) {
-	key, err := resourceKey("shares", id)
-	if err != nil {
-		return domain.Share{}, err
-	}
-	for {
-		body, err := s.store.Read(ctx, key)
-		if err != nil {
-			return domain.Share{}, err
-		}
-		var share domain.Share
-		if err := json.Unmarshal(body, &share); err != nil {
-			return domain.Share{}, err
-		}
-		now = now.UTC()
-		if (!share.ValidFrom.IsZero() && now.Before(share.ValidFrom.UTC())) ||
-			(!share.ValidUntil.IsZero() && !now.Before(share.ValidUntil.UTC())) ||
-			(share.MaxUses > 0 && share.UseCount >= share.MaxUses) {
-			return domain.Share{}, os.ErrNotExist
-		}
-		share.UseCount++
-		share.LastAccessedAt = now
-		share.UpdatedAt = now
-		next, err := marshalStoreJSON(share)
-		if err != nil {
-			return domain.Share{}, err
-		}
-		swapped, err := s.store.CompareAndSwap(ctx, key, body, next)
-		if err != nil {
-			return domain.Share{}, err
-		}
-		if swapped {
-			return share, nil
-		}
-	}
+	return s.store.Write(ctx, key, body)
 }
 
 func (s *MetaStore) GetShare(ctx context.Context, id string) (domain.Share, error) {

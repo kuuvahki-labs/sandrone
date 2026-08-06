@@ -37,8 +37,7 @@ describe("share actions", () => {
     form.set("target_format", "mihomo-proxies");
     form.set("valid_from", "2026-06-21T10:00");
     form.set("valid_until", "2026-07-01T10:00");
-	form.set("age_recipient", "age1example");
-	form.set("max_uses", "5");
+    form.set("age_recipient", "age1example");
 
     const created = await createShare(form);
 
@@ -49,8 +48,7 @@ describe("share actions", () => {
       target_format: "mihomo-proxies",
       valid_from: new Date("2026-06-21T10:00").toISOString(),
       valid_until: new Date("2026-07-01T10:00").toISOString(),
-	  age_recipient: "age1example",
-      max_uses: 5,
+      age_recipient: "age1example",
       meta: { ui: "web" },
     });
     expect(created).toEqual(expect.objectContaining({

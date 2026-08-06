@@ -7,9 +7,7 @@ export interface ShareItem {
   validFrom?: string;
   validUntil?: string;
   ageRecipient?: string;
-  maxUses?: number;
-  useCount?: number;
-  status: "valid" | "upcoming" | "expired" | "exhausted";
+  status: "valid" | "upcoming" | "expired";
   publicUrl: string;
   formatFilenames?: Record<string, string>;
 }

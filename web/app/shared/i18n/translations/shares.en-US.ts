@@ -3,7 +3,6 @@ export const shareEnUS = {
   "share.result.done": "Done",
   "share.ageRecipient": "age X25519 recipient public key",
   "share.field.targetFormatHelper": "This share supports multiple formats; this only sets the default.",
-  "share.maxUses": "Maximum uses (0 is unlimited)",
   "shares.actions.copyBase64": "Copy as universal subscription (Base64)",
   "shares.actions.copyMihomo": "Copy as Mihomo",
   "shares.actions.copySingBox": "Copy as sing-box",
@@ -12,7 +11,4 @@ export const shareEnUS = {
   "shares.messages.copyUnavailable": "Automatic copy is unavailable. Copy the link manually.",
   "shares.manualCopy.retry": "Retry copy",
   "shares.manualCopy.title": "Copy link manually",
-  "shares.status.exhausted": "Uses exhausted",
-	"shares.metric.exhausted": "Exhausted",
-  "shares.uses": "Used {used} / {max}",
 } as const;

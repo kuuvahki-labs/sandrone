@@ -18,9 +18,6 @@ var ErrInvalidKey = errors.New("invalid store key")
 type Store interface {
 	Read(ctx context.Context, key string) ([]byte, error)
 	Write(ctx context.Context, key string, value []byte) error
-	// CompareAndSwap atomically writes newValue only when the current bytes equal
-	// oldValue. A nil oldValue matches a missing key; a nil newValue deletes it.
-	CompareAndSwap(ctx context.Context, key string, oldValue, newValue []byte) (bool, error)
 	Delete(ctx context.Context, key string) error
 	List(ctx context.Context, prefix string) ([]Entry, error)
 	Stat(ctx context.Context, key string) (Entry, error)

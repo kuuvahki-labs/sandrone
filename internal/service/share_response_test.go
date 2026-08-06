@@ -60,7 +60,7 @@ func TestRenderShareDefaultsPersistedMissingSubscriptionFormatToBase64(t *testin
 		Name: "nodes", Type: domain.SubscriptionTypeLocal,
 		Format: "uri-list", Content: "ss://aes-128-gcm:secret@example.com:8388#node",
 	}))
-	require.NoError(t, svc.metaStore.CreateShare(ctx, domain.Share{
+	require.NoError(t, svc.metaStore.PutShare(ctx, domain.Share{
 		ID: "legacy-share", Name: "mobile",
 		TargetKind: "subscription", TargetName: "nodes",
 	}))

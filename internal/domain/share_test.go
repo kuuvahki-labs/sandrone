@@ -21,7 +21,7 @@ func TestShareJSONOmitsUnsetOptionalTimes(t *testing.T) {
 			value: domain.Share{
 				ID: "long-lived", TargetKind: "file", TargetName: "client",
 			},
-			keys: []string{"created_at", "updated_at", "valid_from", "valid_until", "last_accessed_at"},
+			keys: []string{"created_at", "updated_at", "valid_from", "valid_until"},
 		},
 		{
 			name: "create request",
@@ -48,7 +48,7 @@ func TestShareJSONOmitsUnsetOptionalTimes(t *testing.T) {
 func TestShareJSONKeepsSetOptionalTimes(t *testing.T) {
 	validUntil := time.Date(2026, 7, 19, 12, 30, 0, 0, time.UTC)
 	body, err := json.Marshal(domain.Share{
-		ID: "limited", TargetKind: "file", TargetName: "client", ValidUntil: validUntil,
+		ID: "expiring", TargetKind: "file", TargetName: "client", ValidUntil: validUntil,
 	})
 	require.NoError(t, err)
 

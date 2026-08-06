@@ -115,20 +115,16 @@ describe("share model codec", () => {
     ]);
   });
 
-  it("maps age encryption and exhausted maximum uses", () => {
+  it("maps age encryption", () => {
     const [share] = sharesFromShareList({ shares: [{
-      id: "limited",
+      id: "encrypted",
       target_kind: "file",
       target_name: "client",
       age_recipient: "age1recipient",
-      max_uses: 2,
-      use_count: 2,
     }] });
     expect(share).toMatchObject({
       ageRecipient: "age1recipient",
-      maxUses: 2,
-      useCount: 2,
-      status: "exhausted",
+      status: "valid",
     });
   });
 });

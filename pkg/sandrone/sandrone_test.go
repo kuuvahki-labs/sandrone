@@ -1,7 +1,6 @@
 package sandrone_test
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"mime"
@@ -299,10 +298,6 @@ func TestEngineShareResources(t *testing.T) {
 	require.Equal(t, "inline", dispositionType)
 	require.Equal(t, "default.yaml", dispositionParams["filename"])
 
-	gotShare, err := engine.GetShare(ctx, "sh_public")
-	require.NoError(t, err)
-	require.False(t, gotShare.LastAccessedAt.IsZero())
-
 	require.NoError(t, engine.DeleteShare(ctx, "sh_public"))
 	_, err = engine.GetShare(ctx, "sh_public")
 	require.Error(t, err)
@@ -377,25 +372,6 @@ func (s *publicMemoryStore) Write(_ context.Context, key string, value []byte) e
 		modTime: s.now,
 	}
 	return nil
-}
-
-func (s *publicMemoryStore) CompareAndSwap(_ context.Context, key string, oldValue, newValue []byte) (bool, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	entry, ok := s.entries[key]
-	if !ok {
-		if oldValue != nil {
-			return false, os.ErrNotExist
-		}
-	} else if oldValue == nil || !bytes.Equal(entry.body, oldValue) {
-		return false, nil
-	}
-	if newValue == nil {
-		delete(s.entries, key)
-	} else {
-		s.entries[key] = publicMemoryStoreEntry{body: append([]byte{}, newValue...), modTime: s.now}
-	}
-	return true, nil
 }
 
 func (s *publicMemoryStore) Delete(_ context.Context, key string) error {

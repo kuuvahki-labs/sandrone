@@ -1,7 +1,6 @@
 package store
 
 import (
-	"bytes"
 	"context"
 	"io/fs"
 	"os"
@@ -92,33 +91,6 @@ func (s *FSStore) write(key string, value []byte) error {
 		return err
 	}
 	return afero.WriteFile(s.fs, key, value, 0o644)
-}
-
-func (s *FSStore) CompareAndSwap(_ context.Context, key string, oldValue, newValue []byte) (bool, error) {
-	key, err := CleanKey(key)
-	if err != nil {
-		return false, err
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	current, err := afero.ReadFile(s.fs, key)
-	if err != nil {
-		if !os.IsNotExist(err) || oldValue != nil {
-			return false, err
-		}
-	} else if oldValue == nil || !bytes.Equal(current, oldValue) {
-		return false, nil
-	}
-	if newValue == nil {
-		if err := s.fs.Remove(key); err != nil && !os.IsNotExist(err) {
-			return false, err
-		}
-		return true, nil
-	}
-	if err := s.write(key, newValue); err != nil {
-		return false, err
-	}
-	return true, nil
 }
 
 func (s *FSStore) Delete(_ context.Context, key string) error {

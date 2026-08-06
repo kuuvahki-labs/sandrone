@@ -167,9 +167,6 @@ func (s *Service) CreateShare(ctx context.Context, req domain.ShareCreateRequest
 	if err := validateShareTimeRange(req.ValidFrom, req.ValidUntil); err != nil {
 		return nil, err
 	}
-	if req.MaxUses < 0 {
-		return nil, domain.NewError(domain.CodeInvalidArgument, "share max_uses must not be negative")
-	}
 	ageRecipient := strings.TrimSpace(req.AgeRecipient)
 	if ageRecipient != "" {
 		if _, err := age.ParseX25519Recipient(ageRecipient); err != nil {
@@ -201,10 +198,9 @@ func (s *Service) CreateShare(ctx context.Context, req domain.ShareCreateRequest
 		ValidFrom:    req.ValidFrom.UTC(),
 		ValidUntil:   req.ValidUntil.UTC(),
 		AgeRecipient: ageRecipient,
-		MaxUses:      req.MaxUses,
 		Meta:         cloneStringMap(req.Meta),
 	}
-	if err := s.metaStore.CreateShare(ctx, share); err != nil {
+	if err := s.metaStore.PutShare(ctx, share); err != nil {
 		return nil, err
 	}
 	s.logResource(ctx, "put", "share", share.ID)
@@ -328,9 +324,6 @@ func (s *Service) RenderShare(ctx context.Context, req domain.ShareRenderRequest
 		return nil, domain.NewError(domain.CodeInvalidArgument, "share filename does not match the requested format")
 	}
 	setShareContentDisposition(&out, filename)
-	if _, err := s.metaStore.ConsumeShare(ctx, share.ID, s.now()); err != nil {
-		return nil, err
-	}
 	return &out, nil
 }
 
@@ -428,9 +421,6 @@ func shareCurrentlyValid(share domain.Share, now time.Time) bool {
 		return false
 	}
 	if !share.ValidUntil.IsZero() && !now.Before(share.ValidUntil.UTC()) {
-		return false
-	}
-	if share.MaxUses > 0 && share.UseCount >= share.MaxUses {
 		return false
 	}
 	return true

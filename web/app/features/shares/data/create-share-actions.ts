@@ -41,10 +41,8 @@ export function createShareActions({
     const validUntil = isoDateTime(form, "valid_until");
     if (validFrom) payload.valid_from = validFrom;
     if (validUntil) payload.valid_until = validUntil;
-	const ageRecipient = String(form.get("age_recipient") ?? "").trim();
-	if (ageRecipient) payload.age_recipient = ageRecipient;
-	const maxUses = Number.parseInt(String(form.get("max_uses") ?? ""), 10);
-	if (Number.isFinite(maxUses) && maxUses > 0) payload.max_uses = maxUses;
+    const ageRecipient = String(form.get("age_recipient") ?? "").trim();
+    if (ageRecipient) payload.age_recipient = ageRecipient;
 
     const response = await client.createShare(payload);
     return shareFromCreateResponse(response, publicBaseUrl);

@@ -18,7 +18,7 @@ Share 把一个现有文件或订阅暴露为公开、只读、按请求实时�
 ### `POST /v1/shares`
 
 为一个已存在的文件或订阅创建 share，成功返回 `201`。省略 `id` 时由服务端
-生成；显式 `id` 必须唯一。
+生成；显式 `id` 已存在时，使用新请求完整覆盖旧 share。
 
 ### `GET /v1/shares/:id`
 
@@ -48,7 +48,6 @@ Share 把一个现有文件或订阅暴露为公开、只读、按请求实时�
   "target_format": "mihomo-proxies",
   "valid_from": "2026-07-22T00:00:00Z",
   "valid_until": "2026-08-01T00:00:00Z",
-  "max_uses": 5,
   "meta": {
     "description": "mobile clients"
   }
@@ -59,7 +58,7 @@ Share 把一个现有文件或订阅暴露为公开、只读、按请求实时�
 
 | 字段 | 契约 |
 | --- | --- |
-| `id` | 可省略；自定义值必须唯一，并且是单个 path segment |
+| `id` | 可省略；自定义值必须是单个 path segment，已存在时覆盖旧 share |
 | `name` | 可选分享名，也是公开文件名的首选来源；必须满足单个 path segment 约束 |
 | `target_kind` | 必填，只能是 `file` 或 `subscription` |
 | `target_name` | 必填，目标必须已存在；HTTP 接口只接受单个 path segment |
@@ -68,11 +67,10 @@ Share 把一个现有文件或订阅暴露为公开、只读、按请求实时�
 | `valid_from` | 可选 RFC 3339 时间，闭区间起点 |
 | `valid_until` | 可选 RFC 3339 时间，开区间终点 |
 | `age_recipient` | 可选，只接受一个 age X25519 recipient 公钥 |
-| `max_uses` | 可省略或为 `0`，表示不限次数；正整数表示成功公开读取的上限 |
 | `meta` | 可选字符串 map，随管理响应返回 |
 
-`valid_from` 和 `valid_until` 同时存在时，前者必须早于后者。`max_uses`
-不能为负数。`id`、`name` 和 `target_name` 的单 segment 约束会拒绝 `/`、
+`valid_from` 和 `valid_until` 同时存在时，前者必须早于后者。`id`、`name` 和
+`target_name` 的单 segment 约束会拒绝 `/`、
 `\`、`.` 和 `..`；调用方不应把层级路径编码进这些字段。
 
 公开请求可带：
@@ -122,7 +120,6 @@ file-stage processor 中消费它们，订阅 share 可在订阅的 node-stage p
     },
     "created_at": "2026-07-22T12:00:00Z",
     "updated_at": "2026-07-22T12:00:00Z",
-    "max_uses": 5,
     "meta": {
       "description": "mobile clients"
     }
@@ -159,9 +156,7 @@ file-stage processor 中消费它们，订阅 share 可在订阅的 node-stage p
 文件 share 不返回该 map。它们都是管理响应的派生字段，不写入 share 存储。
 
 管理对象还可能包含 `content_type`、`valid_from`、`valid_until`、
-`last_accessed_at`、`age_recipient`、`use_count` 等字段；零值时间与多数零值
-字段会从 JSON 省略。每次成功消费公开内容后，`use_count` 增加，
-`last_accessed_at` 和 `updated_at` 更新。
+`age_recipient` 等字段；零值时间与多数零值字段会从 JSON 省略。
 
 删除成功返回：
 
@@ -192,8 +187,7 @@ canonical 路径把该文件名 percent-encode 为单个 path segment。订阅 s
 
 服务端会精确校验解码后的 `:filename` 与实际格式对应的 canonical 文件名。
 名称不匹配、空名称、额外 path segment 或编码后的路径分隔符返回
-`invalid_argument`，并且不会消耗 `max_uses`。省略 `:filename` 的旧链接继续
-有效且不重定向。
+`invalid_argument`。省略 `:filename` 的旧链接继续有效且不重定向。
 
 设置 `age_recipient` 后，正文使用该公钥加密，响应改为
 `Content-Type: application/age`；原内容类型通过
@@ -203,7 +197,7 @@ canonical 路径把该文件名 percent-encode 为单个 path segment。订阅 s
 ## 失败与安全边界
 
 公开 URL 本身就是读取凭据。任何持有仍有效 URL 的人都可以发起读取、为订阅
-选择任一受支持的 `format`、提交 `arg.*`，并消耗 `max_uses` 配额；
+选择任一受支持的 `format`、提交 `arg.*`；
 `target_format` 只是默认值，不是格式 allowlist。Share 不授予列表、删除或其它
 管理权限。
 
@@ -212,17 +206,11 @@ canonical 路径把该文件名 percent-encode 为单个 path segment。订阅 s
 持有者能解密正文。age 不加密这些 HTTP 元数据，因此不要把敏感标识放进
 share 名称、目标名称或最终文件名。
 
-`max_uses` 通过 Store compare-and-swap 原子消费，并发成功次数不会超过上限。
-加密 share 使用相同计数规则。文件名不匹配、格式无效或生成失败不会消费次数；
-服务器在写出响应前完成消费，因此客户端中途断开仍可能已经计数。链接持有者
-可以主动耗尽有限配额，`max_uses` 不是身份认证机制。
-
 以下情况对公开接口统一表现为 `404`，不向链接持有者区分原因：
 
 - share 不存在或已物理删除；
 - 当前时间早于 `valid_from`；
 - 当前时间大于或等于 `valid_until`；
-- `use_count` 已达到 `max_uses`；
 - 当前目标资源已经不存在。
 
 使用未知订阅格式会失败，且不会回退到默认格式。错误 envelope、HTTP status
@@ -230,7 +218,7 @@ share 名称、目标名称或最终文件名。
 
 ## 最小示例
 
-创建一个不限次数的订阅 share：
+创建一个订阅 share：
 
 ```sh
 curl -fsS -X POST \
