@@ -16,7 +16,7 @@ import Typography from "@mui/material/Typography";
 
 import type { SubscriptionItem, SubscriptionPreview, SubscriptionPreviewNode, SubscriptionPreviewNodeDiff, SubscriptionPreviewStatus } from "~/features/subscriptions/model/types";
 import { type Translator, useI18n } from "~/shared/i18n/context";
-import { WarningList } from "~/shared/resources/warnings";
+import { CollapsibleWarningPanel } from "~/shared/resources/warning-panel";
 import { CodeBlock } from "~/shared/ui/code-editor";
 import { Metric, PageHeader } from "~/shared/ui/page";
 
@@ -104,16 +104,7 @@ export function SubscriptionPreviewPage({ backLabel, failed = false, pending = f
           </div>
 
           {preview.warnings.length ? (
-            <Card component="section" variant="outlined" aria-label={t("subscriptions.preview.warnings")}>
-              <CardContent>
-                <div className="grid gap-3">
-                  <Typography component="h3" variant="h6">
-                    {t("common.warning")}
-                  </Typography>
-                  <WarningList warnings={preview.warnings} />
-                </div>
-              </CardContent>
-            </Card>
+            <CollapsibleWarningPanel label={t("subscriptions.preview.warnings")} warnings={preview.warnings} />
           ) : null}
 
           <List aria-label={t("subscriptions.preview.nodeList")} className="grid gap-3 p-0">

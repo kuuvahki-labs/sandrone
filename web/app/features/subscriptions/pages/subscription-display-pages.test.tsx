@@ -26,7 +26,8 @@ const previewPageActions = {
 };
 
 describe("SubscriptionPreviewPage", () => {
-  it("keeps the summary warning metric raw while grouping the warning list", () => {
+  it("keeps the summary warning metric raw while collapsing the grouped warning list", async () => {
+    const user = userEvent.setup();
     const repeatedWarnings: SubscriptionPreview = {
       ...subscriptionPreview,
       warnings: [{
@@ -50,6 +51,10 @@ describe("SubscriptionPreviewPage", () => {
     expect(within(summary).getAllByText(/^\d+$/).map((node) => node.textContent)).toEqual(["2", "1", "1", "2"]);
     const warningRegion = screen.getByRole("region", { name: "预览警告" });
     expect(within(warningRegion).getByText("1 组警告 · 2 条记录")).toBeInTheDocument();
+    expect(within(warningRegion).queryByText("2 个节点或位置受到影响")).not.toBeInTheDocument();
+
+    await user.click(within(warningRegion).getByRole("button", { name: "展开预览警告" }));
+
     expect(within(warningRegion).getByText("2 个节点或位置受到影响")).toBeInTheDocument();
   });
 
@@ -85,7 +90,6 @@ describe("SubscriptionPreviewPage", () => {
     const summary = screen.getByLabelText("预览统计");
     expect(within(summary).getAllByText(/^\d+$/).map((node) => node.textContent)).toEqual(["2", "1", "1", "2"]);
     expect(within(summary).getAllByText(/处理前|处理后|已移除|警告/).map((node) => node.textContent)).toEqual(["处理前", "处理后", "已移除", "警告"]);
-    expect(screen.getByText("keep")).toBeInTheDocument();
     expect(screen.getByText("source-keep")).toBeInTheDocument();
     expect(screen.getByText("name")).toBeInTheDocument();
     expect(screen.getByText("keep -> source-keep")).toBeInTheDocument();
@@ -93,6 +97,12 @@ describe("SubscriptionPreviewPage", () => {
     expect(screen.getAllByText("已移除").length).toBeGreaterThan(0);
     const warningRegion = screen.getByRole("region", { name: "预览警告" });
     expect(within(warningRegion).getByText("警告")).toBeInTheDocument();
+    expect(within(warningRegion).getByText("2 组警告 · 2 条记录")).toBeInTheDocument();
+    expect(within(warningRegion).queryByText("quick_settings_warning · left unchanged")).not.toBeInTheDocument();
+
+    await user.click(within(warningRegion).getByRole("button", { name: "展开预览警告" }));
+
+    expect(within(warningRegion).getByText("keep")).toBeInTheDocument();
     expect(within(warningRegion).getByText("quick_settings_warning · left unchanged")).toBeInTheDocument();
     expect(within(warningRegion).getByText("probe-dead")).toBeInTheDocument();
     expect(within(warningRegion).getByText("probe_tcp_failed · probe result reported probe_tcp_failed")).toBeInTheDocument();

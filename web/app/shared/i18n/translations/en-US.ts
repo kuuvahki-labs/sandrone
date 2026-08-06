@@ -44,6 +44,8 @@ export const enUS: Record<TranslationKey, string> = {
   "warnings.detailLabel": "Warning details",
   "warnings.detailWithTitle": "{title} warning details",
   "warnings.summary": "{groups} warning groups · {warnings} records",
+  "warnings.expandPanel": "Expand {label}",
+  "warnings.collapsePanel": "Collapse {label}",
   "warnings.affectedLocations": "{count} affected nodes or locations",
   "warnings.groupWithTitle": "Expand {count} matching warnings for {title}",
   "warnings.occurrenceList": "Matching warning nodes",

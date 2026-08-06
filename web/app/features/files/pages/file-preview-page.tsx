@@ -6,7 +6,7 @@ import Typography from "@mui/material/Typography";
 
 import type { FilePreview } from "~/features/files/model/types";
 import { useI18n } from "~/shared/i18n/context";
-import { WarningList } from "~/shared/resources/warnings";
+import { CollapsibleWarningPanel } from "~/shared/resources/warning-panel";
 import { CodeBlock } from "~/shared/ui/code-editor";
 import { PageHeader } from "~/shared/ui/page";
 
@@ -28,7 +28,7 @@ export function FilePreviewPage({ backLabel, failed = false, fileName, pending =
     <section
       className={
         preview
-          ? "flex h-[calc(100dvh-2.5rem)] min-h-0 min-w-0 flex-col gap-4 min-[820px]:h-[calc(100dvh-3rem)]"
+          ? "flex min-h-[calc(100dvh-2.5rem)] min-w-0 flex-col gap-4 min-[820px]:min-h-[calc(100dvh-3rem)]"
           : "grid min-w-0 gap-4"
       }
     >
@@ -70,24 +70,17 @@ export function FilePreviewPage({ backLabel, failed = false, fileName, pending =
       {preview ? (
         <>
           {preview.warnings.length ? (
-            <Card aria-label={t("files.preview.warnings")} component="section" variant="outlined">
-              <CardContent>
-                <div className="grid gap-3">
-                  <Typography component="h3" variant="h6">
-                    {t("common.warning")}
-                  </Typography>
-                  <WarningList warnings={preview.warnings} />
-                </div>
-              </CardContent>
-            </Card>
+            <CollapsibleWarningPanel label={t("files.preview.warnings")} warnings={preview.warnings} />
           ) : null}
 
-          <CodeBlock
-            fillHeight
-            label={t("files.preview.finalContent")}
-            language={languageFromPreview(preview.contentType, fileName)}
-            value={preview.body}
-          />
+          <div className="flex h-[min(70dvh,640px)] min-w-0 shrink-0">
+            <CodeBlock
+              fillHeight
+              label={t("files.preview.finalContent")}
+              language={languageFromPreview(preview.contentType, fileName)}
+              value={preview.body}
+            />
+          </div>
         </>
       ) : null}
     </section>

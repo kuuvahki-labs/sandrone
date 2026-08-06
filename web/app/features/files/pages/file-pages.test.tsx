@@ -96,7 +96,8 @@ describe("FilePreviewPage", () => {
     expect(screen.getByRole("region", { name: "最终文件内容" })).toHaveTextContent("[General]");
   });
 
-  it("keeps server warnings above the final body", () => {
+  it("keeps server warnings collapsed above the final body", async () => {
+    const user = userEvent.setup();
     render(
       <FilePreviewPage
         {...pageActions}
@@ -108,8 +109,13 @@ describe("FilePreviewPage", () => {
       />,
     );
 
-    expect(screen.getByText(/processor kept output/)).toBeInTheDocument();
+    expect(screen.getByText("1 组警告 · 1 条记录")).toBeInTheDocument();
+    expect(screen.queryByText(/processor kept output/)).not.toBeInTheDocument();
     expect(screen.getByRole("region", { name: "最终文件内容" })).toHaveTextContent("processor output");
+
+    await user.click(screen.getByRole("button", { name: "展开预览警告" }));
+
+    expect(screen.getByText(/processor kept output/)).toBeInTheDocument();
   });
 
   it("keeps loading, failure, and refresh behavior", async () => {

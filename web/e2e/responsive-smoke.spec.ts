@@ -91,7 +91,12 @@ const filePreview = {
     "  - MATCH,Proxy",
     ...Array.from({ length: 80 }, (_, index) => `# generated line ${index + 1}`),
   ].join("\n"),
-  warnings: [{ code: "file_warning", message: "preview warning" }],
+  warnings: Array.from({ length: 3 }, (_, index) => ({
+    code: "file_warning",
+    message: "preview warning",
+    node: `node-${index + 1}`,
+    node_index: index,
+  })),
 };
 
 const fileSource = {
@@ -405,25 +410,36 @@ for (const route of routes) {
       await expect(page.getByRole("status").filter({ hasText: "配置已由模板替换" })).toBeVisible();
     }
     if (route.path.startsWith("/files/") && route.path.endsWith("/preview")) {
-      await expect(page.getByText("preview warning")).toBeVisible();
+      await expect(page.getByText("1 组警告 · 3 条记录")).toBeVisible();
+      await expect(page.getByText("preview warning")).toBeHidden();
       const sourceBlock = page.getByRole("region", { name: "最终文件内容" });
       await expect(sourceBlock).toContainText(longPreviewNode);
       await expect(page.getByRole("tab")).toHaveCount(0);
-      const layout = await sourceBlock.evaluate((block) => {
-        const shellContent = block.closest("main")?.querySelector(":scope > section");
+      const layoutBeforeExpansion = await sourceBlock.evaluate((block) => {
         const pre = block.querySelector("pre");
-        const blockBounds = block.getBoundingClientRect();
         return {
-          blockBottom: blockBounds.bottom,
-          expectedBottom: window.innerHeight - Number.parseFloat(getComputedStyle(shellContent!).paddingBottom),
           overflowY: pre ? getComputedStyle(pre).overflowY : "",
           preClientHeight: pre?.clientHeight ?? 0,
           preScrollHeight: pre?.scrollHeight ?? 0,
+          pageScrollHeight: document.documentElement.scrollHeight,
         };
       });
-      expect(Math.abs(layout.blockBottom - layout.expectedBottom)).toBeLessThanOrEqual(1);
-      expect(layout.overflowY).toBe("auto");
-      expect(layout.preScrollHeight).toBeGreaterThan(layout.preClientHeight);
+      expect(layoutBeforeExpansion.overflowY).toBe("auto");
+      expect(layoutBeforeExpansion.preScrollHeight).toBeGreaterThan(layoutBeforeExpansion.preClientHeight);
+
+      await page.getByRole("button", { name: "展开预览警告" }).click();
+      await expect(page.getByText("preview warning")).toBeVisible();
+      await page.getByRole("button", { name: /3 条同类警告/ }).click();
+      const warningOccurrences = page.getByRole("list", { name: "同类警告节点" });
+      await expect(warningOccurrences).toBeVisible();
+      await expect.poll(() => warningOccurrences.evaluate((list) => list.getBoundingClientRect().height)).toBeGreaterThan(200);
+      const layoutAfterExpansion = await sourceBlock.evaluate((block) => ({
+        preClientHeight: block.querySelector("pre")?.clientHeight ?? 0,
+        pageScrollHeight: document.documentElement.scrollHeight,
+      }));
+      expect(Math.abs(layoutAfterExpansion.preClientHeight - layoutBeforeExpansion.preClientHeight)).toBeLessThanOrEqual(1);
+      expect(layoutAfterExpansion.pageScrollHeight).toBeGreaterThanOrEqual(layoutBeforeExpansion.pageScrollHeight);
+
       const scrollTop = await sourceBlock.locator("pre").evaluate((pre) => {
         pre.scrollTop = pre.scrollHeight;
         return pre.scrollTop;
@@ -731,6 +747,9 @@ test("subscription preview JSON stays inside the viewport and uses theme colors"
   await page.goto("/subscriptions/remote/provider/preview");
 
   await expect(page.getByRole("heading", { name: "节点预览", level: 2 })).toBeVisible();
+  await expect(page.getByText("1 组警告 · 1 条记录")).toBeVisible();
+  await expect(page.getByText("preview warning")).toBeHidden();
+  await page.getByRole("button", { name: "展开预览警告" }).click();
   await expect(page.getByText("preview warning")).toBeVisible();
   await expect(page.getByRole("navigation", { name: "底部导航" })).toHaveCount(0);
   const previewCard = page.getByRole("button", { name: `${previewAfterName} 节点详情` });

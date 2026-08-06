@@ -13,15 +13,17 @@ import type { PreviewWarning } from "~/shared/resources/types";
 import { groupPreviewWarnings, type PreviewWarningGroup } from "~/shared/resources/warning-groups";
 import { CodeBlock } from "~/shared/ui/code-editor";
 
-export function WarningList({ className, warnings }: { className?: string; warnings: readonly PreviewWarning[] }) {
+export function WarningList({ className, showSummary = true, warnings }: { className?: string; showSummary?: boolean; warnings: readonly PreviewWarning[] }) {
   const { t } = useI18n();
   const groups = groupPreviewWarnings(warnings);
 
   return (
     <div className={["grid min-w-0 gap-2", className].filter(Boolean).join(" ")}>
-      <Typography color="text.secondary" component="p" variant="body2">
-        {t("warnings.summary", { groups: groups.length, warnings: warnings.length })}
-      </Typography>
+      {showSummary ? (
+        <Typography color="text.secondary" component="p" variant="body2">
+          {t("warnings.summary", { groups: groups.length, warnings: warnings.length })}
+        </Typography>
+      ) : null}
       <List className="grid gap-2 p-0">
         {groups.map((group, index) => (
           group.warnings.length === 1

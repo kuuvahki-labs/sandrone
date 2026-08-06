@@ -43,6 +43,8 @@ export const zhCN = {
   "warnings.detailLabel": "警告详情",
   "warnings.detailWithTitle": "{title} 警告详情",
   "warnings.summary": "{groups} 组警告 · {warnings} 条记录",
+  "warnings.expandPanel": "展开{label}",
+  "warnings.collapsePanel": "收起{label}",
   "warnings.affectedLocations": "{count} 个节点或位置受到影响",
   "warnings.groupWithTitle": "展开 {title} 的 {count} 条同类警告",
   "warnings.occurrenceList": "同类警告节点",

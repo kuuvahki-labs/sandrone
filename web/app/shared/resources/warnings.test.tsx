@@ -2,9 +2,40 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
+import { CollapsibleWarningPanel } from "~/shared/resources/warning-panel";
 import { WarningList } from "~/shared/resources/warnings";
 
 describe("warning list", () => {
+  it("keeps a warning panel collapsed with one summary until requested", async () => {
+    const user = userEvent.setup();
+    render(
+      <CollapsibleWarningPanel
+        label="预览警告"
+        warnings={[
+          { code: "parse_unknown_field", message: "field preserved", node: "node-a" },
+          { code: "parse_unknown_field", message: "field preserved", node: "node-b" },
+        ]}
+      />,
+    );
+
+    const toggle = screen.getByRole("button", { name: "展开预览警告" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getAllByText("1 组警告 · 2 条记录")).toHaveLength(1);
+    expect(screen.queryByRole("heading", { name: "parse_unknown_field · field preserved" })).not.toBeInTheDocument();
+
+    await user.click(toggle);
+
+    const collapse = screen.getByRole("button", { name: "收起预览警告" });
+    expect(collapse).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("heading", { name: "parse_unknown_field · field preserved" })).toBeInTheDocument();
+    expect(screen.getAllByText("1 组警告 · 2 条记录")).toHaveLength(1);
+
+    await user.click(collapse);
+
+    expect(screen.getByRole("button", { name: "展开预览警告" })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("heading", { name: "parse_unknown_field · field preserved" })).not.toBeInTheDocument();
+  });
+
   it("keeps a single warning directly expandable with its exact JSON", async () => {
     const user = userEvent.setup();
     render(
