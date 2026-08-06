@@ -7,11 +7,23 @@ import type { ShareItem } from "~/features/shares/model/types";
 import { SharesPage } from "./shares-page";
 
 const shares: ShareItem[] = [
-  { id: "sh_123", title: "mobile", targetKind: "file", targetName: "default.yaml", status: "valid", publicUrl: "https://example.com/s/sh_123" },
+  {
+    id: "sh_123",
+    title: "mobile",
+    targetKind: "file",
+    targetName: "default.yaml",
+    validFrom: "2026-07-01T01:02:03Z",
+    validUntil: "2026-08-01T01:02:03Z",
+    createdAt: "2026-06-30T01:02:03Z",
+    updatedAt: "2026-07-02T04:05:06Z",
+    ageRecipient: "age1recipient",
+    status: "valid",
+    publicUrl: "https://example.com/s/sh_123",
+  },
 ];
 
 describe("shares page", () => {
-  it("copies a file share with the primary action and leaves only delete in its menu", async () => {
+  it("opens share details from the card and leaves only delete in a file share menu", async () => {
     const user = userEvent.setup();
     const onCopy = vi.fn().mockResolvedValue({ copied: true });
     const onDelete = vi.fn();
@@ -20,14 +32,26 @@ describe("shares page", () => {
     expect(screen.getByRole("heading", { name: "分享" })).toBeInTheDocument();
     expect(screen.getByText("https://example.com/s/sh_123")).toBeInTheDocument();
     expect(screen.getAllByText("有效").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByRole("button", { name: "复制链接：mobile" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "查看详情：mobile" })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "复制链接：mobile" }));
+    await user.click(screen.getByRole("button", { name: "查看详情：mobile" }));
+    const dialog = screen.getByRole("dialog", { name: "分享详情" });
+    expect(within(dialog).getByText("sh_123")).toBeInTheDocument();
+    expect(within(dialog).getByText("default.yaml")).toBeInTheDocument();
+    expect(within(dialog).getByText("age X25519")).toBeInTheDocument();
+    expect(dialog.querySelector('time[datetime="2026-06-30T01:02:03Z"]')).toBeInTheDocument();
+    expect(dialog.querySelector('time[datetime="2026-07-02T04:05:06Z"]')).toBeInTheDocument();
+    expect(onCopy).not.toHaveBeenCalled();
+
+    await user.click(within(dialog).getByRole("button", { name: "复制链接" }));
+    expect(onCopy).toHaveBeenCalledWith(shares[0]);
+    await user.click(within(dialog).getByRole("button", { name: "关闭" }));
+    expect(screen.queryByRole("dialog", { name: "分享详情" })).not.toBeInTheDocument();
+
     await user.click(screen.getByRole("button", { name: "mobile 更多操作" }));
     expect(screen.queryByRole("menuitem", { name: /复制为/ })).not.toBeInTheDocument();
     await user.click(screen.getByRole("menuitem", { name: "删除" }));
 
-    expect(onCopy).toHaveBeenCalledWith(shares[0]);
     expect(onDelete).toHaveBeenCalledWith(shares[0]);
   });
 
@@ -58,12 +82,14 @@ describe("shares page", () => {
     expect(selection?.toString()).toBe("https");
   });
 
-  it("selects the public URL when the card copy action cannot use the clipboard", async () => {
+  it("selects the public URL in details when copying cannot use the clipboard", async () => {
     const user = userEvent.setup();
     const onCopy = vi.fn().mockResolvedValue({ copied: false, url: shares[0].publicUrl });
     render(<SharesPage items={shares} onCopy={onCopy} onCopyUrl={vi.fn()} onDelete={vi.fn()} />);
 
-    await user.click(screen.getByRole("button", { name: "复制链接：mobile" }));
+    await user.click(screen.getByRole("button", { name: "查看详情：mobile" }));
+    const dialog = screen.getByRole("dialog", { name: "分享详情" });
+    await user.click(within(dialog).getByRole("button", { name: "复制链接" }));
 
     expect(window.getSelection()?.toString()).toBe(shares[0].publicUrl);
     expect(screen.queryByRole("dialog", { name: "请手动复制链接" })).not.toBeInTheDocument();

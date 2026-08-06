@@ -35,6 +35,8 @@ describe("share model codec", () => {
         target_kind: "file",
         target_name: "default.yaml",
         public_filename: "shadowrocket.conf",
+        created_at: "2026-07-01T01:02:03Z",
+        updated_at: "2026-07-02T04:05:06Z",
       },
       {
         id: "sh_nodes",
@@ -55,6 +57,8 @@ describe("share model codec", () => {
       expect.objectContaining({
         id: "sh_123",
         targetKind: "file",
+        createdAt: "2026-07-01T01:02:03Z",
+        updatedAt: "2026-07-02T04:05:06Z",
         status: "valid",
         publicUrl: "https://example.com/s/sh_123/shadowrocket.conf",
       }),

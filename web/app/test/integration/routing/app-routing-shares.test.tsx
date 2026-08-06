@@ -55,7 +55,9 @@ describe("React Router app share and delete workflows", () => {
     const fullUrl = `${window.location.origin}/s/sh_123/mobile`;
     expect(screen.getByText(fullUrl)).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "复制链接：mobile" }));
+    await user.click(screen.getByRole("button", { name: "查看详情：mobile" }));
+    const details = screen.getByRole("dialog", { name: "分享详情" });
+    await user.click(within(details).getByRole("button", { name: "复制链接" }));
 
     expect(writeText).toHaveBeenCalledWith(fullUrl);
   });

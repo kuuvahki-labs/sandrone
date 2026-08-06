@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import LinkIcon from "@mui/icons-material/Link";
@@ -7,6 +7,7 @@ import List from "@mui/material/List";
 import Typography from "@mui/material/Typography";
 
 import { ManualCopyDialog } from "~/features/shares/components/manual-copy-dialog";
+import { ShareDetailsDialog } from "~/features/shares/components/share-details-dialog";
 import { hasSelectionWithin, selectContents } from "~/features/shares/components/share-url-selection";
 import type { CopyShareResult } from "~/features/shares/data/create-share-actions";
 import { type ShareCopyFormat, shareCopyFormats } from "~/features/shares/model/share-formats";
@@ -30,7 +31,7 @@ export interface SharesPageProps {
 export function SharesPage({ items, loaded = true, onCopy, onCopyUrl, onDelete }: SharesPageProps) {
   const { t } = useI18n();
   const [manualCopyUrl, setManualCopyUrl] = useState<string | null>(null);
-  const publicUrlElements = useRef(new Map<string, HTMLElement>());
+  const [selectedShare, setSelectedShare] = useState<ShareItem | null>(null);
   const validCount = items.filter((item) => item.status === "valid").length;
   const upcomingCount = items.filter((item) => item.status === "upcoming").length;
   const expiredCount = items.filter((item) => item.status === "expired").length;
@@ -67,13 +68,6 @@ export function SharesPage({ items, loaded = true, onCopy, onCopyUrl, onDelete }
                   <Typography
                     className="block cursor-text break-words select-text"
                     component="code"
-                    ref={(element) => {
-                      if (element) {
-                        publicUrlElements.current.set(item.id, element);
-                      } else {
-                        publicUrlElements.current.delete(item.id);
-                      }
-                    }}
                     variant="body2"
                     onClick={(event) => {
                       event.stopPropagation();
@@ -86,21 +80,22 @@ export function SharesPage({ items, loaded = true, onCopy, onCopyUrl, onDelete }
                   </Typography>
                 </>
               )}
-              primaryLabel={t("shares.actions.copy")}
+              primaryLabel={t("shares.actions.viewDetails")}
               subtitle={item.targetKind === "subscription" && item.targetFormat ? `${item.targetName} · ${item.targetFormat}` : item.targetName}
               title={item.title}
-              onPrimaryAction={() => {
-                void onCopy(item).then((copy) => {
-                  if (!copy.copied) {
-                    selectContents(publicUrlElements.current.get(item.id));
-                  }
-                });
-              }}
+              onPrimaryAction={() => setSelectedShare(item)}
             />
           ))}
         </List>
       ) : loaded ? (
         <EmptyState title={t("shares.empty")} />
+      ) : null}
+      {selectedShare ? (
+        <ShareDetailsDialog
+          item={selectedShare}
+          onClose={() => setSelectedShare(null)}
+          onCopy={() => onCopy(selectedShare)}
+        />
       ) : null}
       {manualCopyUrl ? (
         <ManualCopyDialog

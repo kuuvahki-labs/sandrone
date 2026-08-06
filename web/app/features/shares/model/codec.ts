@@ -28,6 +28,8 @@ function shareItemFromRecord(item: Record<string, unknown>, publicBaseUrl: strin
   const validFrom = stringField(item.valid_from) || undefined;
   const validUntil = stringField(item.valid_until) || undefined;
   const ageRecipient = stringField(item.age_recipient) || undefined;
+  const createdAt = stringField(item.created_at) || undefined;
+  const updatedAt = stringField(item.updated_at) || undefined;
   const publicFilename = stringField(item.public_filename);
   const formatFilenames = stringMapField(item.format_filenames);
   const filenameSegment = publicFilename ? `/${encodeURIComponent(publicFilename)}` : "";
@@ -44,6 +46,8 @@ function shareItemFromRecord(item: Record<string, unknown>, publicBaseUrl: strin
     validFrom,
     validUntil,
     ageRecipient,
+    createdAt,
+    updatedAt,
     status: shareStatus(validFrom, validUntil),
     publicUrl,
     formatFilenames,

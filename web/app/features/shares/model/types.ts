@@ -7,6 +7,8 @@ export interface ShareItem {
   validFrom?: string;
   validUntil?: string;
   ageRecipient?: string;
+  createdAt?: string;
+  updatedAt?: string;
   status: "valid" | "upcoming" | "expired";
   publicUrl: string;
   formatFilenames?: Record<string, string>;

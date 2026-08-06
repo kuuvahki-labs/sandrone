@@ -37,6 +37,7 @@ export const zhCN = {
   "actions.signOut": "退出",
   "actions.selectAll": "全选",
   "actions.clear": "清空",
+  "actions.close": "关闭",
   "common.preview": "预览",
   "common.warning": "警告",
   "warnings.detailLabel": "警告详情",

@@ -38,6 +38,7 @@ export const enUS: Record<TranslationKey, string> = {
   "actions.signOut": "Sign out",
   "actions.selectAll": "Select all",
   "actions.clear": "Clear",
+  "actions.close": "Close",
   "common.preview": "Preview",
   "common.warning": "Warning",
   "warnings.detailLabel": "Warning details",
