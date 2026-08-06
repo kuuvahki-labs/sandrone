@@ -13,7 +13,7 @@ const TEMPLATE_IDS = ["minimal", "standard", "full"] as const satisfies readonly
 const SHADOWROCKET_RULE_BASE = "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket";
 const SHADOWROCKET_TEMPLATE_ARTIFACTS = new Set([
   "Abema", "Amazon", "AmazonPrimeVideo", "Anthropic", "Apple", "AppleTV", "Atlassian", "BBC",
-  "Bahamut", "BiliBiliIntl", "Binance", "Blizzard", "Bloomberg", "CNN", "China", "Cloudflare", "DAZN",
+  "Bahamut", "BiliBili", "BiliBiliIntl", "Binance", "Blizzard", "Bloomberg", "CNN", "China", "Cloudflare", "DAZN",
   "DigitalOcean", "Discord", "Disney", "Docker", "Dropbox", "EA", "Epic", "Facebook", "GitHub",
   "GitLab", "Global", "Gog", "Google", "HBO", "Hulu", "Instagram", "Jetbrains", "KKTV", "Lan", "Line",
   "LinkedIn", "Microsoft", "NYTimes", "Netflix", "Niconico", "Nintendo", "Notion", "Npmjs", "OneDrive",
@@ -35,6 +35,7 @@ const STANDARD_MODULES = [
   "final",
 ];
 const FULL_ONLY_MODULES = [
+  "bilibili",
   "twitter",
   "meta",
   "discord",
@@ -74,7 +75,7 @@ describe("config templates", () => {
     expect(templates[2].modules.includes("auto")).toBe(kind !== "shadowrocket");
     if (kind === "shadowrocket") {
       expect(templates.every((template) => !template.modules.includes("ad"))).toBe(true);
-      expect(templates.map((template) => template.groupCount)).toEqual([5, 12, 31]);
+      expect(templates.map((template) => template.groupCount)).toEqual([5, 12, 32]);
     }
 
     for (const template of templates) {
@@ -113,6 +114,41 @@ describe("config templates", () => {
       group.type === (kind === "mihomo" ? "url-test" : "urltest"));
 
     expect(autoGroup?.url).toBe("https://cp.cloudflare.com");
+  });
+
+  it.each(CONFIG_KINDS)("defaults Microsoft and Apple service groups to direct in %s templates", (kind) => {
+    for (const templateID of ["standard", "full"] satisfies ConfigTemplateID[]) {
+      const groups = createConfigFromTemplate(kind, templateID).groups ?? [];
+      const memberKey = kind === "sing-box" ? "outbounds" : "proxies";
+      const direct = kind === "sing-box" ? "direct" : "DIRECT";
+
+      for (const name of ["Microsoft", "Apple"]) {
+        const group = groups.find((item) => item.name === name || item.tag === name);
+        const members = group?.[memberKey];
+        expect(Array.isArray(members) ? members[0] : undefined).toBe(direct);
+      }
+    }
+  });
+
+  it.each(CONFIG_KINDS)("adds a direct-first Bilibili group only to the %s full template", (kind) => {
+    const standard = createConfigFromTemplate(kind, "standard");
+    const full = createConfigFromTemplate(kind, "full");
+    const memberKey = kind === "sing-box" ? "outbounds" : "proxies";
+    const direct = kind === "sing-box" ? "direct" : "DIRECT";
+    const groupName = (group: Record<string, unknown>): string => String(group.name ?? group.tag ?? "");
+    const fullGroup = full.groups?.find((group) => groupName(group) === "Bilibili");
+    const members = fullGroup?.[memberKey];
+
+    expect(standard.groups?.some((group) => groupName(group) === "Bilibili")).toBe(false);
+    expect(Array.isArray(members) ? members[0] : undefined).toBe(direct);
+    expect(full.rule_sets).toEqual(expect.arrayContaining([
+      expect.objectContaining(kind === "sing-box" ? { tag: "bilibili" } : { name: "bilibili" }),
+    ]));
+    expect(full.rules).toEqual(expect.arrayContaining([
+      kind === "sing-box"
+        ? expect.objectContaining({ rule_set: ["bilibili"], outbound: "Bilibili" })
+        : "RULE-SET,bilibili,Bilibili",
+    ]));
   });
 
   it("uses MetaCubeX MRS rule providers for Mihomo", () => {

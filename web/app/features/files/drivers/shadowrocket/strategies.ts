@@ -403,7 +403,7 @@ const ARTIFACT_NAMES: Readonly<Record<string, string>> = {
   discord: "Discord", linkedin: "LinkedIn", tiktok: "TikTok", line: "Line", reddit: "Reddit", snap: "Snap",
   pinterest: "Pinterest", tumblr: "Tumblr", netflix: "Netflix", disney: "Disney", hbo: "HBO", hulu: "Hulu",
   primevideo: "AmazonPrimeVideo", "apple-tvplus": "AppleTV", spotify: "Spotify", twitch: "Twitch", dazn: "DAZN",
-  bahamut: "Bahamut", biliintl: "BiliBiliIntl", niconico: "Niconico", abema: "Abema", viu: "ViuTV", kktv: "KKTV",
+  bahamut: "Bahamut", bilibili: "BiliBili", biliintl: "BiliBiliIntl", niconico: "Niconico", abema: "Abema", viu: "ViuTV", kktv: "KKTV",
   steam: "Steam", "steam@cn": "SteamCN", epicgames: "Epic", ea: "EA", ubisoft: "Ubisoft", blizzard: "Blizzard", gog: "Gog", riot: "Riot",
   playstation: "PlayStation", xbox: "Xbox", nintendo: "Nintendo", cloudflare: "Cloudflare", digitalocean: "DigitalOcean",
   vercel: "Vercel", docker: "Docker", npmjs: "Npmjs", jetbrains: "Jetbrains", stackexchange: "Stackexchange",

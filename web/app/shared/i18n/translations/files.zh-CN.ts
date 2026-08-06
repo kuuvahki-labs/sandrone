@@ -24,6 +24,7 @@ export const fileZhCN = {
   "files.config.outputNames.group.disney": "🏰 迪士尼+",
   "files.config.outputNames.group.streaming-west": "📺 欧美流媒体",
   "files.config.outputNames.group.streaming-asia": "🎌 亚洲流媒体",
+  "files.config.outputNames.group.bilibili": "📺 哔哩哔哩",
   "files.config.outputNames.group.steam": "🎮 Steam",
   "files.config.outputNames.group.gaming-pc": "🖥️ PC 游戏",
   "files.config.outputNames.group.gaming-console": "🎯 主机游戏",

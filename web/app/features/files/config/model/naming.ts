@@ -8,7 +8,7 @@ export type ConfigNamingLocale = Locale;
 export const CONFIG_GROUP_IDS = [
   "select", "auto", "fallback", "other", "ad", "private", "cn", "global", "final", "ai", "youtube", "google",
   "microsoft", "apple", "telegram", "twitter", "meta", "discord", "social-other", "netflix",
-  "disney", "streaming-west", "streaming-asia", "steam", "gaming-pc", "gaming-console", "github",
+  "disney", "streaming-west", "streaming-asia", "bilibili", "steam", "gaming-pc", "gaming-console", "github",
   "cloud", "dev-tools", "storage", "payment", "crypto", "education", "news", "shopping",
 ] as const;
 

@@ -24,6 +24,7 @@ export const fileEnUS = {
   "files.config.outputNames.group.disney": "Disney+",
   "files.config.outputNames.group.streaming-west": "Western Streaming",
   "files.config.outputNames.group.streaming-asia": "Asian Streaming",
+  "files.config.outputNames.group.bilibili": "Bilibili",
   "files.config.outputNames.group.steam": "Steam",
   "files.config.outputNames.group.gaming-pc": "PC Gaming",
   "files.config.outputNames.group.gaming-console": "Console Gaming",

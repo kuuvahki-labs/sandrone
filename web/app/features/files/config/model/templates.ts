@@ -78,12 +78,12 @@ const MODULES: readonly ConfigTemplateModule[] = [
   module("select"), module("auto", "url-test"), module("ad", "reject-first", ["category-ads-all"]),
   module("private", "direct-first", ["private", "private-ip"]), module("cn", "direct-first", ["cn", "cn-ip"]),
   module("global", "select", ["geolocation-!cn"]), module("final"), module("ai", "select", ["openai", "anthropic", "category-ai-chat-!cn"]),
-  module("youtube", "select", ["youtube"]), module("google", "select", ["google", "google-ip"]), module("microsoft", "select", ["microsoft", "onedrive"]),
-  module("apple", "select", ["apple", "icloud"]), module("telegram", "select", ["telegram", "telegram-ip"]), module("twitter", "select", ["twitter", "twitter-ip"]),
+  module("youtube", "select", ["youtube"]), module("google", "select", ["google", "google-ip"]), module("microsoft", "direct-first", ["microsoft", "onedrive"]),
+  module("apple", "direct-first", ["apple", "icloud"]), module("telegram", "select", ["telegram", "telegram-ip"]), module("twitter", "select", ["twitter", "twitter-ip"]),
   module("meta", "select", ["facebook", "instagram", "whatsapp", "facebook-ip"]), module("discord", "select", ["discord"]),
   module("social-other", "select", ["tiktok", "line", "reddit", "linkedin", "snap", "pinterest", "tumblr"]), module("netflix", "select", ["netflix", "netflix-ip"]),
   module("disney", "select", ["disney"]), module("streaming-west", "select", ["hbo", "hulu", "primevideo", "apple-tvplus", "spotify", "twitch", "dazn"]),
-  module("streaming-asia", "select", ["bahamut", "biliintl", "niconico", "abema", "viu", "kktv"]), module("steam", "select", ["steam"]),
+  module("streaming-asia", "select", ["bahamut", "biliintl", "niconico", "abema", "viu", "kktv"]), module("bilibili", "direct-first", ["bilibili"]), module("steam", "select", ["steam"]),
   module("gaming-pc", "select", ["epicgames", "ea", "ubisoft", "blizzard", "gog", "riot"]), module("gaming-console", "select", ["playstation", "xbox", "nintendo"]),
   module("github", "select", ["github", "gitlab", "atlassian"]), module("cloud", "select", ["aws", "azure", "cloudflare", "digitalocean", "vercel", "netlify", "cloudflare-ip"]),
   module("dev-tools", "select", ["docker", "npmjs", "jetbrains", "stackexchange"]), module("storage", "select", ["dropbox", "notion"]),
@@ -111,12 +111,12 @@ const TEMPLATE_METADATA: Record<ConfigTemplateID, { name: string; description: s
 
 const GROUP_ORDER: readonly ConfigGroupID[] = [
   "select", "auto", "ad", "ai", "youtube", "google", "microsoft", "apple", "telegram", "twitter", "meta", "discord", "social-other",
-  "netflix", "disney", "streaming-west", "streaming-asia", "steam", "gaming-pc", "gaming-console", "github", "cloud", "dev-tools", "storage",
+  "netflix", "disney", "streaming-west", "streaming-asia", "bilibili", "steam", "gaming-pc", "gaming-console", "github", "cloud", "dev-tools", "storage",
   "payment", "crypto", "education", "news", "shopping", "private", "cn", "global", "final",
 ];
 const RULE_ORDER: readonly ConfigGroupID[] = [
   "ad", "private", "ai", "youtube", "education", "cloud", "google", "telegram", "github", "microsoft", "apple", "twitter", "meta",
-  "discord", "social-other", "netflix", "disney", "streaming-west", "streaming-asia", "steam", "gaming-pc", "gaming-console", "dev-tools",
+  "discord", "social-other", "netflix", "disney", "streaming-west", "streaming-asia", "bilibili", "steam", "gaming-pc", "gaming-console", "dev-tools",
   "storage", "payment", "crypto", "news", "shopping", "cn", "global",
 ];
 const RULE_EXCEPTIONS: readonly ConfigTemplateRuleException[] = [
