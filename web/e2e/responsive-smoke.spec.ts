@@ -104,6 +104,14 @@ const fileSource = {
   body: "mixed-port: 7890\nallow-lan: false\nmode: rule\nlog-level: info\nproxies: []\nproxy-groups: []\nrule-providers: {}\nrules: []",
 };
 
+const ruleSetCatalog = {
+  items: Array.from({ length: 30 }, (_, index) => ({
+    name: `catalog-${String(index).padStart(2, "0")}`,
+    rule_kind: (["domain", "ip", "mixed"] as const)[index % 3],
+    url: `https://example.com/rules/catalog-${index}.${(["mrs", "text", "list", "text"] as const)[index % 4]}`,
+  })),
+};
+
 const previewBeforeName = "keep-node-with-an-extremely-long-original-identity-segment-abcdefghijklmnopqrstuvwxyz-0123456789";
 const previewAfterName = "source-node-with-an-extremely-long-renamed-identity-segment-abcdefghijklmnopqrstuvwxyz-9876543210";
 
@@ -172,6 +180,9 @@ test.beforeEach(async ({ page }) => {
   });
   await page.route("**/v1/files", async (route) => {
     await route.fulfill({ json: { items: manifest.files } });
+  });
+  await page.route("**/v1/rule-set-catalog?target=*", async (route) => {
+    await route.fulfill({ json: ruleSetCatalog });
   });
   await page.route("**/v1/shares", async (route) => {
     if (route.request().method() === "POST") {
@@ -642,12 +653,30 @@ for (const kind of ["mihomo", "sing-box", "shadowrocket"] as const) {
     const rules = page.getByRole("group", { exact: true, name: "规则策略" });
 
     await expect(groups.getByRole("button", { name: "添加代理组" })).toBeVisible();
+    const ruleSetsDisclosure = ruleSets.getByRole("button", { name: /^规则集/ }).first();
+    if (await ruleSetsDisclosure.getAttribute("aria-expanded") !== "true") {
+      await ruleSetsDisclosure.click();
+    }
     const fromLibrary = ruleSets.getByRole("button", { name: "从规则集库添加" });
     await expect(fromLibrary).toHaveText("从库添加");
     await expect(ruleSets.getByRole("button", { name: "添加规则集" })).toBeVisible();
     await expect(page.getByRole("button", { name: "规则策略" }))
       .toHaveAttribute("aria-expanded", "true");
     await expect(rules.getByRole("button", { name: "添加规则" })).toBeVisible();
+
+    await fromLibrary.click();
+    const catalogDialog = page.getByRole("dialog", { name: "规则集库" });
+    await expect(catalogDialog).toBeVisible();
+    await expect(catalogDialog.getByText("共 30 个匹配规则集")).toBeVisible();
+    await expect(catalogDialog.getByRole("navigation", { name: "规则集库分页" })).toBeVisible();
+    await catalogDialog.getByRole("button", { name: "Go to page 2" }).click();
+    await expect(catalogDialog.getByText("catalog-25", { exact: true })).toBeVisible();
+    const catalogMetrics = await catalogDialog.evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+    }));
+    expect(catalogMetrics.scrollWidth).toBeLessThanOrEqual(catalogMetrics.clientWidth);
+    await catalogDialog.getByRole("button", { name: "取消" }).click();
 
     for (const section of [groups, ruleSets, rules]) {
       const metrics = await section.evaluate((element) => ({

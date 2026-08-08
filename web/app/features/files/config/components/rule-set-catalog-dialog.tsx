@@ -6,6 +6,7 @@ import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
+import Pagination from "@mui/material/Pagination";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 
@@ -13,7 +14,7 @@ import type { AddCatalogRuleSetRequest, AddCatalogRuleSetResult } from "~/featur
 import type { RuleSetCatalogItem, RuleSetCatalogResult, RuleSetCatalogTarget } from "~/features/files/model/types";
 import { useI18n } from "~/shared/i18n/context";
 
-const RESULT_LIMIT = 100;
+import { deriveCatalogView } from "./rule-set-catalog-view";
 
 export type LoadRuleSetCatalog = (target: RuleSetCatalogTarget) => Promise<RuleSetCatalogResult>;
 
@@ -28,6 +29,7 @@ export function RuleSetCatalogDialog({ kind, loadCatalog, onAdd, onClose, open }
   const catalogLoadFailed = t("files.config.catalogLoadFailed");
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search);
+  const [page, setPage] = useState(1);
   const [catalog, setCatalog] = useState<RuleSetCatalogResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
@@ -36,6 +38,7 @@ export function RuleSetCatalogDialog({ kind, loadCatalog, onAdd, onClose, open }
   useEffect(() => {
     if (open) {
       setSearch("");
+      setPage(1);
       setActionError("");
     }
   }, [open]);
@@ -55,15 +58,11 @@ export function RuleSetCatalogDialog({ kind, loadCatalog, onAdd, onClose, open }
     return () => { active = false; };
   }, [catalog, catalogLoadFailed, kind, loadCatalog, open]);
 
-  const matchingItems = useMemo(() => {
-    const items = catalog?.items ?? [];
-    const query = deferredSearch.trim().toLocaleLowerCase();
-    if (!query) return items;
-    return items.filter((item) => (
-      item.name.toLocaleLowerCase().includes(query) || item.url.toLocaleLowerCase().includes(query)
-    ));
-  }, [catalog?.items, deferredSearch]);
-  const visibleItems = matchingItems.slice(0, RESULT_LIMIT);
+  const catalogView = useMemo(() => deriveCatalogView({
+    items: catalog?.items ?? [],
+    page,
+    query: deferredSearch,
+  }), [catalog?.items, deferredSearch, page]);
 
   function addEntry(entry: RuleSetCatalogItem) {
     setActionError("");
@@ -91,16 +90,18 @@ export function RuleSetCatalogDialog({ kind, loadCatalog, onAdd, onClose, open }
           value={search}
           onChange={(event) => {
             setSearch(event.target.value);
+            setPage(1);
             setActionError("");
           }}
         />
         {loadError ? <Alert severity="error">{loadError}</Alert> : null}
         {actionError ? <Alert severity="warning">{actionError}</Alert> : null}
         {loading ? <div className="flex min-h-24 items-center justify-center"><CircularProgress aria-label={t("files.config.catalogLoading")} size={28} /></div> : null}
-        {!loading && !loadError && !matchingItems.length ? <Typography color="text.secondary">{t("files.config.catalogEmpty")}</Typography> : null}
-        {!loading && visibleItems.length ? (
+        {!loading && !loadError ? <Typography color="text.secondary" variant="caption">{t("files.config.catalogResultCount", { count: catalogView.total })}</Typography> : null}
+        {!loading && !loadError && !catalogView.total ? <Typography color="text.secondary">{t("files.config.catalogEmpty")}</Typography> : null}
+        {!loading && catalogView.items.length ? (
           <div aria-label={t("files.config.catalogResults")} className="max-h-96 overflow-auto rounded-md border border-divider" role="list">
-            {visibleItems.map((entry) => (
+            {catalogView.items.map((entry) => (
               <div className="grid min-w-0 gap-2 border-t border-divider p-3 first:border-t-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center" key={entry.url} role="listitem">
                 <div className="grid min-w-0 gap-1">
                   <Typography className="font-semibold" component="span" variant="body2">{entry.name}</Typography>
@@ -111,8 +112,10 @@ export function RuleSetCatalogDialog({ kind, loadCatalog, onAdd, onClose, open }
             ))}
           </div>
         ) : null}
-        {!loading && matchingItems.length > RESULT_LIMIT ? (
-          <Typography color="text.secondary" variant="caption">{t("files.config.catalogRefineSearch", { count: RESULT_LIMIT })}</Typography>
+        {!loading && !loadError && catalogView.pageCount > 1 ? (
+          <div className="flex justify-center">
+            <Pagination aria-label={t("files.config.catalogPages")} count={catalogView.pageCount} page={page} size="small" onChange={(_event, nextPage) => setPage(nextPage)} />
+          </div>
         ) : null}
       </DialogContent>
       <DialogActions>

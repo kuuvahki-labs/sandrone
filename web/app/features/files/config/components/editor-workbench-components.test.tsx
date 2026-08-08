@@ -486,7 +486,7 @@ describe("ConfigTemplateAppliedNotice", () => {
   });
 });
 
-it("loads a target once, searches locally, and renders at most 100 matches", async () => {
+it("loads a target once, paginates locally, and searches the complete catalog", async () => {
   localStorage.setItem("sandrone.locale", "en-US");
   const user = userEvent.setup();
   const items = Array.from({ length: 101 }, (_, index) => catalogItem(`geosite-${String(index).padStart(3, "0")}`));
@@ -502,8 +502,13 @@ it("loads a target once, searches locally, and renders at most 100 matches", asy
   expect(await screen.findByText("geosite-000")).toBeInTheDocument();
   expect(loadCatalog).toHaveBeenCalledOnce();
   expect(loadCatalog).toHaveBeenCalledWith("mihomo");
-  expect(screen.getAllByRole("listitem")).toHaveLength(100);
-  expect(screen.getByText(/Showing the first 100 matches/)).toBeInTheDocument();
+  expect(within(screen.getByRole("list", { name: "Rule-set catalog results" })).getAllByRole("listitem")).toHaveLength(25);
+  expect(screen.getByText("102 matching rule sets")).toBeInTheDocument();
+  expect(screen.getByRole("navigation", { name: "Rule-set catalog pages" })).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Go to page 2" }));
+  expect(await screen.findByText("geosite-025")).toBeInTheDocument();
+  expect(screen.queryByText("geosite-000")).not.toBeInTheDocument();
 
   const search = screen.getByRole("textbox", { name: "Search rule sets" });
   expect(screen.getByText("Search", { selector: "label" })).toBeInTheDocument();
@@ -511,6 +516,7 @@ it("loads a target once, searches locally, and renders at most 100 matches", asy
   const row = await screen.findByRole("listitem");
   expect(within(row).getByText(special.name)).toBeInTheDocument();
   expect(within(row).getByText(special.url)).toBeInTheDocument();
+  expect(screen.queryByRole("navigation", { name: "Rule-set catalog pages" })).not.toBeInTheDocument();
   expect(loadCatalog).toHaveBeenCalledOnce();
 
   const add = within(row).getByRole("button", { name: `Add rule set “${special.name}”` });
@@ -518,6 +524,23 @@ it("loads a target once, searches locally, and renders at most 100 matches", asy
   await user.click(add);
   expect(onAdd).toHaveBeenCalledWith({ entry: special });
   expect(onClose).toHaveBeenCalledOnce();
+});
+
+it("keeps catalog rows focused on the name and URL without type metadata", async () => {
+  localStorage.setItem("sandrone.locale", "en-US");
+  const entry: RuleSetCatalogItem = {
+    name: "domain-text",
+    ruleKind: "domain",
+    url: "https://example.com/domain.text",
+  };
+  render(<RuleSetCatalogDialog kind="mihomo" open loadCatalog={vi.fn().mockResolvedValue({ items: [entry] })} onAdd={vi.fn()} onClose={vi.fn()} />);
+
+  const row = await screen.findByRole("listitem");
+  expect(within(row).getByText(entry.name)).toBeInTheDocument();
+  expect(within(row).getByText(entry.url)).toBeInTheDocument();
+  expect(within(row).queryByText("Domain")).not.toBeInTheDocument();
+  expect(within(row).queryByText(".text")).not.toBeInTheDocument();
+  expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
 });
 
 it("reuses the loaded target after closing and reopening", async () => {
