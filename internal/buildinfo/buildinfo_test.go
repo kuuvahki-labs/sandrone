@@ -663,30 +663,70 @@ func TestBuildMetadataContracts(t *testing.T) {
   workflow_dispatch:`; got != want {
 		t.Errorf("workflow trigger block =\n%s\nwant:\n%s", got, want)
 	}
-	containerJob := workflowNamedJob(t, workflowText, "container-image")
-	if got, want := workflowNamedStep(t, containerJob, "Resolve image metadata"), `      - name: Resolve image metadata
+	if strings.Contains(workflowText, "  build-webui:\n") {
+		t.Error("workflow must not duplicate the embedded Web UI build outside the container and release jobs")
+	}
+	if strings.Contains(workflowText, "  container-image:\n") {
+		t.Error("workflow must split ordinary container validation from release publication")
+	}
+
+	containerCheckJob := workflowNamedJob(t, workflowText, "container-check")
+	if got, want := workflowNamedStep(t, containerCheckJob, "Resolve image version"), `      - name: Resolve image version
         id: image-metadata
         shell: bash
         run: |
           version="$(tr -d '\r\n' < internal/buildinfo/VERSION)"
-          tags="${IMAGE}:ci"
-          platforms="linux/amd64"
-          if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            git fetch --force --tags origin
-            tags="$(./scripts/container-image-tags.sh)"
-            platforms="linux/amd64,linux/arm64"
-          fi
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"`; got != want {
+		t.Errorf("Resolve image version step =\n%s\nwant:\n%s", got, want)
+	}
+	if got, want := workflowNamedStep(t, containerCheckJob, "Build container image"), `      - name: Build container image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          push: false
+          tags: ${{ env.IMAGE }}:ci
+          cache-from: type=gha,scope=sandrone-container
+          cache-to: type=gha,mode=max,scope=sandrone-container
+          build-args: |
+            VERSION=${{ steps.image-metadata.outputs.version }}
+            REVISION=${{ github.sha }}
+          labels: |
+            org.opencontainers.image.version=${{ steps.image-metadata.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}`; got != want {
+		t.Errorf("container check build step =\n%s\nwant:\n%s", got, want)
+	}
+	for _, want := range []string{
+		`if: github.event_name != 'push' || github.ref_type != 'tag'`,
+		`uses: docker/setup-buildx-action@v4`,
+	} {
+		if !strings.Contains(containerCheckJob, want) {
+			t.Errorf("container check workflow does not contain %q", want)
+		}
+	}
+	for _, forbidden := range []string{"needs:", "packages: write", "setup-qemu-action", "login-action", "make image", "docker push"} {
+		if strings.Contains(containerCheckJob, forbidden) {
+			t.Errorf("container check workflow must not contain %q", forbidden)
+		}
+	}
+
+	containerPublishJob := workflowNamedJob(t, workflowText, "container-publish")
+	if got, want := workflowNamedStep(t, containerPublishJob, "Resolve image metadata"), `      - name: Resolve image metadata
+        id: image-metadata
+        shell: bash
+        run: |
+          version="$(tr -d '\r\n' < internal/buildinfo/VERSION)"
+          git fetch --force --tags origin
+          tags="$(./scripts/container-image-tags.sh)"
           {
             echo "version=${version}"
-            echo "platforms=${platforms}"
             echo 'tags<<EOF'
             echo "${tags}"
             echo EOF
           } >> "${GITHUB_OUTPUT}"`; got != want {
 		t.Errorf("Resolve image metadata step =\n%s\nwant:\n%s", got, want)
 	}
-	if got, want := workflowNamedStep(t, containerJob, "Log in to GHCR"), `      - name: Log in to GHCR
-        if: github.event_name == 'push' && github.ref_type == 'tag'
+	if got, want := workflowNamedStep(t, containerPublishJob, "Log in to GHCR"), `      - name: Log in to GHCR
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -694,12 +734,12 @@ func TestBuildMetadataContracts(t *testing.T) {
           password: ${{ secrets.GITHUB_TOKEN }}`; got != want {
 		t.Errorf("Log in to GHCR step =\n%s\nwant:\n%s", got, want)
 	}
-	if got, want := workflowNamedStep(t, containerJob, "Build container image"), `      - name: Build container image
+	if got, want := workflowNamedStep(t, containerPublishJob, "Build and publish container image"), `      - name: Build and publish container image
         uses: docker/build-push-action@v7
         with:
           context: .
-          platforms: ${{ steps.image-metadata.outputs.platforms }}
-          push: ${{ github.event_name == 'push' && github.ref_type == 'tag' }}
+          platforms: linux/amd64,linux/arm64
+          push: true
           tags: ${{ steps.image-metadata.outputs.tags }}
           cache-from: type=gha,scope=sandrone-container
           cache-to: type=gha,mode=max,scope=sandrone-container
@@ -709,31 +749,30 @@ func TestBuildMetadataContracts(t *testing.T) {
           labels: |
             org.opencontainers.image.version=${{ steps.image-metadata.outputs.version }}
             org.opencontainers.image.revision=${{ github.sha }}`; got != want {
-		t.Errorf("Build container image step =\n%s\nwant:\n%s", got, want)
+		t.Errorf("container publish build step =\n%s\nwant:\n%s", got, want)
 	}
-	if got, want := workflowNamedStep(t, containerJob, "Set up QEMU"), `      - name: Set up QEMU
-        if: github.event_name == 'push' && github.ref_type == 'tag'
+	if got, want := workflowNamedStep(t, containerPublishJob, "Set up QEMU"), `      - name: Set up QEMU
         uses: docker/setup-qemu-action@v4`; got != want {
 		t.Errorf("Set up QEMU step =\n%s\nwant:\n%s", got, want)
 	}
 	for _, forbidden := range []string{"make image", "docker tag", "docker push", "sha-"} {
-		if strings.Contains(containerJob, forbidden) {
+		if strings.Contains(containerPublishJob, forbidden) {
 			t.Errorf("container workflow must not contain %q", forbidden)
 		}
 	}
 	for _, want := range []string{
+		`if: github.event_name == 'push' && github.ref_type == 'tag'`,
 		`uses: docker/setup-buildx-action@v4`,
 		`needs:`,
 		`- go`,
 		`- web`,
-		`- build-webui`,
 		`packages: write`,
 		`fetch-depth: 0`,
-		`group: container-image-${{ github.event_name == 'push' && 'publish' || github.run_id }}`,
+		`group: container-image-publish`,
 		`cancel-in-progress: false`,
 		`queue: max`,
 	} {
-		if !strings.Contains(containerJob, want) {
+		if !strings.Contains(containerPublishJob, want) {
 			t.Errorf("container workflow does not contain %q", want)
 		}
 	}
@@ -741,7 +780,7 @@ func TestBuildMetadataContracts(t *testing.T) {
 	releaseJob := workflowNamedJob(t, workflowText, "release")
 	for _, want := range []string{
 		`if: github.event_name == 'push' && github.ref_type == 'tag'`,
-		"needs:\n      - container-image",
+		"needs:\n      - container-publish",
 		"permissions:\n      contents: write",
 		`uses: actions/checkout@v7`,
 		`fetch-depth: 0`,

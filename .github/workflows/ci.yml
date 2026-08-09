@@ -78,48 +78,53 @@ jobs:
       - name: Test built Web UI in Chromium
         run: pnpm test:e2e
 
-  build-webui:
-    name: Build embedded Web UI
+  container-check:
+    name: Container image
+    if: github.event_name != 'push' || github.ref_type != 'tag'
     runs-on: ubuntu-latest
+    env:
+      IMAGE: ghcr.io/kuuvahki-labs/sandrone
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Set up Go
-        uses: actions/setup-go@v7
+      - name: Resolve image version
+        id: image-metadata
+        shell: bash
+        run: |
+          version="$(tr -d '\r\n' < internal/buildinfo/VERSION)"
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build container image
+        uses: docker/build-push-action@v7
         with:
-          go-version-file: go.mod
+          context: .
+          platforms: linux/amd64
+          push: false
+          tags: ${{ env.IMAGE }}:ci
+          cache-from: type=gha,scope=sandrone-container
+          cache-to: type=gha,mode=max,scope=sandrone-container
+          build-args: |
+            VERSION=${{ steps.image-metadata.outputs.version }}
+            REVISION=${{ github.sha }}
+          labels: |
+            org.opencontainers.image.version=${{ steps.image-metadata.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: 11.5.2
-          run_install: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: .node-version
-          cache: pnpm
-          cache-dependency-path: web/pnpm-lock.yaml
-
-      - name: Build Web UI assets
-        run: make build-webui
-
-      - name: Build project
-        run: make build
-
-  container-image:
-    name: Container image
+  container-publish:
+    name: Publish container image
+    if: github.event_name == 'push' && github.ref_type == 'tag'
     runs-on: ubuntu-latest
     concurrency:
-      group: container-image-${{ github.event_name == 'push' && 'publish' || github.run_id }}
+      group: container-image-publish
       cancel-in-progress: false
       queue: max
     needs:
       - go
       - web
-      - build-webui
     permissions:
       contents: read
       packages: write
@@ -136,42 +141,34 @@ jobs:
         shell: bash
         run: |
           version="$(tr -d '\r\n' < internal/buildinfo/VERSION)"
-          tags="${IMAGE}:ci"
-          platforms="linux/amd64"
-          if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            git fetch --force --tags origin
-            tags="$(./scripts/container-image-tags.sh)"
-            platforms="linux/amd64,linux/arm64"
-          fi
+          git fetch --force --tags origin
+          tags="$(./scripts/container-image-tags.sh)"
           {
             echo "version=${version}"
-            echo "platforms=${platforms}"
             echo 'tags<<EOF'
             echo "${tags}"
             echo EOF
           } >> "${GITHUB_OUTPUT}"
 
       - name: Set up QEMU
-        if: github.event_name == 'push' && github.ref_type == 'tag'
         uses: docker/setup-qemu-action@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
       - name: Log in to GHCR
-        if: github.event_name == 'push' && github.ref_type == 'tag'
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build container image
+      - name: Build and publish container image
         uses: docker/build-push-action@v7
         with:
           context: .
-          platforms: ${{ steps.image-metadata.outputs.platforms }}
-          push: ${{ github.event_name == 'push' && github.ref_type == 'tag' }}
+          platforms: linux/amd64,linux/arm64
+          push: true
           tags: ${{ steps.image-metadata.outputs.tags }}
           cache-from: type=gha,scope=sandrone-container
           cache-to: type=gha,mode=max,scope=sandrone-container
@@ -187,7 +184,7 @@ jobs:
     if: github.event_name == 'push' && github.ref_type == 'tag'
     runs-on: ubuntu-latest
     needs:
-      - container-image
+      - container-publish
     permissions:
       contents: write
     steps:

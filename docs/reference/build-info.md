@@ -99,7 +99,8 @@ pull request、`main` 和手动 CI 只验证 `linux/amd64` 容器；`v<version>`
 `linux/amd64` 和 `linux/arm64` 的 GHCR manifest。Docker pull 或 run 会按宿主机架构
 自动选择对应镜像：
 
-- pull request、`main` 和手动 CI 只验证 `:ci` 镜像，不推送到 GHCR；
+- pull request、`main` 和手动 CI 通过独立任务验证 `:ci` 镜像，并与 Go/Web
+  检查并行，不推送到 GHCR；
 - 只有 `v<version>` Git tag push 才推送双架构镜像，并保留 `v` 的同名镜像 tag，
   例如 `ghcr.io/kuuvahki-labs/sandrone:v0.1.0`；
 - 只有版本顺序最高、格式为 `vMAJOR.MINOR.PATCH` 的稳定版本才同时更新 `latest`；
@@ -111,6 +112,10 @@ Dockerfile 的 Web 和 Go builder 固定运行在 `$BUILDPLATFORM`。Web 资产�
 镜像时不会用 QEMU 执行 pnpm 或 Go 编译。最终 Debian runtime 层仍按目标平台组装。
 BuildKit 使用命名的 GitHub Actions 缓存复用依赖和编译层；缓存未命中只会增加
 构建时间，不改变镜像内容或发布规则。
+
+普通 CI 的完整容器构建同时验证 Web 资产生成、Go embed 和最终二进制，因此不再
+单独重复运行嵌入式 Web UI 构建任务。tag 发布任务仍须等待 Go/Web 检查通过；
+GitHub Release 产物继续独立构建 Web 资产和二进制归档。
 
 容器发布任务使用同一 FIFO 队列串行执行，最多保留 100 个 pending 任务。发布
 前会重新获取远端 tags；旧版本 tag 即使晚创建或晚完成，也只会写入自己的版本
