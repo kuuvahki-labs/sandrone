@@ -58,7 +58,7 @@ func TestServerReportsBuildVersionDuringInitialize(t *testing.T) {
 	session := connect(t, ctx, mcpapi.SDKServer(testRuntime(t, app.Config{})))
 	defer session.Close()
 
-	require.Equal(t, "0.1.0", session.InitializeResult().ServerInfo.Version)
+	require.Equal(t, "0.1.1", session.InitializeResult().ServerInfo.Version)
 }
 
 func TestConvertToolAcceptsRemoteInput(t *testing.T) {

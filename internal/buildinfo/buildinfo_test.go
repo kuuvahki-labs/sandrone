@@ -19,7 +19,7 @@ func TestVersion(t *testing.T) {
 		want string
 	}{
 		{name: "default", raw: "0.1.0", want: "0.1.0"},
-		{name: "blank falls back to default", raw: " \t\n", want: "0.1.0"},
+		{name: "blank falls back to default", raw: " \t\n", want: "0.1.1"},
 		{name: "trims whitespace", raw: "  1.2.3\n", want: "1.2.3"},
 		{name: "removes leading v", raw: "v1.2.3", want: "1.2.3"},
 		{name: "removes only one leading v", raw: "vv1.2.3", want: "v1.2.3"},
@@ -290,7 +290,7 @@ func TestMakeImageDerivesIdentityFromWorktreeState(t *testing.T) {
 			t.Fatalf("make image in clean worktree: %v\n%s", err, output)
 		}
 		for _, want := range []string{
-			"--build-arg VERSION=0.1.0",
+			"--build-arg VERSION=0.1.1",
 			"--build-arg REVISION=" + revision,
 		} {
 			if !strings.Contains(string(output), want) {
@@ -332,7 +332,7 @@ func TestMakeInjectsBuildRevision(t *testing.T) {
 	if err != nil {
 		t.Fatalf("built binary --version failed: %v\n%s", err, versionOutput)
 	}
-	if got, want := string(versionOutput), "sandrone version 0.1.0 (deadbeefcafe)\n"; got != want {
+	if got, want := string(versionOutput), "sandrone version 0.1.1 (deadbeefcafe)\n"; got != want {
 		t.Fatalf("built binary --version = %q, want %q", got, want)
 	}
 }
@@ -840,9 +840,9 @@ func TestMakeImageInjectsCanonicalVersionAndRevision(t *testing.T) {
 		t.Fatalf("make image failed: %v\n%s", err, output)
 	}
 	for _, want := range []string{
-		"--build-arg VERSION=0.1.0",
+		"--build-arg VERSION=0.1.1",
 		"--build-arg REVISION=" + revision,
-		"--label org.opencontainers.image.version=0.1.0",
+		"--label org.opencontainers.image.version=0.1.1",
 		"--label org.opencontainers.image.revision=" + revision,
 		"--tag example.test/sandrone:test",
 	} {

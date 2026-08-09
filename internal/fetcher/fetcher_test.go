@@ -21,7 +21,7 @@ func TestFetchRejectsUnsupportedScheme(t *testing.T) {
 
 func TestFetchUsesVersionedDefaultUserAgent(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, "sandrone/0.1.0", r.UserAgent())
+		require.Equal(t, "sandrone/0.1.1", r.UserAgent())
 		_, _ = w.Write([]byte("ok"))
 	}))
 	defer server.Close()
