@@ -599,6 +599,7 @@ func TestBuildMetadataContracts(t *testing.T) {
 		"`$BUILDPLATFORM`",
 		"`GOOS`/`GOARCH`",
 		"GitHub Actions 缓存",
+		"随后并行发布",
 	} {
 		if !strings.Contains(string(buildReference), want) {
 			t.Errorf("build reference does not contain %q", want)
@@ -780,7 +781,8 @@ func TestBuildMetadataContracts(t *testing.T) {
 	releaseJob := workflowNamedJob(t, workflowText, "release")
 	for _, want := range []string{
 		`if: github.event_name == 'push' && github.ref_type == 'tag'`,
-		"needs:\n      - container-publish",
+		"concurrency:\n      group: github-release-publish\n      cancel-in-progress: false\n      queue: max",
+		"needs:\n      - go\n      - web",
 		"permissions:\n      contents: write",
 		`uses: actions/checkout@v7`,
 		`fetch-depth: 0`,
@@ -807,6 +809,9 @@ func TestBuildMetadataContracts(t *testing.T) {
 		if !strings.Contains(releaseJob, want) {
 			t.Errorf("release job does not contain %q", want)
 		}
+	}
+	if strings.Contains(releaseJob, "container-publish") {
+		t.Error("GitHub Release must run in parallel with container publication after the shared Go/Web gates")
 	}
 }
 

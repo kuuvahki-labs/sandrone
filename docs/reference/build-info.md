@@ -114,12 +114,14 @@ BuildKit 使用命名的 GitHub Actions 缓存复用依赖和编译层；缓存�
 构建时间，不改变镜像内容或发布规则。
 
 普通 CI 的完整容器构建同时验证 Web 资产生成、Go embed 和最终二进制，因此不再
-单独重复运行嵌入式 Web UI 构建任务。tag 发布任务仍须等待 Go/Web 检查通过；
-GitHub Release 产物继续独立构建 Web 资产和二进制归档。
+单独重复运行嵌入式 Web UI 构建任务。tag 的容器发布与 GitHub Release 均须等待
+Go/Web 检查通过，随后并行发布；GitHub Release 产物继续独立构建 Web 资产和
+二进制归档。
 
-容器发布任务使用同一 FIFO 队列串行执行，最多保留 100 个 pending 任务。发布
-前会重新获取远端 tags；旧版本 tag 即使晚创建或晚完成，也只会写入自己的版本
-tag，不会覆盖较新正式版本的 `latest`。
+容器发布与 GitHub Release 分别使用自己的 FIFO 队列串行执行，最多各保留 100 个
+pending 任务；同一个 tag 的两类发布仍可并行。容器发布前会重新获取远端 tags；
+旧版本 tag 即使晚创建或晚完成，也只会写入自己的版本 tag，不会覆盖较新正式版本
+的 `latest`。
 
 仓库的 Compose 配置默认运行 `ghcr.io/kuuvahki-labs/sandrone:latest`，不会构建
 当前 worktree。本地镜像需要显式覆盖：

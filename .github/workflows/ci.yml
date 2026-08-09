@@ -183,8 +183,13 @@ jobs:
     name: GitHub Release
     if: github.event_name == 'push' && github.ref_type == 'tag'
     runs-on: ubuntu-latest
+    concurrency:
+      group: github-release-publish
+      cancel-in-progress: false
+      queue: max
     needs:
-      - container-publish
+      - go
+      - web
     permissions:
       contents: write
     steps:
