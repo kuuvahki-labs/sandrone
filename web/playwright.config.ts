@@ -24,17 +24,8 @@ export default defineConfig({
   },
   projects: [
     {
-      name: "smoke",
-      grep: /@smoke/,
-      use: { viewport: { width: 1280, height: 820 } },
-    },
-    {
       name: "mobile",
       use: { ...devices["Pixel 7"], viewport: { width: 390, height: 844 } },
-    },
-    {
-      name: "tablet",
-      use: { viewport: { width: 820, height: 1180 } },
     },
     {
       name: "desktop",

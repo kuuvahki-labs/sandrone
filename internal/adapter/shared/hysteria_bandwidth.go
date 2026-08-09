@@ -26,11 +26,23 @@ type HysteriaRate struct {
 }
 
 func MaxHysteriaMbps() int {
+	max, _ := checkedHysteriaMbpsInt(maxHysteriaMbpsUint64())
+	return max
+}
+
+func maxHysteriaMbpsUint64() uint64 {
 	max := uint64(math.MaxUint64 / 1_000_000)
 	if archMax := maxUint64ForArch(); archMax < max {
 		max = archMax
 	}
-	return int(max)
+	return max
+}
+
+func checkedHysteriaMbpsInt(value uint64) (int, bool) {
+	if value > maxHysteriaMbpsUint64() {
+		return 0, false
+	}
+	return int(value), true //nolint:gosec // The architecture-specific upper bound is checked above.
 }
 
 func NormalizeHysteriaMbps(value any) (int, error) {
@@ -71,10 +83,11 @@ func NormalizeHysteriaMbps(value any) (int, error) {
 	default:
 		return 0, fmt.Errorf("unsupported Hysteria Mbps type %T", value)
 	}
-	if parsed > uint64(MaxHysteriaMbps()) {
+	result, ok := checkedHysteriaMbpsInt(parsed)
+	if !ok {
 		return 0, fmt.Errorf("hysteria Mbps rate exceeds safe bound")
 	}
-	return int(parsed), nil
+	return result, nil
 }
 
 var hysteriaRateBitMultipliers = map[string]uint64{
@@ -122,8 +135,8 @@ func NormalizeHysteriaRate(raw string, implicit HysteriaImplicitUnit) (HysteriaR
 	bits := value * bitMultiplier
 	if bits%1_000_000 == 0 {
 		mbps := bits / 1_000_000
-		if mbps <= uint64(MaxHysteriaMbps()) {
-			return HysteriaRate{Mbps: int(mbps)}, nil
+		if parsed, ok := checkedHysteriaMbpsInt(mbps); ok {
+			return HysteriaRate{Mbps: parsed}, nil
 		}
 	}
 	return HysteriaRate{Text: strconv.FormatUint(value, 10) + " " + unit}, nil

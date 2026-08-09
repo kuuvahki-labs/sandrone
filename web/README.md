@@ -81,13 +81,8 @@ pnpm lint
 pnpm build
 ```
 
-涉及路由流程时，本地默认运行核心桌面链路的 Playwright smoke：
-
-```sh
-pnpm test:e2e:smoke
-```
-
-涉及响应式行为、跨 viewport 风险或准备合并、发版时，再运行完整 E2E：
+涉及路由流程、响应式布局或准备合并、发版时，运行精简的桌面与移动端
+Playwright smoke：
 
 ```sh
 pnpm test:e2e

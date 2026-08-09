@@ -72,7 +72,7 @@ func (s *Service) resolveNodeInputWithSubscriptionState(ctx context.Context, inp
 func normalizeInlineNodes(nodes []domain.NodeIR) ([]domain.NodeIR, []domain.Warning) {
 	out := make([]domain.NodeIR, len(nodes))
 	copy(out, nodes)
-	warnings := []domain.Warning{}
+	warnings := make([]domain.Warning, 0, len(out)*2)
 	for i := range out {
 		if out[i].Hysteria != nil {
 			hysteria := *out[i].Hysteria
