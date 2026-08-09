@@ -593,6 +593,12 @@ func TestBuildMetadataContracts(t *testing.T) {
 		"只有推送与规范版本匹配的 `v<version>` Git tag 才会发布",
 		"稳定版本才同时更新 `latest`",
 		"预发布 tag 只发布自己的同名 tag",
+		"pull request、`main` 和手动 CI 只验证 `linux/amd64`",
+		"`v<version>` tag 构建并发布",
+		"`linux/amd64` 和 `linux/arm64` 的 GHCR manifest",
+		"`$BUILDPLATFORM`",
+		"`GOOS`/`GOARCH`",
+		"GitHub Actions 缓存",
 	} {
 		if !strings.Contains(string(buildReference), want) {
 			t.Errorf("build reference does not contain %q", want)
@@ -600,8 +606,13 @@ func TestBuildMetadataContracts(t *testing.T) {
 	}
 
 	for _, want := range []string{
+		`FROM --platform=$BUILDPLATFORM node:24.17.0-bookworm AS web`,
+		`FROM --platform=$BUILDPLATFORM golang:1.25.11-bookworm AS build`,
 		`ARG VERSION="dev"`,
 		"ARG REVISION",
+		"ARG TARGETOS",
+		"ARG TARGETARCH",
+		`CGO_ENABLED=0 GOOS="$TARGETOS" GOARCH="$TARGETARCH"`,
 		`if [ -z "$REVISION" ] && [ "$VERSION" != "dev" ]; then`,
 		"org.opencontainers.image.source=https://github.com/kuuvahki-labs/sandrone",
 	} {
@@ -614,6 +625,34 @@ func TestBuildMetadataContracts(t *testing.T) {
 	}
 
 	workflowText := string(workflow)
+	for _, want := range []string{
+		`uses: actions/checkout@v7`,
+		`uses: actions/setup-go@v7`,
+		`uses: actions/setup-node@v7`,
+		`uses: pnpm/action-setup@v6`,
+		`uses: docker/setup-qemu-action@v4`,
+		`uses: docker/setup-buildx-action@v4`,
+		`uses: docker/login-action@v4`,
+		`uses: docker/build-push-action@v7`,
+	} {
+		if !strings.Contains(workflowText, want) {
+			t.Errorf("workflow does not contain Node.js 24 action %q", want)
+		}
+	}
+	for _, forbidden := range []string{
+		`uses: actions/checkout@v4`,
+		`uses: actions/setup-go@v5`,
+		`uses: actions/setup-node@v4`,
+		`uses: pnpm/action-setup@v4`,
+		`uses: docker/setup-qemu-action@v3`,
+		`uses: docker/setup-buildx-action@v3`,
+		`uses: docker/login-action@v3`,
+		`uses: docker/build-push-action@v6`,
+	} {
+		if strings.Contains(workflowText, forbidden) {
+			t.Errorf("workflow still contains Node.js 20 action %q", forbidden)
+		}
+	}
 	if got, want := workflowTriggerBlock(t, workflowText), `on:
   pull_request:
   push:
@@ -631,12 +670,15 @@ func TestBuildMetadataContracts(t *testing.T) {
         run: |
           version="$(tr -d '\r\n' < internal/buildinfo/VERSION)"
           tags="${IMAGE}:ci"
+          platforms="linux/amd64"
           if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF_TYPE}" == "tag" ]]; then
             git fetch --force --tags origin
             tags="$(./scripts/container-image-tags.sh)"
+            platforms="linux/amd64,linux/arm64"
           fi
           {
             echo "version=${version}"
+            echo "platforms=${platforms}"
             echo 'tags<<EOF'
             echo "${tags}"
             echo EOF
@@ -645,7 +687,7 @@ func TestBuildMetadataContracts(t *testing.T) {
 	}
 	if got, want := workflowNamedStep(t, containerJob, "Log in to GHCR"), `      - name: Log in to GHCR
         if: github.event_name == 'push' && github.ref_type == 'tag'
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -653,12 +695,14 @@ func TestBuildMetadataContracts(t *testing.T) {
 		t.Errorf("Log in to GHCR step =\n%s\nwant:\n%s", got, want)
 	}
 	if got, want := workflowNamedStep(t, containerJob, "Build container image"), `      - name: Build container image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ steps.image-metadata.outputs.platforms }}
           push: ${{ github.event_name == 'push' && github.ref_type == 'tag' }}
           tags: ${{ steps.image-metadata.outputs.tags }}
+          cache-from: type=gha,scope=sandrone-container
+          cache-to: type=gha,mode=max,scope=sandrone-container
           build-args: |
             VERSION=${{ steps.image-metadata.outputs.version }}
             REVISION=${{ github.sha }}
@@ -667,14 +711,18 @@ func TestBuildMetadataContracts(t *testing.T) {
             org.opencontainers.image.revision=${{ github.sha }}`; got != want {
 		t.Errorf("Build container image step =\n%s\nwant:\n%s", got, want)
 	}
+	if got, want := workflowNamedStep(t, containerJob, "Set up QEMU"), `      - name: Set up QEMU
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        uses: docker/setup-qemu-action@v4`; got != want {
+		t.Errorf("Set up QEMU step =\n%s\nwant:\n%s", got, want)
+	}
 	for _, forbidden := range []string{"make image", "docker tag", "docker push", "sha-"} {
 		if strings.Contains(containerJob, forbidden) {
 			t.Errorf("container workflow must not contain %q", forbidden)
 		}
 	}
 	for _, want := range []string{
-		`uses: docker/setup-qemu-action@v3`,
-		`uses: docker/setup-buildx-action@v3`,
+		`uses: docker/setup-buildx-action@v4`,
 		`needs:`,
 		`- go`,
 		`- web`,
@@ -695,13 +743,13 @@ func TestBuildMetadataContracts(t *testing.T) {
 		`if: github.event_name == 'push' && github.ref_type == 'tag'`,
 		"needs:\n      - container-image",
 		"permissions:\n      contents: write",
-		`uses: actions/checkout@v4`,
+		`uses: actions/checkout@v7`,
 		`fetch-depth: 0`,
-		`uses: actions/setup-go@v5`,
+		`uses: actions/setup-go@v7`,
 		`go-version-file: go.mod`,
-		`uses: pnpm/action-setup@v4`,
+		`uses: pnpm/action-setup@v6`,
 		`version: 11.5.2`,
-		`uses: actions/setup-node@v4`,
+		`uses: actions/setup-node@v7`,
 		`node-version-file: .node-version`,
 		`run: make build-webui`,
 		`make release-artifacts REVISION="${GITHUB_SHA}"`,

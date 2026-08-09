@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM node:24.17.0-bookworm AS web
+FROM --platform=$BUILDPLATFORM node:24.17.0-bookworm AS web
 WORKDIR /src/web
 
 ARG NPM_REGISTRY=""
@@ -16,10 +16,12 @@ RUN if [ -n "$PNPM_REGISTRY" ]; then pnpm config set registry "$PNPM_REGISTRY"; 
 COPY web/ ./
 RUN pnpm build
 
-FROM golang:1.25.11-bookworm AS build
+FROM --platform=$BUILDPLATFORM golang:1.25.11-bookworm AS build
 WORKDIR /src
 
 ARG GOPROXY=""
+ARG TARGETOS
+ARG TARGETARCH
 
 COPY go.mod go.sum ./
 RUN if [ -n "$GOPROXY" ]; then go env -w GOPROXY="$GOPROXY"; fi \
@@ -34,7 +36,8 @@ RUN if [ -z "$REVISION" ] && [ "$VERSION" != "dev" ]; then \
 
 COPY . .
 COPY --from=web /src/web/build/client ./internal/entry/webui/static
-RUN make build BUILD_BIN=/out/sandrone VERSION="$VERSION" REVISION="$REVISION"
+RUN CGO_ENABLED=0 GOOS="$TARGETOS" GOARCH="$TARGETARCH" \
+  make build BUILD_BIN=/out/sandrone VERSION="$VERSION" REVISION="$REVISION"
 
 FROM debian:bookworm-slim AS runtime
 

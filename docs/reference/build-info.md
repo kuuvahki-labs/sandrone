@@ -94,16 +94,23 @@ docker run --rm sandrone:dev --version
 # sandrone version dev
 ```
 
-需要本地可追溯镜像时，在干净 worktree 中执行 `make image`。CI 使用 Buildx 构建
-同时包含 `linux/amd64` 和 `linux/arm64` 的 GHCR manifest；Docker pull 或 run 会
-按宿主机架构自动选择对应镜像：
+需要本地可追溯镜像时，在干净 worktree 中执行 `make image`。CI 使用 Buildx；
+pull request、`main` 和手动 CI 只验证 `linux/amd64` 容器；`v<version>` tag 构建并发布
+`linux/amd64` 和 `linux/arm64` 的 GHCR manifest。Docker pull 或 run 会按宿主机架构
+自动选择对应镜像：
 
-- pull request、main 和手动 CI 只验证 `:ci` 镜像，不推送到 GHCR；
+- pull request、`main` 和手动 CI 只验证 `:ci` 镜像，不推送到 GHCR；
 - 只有 `v<version>` Git tag push 才推送双架构镜像，并保留 `v` 的同名镜像 tag，
   例如 `ghcr.io/kuuvahki-labs/sandrone:v0.1.0`；
 - 只有版本顺序最高、格式为 `vMAJOR.MINOR.PATCH` 的稳定版本才同时更新 `latest`；
 - 预发布 tag 只发布自己的同名 tag；
 - CI 不创建或发布 `sha-*` 镜像 tag，需要精确复现时使用镜像 digest。
+
+Dockerfile 的 Web 和 Go builder 固定运行在 `$BUILDPLATFORM`。Web 资产只在 runner
+原生架构构建；最终 Go 二进制通过目标 `GOOS`/`GOARCH` 交叉编译，因此发布 ARM64
+镜像时不会用 QEMU 执行 pnpm 或 Go 编译。最终 Debian runtime 层仍按目标平台组装。
+BuildKit 使用命名的 GitHub Actions 缓存复用依赖和编译层；缓存未命中只会增加
+构建时间，不改变镜像内容或发布规则。
 
 容器发布任务使用同一 FIFO 队列串行执行，最多保留 100 个 pending 任务。发布
 前会重新获取远端 tags；旧版本 tag 即使晚创建或晚完成，也只会写入自己的版本
