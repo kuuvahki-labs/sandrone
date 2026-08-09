@@ -24,5 +24,6 @@ sandrone
 /internal/entry/cli/data/
 web/.pnpm-store/
 
-internal/entry/webui/static
+internal/entry/webui/static/*
+!internal/entry/webui/static/.gitkeep
 internal/service/catalog_builtin/catalog.json.gz

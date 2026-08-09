@@ -59,7 +59,7 @@ for target do
 		"VERSION=$VERSION" \
 		"REVISION=$REVISION"
 	cp "$repo_root/LICENSE" "$package_dir/LICENSE"
-	tar -czf "$artifact_dir/sandrone_${VERSION}_${goos}_${goarch}.tar.gz" \
+	tar -czf "$artifact_dir/sandrone_${goos}_${goarch}.tar.gz" \
 		-C "$package_dir" sandrone LICENSE
 done
 

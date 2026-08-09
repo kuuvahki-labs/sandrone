@@ -8,8 +8,9 @@
 
 Web UI 使用 React Router framework mode，并以 `ssr: false` 构建为静态
 SPA。构建脚本会移除 server 产物，client-side 静态资源生成在
-`web/build/client`；Sandrone HTTP server 从复制后或显式配置的静态目录提供
-这些资源，不运行 Node application server。
+`web/build/client`；生产 Go 构建将复制后的资源嵌入二进制，Sandrone HTTP server
+只从嵌入文件系统提供生产资源，不运行 Node application server。日常开发使用
+独立 Vite server，并通过开发代理连接 Go server。
 
 `web/build/` 与复制到 `internal/entry/webui/static` 的资源都是生成物，不应提交。
 

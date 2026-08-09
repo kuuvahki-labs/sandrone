@@ -66,7 +66,6 @@ export const settingsZhCN = {
   "settings.startup.overridden": "当前由 {source} 覆盖",
   "settings.startup.serviceGroup": "服务",
   "settings.startup.title": "启动设置",
-  "settings.startup.webuiDir": "Web UI 静态目录",
   "settings.subscriptionTraffic.autoLoad.label": "自动获取流量",
   "settings.subscriptionTraffic.title": "订阅流量",
   "settings.theme.dark": "深色",

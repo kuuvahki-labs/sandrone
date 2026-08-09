@@ -173,7 +173,6 @@ func projectSettingsUpdate(value domain.Settings) domain.SettingsUpdate {
 		SchemaVersion:  value.SchemaVersion,
 		HTTP:           value.HTTP,
 		MCP:            value.MCP,
-		WebUI:          value.WebUI,
 		Log:            value.Log,
 		RemoteDefaults: value.RemoteDefaults,
 		ProbeDefaults:  value.ProbeDefaults,

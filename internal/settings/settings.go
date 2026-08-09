@@ -49,7 +49,6 @@ func DecodeStored(body []byte) (domain.Settings, bool, error) {
 			AllowManagementTools: stored.MCP.AllowManagementTools,
 			MaxOutputBytes:       stored.MCP.MaxOutputBytes,
 		},
-		WebUI:          stored.WebUI,
 		Log:            stored.Log,
 		RemoteDefaults: stored.RemoteDefaults,
 		ProbeDefaults:  stored.ProbeDefaults,
@@ -65,7 +64,8 @@ func DecodeStored(body []byte) (domain.Settings, bool, error) {
 	}
 	removedFields := stored.HTTP.LegacyToken != nil ||
 		stored.HTTP.LegacyTokenRequired != nil ||
-		stored.MCP.LegacyTransport != nil
+		stored.MCP.LegacyTransport != nil ||
+		stored.LegacyWebUI != nil
 	return normalized, removedFields, nil
 }
 
@@ -73,7 +73,7 @@ type storedSettings struct {
 	SchemaVersion  int                         `json:"schema_version"`
 	HTTP           storedHTTPSettings          `json:"http"`
 	MCP            storedMCPSettings           `json:"mcp"`
-	WebUI          domain.WebUISettings        `json:"webui"`
+	LegacyWebUI    *storedWebUISettings        `json:"webui,omitempty"`
 	Log            domain.LogSettings          `json:"log"`
 	RemoteDefaults domain.RemoteDefaults       `json:"remote_defaults"`
 	ProbeDefaults  domain.ProbeDefaults        `json:"probe_defaults"`
@@ -93,6 +93,10 @@ type storedMCPSettings struct {
 	Path                 string  `json:"path"`
 	AllowManagementTools bool    `json:"allow_management_tools"`
 	MaxOutputBytes       int     `json:"max_output_bytes"`
+}
+
+type storedWebUISettings struct {
+	StaticDir string `json:"static_dir"`
 }
 
 func Default() domain.Settings {
@@ -156,7 +160,6 @@ func Normalize(value domain.Settings) (domain.Settings, error) {
 		return domain.Settings{}, err
 	}
 
-	out.WebUI.StaticDir = strings.TrimSpace(value.WebUI.StaticDir)
 	out.Log.Level = firstNonEmpty(strings.ToLower(strings.TrimSpace(value.Log.Level)), defaults.Log.Level)
 	if err := validateLogLevel(out.Log.Level); err != nil {
 		return domain.Settings{}, err
@@ -192,7 +195,6 @@ func ApplyUpdate(update domain.SettingsUpdate) (domain.Settings, error) {
 		SchemaVersion:  update.SchemaVersion,
 		HTTP:           update.HTTP,
 		MCP:            update.MCP,
-		WebUI:          update.WebUI,
 		Log:            update.Log,
 		RemoteDefaults: update.RemoteDefaults,
 		ProbeDefaults:  update.ProbeDefaults,
@@ -208,7 +210,6 @@ func View(value domain.Settings) domain.SettingsView {
 		SchemaVersion:  value.SchemaVersion,
 		HTTP:           value.HTTP,
 		MCP:            value.MCP,
-		WebUI:          value.WebUI,
 		Log:            value.Log,
 		RemoteDefaults: value.RemoteDefaults,
 		ProbeDefaults:  value.ProbeDefaults,

@@ -27,5 +27,6 @@ describe("project settings model", () => {
 
     expect(update.http).toEqual({ listen: "127.0.0.1:1137" });
     expect(update.mcp).not.toHaveProperty("transport");
+    expect(update).not.toHaveProperty("webui");
   });
 });

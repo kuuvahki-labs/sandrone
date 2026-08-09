@@ -10,5 +10,5 @@ pnpm install --frozen-lockfile
 pnpm build
 
 mkdir -p "$STATIC_DIR"
-find "$STATIC_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+find "$STATIC_DIR" -mindepth 1 -maxdepth 1 ! -name .gitkeep -exec rm -rf {} +
 cp -R "$WEB_DIR/build/client/." "$STATIC_DIR/"

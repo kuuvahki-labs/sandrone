@@ -25,7 +25,7 @@ func TestDefaultSettingsContainsWholeProject(t *testing.T) {
 	require.Equal(t, "https://cp.cloudflare.com", got.ProbeDefaults.URL)
 }
 
-func TestStoredAndPublicSettingsOmitStartupAuthenticationAndMCPTransport(t *testing.T) {
+func TestStoredAndPublicSettingsOmitRemovedStartupFields(t *testing.T) {
 	value := settings.Default()
 
 	stored, err := json.Marshal(value)
@@ -38,6 +38,7 @@ func TestStoredAndPublicSettingsOmitStartupAuthenticationAndMCPTransport(t *test
 		require.NotContains(t, string(body), `"token_required"`)
 		require.NotContains(t, string(body), `"token_configured"`)
 		require.NotContains(t, string(body), `"transport"`)
+		require.NotContains(t, string(body), `"webui"`)
 	}
 }
 
@@ -55,7 +56,7 @@ func TestDecodeMigratesLegacyStartupAuthenticationAndMCPTransport(t *testing.T) 
 			"allow_management_tools": true,
 			"max_output_bytes": 2048
 		},
-		"webui": {"static_dir": ""},
+		"webui": {"static_dir": "/legacy/static"},
 		"log": {"level": "warn"}
 	}`))
 	require.NoError(t, err)
@@ -68,6 +69,7 @@ func TestDecodeMigratesLegacyStartupAuthenticationAndMCPTransport(t *testing.T) 
 	require.NotContains(t, string(body), "legacy-secret")
 	require.NotContains(t, string(body), `"token_required"`)
 	require.NotContains(t, string(body), `"transport"`)
+	require.NotContains(t, string(body), `"webui"`)
 }
 
 func TestNormalizeRejectsInvalidProjectFields(t *testing.T) {

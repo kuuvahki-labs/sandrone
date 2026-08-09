@@ -49,7 +49,6 @@ RUN apt-get update \
   && chown -R sandrone:sandrone /app
 
 COPY --from=build /out/sandrone /usr/local/bin/sandrone
-COPY --from=web --chown=sandrone:sandrone /src/web/build/client /app/static
 
 USER sandrone
 WORKDIR /app

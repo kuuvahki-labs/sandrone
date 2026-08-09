@@ -17,23 +17,21 @@ import (
 )
 
 type serveOptions struct {
-	listen         string
-	token          string
-	webUIStaticDir string
-	path           string
-	management     bool
-	maxOutput      int
-	logLevel       string
+	listen     string
+	token      string
+	path       string
+	management bool
+	maxOutput  int
+	logLevel   string
 }
 
 func newServeCommand(cfg *config) *cobra.Command {
 	opts := serveOptions{
-		listen:         firstNonEmpty(cfg.env[EnvListen], app.DefaultListen),
-		token:          cfg.env[EnvToken],
-		webUIStaticDir: cfg.env[EnvWebUIStaticDir],
-		path:           firstNonEmpty(cfg.env[EnvMCPPath], app.DefaultMCPPath),
-		maxOutput:      1 << 20,
-		logLevel:       firstNonEmpty(cfg.env[EnvLogLevel], "info"),
+		listen:    firstNonEmpty(cfg.env[EnvListen], app.DefaultListen),
+		token:     cfg.env[EnvToken],
+		path:      firstNonEmpty(cfg.env[EnvMCPPath], app.DefaultMCPPath),
+		maxOutput: 1 << 20,
+		logLevel:  firstNonEmpty(cfg.env[EnvLogLevel], "info"),
 	}
 	cmd := &cobra.Command{
 		Use:   "serve",
@@ -41,7 +39,6 @@ func newServeCommand(cfg *config) *cobra.Command {
 	}
 	cmd.PersistentFlags().StringVar(&opts.listen, "listen", opts.listen, "listen address")
 	cmd.PersistentFlags().StringVar(&opts.token, "token", opts.token, "bearer token for HTTP and MCP HTTP")
-	cmd.PersistentFlags().StringVar(&opts.webUIStaticDir, "webui-static-dir", opts.webUIStaticDir, "directory containing Web UI static assets")
 	cmd.PersistentFlags().StringVar(&opts.logLevel, "log-level", opts.logLevel, "log level: debug, info, warn, or error")
 	cmd.AddCommand(
 		newServeHTTPCommand(cfg, &opts),
@@ -136,9 +133,6 @@ func newServeRuntime(cmd *cobra.Command, cfg *config, opts serveOptions) (*app.R
 			AllowManagementTools: opts.management,
 			MaxOutputBytes:       opts.maxOutput,
 		},
-		WebUI: app.WebUIConfig{
-			StaticDir: opts.webUIStaticDir,
-		},
 		Log: app.LogConfig{
 			Level: opts.logLevel,
 		},
@@ -164,7 +158,6 @@ func startupOverrideSources(cmd *cobra.Command, env map[string]string) map[strin
 		{path: "mcp.path", envKey: EnvMCPPath, flag: "path"},
 		{path: "mcp.allow_management_tools", envKey: EnvMCPAllowManagementTools, flag: "allow-management-tools"},
 		{path: "mcp.max_output_bytes", envKey: EnvMCPMaxOutputBytes, flag: "max-output-bytes"},
-		{path: "webui.static_dir", envKey: EnvWebUIStaticDir, flag: "webui-static-dir"},
 		{path: "log.level", envKey: EnvLogLevel, flag: "log-level"},
 	} {
 		if env[item.envKey] != "" {
@@ -208,7 +201,6 @@ func environmentInt(env map[string]string, key string, fallback int) (int, error
 
 func newWebUIHandler(cfg app.Config) http.Handler {
 	return webui.Handler(
-		webui.WithStaticDir(cfg.WebUI.StaticDir),
 		webui.WithReservedPrefixes("/v1", cfg.MCP.Path, "/s"),
 	)
 }

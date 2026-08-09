@@ -8,7 +8,6 @@ services:
       SANDRONE_DATA_DIR: ${SANDRONE_DATA_DIR:-/app/data}
       SANDRONE_LISTEN: ${SANDRONE_LISTEN:-0.0.0.0:1137}
       SANDRONE_TOKEN: ${SANDRONE_TOKEN:-sandrone}
-      SANDRONE_WEBUI_STATIC_DIR: ${SANDRONE_WEBUI_STATIC_DIR:-}
     ports:
       - "0.0.0.0:1137:1137"
     volumes:

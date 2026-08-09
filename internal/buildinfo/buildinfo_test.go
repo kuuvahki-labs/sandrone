@@ -369,7 +369,7 @@ func TestReleaseArtifactsTargetUsesCanonicalScript(t *testing.T) {
 	if !strings.Contains(content, validatedLine) {
 		t.Errorf("Makefile does not validate release-artifacts")
 	}
-	wantTarget := "release-artifacts:\n\tVERSION=\"$(BUILD_VERSION)\" REVISION=\"$(BUILD_REVISION)\" ./scripts/build-release-artifacts.sh\n"
+	wantTarget := "release-artifacts: build-webui\n\tVERSION=\"$(BUILD_VERSION)\" REVISION=\"$(BUILD_REVISION)\" ./scripts/build-release-artifacts.sh\n"
 	if count := strings.Count(content, wantTarget); count != 1 {
 		t.Fatalf("Makefile contains %d canonical release-artifacts recipes, want 1", count)
 	}
@@ -392,7 +392,7 @@ func TestBuildReleaseArtifactsProducesCanonicalArchive(t *testing.T) {
 		t.Fatalf("build release artifacts: %v\n%s", err, output)
 	}
 
-	archiveName := "sandrone_1.2.3_linux_arm64.tar.gz"
+	archiveName := "sandrone_linux_arm64.tar.gz"
 	archive := filepath.Join(outputDir, archiveName)
 	listing, err := runCommand(repo, "tar", "-tzf", archive)
 	if err != nil {
@@ -572,6 +572,10 @@ func TestBuildMetadataContracts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	dockerignore, err := os.ReadFile(filepath.Join(root, ".dockerignore"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	workflow, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "ci.yml"))
 	if err != nil {
 		t.Fatal(err)
@@ -582,8 +586,8 @@ func TestBuildMetadataContracts(t *testing.T) {
 	}
 
 	for _, want := range []string{
-		"sandrone_<version>_linux_amd64.tar.gz",
-		"sandrone_<version>_linux_arm64.tar.gz",
+		"sandrone_linux_amd64.tar.gz",
+		"sandrone_linux_arm64.tar.gz",
 		"checksums.txt",
 		"sha256sum -c checksums.txt",
 		"linux/amd64",
@@ -614,12 +618,19 @@ func TestBuildMetadataContracts(t *testing.T) {
 		"ARG TARGETOS",
 		"ARG TARGETARCH",
 		`CGO_ENABLED=0 GOOS="$TARGETOS" GOARCH="$TARGETARCH"`,
+		`COPY --from=web /src/web/build/client ./internal/entry/webui/static`,
 		`if [ -z "$REVISION" ] && [ "$VERSION" != "dev" ]; then`,
 		"org.opencontainers.image.source=https://github.com/kuuvahki-labs/sandrone",
 	} {
 		if !strings.Contains(string(dockerfile), want) {
 			t.Errorf("Dockerfile does not contain %q", want)
 		}
+	}
+	if strings.Contains(string(dockerfile), `COPY --from=web --chown=sandrone:sandrone /src/web/build/client /app/static`) {
+		t.Error("Dockerfile must not duplicate embedded Web UI assets in the runtime image")
+	}
+	if !strings.Contains(string(dockerignore), "internal/entry/webui/static") {
+		t.Error("Docker context must exclude ignored host Web UI assets before copying the current web build")
 	}
 	if labelAt, copyAt := strings.LastIndex(string(dockerfile), "LABEL "), strings.LastIndex(string(dockerfile), "COPY --from=web"); labelAt < copyAt {
 		t.Error("Dockerfile OCI labels must follow runtime package and asset layers")
@@ -792,13 +803,11 @@ func TestBuildMetadataContracts(t *testing.T) {
 		`version: 11.5.2`,
 		`uses: actions/setup-node@v7`,
 		`node-version-file: .node-version`,
-		`run: make build-webui`,
 		`make release-artifacts REVISION="${GITHUB_SHA}"`,
 		`GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}`,
-		`version="$(tr -d '\r\n' < internal/buildinfo/VERSION)"`,
 		`artifacts=(`,
-		`"dist/sandrone_${version}_linux_amd64.tar.gz"`,
-		`"dist/sandrone_${version}_linux_arm64.tar.gz"`,
+		`"dist/sandrone_linux_amd64.tar.gz"`,
+		`"dist/sandrone_linux_arm64.tar.gz"`,
 		`"dist/checksums.txt"`,
 		`if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then`,
 		`gh release upload "${GITHUB_REF_NAME}" "${artifacts[@]}" --clobber`,
@@ -809,6 +818,9 @@ func TestBuildMetadataContracts(t *testing.T) {
 		if !strings.Contains(releaseJob, want) {
 			t.Errorf("release job does not contain %q", want)
 		}
+	}
+	if strings.Contains(releaseJob, `run: make build-webui`) {
+		t.Error("release job must let make release-artifacts build the Web UI exactly once")
 	}
 	if strings.Contains(releaseJob, "container-publish") {
 		t.Error("GitHub Release must run in parallel with container publication after the shared Go/Web gates")

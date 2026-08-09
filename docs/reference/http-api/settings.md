@@ -42,7 +42,6 @@ SettingsEnvelope {
     "allow_management_tools": false,
     "max_output_bytes": 1048576
   },
-  "webui": {"static_dir": ""},
   "log": {"level": "info"},
   "remote_defaults": {
     "user_agent": "sandrone/0.1.0",
@@ -93,7 +92,6 @@ SettingsEnvelope {
     "allow_management_tools": false,
     "max_output_bytes": 1048576
   },
-  "webui": {"static_dir": ""},
   "log": {"level": "info"},
   "remote_defaults": {
     "user_agent": "Sandrone Client",

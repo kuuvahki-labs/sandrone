@@ -733,16 +733,15 @@ func TestServeHTTPUsesTokenEnv(t *testing.T) {
 	require.Equal(t, "env-secret", got.HTTP.Token)
 }
 
-func TestServeHTTPUsesWebUIStaticDirEnv(t *testing.T) {
+func TestServeHTTPIgnoresRemovedWebUIStaticDirEnv(t *testing.T) {
 	dataDir := t.TempDir()
-	staticDir := t.TempDir()
 	stopErr := errors.New("stop after runtime")
 	var got app.Config
 
 	code, _, stderr := runCLI(t,
 		[]string{"--data-dir", dataDir, "serve", "http"},
 		"",
-		WithEnv(map[string]string{EnvWebUIStaticDir: staticDir}),
+		WithEnv(map[string]string{"SANDRONE_WEBUI_STATIC_DIR": t.TempDir()}),
 		WithRuntimeFactory(func(cfg app.Config) (*app.Runtime, error) {
 			got = cfg
 			return nil, stopErr
@@ -751,29 +750,19 @@ func TestServeHTTPUsesWebUIStaticDirEnv(t *testing.T) {
 
 	require.Equal(t, 1, code)
 	require.Contains(t, stderr, stopErr.Error())
-	require.Equal(t, staticDir, got.WebUI.StaticDir)
+	require.NotContains(t, got.OverrideSources, "webui.static_dir")
 }
 
-func TestServeHTTPWebUIStaticDirFlagOverridesEnv(t *testing.T) {
+func TestServeHTTPRejectsRemovedWebUIStaticDirFlag(t *testing.T) {
 	dataDir := t.TempDir()
-	envStaticDir := t.TempDir()
-	flagStaticDir := t.TempDir()
-	stopErr := errors.New("stop after runtime")
-	var got app.Config
 
 	code, _, stderr := runCLI(t,
-		[]string{"--data-dir", dataDir, "serve", "--webui-static-dir", flagStaticDir, "http"},
+		[]string{"--data-dir", dataDir, "serve", "--webui-static-dir", t.TempDir(), "http"},
 		"",
-		WithEnv(map[string]string{EnvWebUIStaticDir: envStaticDir}),
-		WithRuntimeFactory(func(cfg app.Config) (*app.Runtime, error) {
-			got = cfg
-			return nil, stopErr
-		}),
 	)
 
 	require.Equal(t, 1, code)
-	require.Contains(t, stderr, stopErr.Error())
-	require.Equal(t, flagStaticDir, got.WebUI.StaticDir)
+	require.Contains(t, stderr, "unknown flag: --webui-static-dir")
 }
 
 func TestServeHTTPUsesDefaultListen(t *testing.T) {

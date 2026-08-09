@@ -17,9 +17,6 @@ export const defaultProjectSettings: SettingsView = {
     allow_management_tools: false,
     max_output_bytes: 1 << 20,
   },
-  webui: {
-    static_dir: "",
-  },
   log: {
     level: "info",
   },
@@ -59,7 +56,6 @@ export function completeProjectSettings(settings?: Partial<SettingsView>): Setti
     ...settings,
     http: { ...defaultProjectSettings.http, ...settings?.http },
     mcp: { ...defaultProjectSettings.mcp, ...settings?.mcp },
-    webui: { ...defaultProjectSettings.webui, ...settings?.webui },
     log: { ...defaultProjectSettings.log, ...settings?.log },
     remote_defaults: { ...defaultProjectSettings.remote_defaults, ...settings?.remote_defaults },
     probe_defaults: { ...defaultProjectSettings.probe_defaults, ...settings?.probe_defaults },
@@ -74,7 +70,6 @@ export function settingsUpdateFromView(view: SettingsView): SettingsUpdate {
     schema_version: view.schema_version,
     http: view.http,
     mcp: view.mcp,
-    webui: view.webui,
     log: view.log,
     remote_defaults: view.remote_defaults,
     probe_defaults: view.probe_defaults,

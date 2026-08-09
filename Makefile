@@ -130,7 +130,7 @@ build-bin: ruleset-catalog
 build-check:
 	$(GO) build $(GOFLAGS) $(BUILD_VCS_ARG) $(BUILD_LDFLAGS_ARG) -o $(BUILD_BIN) $(CMD_PKG)
 
-release-artifacts:
+release-artifacts: build-webui
 	VERSION="$(BUILD_VERSION)" REVISION="$(BUILD_REVISION)" ./scripts/build-release-artifacts.sh
 
 build-webui:

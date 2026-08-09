@@ -216,9 +216,6 @@ jobs:
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
 
-      - name: Build Web UI assets
-        run: make build-webui
-
       - name: Build release artifacts
         run: make release-artifacts REVISION="${GITHUB_SHA}"
 
@@ -227,10 +224,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          version="$(tr -d '\r\n' < internal/buildinfo/VERSION)"
           artifacts=(
-            "dist/sandrone_${version}_linux_amd64.tar.gz"
-            "dist/sandrone_${version}_linux_arm64.tar.gz"
+            "dist/sandrone_linux_amd64.tar.gz"
+            "dist/sandrone_linux_arm64.tar.gz"
             "dist/checksums.txt"
           )
           if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then

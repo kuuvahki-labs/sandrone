@@ -47,7 +47,6 @@ revision 的来源和职责见[构建身份](build-info.md)。
 | --- | --- | --- | --- |
 | `--listen <host:port>` | `SANDRONE_LISTEN` | `127.0.0.1:1137` | HTTP 监听地址 |
 | `--token <token>` | `SANDRONE_TOKEN` | 空 | HTTP 与 MCP HTTP 的 bearer token |
-| `--webui-static-dir <dir>` | `SANDRONE_WEBUI_STATIC_DIR` | 空 | 覆盖 Web UI 静态资源目录 |
 | `--log-level <level>` | `SANDRONE_LOG_LEVEL` | `info` | `debug`、`info`、`warn` 或 `error` |
 
 启动字段的优先级是：
@@ -59,8 +58,7 @@ revision 的来源和职责见[构建身份](build-info.md)。
 环境变量或 flag 只覆盖当前进程，不回写 `settings.json`。token 只从
 `--token` 或 `SANDRONE_TOKEN` 读取，既不属于项目设置，也不会进入备份。管理
 API 保存了其它被覆盖字段时，当前进程继续使用覆盖值。`warning` 也会被接受为
-`warn` 日志级别。静态资源目录若非现有目录，启动失败。统一文件与管理接口见
-[项目设置接口](http-api/settings.md)。
+`warn` 日志级别。统一文件与管理接口见[项目设置接口](http-api/settings.md)。
 
 ## 节点格式
 
@@ -190,10 +188,10 @@ sandrone file render <name-or-spec-path>
 
 ### `serve http`
 
-启动 HTTP API，并在同一监听器挂载可选 Web UI。只有存在可发现的静态资源，
-或通过 `--webui-static-dir` / `SANDRONE_WEBUI_STATIC_DIR` 显式指定目录时才会
-提供页面；否则 API 仍可用而 Web 路径返回 `404`。构建与复制资源见
-[Web UI 快速说明](../../web/README.md)，HTTP endpoint 契约见
+启动 HTTP API，并在同一监听器挂载构建时嵌入的 Web UI。发布二进制提供完整页面；
+未先生成 Web 资源的普通 Go 开发构建仍可启动 API，但 Web 路径返回 `404`，前端由
+独立 Vite 开发服务器提供。开发与嵌入构建见 [Web UI 快速说明](../../web/README.md)，
+HTTP endpoint 契约见
 [HTTP API 通用约定](http-api/README.md)。
 
 ### `serve mcp`

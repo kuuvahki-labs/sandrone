@@ -29,7 +29,6 @@ type Config struct {
 	DataDir           string
 	HTTP              HTTPConfig
 	MCP               MCPConfig
-	WebUI             WebUIConfig
 	Log               LogConfig
 	StoredSettings    domain.Settings
 	EffectiveSettings domain.Settings
@@ -45,10 +44,6 @@ type MCPConfig struct {
 	Path                 string
 	AllowManagementTools bool
 	MaxOutputBytes       int
-}
-
-type WebUIConfig struct {
-	StaticDir string
 }
 
 type LogConfig struct {
@@ -144,15 +139,6 @@ func Validate(cfg Config) error {
 	}
 	if _, err := parseLogLevel(cfg.Log.Level); err != nil {
 		return err
-	}
-	if cfg.WebUI.StaticDir != "" {
-		info, err := os.Stat(cfg.WebUI.StaticDir)
-		if err != nil {
-			return domain.WrapError(domain.CodeInvalidArgument, "invalid Web UI static dir", err)
-		}
-		if !info.IsDir() {
-			return domain.NewError(domain.CodeInvalidArgument, "Web UI static dir must be a directory")
-		}
 	}
 	return nil
 }

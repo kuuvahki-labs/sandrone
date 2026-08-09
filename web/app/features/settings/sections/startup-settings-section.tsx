@@ -44,13 +44,6 @@ export function StartupSettingsSection({
               value={value.http.listen}
               onChange={(event) => onChange({ ...value, http: { listen: event.target.value } })}
             />
-            <TextField
-              fullWidth
-              helperText={source("webui.static_dir")}
-              label={t("settings.startup.webuiDir")}
-              value={value.webui.static_dir}
-              onChange={(event) => onChange({ ...value, webui: { static_dir: event.target.value } })}
-            />
             <FormControl fullWidth>
               <InputLabel>{t("settings.startup.logLevel")}</InputLabel>
               <Select

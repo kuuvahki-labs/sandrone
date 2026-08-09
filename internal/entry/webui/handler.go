@@ -6,10 +6,7 @@ import (
 	"io/fs"
 	"mime"
 	"net/http"
-	"os"
 	"path"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 )
@@ -18,7 +15,6 @@ type Option func(*options)
 
 type options struct {
 	static           fs.FS
-	staticDir        string
 	reservedPrefixes []string
 }
 
@@ -28,7 +24,7 @@ func Handler(opts ...Option) http.Handler {
 		opt(&cfg)
 	}
 	if cfg.static == nil {
-		cfg.static = staticFS(cfg.staticDir)
+		cfg.static = embeddedStaticFS()
 	}
 	return &handler{
 		static:           cfg.static,
@@ -43,12 +39,6 @@ func HandlerWithFS(static fs.FS, opts ...Option) http.Handler {
 	})
 	all = append(all, opts...)
 	return Handler(all...)
-}
-
-func WithStaticDir(dir string) Option {
-	return func(cfg *options) {
-		cfg.staticDir = dir
-	}
 }
 
 func WithReservedPrefixes(prefixes ...string) Option {
@@ -105,29 +95,6 @@ func (h *handler) serveStatic(w http.ResponseWriter, r *http.Request, name strin
 	}
 	http.ServeContent(w, r, name, time.Time{}, bytes.NewReader(body))
 	return true
-}
-
-func staticFS(staticDir string) fs.FS {
-	if staticDir != "" {
-		if info, err := os.Stat(staticDir); err == nil && info.IsDir() {
-			return os.DirFS(staticDir)
-		}
-		return nil
-	}
-	dirs := []string{
-		filepath.Join("internal", "entry", "webui", "static"),
-		"static",
-	}
-	if _, filename, _, ok := runtime.Caller(0); ok {
-		dirs = append(dirs, filepath.Join(filepath.Dir(filename), "static"))
-	}
-	for _, dir := range dirs {
-		info, err := os.Stat(dir)
-		if err == nil && info.IsDir() {
-			return os.DirFS(dir)
-		}
-	}
-	return nil
 }
 
 func defaultReservedPrefixes() []string {

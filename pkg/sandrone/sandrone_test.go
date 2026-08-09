@@ -189,7 +189,6 @@ func TestEngineSettingsRoundTrip(t *testing.T) {
 		SchemaVersion: defaults.Settings.SchemaVersion,
 		HTTP:          defaults.Settings.HTTP,
 		MCP:           defaults.Settings.MCP,
-		WebUI:         defaults.Settings.WebUI,
 		Log:           defaults.Settings.Log,
 		RemoteDefaults: sandrone.RemoteDefaults{
 			UserAgent: "Sandrone Test",

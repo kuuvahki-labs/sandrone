@@ -66,7 +66,6 @@ export const settingsEnUS = {
   "settings.startup.overridden": "Currently overridden by {source}",
   "settings.startup.serviceGroup": "Service",
   "settings.startup.title": "Startup settings",
-  "settings.startup.webuiDir": "Web UI static directory",
   "settings.subscriptionTraffic.autoLoad.label": "Automatically load traffic",
   "settings.subscriptionTraffic.title": "Subscription traffic",
   "settings.theme.dark": "Dark",

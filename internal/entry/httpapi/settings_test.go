@@ -19,7 +19,7 @@ import (
 	projectsettings "github.com/kuuvahki-labs/sandrone/internal/settings"
 )
 
-func TestSettingsEndpointRoundTripOmitsStartupAuthenticationAndMCPTransport(t *testing.T) {
+func TestSettingsEndpointRoundTripOmitsRemovedStartupFields(t *testing.T) {
 	rt := testRuntime(t, app.Config{})
 	server := httpapi.New(rt)
 
@@ -34,6 +34,7 @@ func TestSettingsEndpointRoundTripOmitsStartupAuthenticationAndMCPTransport(t *t
 	require.NotContains(t, put.Body.String(), `"token_required"`)
 	require.NotContains(t, put.Body.String(), `"token_configured"`)
 	require.NotContains(t, put.Body.String(), `"transport"`)
+	require.NotContains(t, put.Body.String(), `"webui"`)
 
 	get := httptest.NewRecorder()
 	server.Handler().ServeHTTP(get, httptest.NewRequest(http.MethodGet, "/v1/settings", nil))
@@ -50,9 +51,10 @@ func TestSettingsEndpointRoundTripOmitsStartupAuthenticationAndMCPTransport(t *t
 	require.NoError(t, err)
 	require.NotContains(t, string(body), `"token"`)
 	require.NotContains(t, string(body), `"transport"`)
+	require.NotContains(t, string(body), `"webui"`)
 }
 
-func TestSettingsEndpointRejectsRemovedStartupAuthenticationAndTransportFields(t *testing.T) {
+func TestSettingsEndpointRejectsRemovedStartupFields(t *testing.T) {
 	rt := testRuntime(t, app.Config{})
 	server := httpapi.New(rt)
 	base, err := json.Marshal(settingsUpdate())
@@ -62,6 +64,7 @@ func TestSettingsEndpointRejectsRemovedStartupAuthenticationAndTransportFields(t
 		"token":          strings.Replace(string(base), `"listen":"127.0.0.1:1137"`, `"listen":"127.0.0.1:1137","token":"secret"`, 1),
 		"token required": strings.Replace(string(base), `"listen":"127.0.0.1:1137"`, `"listen":"127.0.0.1:1137","token_required":true`, 1),
 		"transport":      strings.Replace(string(base), `"path":"/mcp"`, `"path":"/mcp","transport":"streamable-http"`, 1),
+		"webui":          strings.Replace(string(base), `"log":`, `"webui":{"static_dir":"/tmp/static"},"log":`, 1),
 	} {
 		t.Run(name, func(t *testing.T) {
 			response := httptest.NewRecorder()
@@ -159,7 +162,6 @@ func settingsUpdate() domain.SettingsUpdate {
 		SchemaVersion:  value.SchemaVersion,
 		HTTP:           value.HTTP,
 		MCP:            value.MCP,
-		WebUI:          value.WebUI,
 		Log:            value.Log,
 		RemoteDefaults: value.RemoteDefaults,
 		ProbeDefaults:  value.ProbeDefaults,

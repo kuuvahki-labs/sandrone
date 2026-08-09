@@ -100,9 +100,6 @@ export interface SettingsView {
     allow_management_tools: boolean;
     max_output_bytes: number;
   };
-  webui: {
-    static_dir: string;
-  };
   log: {
     level: "debug" | "info" | "warn" | "error";
   };
@@ -124,7 +121,6 @@ export interface SettingsUpdate {
     listen: string;
   };
   mcp: SettingsView["mcp"];
-  webui: SettingsView["webui"];
   log: SettingsView["log"];
   remote_defaults: RemoteDefaultsInput;
   probe_defaults: ProbeDefaultsInput;

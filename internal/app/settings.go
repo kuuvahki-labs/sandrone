@@ -43,7 +43,6 @@ func ResolveSettings(ctx context.Context, cfg Config, repository *store.Settings
 		AllowManagementTools: normalized.MCP.AllowManagementTools,
 		MaxOutputBytes:       normalized.MCP.MaxOutputBytes,
 	}
-	cfg.WebUI = WebUIConfig{StaticDir: normalized.WebUI.StaticDir}
 	cfg.Log = LogConfig{Level: normalized.Log.Level}
 	if cfg.OverrideSources == nil {
 		cfg.OverrideSources = map[string]string{}
@@ -63,9 +62,6 @@ func applyStartupOverrides(value *domain.Settings, cfg Config, sources map[strin
 	}
 	if _, ok := sources["mcp.max_output_bytes"]; ok {
 		value.MCP.MaxOutputBytes = cfg.MCP.MaxOutputBytes
-	}
-	if _, ok := sources["webui.static_dir"]; ok {
-		value.WebUI.StaticDir = cfg.WebUI.StaticDir
 	}
 	if _, ok := sources["log.level"]; ok {
 		value.Log.Level = cfg.Log.Level
@@ -87,7 +83,6 @@ func withProgrammaticOverrideSources(cfg Config) Config {
 	mark("mcp.path", cfg.MCP.Path != "")
 	mark("mcp.allow_management_tools", cfg.MCP.AllowManagementTools)
 	mark("mcp.max_output_bytes", cfg.MCP.MaxOutputBytes != 0)
-	mark("webui.static_dir", cfg.WebUI.StaticDir != "")
 	mark("log.level", cfg.Log.Level != "")
 	return cfg
 }

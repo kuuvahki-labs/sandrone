@@ -20,7 +20,14 @@ pnpm install --frozen-lockfile
 
 ## 开发
 
-启动 React Router/Vite 开发服务器：
+前端与后端使用两个独立开发进程。先在仓库根目录启动 Go 后端；这个命令不要求先
+生成或嵌入 Web 资源：
+
+```sh
+go run -mod=readonly -tags probe_singbox ./cmd/sandrone serve http
+```
+
+然后在 `web/` 目录启动 React Router/Vite 开发服务器：
 
 ```sh
 pnpm dev
@@ -50,8 +57,9 @@ make build-webui
 ```
 
 该目标会安装锁定依赖、构建 Web UI，并把 client 产物复制到
-`internal/entry/webui/static`。`web/build/` 和复制后的静态资源均为生成物，
-不应提交。
+`internal/entry/webui/static`，供随后的 Go 构建嵌入二进制。`web/build/` 和复制后
+的静态资源均为生成物，不应提交；仓库只保留让无前端产物的普通 Go 构建仍可编译
+的占位文件。
 
 ## 运行
 
@@ -61,14 +69,17 @@ make build-webui
 pnpm start
 ```
 
-预览地址默认为 `http://127.0.0.1:4173`。生产运行时不需要 Node server；
-在仓库根目录先执行 `make build-webui`，再启动 Sandrone HTTP server：
+预览地址默认为 `http://127.0.0.1:4173`。生产运行时不需要 Node server；在仓库
+根目录先执行 `make build-webui`，再启动 Sandrone HTTP server。Go 构建会把当前
+静态资源嵌入可执行文件：
 
 ```sh
 go run -mod=readonly -tags probe_singbox ./cmd/sandrone serve http
 ```
 
 然后访问 `http://127.0.0.1:1137/`。
+
+发布二进制只使用构建时嵌入的 Web 资源，不读取运行时外部静态目录。
 
 ## 验证
 

@@ -6,7 +6,6 @@ const (
 	EnvDataDir                 = "SANDRONE_DATA_DIR"
 	EnvListen                  = "SANDRONE_LISTEN"
 	EnvToken                   = "SANDRONE_TOKEN"
-	EnvWebUIStaticDir          = "SANDRONE_WEBUI_STATIC_DIR"
 	EnvLogLevel                = "SANDRONE_LOG_LEVEL"
 	EnvMCPPath                 = "SANDRONE_MCP_PATH"
 	EnvMCPAllowManagementTools = "SANDRONE_MCP_ALLOW_MANAGEMENT_TOOLS"

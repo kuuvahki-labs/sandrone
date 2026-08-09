@@ -74,28 +74,6 @@ func TestHandlerUsesConfiguredReservedPrefixes(t *testing.T) {
 	require.Contains(t, w.Body.String(), "Sandrone")
 }
 
-func TestHandlerServesConfiguredStaticDir(t *testing.T) {
-	staticDir := t.TempDir()
-	require.NoError(t, os.Mkdir(filepath.Join(staticDir, "assets"), 0o755))
-	require.NoError(t, os.WriteFile(
-		filepath.Join(staticDir, "index.html"),
-		[]byte(`<html><body>Custom Sandrone<script src="/assets/custom.js"></script></body></html>`),
-		0o644,
-	))
-	require.NoError(t, os.WriteFile(filepath.Join(staticDir, "assets", "custom.js"), []byte(`console.log("custom")`), 0o644))
-	handler := Handler(WithStaticDir(staticDir))
-
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
-	require.Equal(t, http.StatusOK, w.Code)
-	require.Contains(t, w.Body.String(), "Custom Sandrone")
-
-	w = httptest.NewRecorder()
-	handler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/assets/custom.js", nil))
-	require.Equal(t, http.StatusOK, w.Code)
-	require.Contains(t, w.Body.String(), "custom")
-}
-
 func TestHandlerReturnsNotFoundWhenStaticAssetsAreMissing(t *testing.T) {
 	handler := &handler{}
 
@@ -115,20 +93,32 @@ func TestPackageBuildsWithoutGeneratedStaticAssets(t *testing.T) {
 	packageDir, err := os.Getwd()
 	require.NoError(t, err)
 	repoRoot := filepath.Clean(filepath.Join(packageDir, "..", "..", ".."))
-	staticDir := filepath.Join(packageDir, "static")
-	hiddenDir := filepath.Join(packageDir, "static.optional-test-hidden")
-	require.NoFileExists(t, hiddenDir)
-	if _, err := os.Stat(staticDir); err == nil {
-		require.NoError(t, os.Rename(staticDir, hiddenDir))
-		defer func() {
-			require.NoError(t, os.Rename(hiddenDir, staticDir))
-		}()
-	} else if !os.IsNotExist(err) {
-		require.NoError(t, err)
+	tempRepo := t.TempDir()
+	copyFile := func(source, target string) {
+		body, readErr := os.ReadFile(source)
+		require.NoError(t, readErr)
+		require.NoError(t, os.MkdirAll(filepath.Dir(target), 0o755))
+		require.NoError(t, os.WriteFile(target, body, 0o644))
 	}
+	for _, name := range []string{"go.mod", "go.sum"} {
+		copyFile(filepath.Join(repoRoot, name), filepath.Join(tempRepo, name))
+	}
+	targetPackageDir := filepath.Join(tempRepo, "internal", "entry", "webui")
+	entries, err := os.ReadDir(packageDir)
+	require.NoError(t, err)
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".go" {
+			continue
+		}
+		copyFile(filepath.Join(packageDir, entry.Name()), filepath.Join(targetPackageDir, entry.Name()))
+	}
+	copyFile(
+		filepath.Join(packageDir, "static", ".gitkeep"),
+		filepath.Join(targetPackageDir, "static", ".gitkeep"),
+	)
 
 	cmd := exec.Command("go", "test", "./internal/entry/webui")
-	cmd.Dir = repoRoot
+	cmd.Dir = tempRepo
 	cmd.Env = append(os.Environ(), "SANDRONE_WEBUI_OPTIONAL_STATIC_SUBPROCESS=1")
 	output, err := cmd.CombinedOutput()
 	require.NoError(t, err, string(output))

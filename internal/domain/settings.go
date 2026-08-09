@@ -30,7 +30,6 @@ type Settings struct {
 	SchemaVersion  int                  `json:"schema_version"`
 	HTTP           HTTPSettings         `json:"http"`
 	MCP            MCPSettings          `json:"mcp"`
-	WebUI          WebUISettings        `json:"webui"`
 	Log            LogSettings          `json:"log"`
 	RemoteDefaults RemoteDefaults       `json:"remote_defaults"`
 	ProbeDefaults  ProbeDefaults        `json:"probe_defaults"`
@@ -83,10 +82,6 @@ type MCPSettings struct {
 	MaxOutputBytes       int    `json:"max_output_bytes"`
 }
 
-type WebUISettings struct {
-	StaticDir string `json:"static_dir"`
-}
-
 type LogSettings struct {
 	Level string `json:"level"`
 }
@@ -104,7 +99,6 @@ type SettingsUpdate struct {
 	SchemaVersion  int                  `json:"schema_version"`
 	HTTP           HTTPSettings         `json:"http"`
 	MCP            MCPSettings          `json:"mcp"`
-	WebUI          WebUISettings        `json:"webui"`
 	Log            LogSettings          `json:"log"`
 	RemoteDefaults RemoteDefaults       `json:"remote_defaults"`
 	ProbeDefaults  ProbeDefaults        `json:"probe_defaults"`
@@ -117,7 +111,6 @@ type SettingsView struct {
 	SchemaVersion  int                  `json:"schema_version"`
 	HTTP           HTTPSettings         `json:"http"`
 	MCP            MCPSettings          `json:"mcp"`
-	WebUI          WebUISettings        `json:"webui"`
 	Log            LogSettings          `json:"log"`
 	RemoteDefaults RemoteDefaults       `json:"remote_defaults"`
 	ProbeDefaults  ProbeDefaults        `json:"probe_defaults"`

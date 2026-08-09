@@ -32,6 +32,7 @@ describe("settings runtime page", () => {
     expect(screen.getByRole("button", { name: "测活" })).toHaveAttribute("aria-expanded", "false");
 
     expect(screen.getByRole("textbox", { name: "监听地址" })).toHaveValue("127.0.0.1:1137");
+    expect(screen.queryByRole("textbox", { name: "Web UI 静态目录" })).not.toBeInTheDocument();
     expect(screen.getByText("当前由 environment 覆盖")).toBeInTheDocument();
     fireEvent.change(screen.getByRole("textbox", { name: "MCP 路径" }), {
       target: { value: "/agent" },

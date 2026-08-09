@@ -67,16 +67,24 @@ metadata。
 
 每个 GitHub Release 固定包含以下三个附件：
 
-- `sandrone_<version>_linux_amd64.tar.gz`，用于 `linux/amd64`；
-- `sandrone_<version>_linux_arm64.tar.gz`，用于 `linux/arm64`；
+- `sandrone_linux_amd64.tar.gz`，用于 `linux/amd64`；
+- `sandrone_linux_arm64.tar.gz`，用于 `linux/arm64`；
 - `checksums.txt`，包含上述两个压缩包的 SHA-256 校验值。
 
-两个压缩包都只包含 `sandrone` 可执行文件和 `LICENSE`。下载三个附件到同一目录
-后执行：
+附件名不重复版本号；GitHub Release tag 是下载路径中的版本边界。安装脚本既可以用
+`releases/download/v<version>/sandrone_linux_<arch>.tar.gz` 固定版本，也可以用
+`releases/latest/download/sandrone_linux_<arch>.tar.gz` 跟随最新稳定版本。
+
+两个压缩包都只包含 `sandrone` 可执行文件和 `LICENSE`。可执行文件已经嵌入同版本
+Web UI，并使用与 Docker 镜像一致的默认 build tags，包含 TCP 与 sing-box probe
+backend；用户不需要再组合前端或测活附件。下载三个附件到同一目录后执行：
 
 ```sh
 sha256sum -c checksums.txt
 ```
+
+本地执行 `make release-artifacts` 会先构建 Web UI，再生成两个自包含二进制归档和
+校验文件。
 
 纯 `vMAJOR.MINOR.PATCH` tag 创建正式 Release；其他与版本文件匹配的 tag（例如
 `v0.1.0-rc.1`）创建 prerelease。重新运行同一个 tag 的发布任务会替换同名附件，
@@ -115,8 +123,9 @@ BuildKit 使用命名的 GitHub Actions 缓存复用依赖和编译层；缓存�
 
 普通 CI 的完整容器构建同时验证 Web 资产生成、Go embed 和最终二进制，因此不再
 单独重复运行嵌入式 Web UI 构建任务。tag 的容器发布与 GitHub Release 均须等待
-Go/Web 检查通过，随后并行发布；GitHub Release 产物继续独立构建 Web 资产和
-二进制归档。
+Go/Web 检查通过，随后并行发布；`make release-artifacts` 在编译原生二进制前构建
+一次 Web 资产。容器和原生包都从二进制内的同一嵌入式文件系统提供 Web UI，容器
+运行层不再复制第二份 `/app/static`。
 
 容器发布与 GitHub Release 分别使用自己的 FIFO 队列串行执行，最多各保留 100 个
 pending 任务；同一个 tag 的两类发布仍可并行。容器发布前会重新获取远端 tags；

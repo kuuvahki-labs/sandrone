@@ -103,7 +103,6 @@ func restartRequiredPaths(stored, effective domain.Settings, overrides map[strin
 	add("mcp.path", stored.MCP.Path != effective.MCP.Path)
 	add("mcp.allow_management_tools", stored.MCP.AllowManagementTools != effective.MCP.AllowManagementTools)
 	add("mcp.max_output_bytes", stored.MCP.MaxOutputBytes != effective.MCP.MaxOutputBytes)
-	add("webui.static_dir", stored.WebUI.StaticDir != effective.WebUI.StaticDir)
 	add("log.level", stored.Log.Level != effective.Log.Level)
 	sort.Strings(paths)
 	return paths
