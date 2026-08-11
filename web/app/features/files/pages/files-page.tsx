@@ -7,12 +7,12 @@ import Chip from "@mui/material/Chip";
 import InputAdornment from "@mui/material/InputAdornment";
 import List from "@mui/material/List";
 import TextField from "@mui/material/TextField";
-import Typography from "@mui/material/Typography";
 
 import { fileDriver } from "~/features/files/drivers/registry";
 import { FileDriverIcon } from "~/features/files/editor/file-driver-icon";
 import type { FileItem } from "~/features/files/model/types";
 import { type Translator, useI18n } from "~/shared/i18n/context";
+import { resourceOptionText, resourceSecondaryName } from "~/shared/resources/labels";
 import { EmptyState } from "~/shared/ui/feedback";
 import { Metric, PageHeader } from "~/shared/ui/page";
 import {
@@ -99,23 +99,32 @@ export function FilesPage({ createActions, items, loaded = true, onDelete, onEdi
       </div>
       {filtered.length ? (
         <List aria-label={t("files.list")} className="grid gap-3 p-0">
-          {filtered.map((item) => (
-            <DestinationListItem
-              actions={fileActions(item, { onDelete, onPreview, onShare }, t)}
-              actionTitle={item.name}
-              icon={fileIcon(item)}
-              key={item.name}
-              meta={(
-                <>
-                  <Chip label={fileUsageLabel(item, t)} size="small" variant="outlined" />
-                </>
-              )}
-              primaryLabel={t("actions.edit")}
-              subtitle={item.description ? <Typography color="text.secondary" component="span" variant="body2">{item.description}</Typography> : undefined}
-              title={item.title}
-              onPrimaryAction={() => onEdit(item)}
-            />
-          ))}
+          {filtered.map((item) => {
+            const secondaryName = resourceSecondaryName(item);
+            const subtitle = secondaryName || item.description ? (
+              <span className="grid gap-1">
+                {secondaryName ? <span>{secondaryName}</span> : null}
+                {item.description ? <span>{item.description}</span> : null}
+              </span>
+            ) : undefined;
+            return (
+              <DestinationListItem
+                actions={fileActions(item, { onDelete, onPreview, onShare }, t)}
+                actionTitle={resourceOptionText(item)}
+                icon={fileIcon(item)}
+                key={item.name}
+                meta={(
+                  <>
+                    <Chip label={fileUsageLabel(item, t)} size="small" variant="outlined" />
+                  </>
+                )}
+                primaryLabel={t("actions.edit")}
+                subtitle={subtitle}
+                title={item.title}
+                onPrimaryAction={() => onEdit(item)}
+              />
+            );
+          })}
         </List>
       ) : loaded ? (
         <EmptyState title={t("files.empty")} />

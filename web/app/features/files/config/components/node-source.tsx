@@ -15,6 +15,7 @@ import {
   type ConfigNodePreviewInput,
 } from "~/features/files/config/model/node-source";
 import { useI18n } from "~/shared/i18n/context";
+import { resourceOptionText } from "~/shared/resources/labels";
 import type { ResourceOption } from "~/shared/resources/types";
 import { WarningList } from "~/shared/resources/warnings";
 
@@ -132,7 +133,7 @@ export function ConfigNodeSourceSection({ disabled = false, loadPreview, onSelec
         disabled={disabled}
         options={subscriptions}
         value={selectedItem}
-        getOptionLabel={(item) => item.name}
+        getOptionLabel={resourceOptionText}
         isOptionEqualToValue={(option, value) => option.name === value.name}
         renderInput={(params) => <TextField {...params} label={t("files.config.subscription")} />}
         onChange={(_event, item) => onSelectedChange(item?.name ?? "")}

@@ -300,7 +300,7 @@ describe("ProcessorBuilder", () => {
           params: { enabled: true, threshold: 2 },
         },
       ],
-      scriptFiles,
+      scriptFiles: scriptFiles.map((file) => file.name === "rename.js" ? { ...file, title: "Rename Nodes" } : file),
     });
 
     const scriptGroup = screen.getByRole("group", { name: "处理器 脚本处理" });
@@ -330,6 +330,7 @@ describe("ProcessorBuilder", () => {
     expect(within(scriptGroup).queryByRole("textbox", { name: "内联脚本" })).not.toBeInTheDocument();
     const scriptFileSelect = within(scriptGroup).getByRole("combobox", { name: "脚本文件" });
     expect(scriptFileSelect).toHaveValue("rename.js");
+    expect(within(scriptFileSelect).getByRole("option", { name: "Rename Nodes (rename.js)" })).toBeInTheDocument();
     expect(within(scriptGroup).queryByRole("textbox", { name: "脚本路径" })).not.toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "default.yaml" })).not.toBeInTheDocument();
     await user.selectOptions(scriptFileSelect, "other.js");

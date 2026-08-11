@@ -168,6 +168,8 @@ describe("FilesPage", () => {
       />,
     );
 
+    expect(screen.getByText("移动端配置")).toBeInTheDocument();
+    expect(screen.getByText("default.yaml")).toBeInTheDocument();
     const searchbox = screen.getByRole("searchbox", { name: "搜索文件" });
     fireEvent.change(searchbox, { target: { value: "移动端" } });
     expect(screen.getByText("移动端配置")).toBeInTheDocument();
@@ -176,15 +178,15 @@ describe("FilesPage", () => {
 
     await user.click(screen.getByRole("button", { name: "新建文件" }));
     await user.click(await screen.findByRole("menuitem", { name: "远程" }));
-    await user.click(screen.getByRole("button", { name: "编辑：default.yaml" }));
-    await user.click(screen.getByRole("button", { name: "default.yaml 更多操作" }));
+    await user.click(screen.getByRole("button", { name: "编辑：移动端配置 (default.yaml)" }));
+    await user.click(screen.getByRole("button", { name: "移动端配置 (default.yaml) 更多操作" }));
     expect(within(screen.getByRole("menu")).getAllByRole("menuitem").map((item) => item.textContent))
       .toEqual(["预览", "分享", "删除"]);
     expect(screen.queryByRole("menuitem", { name: "编辑" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("menuitem", { name: "预览文件" }));
-    await user.click(screen.getByRole("button", { name: "default.yaml 更多操作" }));
+    await user.click(screen.getByRole("button", { name: "移动端配置 (default.yaml) 更多操作" }));
     await user.click(screen.getByRole("menuitem", { name: "分享文件" }));
-    await user.click(screen.getByRole("button", { name: "default.yaml 更多操作" }));
+    await user.click(screen.getByRole("button", { name: "移动端配置 (default.yaml) 更多操作" }));
     await user.click(screen.getByRole("menuitem", { name: "删除" }));
 
     expect(onCreateRemote).toHaveBeenCalledTimes(1);

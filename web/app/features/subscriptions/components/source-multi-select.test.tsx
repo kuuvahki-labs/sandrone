@@ -11,6 +11,32 @@ import {
 import { SourceMultiSelect } from "./source-multi-select";
 
 describe("SourceMultiSelect", () => {
+  it("shows display names while submitting canonical subscription names", async () => {
+    const user = userEvent.setup();
+    const submittedSources: string[][] = [];
+    const onSubmit = vi.fn((event: SyntheticEvent<HTMLFormElement, SubmitEvent>) => {
+      event.preventDefault();
+      submittedSources.push(new FormData(event.currentTarget).getAll("subscriptions").map(String));
+    });
+    const titledProvider = { ...subscriptions[0], displayName: "Provider Main", title: "Provider Main" };
+    render(
+      <form onSubmit={onSubmit}>
+        <SourceMultiSelect defaultValue={[]} subscriptions={[titledProvider]} />
+        <button type="submit">保存</button>
+      </form>,
+    );
+
+    const sourcePicker = screen.getByRole("group", { name: "包含订阅" });
+    const provider = within(sourcePicker).getByRole("checkbox", { name: "Provider Main (provider) 远程订阅 · uri-list" });
+    expect(within(sourcePicker).getByText("Provider Main")).toBeInTheDocument();
+    expect(within(sourcePicker).getByText("provider")).toBeInTheDocument();
+
+    await user.click(provider);
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    expect(submittedSources).toEqual([["provider"]]);
+  });
+
   it("treats an empty source picker default as an explicit empty selection", async () => {
     const user = userEvent.setup();
     const submittedSources: string[][] = [];

@@ -17,6 +17,7 @@ import { SubscriptionTrafficSummary } from "~/features/subscriptions/components/
 import { subscriptionSummary } from "~/features/subscriptions/model/summary";
 import type { SubscriptionItem, SubscriptionKind, SubscriptionTraffic } from "~/features/subscriptions/model/types";
 import { type Translator, useI18n } from "~/shared/i18n/context";
+import { resourceOptionText, resourceSecondaryName } from "~/shared/resources/labels";
 import { EmptyState } from "~/shared/ui/feedback";
 import { Metric, PageHeader } from "~/shared/ui/page";
 import {
@@ -114,7 +115,7 @@ export function SubscriptionsPage({
             return (
               <DestinationListItem
                 actions={subscriptionActions(item, traffic, { onDelete, onPreview, onShare }, t)}
-                actionTitle={item.name}
+                actionTitle={resourceOptionText(item)}
                 icon={subscriptionIcon(item.kind)}
                 key={`${item.kind}:${item.name}`}
                 details={traffic ? (
@@ -131,6 +132,7 @@ export function SubscriptionsPage({
                   </>
                 )}
                 primaryLabel={t("actions.edit")}
+                subtitle={resourceSecondaryName(item)}
                 title={item.title}
                 onPrimaryAction={() => onEdit(item)}
               />

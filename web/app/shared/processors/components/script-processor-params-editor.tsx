@@ -15,6 +15,7 @@ import {
   objectToKeyValueText,
   stringValue,
 } from "~/shared/processors/model";
+import { resourceOptionText } from "~/shared/resources/labels";
 import type { ResourceOption } from "~/shared/resources/types";
 import { HighlightedTextarea } from "~/shared/ui/code-editor";
 
@@ -174,7 +175,7 @@ type RemoteScriptSourceDraft = { type: "remote"; remote: RemoteScriptDraft; sha2
 function scriptFileOptionsFor(files: ResourceOption[], currentPath: string): ScriptFileOption[] {
   const options = files
     .filter((file) => file.name.toLowerCase().endsWith(".js"))
-    .map((file) => ({ label: file.title || file.name, value: file.name }))
+    .map((file) => ({ label: resourceOptionText(file), value: file.name }))
     .sort((left, right) => left.value.localeCompare(right.value));
   const seen = new Set(options.map((option) => option.value));
   const current = currentPath.trim();

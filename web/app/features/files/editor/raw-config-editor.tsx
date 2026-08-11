@@ -7,6 +7,7 @@ import Typography from "@mui/material/Typography";
 import { WorkbenchGroupSection } from "~/features/files/config/components/editor-shared";
 import type { FileConfigDetail } from "~/features/files/model/types";
 import { useI18n } from "~/shared/i18n/context";
+import { resourceOptionText } from "~/shared/resources/labels";
 import type { ResourceOption } from "~/shared/resources/types";
 import { HighlightedTextarea } from "~/shared/ui/code-editor";
 
@@ -62,7 +63,7 @@ export function RawFileConfigEditor({
           onChange={(event) => setSelected(event.target.value)}
         >
           <MenuItem value="">—</MenuItem>
-          {subscriptions.map((subscription) => <MenuItem key={subscription.name} value={subscription.name}>{subscription.name}</MenuItem>)}
+          {subscriptions.map((subscription) => <MenuItem key={subscription.name} value={subscription.name}>{resourceOptionText(subscription)}</MenuItem>)}
         </TextField>
         {multipleSubscriptions ? <Alert severity="error">{t("files.config.multipleSubscriptions", { names: originalSubscriptions.join(", ") })}</Alert> : null}
         <HighlightedTextarea

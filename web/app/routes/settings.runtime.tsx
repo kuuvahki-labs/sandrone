@@ -6,6 +6,7 @@ import { useScheduledRefreshStatus } from "~/features/settings/data/use-schedule
 import { SettingsRuntimePage } from "~/features/settings/pages/settings-runtime-page";
 import { useSubscriptionResources } from "~/features/subscriptions/data/use-subscription-resources";
 import { useI18n } from "~/shared/i18n/context";
+import { resourceOptionText } from "~/shared/resources/labels";
 
 export default function SettingsRuntimeRoute() {
   const app = useSandrone();
@@ -16,8 +17,8 @@ export default function SettingsRuntimeRoute() {
   const files = useFileResources(ports);
   const scheduledRefreshStatus = useScheduledRefreshStatus(app.client);
   const scheduledRefreshResources = [
-    ...subscriptions.items.map((item) => ({ kind: "subscription" as const, name: item.name, label: item.title })),
-    ...files.items.map((item) => ({ kind: "file" as const, name: item.name, label: item.title })),
+    ...subscriptions.items.map((item) => ({ kind: "subscription" as const, name: item.name, label: resourceOptionText(item) })),
+    ...files.items.map((item) => ({ kind: "file" as const, name: item.name, label: resourceOptionText(item) })),
   ];
 
   return (

@@ -269,6 +269,7 @@ describe("SubscriptionsPage", () => {
     );
 
     expect(screen.getByText("机场主订阅")).toBeInTheDocument();
+    expect(screen.getByText("provider")).toBeInTheDocument();
     expect(screen.getByText("default")).toBeInTheDocument();
 
     const searchbox = screen.getByRole("searchbox", { name: "搜索订阅" });

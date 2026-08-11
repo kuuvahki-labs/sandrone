@@ -8,6 +8,7 @@ import { requireFileDriver } from "~/features/files/drivers/registry";
 import { requireFileDriverUI } from "~/features/files/editor/file-driver-ui-registry";
 
 import { FileFormFields, FileKindConfigWorkbench } from "./file-form";
+import { RawFileConfigEditor } from "./raw-config-editor";
 import { FileSourceEditor } from "./source-editor";
 
 afterEach(() => {
@@ -16,6 +17,24 @@ afterEach(() => {
 });
 
 describe("file form drivers", () => {
+  it("shows a subscription display title while serializing its canonical name", async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <RawFileConfigEditor
+        baseEditor={<div />}
+        configDefault={{ subscriptions: ["provider"], settingsPresent: false }}
+        subscriptions={[{ name: "provider", title: "Provider Main" }]}
+      />,
+    );
+
+    const picker = screen.getByRole("combobox", { name: "订阅" });
+    await user.click(picker);
+    expect(await screen.findByRole("option", { name: "Provider Main (provider)" })).toBeInTheDocument();
+    expect(JSON.parse(container.querySelector<HTMLInputElement>('input[name="config"]')?.value ?? "null")).toEqual({
+      subscriptions: ["provider"],
+    });
+  });
+
   it("round-trips raw settings until replacement is explicitly confirmed", async () => {
     const user = userEvent.setup();
     vi.spyOn(window, "confirm").mockReturnValue(false);

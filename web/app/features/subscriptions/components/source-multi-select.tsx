@@ -10,6 +10,11 @@ import Typography from "@mui/material/Typography";
 
 import type { SubscriptionItem } from "~/features/subscriptions/model/types";
 import { type Translator, useI18n } from "~/shared/i18n/context";
+import {
+  resourceOptionText,
+  resourceSecondaryName,
+  resourceTitle,
+} from "~/shared/resources/labels";
 
 const LONG_SOURCE_LIST_THRESHOLD = 8;
 
@@ -82,6 +87,7 @@ export function SourceMultiSelect({ defaultValue, excludeName, onDirty, subscrip
         {visibleSourceItems.length ? visibleSourceItems.map((item) => {
           const label = subscriptionKindLabel(item, t);
           const detail = item.format ? `${label} · ${item.format}` : label;
+          const secondaryName = resourceSecondaryName(item);
 
           return (
             <Paper
@@ -93,16 +99,17 @@ export function SourceMultiSelect({ defaultValue, excludeName, onDirty, subscrip
                 control={(
                   <Checkbox
                     checked={selected.has(item.name)}
-                    slotProps={{ input: { "aria-label": `${item.name} ${detail}` } }}
+                    slotProps={{ input: { "aria-label": `${resourceOptionText(item)} ${detail}` } }}
                     onChange={(event) => toggleSource(item.name, event.target.checked)}
                   />
                 )}
                 label={(
                   <span className="grid min-w-0 gap-0.5">
                     <Typography className="break-words" variant="body2">
-                      {item.name}
+                      {resourceTitle(item)}
                     </Typography>
                     <Typography color="text.secondary" variant="caption">
+                      {secondaryName ? <><span>{secondaryName}</span> · </> : null}
                       {detail}
                     </Typography>
                   </span>

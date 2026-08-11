@@ -32,6 +32,20 @@ const preview: ConfigNodePreviewInput = {
 };
 
 describe("config node source section", () => {
+  it("shows a display title while loading the canonical subscription name", async () => {
+    const user = userEvent.setup();
+    const loadPreview = vi.fn<LoadSubscriptionPreview>().mockResolvedValue(preview);
+    const titledSubscriptions = [{ name: "provider", title: "Provider Main" }];
+    render(<NodeSourceHarness loadPreview={loadPreview} subscriptions={titledSubscriptions} />);
+
+    const picker = screen.getByRole("combobox", { name: "订阅" });
+    await user.click(picker);
+    await user.click(await screen.findByRole("option", { name: "Provider Main (provider)" }));
+
+    expect(picker).toHaveValue("Provider Main (provider)");
+    expect(loadPreview).toHaveBeenCalledWith("provider");
+  });
+
   it("loads a collapsed sanitized preview and reuses it after switching sources", async () => {
     const user = userEvent.setup();
     const providerRequest = deferred<ConfigNodePreviewInput>();
@@ -146,7 +160,7 @@ describe("config node source section", () => {
 
     await selectSubscription(user, "provider");
     expect(await within(section).findByRole("alert")).toHaveTextContent("preview offline");
-    expect(within(section).getByRole("combobox", { name: "订阅" })).toHaveValue("provider");
+    expect(within(section).getByRole("combobox", { name: "订阅" })).toHaveValue("Provider (provider)");
     expect(currentState()).toEqual({
       status: "error",
       subscriptionName: "provider",
@@ -268,7 +282,7 @@ function deferred<T>() {
   return { promise, reject, resolve };
 }
 
-function NodeSourceHarness({ initialSelected = "", loadPreview }: { initialSelected?: string; loadPreview: LoadSubscriptionPreview }) {
+function NodeSourceHarness({ initialSelected = "", loadPreview, subscriptions: availableSubscriptions = subscriptions }: { initialSelected?: string; loadPreview: LoadSubscriptionPreview; subscriptions?: ResourceOption[] }) {
   const [selected, setSelected] = useState(initialSelected);
   const [state, setState] = useState<ConfigNodeSourceState>({
     status: "idle",
@@ -280,7 +294,7 @@ function NodeSourceHarness({ initialSelected = "", loadPreview }: { initialSelec
       <ConfigNodeSourceSection
         loadPreview={loadPreview}
         selected={selected}
-        subscriptions={subscriptions}
+        subscriptions={availableSubscriptions}
         onSelectedChange={setSelected}
         onStateChange={setState}
       />
