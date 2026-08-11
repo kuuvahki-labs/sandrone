@@ -36,6 +36,12 @@ type SubscriptionPreviewResult struct {
 	Report           Report                        `json:"report,omitempty" yaml:"report,omitempty"`
 }
 
+type SubscriptionPreviewRequest struct {
+	Name    string      `json:"name" yaml:"name"`
+	Request RequestInfo `json:"request,omitempty" yaml:"request,omitempty"`
+	Refresh bool        `json:"refresh,omitempty" yaml:"refresh,omitempty"`
+}
+
 type SubscriptionPreviewNodeDiff struct {
 	Identity    string            `json:"identity" yaml:"identity"`
 	Status      string            `json:"status" yaml:"status"`

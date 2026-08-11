@@ -1,6 +1,9 @@
 package domain
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"time"
+)
 
 type RemoteDefaults struct {
 	UserAgent string `json:"user_agent,omitempty" yaml:"user_agent,omitempty"`
@@ -27,15 +30,16 @@ type CacheDefaults struct {
 }
 
 type Settings struct {
-	SchemaVersion  int                  `json:"schema_version"`
-	HTTP           HTTPSettings         `json:"http"`
-	MCP            MCPSettings          `json:"mcp"`
-	Log            LogSettings          `json:"log"`
-	RemoteDefaults RemoteDefaults       `json:"remote_defaults"`
-	ProbeDefaults  ProbeDefaults        `json:"probe_defaults"`
-	CacheDefaults  CacheDefaults        `json:"cache_defaults"`
-	Appearance     AppearanceSettings   `json:"appearance"`
-	Subscriptions  SubscriptionSettings `json:"subscriptions"`
+	SchemaVersion    int                      `json:"schema_version"`
+	HTTP             HTTPSettings             `json:"http"`
+	MCP              MCPSettings              `json:"mcp"`
+	Log              LogSettings              `json:"log"`
+	RemoteDefaults   RemoteDefaults           `json:"remote_defaults"`
+	ProbeDefaults    ProbeDefaults            `json:"probe_defaults"`
+	CacheDefaults    CacheDefaults            `json:"cache_defaults"`
+	Appearance       AppearanceSettings       `json:"appearance"`
+	Subscriptions    SubscriptionSettings     `json:"subscriptions"`
+	ScheduledRefresh ScheduledRefreshSettings `json:"scheduled_refresh"`
 
 	cacheDefaultsSet bool
 }
@@ -95,28 +99,53 @@ type SubscriptionSettings struct {
 	AutoLoadTraffic bool `json:"auto_load_traffic"`
 }
 
+type ScheduledRefreshTarget struct {
+	Kind string `json:"kind"`
+	Name string `json:"name"`
+}
+
+type ScheduledRefreshSettings struct {
+	Enabled  bool                     `json:"enabled"`
+	Schedule string                   `json:"schedule"`
+	Targets  []ScheduledRefreshTarget `json:"targets"`
+}
+
 type SettingsUpdate struct {
-	SchemaVersion  int                  `json:"schema_version"`
-	HTTP           HTTPSettings         `json:"http"`
-	MCP            MCPSettings          `json:"mcp"`
-	Log            LogSettings          `json:"log"`
-	RemoteDefaults RemoteDefaults       `json:"remote_defaults"`
-	ProbeDefaults  ProbeDefaults        `json:"probe_defaults"`
-	CacheDefaults  CacheDefaults        `json:"cache_defaults"`
-	Appearance     AppearanceSettings   `json:"appearance"`
-	Subscriptions  SubscriptionSettings `json:"subscriptions"`
+	SchemaVersion    int                      `json:"schema_version"`
+	HTTP             HTTPSettings             `json:"http"`
+	MCP              MCPSettings              `json:"mcp"`
+	Log              LogSettings              `json:"log"`
+	RemoteDefaults   RemoteDefaults           `json:"remote_defaults"`
+	ProbeDefaults    ProbeDefaults            `json:"probe_defaults"`
+	CacheDefaults    CacheDefaults            `json:"cache_defaults"`
+	Appearance       AppearanceSettings       `json:"appearance"`
+	Subscriptions    SubscriptionSettings     `json:"subscriptions"`
+	ScheduledRefresh ScheduledRefreshSettings `json:"scheduled_refresh"`
 }
 
 type SettingsView struct {
-	SchemaVersion  int                  `json:"schema_version"`
-	HTTP           HTTPSettings         `json:"http"`
-	MCP            MCPSettings          `json:"mcp"`
-	Log            LogSettings          `json:"log"`
-	RemoteDefaults RemoteDefaults       `json:"remote_defaults"`
-	ProbeDefaults  ProbeDefaults        `json:"probe_defaults"`
-	CacheDefaults  CacheDefaults        `json:"cache_defaults"`
-	Appearance     AppearanceSettings   `json:"appearance"`
-	Subscriptions  SubscriptionSettings `json:"subscriptions"`
+	SchemaVersion    int                      `json:"schema_version"`
+	HTTP             HTTPSettings             `json:"http"`
+	MCP              MCPSettings              `json:"mcp"`
+	Log              LogSettings              `json:"log"`
+	RemoteDefaults   RemoteDefaults           `json:"remote_defaults"`
+	ProbeDefaults    ProbeDefaults            `json:"probe_defaults"`
+	CacheDefaults    CacheDefaults            `json:"cache_defaults"`
+	Appearance       AppearanceSettings       `json:"appearance"`
+	Subscriptions    SubscriptionSettings     `json:"subscriptions"`
+	ScheduledRefresh ScheduledRefreshSettings `json:"scheduled_refresh"`
+}
+
+type ScheduledRefreshStatus struct {
+	Enabled          bool       `json:"enabled"`
+	Running          bool       `json:"running"`
+	NextRunAt        *time.Time `json:"next_run_at,omitempty"`
+	LastStartedAt    *time.Time `json:"last_started_at,omitempty"`
+	LastCompletedAt  *time.Time `json:"last_completed_at,omitempty"`
+	LastSuccessCount int        `json:"last_success_count"`
+	LastFailureCount int        `json:"last_failure_count"`
+	SkippedCount     int        `json:"skipped_count"`
+	LastSkippedAt    *time.Time `json:"last_skipped_at,omitempty"`
 }
 
 type SettingsSnapshot struct {

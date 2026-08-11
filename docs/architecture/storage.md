@@ -115,6 +115,32 @@ remote-fetch 和 probe 的缓存读取，成功执行后仍按当前 TTL 重新�
 请求内 memo，用于去重同一调用中的重复依赖；它们不持久化、没有 TTL，也不是
 可配置 cache 层。
 
+### 定时更新
+
+长驻的 HTTP、MCP HTTP 和合并 serve 模式会启动一个进程内定时更新器；直接 CLI
+操作和嵌入 `Engine` 不启动它。项目设置用一个 cron 计划和一组显式目标控制该
+更新器。每次触发按配置顺序逐个执行目标，不并发物化目标：
+
+- subscription 目标执行不带 args、`refresh=true` 的 preview，完成订阅物化和
+  nodes-stage processors，但不要求或生成某个 renderer 目标；
+- file 目标执行不带 args、`refresh=true` 的完整文件 render，最终格式由
+  `FileSpec.kind` 决定。
+
+两类操作都跳过本次 remote-fetch、probe 和适用的最终结果缓存读取，并在成功时
+按资源与项目现有 TTL 填充缓存。调度器不覆盖 TTL，不保存 preview、report、
+历史记录或额外产物。subscription preview 没有 subscription-render 结果缓存；
+它预热的是物化过程中实际使用的 remote-fetch 与 probe 层。file render 还可
+预热 no-args 请求对应的 file-render 层；带 args 的请求具有不同 cache key，
+不会命中该最终结果。
+
+一个进程只运行一个调度任务；上次触发尚未结束时，新触发会被计数并跳过，不会
+排队。单个目标失败只记录错误并继续后续目标，不立即重试。启动和计划热更新都
+等待下一次 cron 时间，不立即补跑；关闭时取消 service context，并等待当前任务
+返回。状态只保存在内存中，重启后清零。多个 Sandrone 实例之间没有 leader 选举
+或分布式锁，因此共享 Store 的部署必须自行确保只有预期实例启用调度。
+
+设置 wire、cron 约束和状态接口见[项目设置接口](../reference/http-api/settings.md#定时更新)。
+
 ## Key 布局
 
 当前 service 使用的主要 keys 是：

@@ -64,7 +64,11 @@ func (s *Server) subscriptionAction(w http.ResponseWriter, r *http.Request) {
 		if !decodeOptionalJSON(w, r, &req) {
 			return
 		}
-		result, err := s.rt.Service.PreviewSubscription(r.Context(), name, requestArgs(r, req.Args))
+		result, err := s.rt.Service.PreviewSubscriptionRequest(r.Context(), domain.SubscriptionPreviewRequest{
+			Name:    name,
+			Request: domain.RequestInfo{Args: requestArgs(r, req.Args)},
+			Refresh: req.Refresh,
+		})
 		writeSubscriptionPreviewResult(w, result, err)
 		return
 	case "traffic":

@@ -19,3 +19,7 @@ func (s *Server) putSettings(w http.ResponseWriter, r *http.Request) {
 	result, err := s.rt.Service.PutSettings(r.Context(), update)
 	writeResult(w, result, err)
 }
+
+func (s *Server) getScheduledRefreshStatus(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, s.rt.Service.ScheduledRefreshStatus(r.Context()))
+}

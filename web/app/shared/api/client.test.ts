@@ -378,6 +378,36 @@ describe("ApiClient", () => {
     ]);
   });
 
+  it("sends force-refresh flags only for explicit preview refreshes", async () => {
+    const calls: Array<{ input: string; method: string; body?: FetchBody }> = [];
+    const client = new ApiClient({
+      fetcher: async (input, init) => {
+        calls.push({
+          input: String(input),
+          method: init?.method ?? "GET",
+          body: init?.body,
+        });
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { "content-type": "application/json" },
+        });
+      },
+    });
+
+    await client.previewSubscription("provider");
+    await client.previewSubscription("provider", { refresh: true });
+    await client.previewFile("client.yaml");
+    await client.previewFile("client.yaml", { refresh: true });
+    await client.getScheduledRefreshStatus();
+
+    expect(calls).toEqual([
+      { input: "/v1/subscriptions/provider/preview", method: "POST", body: undefined },
+      { input: "/v1/subscriptions/provider/preview", method: "POST", body: JSON.stringify({ refresh: true }) },
+      { input: "/v1/files/client.yaml?response=json", method: "GET", body: undefined },
+      { input: "/v1/files/client.yaml?response=json&refresh=true", method: "GET", body: undefined },
+      { input: "/v1/settings/scheduled-refresh-status", method: "GET", body: undefined },
+    ]);
+  });
+
   it("coalesces concurrent subscription list requests", async () => {
     let resolveResponse: (() => void) | undefined;
     const responseReady = new Promise<void>((resolve) => {

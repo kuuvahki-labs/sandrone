@@ -192,7 +192,16 @@ function mockSettingsDataApp() {
 function mockSettingsRuntimeApp() {
   const client = {
     downloadBackup: vi.fn(),
+    getScheduledRefreshStatus: vi.fn().mockResolvedValue({
+      enabled: false,
+      running: false,
+      last_success_count: 0,
+      last_failure_count: 0,
+      skipped_count: 0,
+    }),
     getVersion: vi.fn(),
+    listFiles: vi.fn().mockResolvedValue({ files: [] }),
+    listSubscriptions: vi.fn().mockResolvedValue({ subscriptions: [] }),
     restoreBackup: vi.fn(),
   };
   const updateSettings = vi.fn().mockResolvedValue(undefined);

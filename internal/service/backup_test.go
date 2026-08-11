@@ -170,15 +170,16 @@ func TestBackupExportExcludesExactAndNestedCacheKeys(t *testing.T) {
 
 func projectSettingsUpdate(value domain.Settings) domain.SettingsUpdate {
 	return domain.SettingsUpdate{
-		SchemaVersion:  value.SchemaVersion,
-		HTTP:           value.HTTP,
-		MCP:            value.MCP,
-		Log:            value.Log,
-		RemoteDefaults: value.RemoteDefaults,
-		ProbeDefaults:  value.ProbeDefaults,
-		CacheDefaults:  value.CacheDefaults,
-		Appearance:     value.Appearance,
-		Subscriptions:  value.Subscriptions,
+		SchemaVersion:    value.SchemaVersion,
+		HTTP:             value.HTTP,
+		MCP:              value.MCP,
+		Log:              value.Log,
+		RemoteDefaults:   value.RemoteDefaults,
+		ProbeDefaults:    value.ProbeDefaults,
+		CacheDefaults:    value.CacheDefaults,
+		Appearance:       value.Appearance,
+		Subscriptions:    value.Subscriptions,
+		ScheduledRefresh: value.ScheduledRefresh,
 	}
 }
 

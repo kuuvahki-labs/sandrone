@@ -15,15 +15,16 @@ func putProjectSettings(t *testing.T, svc *service.Service, ctx context.Context,
 	t.Helper()
 	value := projectsettings.Default()
 	update := domain.SettingsUpdate{
-		SchemaVersion:  value.SchemaVersion,
-		HTTP:           value.HTTP,
-		MCP:            value.MCP,
-		Log:            value.Log,
-		RemoteDefaults: value.RemoteDefaults,
-		ProbeDefaults:  value.ProbeDefaults,
-		CacheDefaults:  value.CacheDefaults,
-		Appearance:     value.Appearance,
-		Subscriptions:  value.Subscriptions,
+		SchemaVersion:    value.SchemaVersion,
+		HTTP:             value.HTTP,
+		MCP:              value.MCP,
+		Log:              value.Log,
+		RemoteDefaults:   value.RemoteDefaults,
+		ProbeDefaults:    value.ProbeDefaults,
+		CacheDefaults:    value.CacheDefaults,
+		Appearance:       value.Appearance,
+		Subscriptions:    value.Subscriptions,
+		ScheduledRefresh: value.ScheduledRefresh,
 	}
 	if mutate != nil {
 		mutate(&update)

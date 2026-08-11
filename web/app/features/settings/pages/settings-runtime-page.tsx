@@ -5,10 +5,12 @@ import Button from "@mui/material/Button";
 import Paper from "@mui/material/Paper";
 
 import { settingsUpdateFromView } from "~/features/settings/model/project-settings";
+import type { ScheduledRefreshResourceChoice } from "~/features/settings/model/scheduled-refresh-targets";
 import { RuntimeSettingsSection } from "~/features/settings/sections/runtime-settings-section";
+import { ScheduledRefreshSettingsSection } from "~/features/settings/sections/scheduled-refresh-settings-section";
 import { StartupSettingsSection } from "~/features/settings/sections/startup-settings-section";
 import { SubscriptionTrafficSettingsSection } from "~/features/settings/sections/subscription-traffic-settings-section";
-import type { SettingsUpdate, SettingsView } from "~/shared/api/client";
+import type { ScheduledRefreshStatus, SettingsUpdate, SettingsView } from "~/shared/api/client";
 import { useI18n } from "~/shared/i18n/context";
 import { PageHeader } from "~/shared/ui/page";
 
@@ -16,6 +18,8 @@ interface SettingsRuntimePageProps {
   settings: SettingsView;
   overrides: Record<string, string>;
   restartRequired: string[];
+  scheduledRefreshResources: ScheduledRefreshResourceChoice[];
+  scheduledRefreshStatus?: ScheduledRefreshStatus;
   onBack: () => void;
   onSave: (value: SettingsUpdate) => Promise<unknown> | unknown;
 }
@@ -24,6 +28,8 @@ export function SettingsRuntimePage({
   settings,
   overrides,
   restartRequired,
+  scheduledRefreshResources,
+  scheduledRefreshStatus,
   onBack,
   onSave,
 }: SettingsRuntimePageProps) {
@@ -55,6 +61,12 @@ export function SettingsRuntimePage({
           ...current,
           subscriptions: { auto_load_traffic: enabled },
         }))}
+      />
+      <ScheduledRefreshSettingsSection
+        resources={scheduledRefreshResources}
+        status={scheduledRefreshStatus}
+        value={draft.scheduled_refresh}
+        onChange={(scheduledRefresh) => setDraft((current) => ({ ...current, scheduled_refresh: scheduledRefresh }))}
       />
       <RuntimeSettingsSection
         value={draft}

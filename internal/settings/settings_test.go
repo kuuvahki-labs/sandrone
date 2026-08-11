@@ -23,6 +23,9 @@ func TestDefaultSettingsContainsWholeProject(t *testing.T) {
 	require.False(t, got.Subscriptions.AutoLoadTraffic)
 	require.Equal(t, 60, got.CacheDefaults.SubscriptionTrafficTTLSeconds)
 	require.Equal(t, "https://cp.cloudflare.com", got.ProbeDefaults.URL)
+	require.False(t, got.ScheduledRefresh.Enabled)
+	require.Equal(t, "@every 10m", got.ScheduledRefresh.Schedule)
+	require.Empty(t, got.ScheduledRefresh.Targets)
 }
 
 func TestStoredAndPublicSettingsOmitRemovedStartupFields(t *testing.T) {
@@ -107,6 +110,55 @@ func TestNormalizeRejectsInvalidProjectFields(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			value := settings.Default()
 			tc.mutate(&value)
+
+			_, err := settings.Normalize(value)
+
+			require.Error(t, err)
+			require.True(t, domain.IsCode(err, domain.CodeInvalidArgument), "got %v", err)
+		})
+	}
+}
+
+func TestNormalizeScheduledRefresh(t *testing.T) {
+	value := settings.Default()
+	value.ScheduledRefresh = domain.ScheduledRefreshSettings{
+		Enabled:  true,
+		Schedule: " 0 * * * * ",
+		Targets: []domain.ScheduledRefreshTarget{
+			{Kind: "subscription", Name: " primary "},
+			{Kind: "file", Name: "client.yaml"},
+		},
+	}
+
+	got, err := settings.Normalize(value)
+
+	require.NoError(t, err)
+	require.Equal(t, "0 * * * *", got.ScheduledRefresh.Schedule)
+	require.Equal(t, []domain.ScheduledRefreshTarget{
+		{Kind: "subscription", Name: "primary"},
+		{Kind: "file", Name: "client.yaml"},
+	}, got.ScheduledRefresh.Targets)
+}
+
+func TestNormalizeRejectsInvalidScheduledRefresh(t *testing.T) {
+	tests := []struct {
+		name     string
+		settings domain.ScheduledRefreshSettings
+	}{
+		{name: "seconds field", settings: domain.ScheduledRefreshSettings{Schedule: "0 0 * * * *"}},
+		{name: "short interval", settings: domain.ScheduledRefreshSettings{Schedule: "@every 59s"}},
+		{name: "cron timezone", settings: domain.ScheduledRefreshSettings{Schedule: "CRON_TZ=UTC 0 * * * *"}},
+		{name: "timezone", settings: domain.ScheduledRefreshSettings{Schedule: "TZ=UTC 0 * * * *"}},
+		{name: "unsupported target", settings: domain.ScheduledRefreshSettings{Schedule: "@daily", Targets: []domain.ScheduledRefreshTarget{{Kind: "share", Name: "one"}}}},
+		{name: "empty target name", settings: domain.ScheduledRefreshSettings{Schedule: "@daily", Targets: []domain.ScheduledRefreshTarget{{Kind: "file", Name: " "}}}},
+		{name: "duplicate target", settings: domain.ScheduledRefreshSettings{Schedule: "@daily", Targets: []domain.ScheduledRefreshTarget{{Kind: "file", Name: "one"}, {Kind: "file", Name: "one"}}}},
+		{name: "enabled without targets", settings: domain.ScheduledRefreshSettings{Enabled: true, Schedule: "@daily"}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			value := settings.Default()
+			value.ScheduledRefresh = tc.settings
 
 			_, err := settings.Normalize(value)
 

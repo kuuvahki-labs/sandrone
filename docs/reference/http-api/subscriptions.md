@@ -70,13 +70,14 @@
 ### `POST /v1/subscriptions/{name}/preview`
 
 读取已保存定义，比较该订阅自身 nodes-stage processors 执行前后的节点。请求
-正文可省略，也可传入字符串参数：
+正文可省略，也可传入字符串参数和刷新标记：
 
 ```json
 {
   "args": {
     "environment": "test"
-  }
+  },
+  "refresh": true
 }
 ```
 
@@ -99,7 +100,9 @@
 节点按连接身份而非名称或数组位置匹配，所以重命名表现为 `modified`，过滤、
 排除或去重表现为 `removed`。远程订阅按保存的抓取设置读取，正数
 `cache_ttl_seconds` 可以复用 remote-fetch 缓存。preview 不返回 traffic，
-也不会把节点或 report 写回订阅。
+也不会把节点或 report 写回订阅。`refresh: true` 跳过本次 remote-fetch 与 probe
+缓存读取，并在成功时按当前 TTL 重新填充；preview 本身不使用
+subscription-render 结果缓存。
 
 ### `POST /v1/subscriptions/{name}/traffic`
 

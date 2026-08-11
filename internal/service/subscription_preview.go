@@ -22,16 +22,25 @@ const (
 )
 
 func (s *Service) PreviewSubscription(ctx context.Context, name string, args ...map[string]string) (*domain.SubscriptionPreviewResult, error) {
+	return s.PreviewSubscriptionRequest(ctx, domain.SubscriptionPreviewRequest{
+		Name:    name,
+		Request: domain.RequestInfo{Args: optionalRequestArgs(args...)},
+	})
+}
+
+func (s *Service) PreviewSubscriptionRequest(ctx context.Context, req domain.SubscriptionPreviewRequest) (*domain.SubscriptionPreviewResult, error) {
 	if s.metaStore == nil {
 		return nil, storeUnavailable()
 	}
-	sub, err := s.metaStore.GetSubscription(ctx, name)
+	if req.Refresh {
+		ctx = withCacheReadBypass(ctx)
+	}
+	sub, err := s.metaStore.GetSubscription(ctx, req.Name)
 	if err != nil {
 		return nil, err
 	}
-	requestArgs := optionalRequestArgs(args...)
 	before, after, err := s.subscriptionPreviewNodes(ctx, sub, domain.FileRequest{
-		Request: domain.RequestInfo{Args: requestArgs, Meta: sub.Meta},
+		Request: domain.RequestInfo{Args: req.Request.Args, Meta: sub.Meta},
 		Meta:    sub.Meta,
 	}, newSubscriptionResolveState())
 	if err != nil {

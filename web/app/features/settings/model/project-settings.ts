@@ -48,6 +48,11 @@ export const defaultProjectSettings: SettingsView = {
   subscriptions: {
     auto_load_traffic: false,
   },
+  scheduled_refresh: {
+    enabled: false,
+    schedule: "@every 10m",
+    targets: [],
+  },
 };
 
 export function completeProjectSettings(settings?: Partial<SettingsView>): SettingsView {
@@ -62,6 +67,11 @@ export function completeProjectSettings(settings?: Partial<SettingsView>): Setti
     cache_defaults: { ...defaultProjectSettings.cache_defaults, ...settings?.cache_defaults },
     appearance: { ...defaultProjectSettings.appearance, ...settings?.appearance },
     subscriptions: { ...defaultProjectSettings.subscriptions, ...settings?.subscriptions },
+    scheduled_refresh: {
+      ...defaultProjectSettings.scheduled_refresh,
+      ...settings?.scheduled_refresh,
+      targets: settings?.scheduled_refresh?.targets ?? defaultProjectSettings.scheduled_refresh.targets,
+    },
   };
 }
 
@@ -76,6 +86,7 @@ export function settingsUpdateFromView(view: SettingsView): SettingsUpdate {
     cache_defaults: view.cache_defaults,
     appearance: view.appearance,
     subscriptions: view.subscriptions,
+    scheduled_refresh: view.scheduled_refresh,
   };
 }
 
@@ -103,6 +114,7 @@ export function optimisticSettingsEnvelope(
       cache_defaults: settings.cache_defaults,
       appearance: settings.appearance,
       subscriptions: settings.subscriptions,
+      scheduled_refresh: settings.scheduled_refresh,
     },
   };
 }

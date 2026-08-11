@@ -40,9 +40,12 @@ export function useFileDetailsResource({ client, showNotice, t }: FileResourcePo
     }
   }, [client, showNotice, t]);
 
-  const loadFilePreview = useCallback(async (name: string) => {
+  const loadFilePreview = useCallback(async (name: string, options: { refresh?: boolean } = {}) => {
     try {
-      return filePreviewFromAPI(await client.previewFile(name));
+      const response = options.refresh
+        ? await client.previewFile(name, { refresh: true })
+        : await client.previewFile(name);
+      return filePreviewFromAPI(response);
     } catch (error) {
       showDetailError(error, showNotice, t, "errors.filePreviewFailed");
       return null;

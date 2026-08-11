@@ -63,7 +63,12 @@ SettingsEnvelope {
     "file_render_ttl_seconds": 0
   },
   "appearance": {"theme_mode": "dark", "locale": "auto"},
-  "subscriptions": {"auto_load_traffic": false}
+  "subscriptions": {"auto_load_traffic": false},
+  "scheduled_refresh": {
+    "enabled": false,
+    "schedule": "@every 10m",
+    "targets": []
+  }
 }
 ```
 
@@ -115,7 +120,15 @@ SettingsEnvelope {
     "file_render_ttl_seconds": 300
   },
   "appearance": {"theme_mode": "system", "locale": "auto"},
-  "subscriptions": {"auto_load_traffic": false}
+  "subscriptions": {"auto_load_traffic": false},
+  "scheduled_refresh": {
+    "enabled": true,
+    "schedule": "@every 10m",
+    "targets": [
+      {"kind": "subscription", "name": "provider"},
+      {"kind": "file", "name": "client.yaml"}
+    ]
+  }
 }
 ```
 
@@ -125,7 +138,7 @@ SettingsEnvelope {
 归一化后必须为正数。主题接受 `system`、`light`、`dark`，语言接受 `auto`、
 `zh-CN`、`en-US`。
 
-远程、probe、cache、appearance 和 subscriptions 组保存后立即生效。HTTP、
+远程、probe、cache、appearance、subscriptions 和 scheduled-refresh 组保存后立即生效。HTTP、
 MCP、Web UI 静态目录和日志级别属于启动组，保存后列入 `restart_required`，
 当前 listener、鉴权边界和其它启动组件不会热切换。
 
@@ -139,6 +152,40 @@ curl -fsS \
   -H "Authorization: Bearer ${SANDRONE_TOKEN}" \
   "${SANDRONE_URL}/v1/settings"
 ```
+
+## 定时更新
+
+`scheduled_refresh.schedule` 接受 robfig/cron v3 的标准五字段表达式和 descriptor，
+例如 `0 * * * *`、`@hourly`、`@daily`、`@every 10m`。不接受秒字段；
+`@every` 间隔不得小于一分钟。计划始终使用服务器本地时区，因此拒绝
+`CRON_TZ=` 和 `TZ=` 前缀。
+
+target 的 `kind` 只能是 `subscription` 或 `file`，`name` 去除首尾空白后必须
+非空，同一 `kind`/`name` 不能重复。启用时至少需要一个 target。保存设置时不
+检查目标当前是否存在，因此已删除资源仍能保留在设置中；实际触发时该目标失败，
+后续目标继续执行。调度与缓存的完整执行边界见[存储架构](../../architecture/storage.md#定时更新)。
+
+### `GET /v1/settings/scheduled-refresh-status`
+
+返回当前进程的内存状态，不重新读取或修改项目设置：
+
+```json
+{
+  "enabled": true,
+  "running": false,
+  "next_run_at": "2026-08-11T16:00:00+08:00",
+  "last_started_at": "2026-08-11T15:50:00+08:00",
+  "last_completed_at": "2026-08-11T15:50:08+08:00",
+  "last_success_count": 2,
+  "last_failure_count": 0,
+  "skipped_count": 0
+}
+```
+
+`next_run_at`、`last_started_at`、`last_completed_at` 和 `last_skipped_at` 在尚无
+对应事件时省略。success/failure 是最近一次已完成运行的目标计数；skipped 是
+本进程启动后的累计重叠跳过次数。该接口与其它 `/v1/*` 一样受 bearer token
+保护。
 
 ## 规则集目录
 

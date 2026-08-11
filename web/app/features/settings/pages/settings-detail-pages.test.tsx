@@ -17,6 +17,7 @@ describe("settings runtime page", () => {
       <SettingsRuntimePage
         overrides={{ "http.listen": "environment" }}
         restartRequired={[]}
+        scheduledRefreshResources={[]}
         settings={defaultProjectSettings}
         onBack={onBack}
         onSave={onSave}
@@ -97,6 +98,79 @@ describe("settings runtime page", () => {
 
     await user.click(screen.getByRole("button", { name: "返回" }));
     expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not replace an unsaved schedule when status polling updates", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    const baseProps = {
+      overrides: {},
+      restartRequired: [],
+      scheduledRefreshResources: [],
+      settings: defaultProjectSettings,
+      onBack: vi.fn(),
+      onSave,
+    };
+    const { rerender } = render(
+      <SettingsRuntimePage
+        {...baseProps}
+        scheduledRefreshStatus={{ enabled: false, running: false, last_success_count: 0, last_failure_count: 0, skipped_count: 0 }}
+      />,
+    );
+    const schedule = screen.getByRole("textbox", { name: "Cron 计划" });
+    await user.clear(schedule);
+    await user.type(schedule, "@daily");
+
+    rerender(
+      <SettingsRuntimePage
+        {...baseProps}
+        scheduledRefreshStatus={{ enabled: true, running: true, last_success_count: 2, last_failure_count: 1, skipped_count: 3 }}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "保存设置" }));
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      scheduled_refresh: expect.objectContaining({ schedule: "@daily" }),
+    }));
+  });
+
+  it("selects grouped resources and preserves a configured missing target", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    const settings = {
+      ...defaultProjectSettings,
+      scheduled_refresh: {
+        ...defaultProjectSettings.scheduled_refresh,
+        targets: [{ kind: "subscription" as const, name: "missing-provider" }],
+      },
+    };
+    render(
+      <SettingsRuntimePage
+        overrides={{}}
+        restartRequired={[]}
+        scheduledRefreshResources={[
+          { kind: "subscription", name: "provider", label: "Provider" },
+          { kind: "file", name: "client.yaml", label: "Client config" },
+        ]}
+        settings={settings}
+        onBack={vi.fn()}
+        onSave={onSave}
+      />,
+    );
+
+    expect(screen.getByText("missing-provider (资源已缺失)")).toBeInTheDocument();
+    await user.click(screen.getByRole("combobox", { name: "更新目标" }));
+    await user.click(await screen.findByRole("option", { name: "Provider" }));
+    await user.click(screen.getByRole("button", { name: "保存设置" }));
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      scheduled_refresh: expect.objectContaining({
+        targets: [
+          { kind: "subscription", name: "missing-provider" },
+          { kind: "subscription", name: "provider" },
+        ],
+      }),
+    }));
   });
 });
 

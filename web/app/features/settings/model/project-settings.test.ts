@@ -11,6 +11,11 @@ describe("project settings model", () => {
     expect(defaultProjectSettings.subscriptions.auto_load_traffic).toBe(false);
     expect(defaultProjectSettings.appearance.locale).toBe("auto");
     expect(defaultProjectSettings.probe_defaults.url).toBe("https://cp.cloudflare.com");
+    expect(defaultProjectSettings.scheduled_refresh).toEqual({
+      enabled: false,
+      schedule: "@every 10m",
+      targets: [],
+    });
   });
 
   it("completes nested groups without losing defaults", () => {
@@ -28,5 +33,6 @@ describe("project settings model", () => {
     expect(update.http).toEqual({ listen: "127.0.0.1:1137" });
     expect(update.mcp).not.toHaveProperty("transport");
     expect(update).not.toHaveProperty("webui");
+    expect(update.scheduled_refresh).toEqual(defaultProjectSettings.scheduled_refresh);
   });
 });

@@ -55,6 +55,7 @@ function settingsEnvelope() {
     },
     appearance: { theme_mode: "dark", locale: "zh-CN" },
     subscriptions: { auto_load_traffic: false },
+    scheduled_refresh: { enabled: false, schedule: "@every 10m", targets: [] },
   };
   return {
     settings,
@@ -80,6 +81,17 @@ test.beforeEach(async ({ page }) => {
   });
   await page.route("**/v1/settings", async (route) => {
     await route.fulfill({ json: settingsEnvelope() });
+  });
+  await page.route("**/v1/settings/scheduled-refresh-status", async (route) => {
+    await route.fulfill({
+      json: {
+        enabled: false,
+        running: false,
+        last_success_count: 0,
+        last_failure_count: 0,
+        skipped_count: 0,
+      },
+    });
   });
   await page.route("**/version", async (route) => {
     await route.fulfill({

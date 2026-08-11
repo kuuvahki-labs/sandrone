@@ -71,25 +71,29 @@ type probeCoreSelector interface {
 // Service is the central orchestrator. It composes adapters and the
 // processor registry; consumers receive a value via New().
 type Service struct {
-	parsers           map[string]Parser
-	renderers         map[string]Renderer
-	uriParser         *uri.Parser
-	registry          *processor.Registry
-	typedFiles        *typedFileRegistry
-	prober            ProbeEngine
-	cache             cachepkg.Cache
-	store             store.Store
-	storeCoordinator  store.Coordinator
-	metaStore         *store.MetaStore
-	settingsStore     *store.SettingsStore
-	fetcher           *fetcher.Fetcher
-	logger            *slog.Logger
-	now               func() time.Time
-	catalog           func() (*ruleSetCatalogSnapshot, error)
-	settingsMu        sync.RWMutex
-	storedSettings    domain.Settings
-	effectiveSettings domain.Settings
-	settingsOverrides map[string]string
+	parsers                 map[string]Parser
+	renderers               map[string]Renderer
+	uriParser               *uri.Parser
+	registry                *processor.Registry
+	typedFiles              *typedFileRegistry
+	prober                  ProbeEngine
+	cache                   cachepkg.Cache
+	store                   store.Store
+	storeCoordinator        store.Coordinator
+	metaStore               *store.MetaStore
+	settingsStore           *store.SettingsStore
+	fetcher                 *fetcher.Fetcher
+	logger                  *slog.Logger
+	now                     func() time.Time
+	catalog                 func() (*ruleSetCatalogSnapshot, error)
+	settingsMu              sync.RWMutex
+	storedSettings          domain.Settings
+	effectiveSettings       domain.Settings
+	settingsOverrides       map[string]string
+	scheduledRefreshMu      sync.Mutex
+	scheduledRefreshStatus  domain.ScheduledRefreshStatus
+	scheduledRefreshUpdates chan struct{}
+	scheduledRefreshTarget  func(context.Context, domain.ScheduledRefreshTarget) error
 }
 
 // Option lets callers customise Service construction.
@@ -211,12 +215,13 @@ func New(opts ...Option) *Service {
 			"json-nodes":           jsonRenderer,
 			"uri-list":             uriRenderer,
 		},
-		uriParser:  uriParser,
-		registry:   registry,
-		typedFiles: typedFiles,
-		prober:     probe.New(),
-		fetcher:    fetcher.New(),
-		now:        time.Now,
+		uriParser:               uriParser,
+		registry:                registry,
+		typedFiles:              typedFiles,
+		prober:                  probe.New(),
+		fetcher:                 fetcher.New(),
+		now:                     time.Now,
+		scheduledRefreshUpdates: make(chan struct{}, 1),
 	}
 	nodeproc.Register(registry, s)
 	fileproc.Register(registry)
@@ -235,6 +240,9 @@ func New(opts ...Option) *Service {
 	}
 	if s.cache == nil && s.store != nil {
 		s.cache = cachepkg.New(s.store, s.now)
+	}
+	if s.scheduledRefreshTarget == nil {
+		s.scheduledRefreshTarget = s.refreshScheduledTarget
 	}
 	return s
 }

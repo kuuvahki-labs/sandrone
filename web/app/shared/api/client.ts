@@ -53,6 +53,10 @@ export interface SubscriptionTrafficRequest {
   refresh?: boolean;
 }
 
+export interface SubscriptionPreviewRequest {
+  refresh?: boolean;
+}
+
 export interface FileSpecInput {
   name: string;
   display_name?: string;
@@ -90,6 +94,13 @@ export interface CacheDefaultsInput {
   file_render_ttl_seconds: number;
 }
 
+export type ScheduledRefreshTargetKind = "subscription" | "file";
+
+export interface ScheduledRefreshTarget {
+  kind: ScheduledRefreshTargetKind;
+  name: string;
+}
+
 export interface SettingsView {
   schema_version: number;
   http: {
@@ -113,6 +124,11 @@ export interface SettingsView {
   subscriptions: {
     auto_load_traffic: boolean;
   };
+  scheduled_refresh: {
+    enabled: boolean;
+    schedule: string;
+    targets: ScheduledRefreshTarget[];
+  };
 }
 
 export interface SettingsUpdate {
@@ -127,6 +143,7 @@ export interface SettingsUpdate {
   cache_defaults: CacheDefaultsInput;
   appearance: SettingsView["appearance"];
   subscriptions: SettingsView["subscriptions"];
+  scheduled_refresh: SettingsView["scheduled_refresh"];
 }
 
 export interface SettingsEnvelope {
@@ -134,6 +151,18 @@ export interface SettingsEnvelope {
   effective: SettingsView;
   overrides: Record<string, string>;
   restart_required: string[];
+}
+
+export interface ScheduledRefreshStatus {
+  enabled: boolean;
+  running: boolean;
+  next_run_at?: string;
+  last_started_at?: string;
+  last_completed_at?: string;
+  last_success_count: number;
+  last_failure_count: number;
+  skipped_count: number;
+  last_skipped_at?: string;
 }
 
 export interface VersionInfo {
@@ -193,9 +222,12 @@ export class ApiClient {
     return this.dedupedRequest("GET", `/v1/subscriptions/${encodeURIComponent(name)}`);
   }
 
-  previewSubscription(name: string): Promise<unknown> {
+  previewSubscription(name: string, options: SubscriptionPreviewRequest = {}): Promise<unknown> {
     const path = `/v1/subscriptions/${encodeURIComponent(name)}/preview`;
-    return this.dedupedRequest("POST", path, { method: "POST" });
+    const request = options.refresh
+      ? { method: "POST", body: { refresh: true } }
+      : { method: "POST" };
+    return this.dedupedRequest("POST", path, request);
   }
 
   subscriptionTraffic(name: string, body: SubscriptionTrafficRequest = {}): Promise<unknown> {
@@ -218,6 +250,10 @@ export class ApiClient {
     return this.request("/v1/settings", { method: "PUT", body: settings });
   }
 
+  getScheduledRefreshStatus(): Promise<ScheduledRefreshStatus> {
+    return this.dedupedRequest("GET", "/v1/settings/scheduled-refresh-status");
+  }
+
   async downloadBackup(): Promise<{ blob: Blob; filename: string }> {
     const response = await this.rawRequest("/v1/backup");
     return {
@@ -238,8 +274,9 @@ export class ApiClient {
     return this.request(`/v1/files/${encodeURIComponent(name)}?mode=source&response=json`);
   }
 
-  previewFile(name: string): Promise<unknown> {
-    return this.dedupedRequest("GET", `/v1/files/${encodeURIComponent(name)}?response=json`);
+  previewFile(name: string, options: { refresh?: boolean } = {}): Promise<unknown> {
+    const refresh = options.refresh ? "&refresh=true" : "";
+    return this.dedupedRequest("GET", `/v1/files/${encodeURIComponent(name)}?response=json${refresh}`);
   }
 
   listRuleSetCatalog(target: RuleSetCatalogTransportTarget): Promise<unknown> {

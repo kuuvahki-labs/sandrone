@@ -37,6 +37,7 @@ func (s *Service) PutSettings(ctx context.Context, update domain.SettingsUpdate)
 	s.settingsMu.Unlock()
 
 	s.invalidateResultCaches(ctx)
+	s.notifyScheduledRefreshSettingsChanged()
 	s.logResource(ctx, "put", "settings", "project")
 	return snapshot, nil
 }
@@ -63,6 +64,7 @@ func (s *Service) ReloadSettings(ctx context.Context) error {
 	applyDynamicSettings(&s.effectiveSettings, next)
 	s.settingsMu.Unlock()
 	s.invalidateResultCaches(ctx)
+	s.notifyScheduledRefreshSettingsChanged()
 	return nil
 }
 
@@ -79,6 +81,7 @@ func applyDynamicSettings(effective *domain.Settings, stored domain.Settings) {
 	effective.SpecifyCacheDefaults(stored.CacheDefaults)
 	effective.Appearance = stored.Appearance
 	effective.Subscriptions = stored.Subscriptions
+	effective.ScheduledRefresh = stored.ScheduledRefresh
 }
 
 func settingsSnapshot(stored, effective domain.Settings, overrides map[string]string) domain.SettingsSnapshot {

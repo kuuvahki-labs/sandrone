@@ -189,6 +189,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("DELETE /v1/files/", s.deleteFile)
 	s.mux.HandleFunc("GET /v1/settings", s.getSettings)
 	s.mux.HandleFunc("PUT /v1/settings", s.putSettings)
+	s.mux.HandleFunc("GET /v1/settings/scheduled-refresh-status", s.getScheduledRefreshStatus)
 	s.mux.HandleFunc("GET /v1/rule-set-catalog", s.listRuleSetCatalog)
 	s.mux.HandleFunc("GET /v1/shares", s.listShares)
 	s.mux.HandleFunc("POST /v1/shares", s.createShare)

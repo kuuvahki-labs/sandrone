@@ -206,7 +206,15 @@ func newWebUIHandler(cfg app.Config) http.Handler {
 }
 
 func runEntrypoint(ctx context.Context, entry app.Entrypoint, rt *app.Runtime) error {
+	schedulerCtx, stopScheduler := context.WithCancel(ctx)
+	schedulerDone := make(chan struct{})
+	go func() {
+		rt.Service.RunScheduledRefresh(schedulerCtx)
+		close(schedulerDone)
+	}()
 	err := entry.Run(ctx, rt)
+	stopScheduler()
+	<-schedulerDone
 	if app.IsContextDone(err) || errors.Is(err, http.ErrServerClosed) {
 		return nil
 	}

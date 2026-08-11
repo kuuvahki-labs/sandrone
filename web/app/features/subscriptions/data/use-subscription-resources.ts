@@ -41,9 +41,12 @@ export function useSubscriptionDetailsResource({ client, showNotice, t }: Subscr
     }
   }, [client, showNotice, t]);
 
-  const loadSubscriptionPreview = useCallback(async (name: string) => {
+  const loadSubscriptionPreview = useCallback(async (name: string, options: { refresh?: boolean } = {}) => {
     try {
-      return subscriptionPreviewFromAPI(await client.previewSubscription(name));
+      const response = options.refresh
+        ? await client.previewSubscription(name, { refresh: true })
+        : await client.previewSubscription(name);
+      return subscriptionPreviewFromAPI(response);
     } catch (error) {
       showDetailError(error, showNotice, t, "errors.subscriptionPreviewFailed");
       return null;

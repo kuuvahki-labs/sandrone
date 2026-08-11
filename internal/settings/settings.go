@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/robfig/cron/v3"
+
 	"github.com/kuuvahki-labs/sandrone/internal/buildinfo"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/fetcher"
@@ -49,11 +51,12 @@ func DecodeStored(body []byte) (domain.Settings, bool, error) {
 			AllowManagementTools: stored.MCP.AllowManagementTools,
 			MaxOutputBytes:       stored.MCP.MaxOutputBytes,
 		},
-		Log:            stored.Log,
-		RemoteDefaults: stored.RemoteDefaults,
-		ProbeDefaults:  stored.ProbeDefaults,
-		Appearance:     stored.Appearance,
-		Subscriptions:  stored.Subscriptions,
+		Log:              stored.Log,
+		RemoteDefaults:   stored.RemoteDefaults,
+		ProbeDefaults:    stored.ProbeDefaults,
+		Appearance:       stored.Appearance,
+		Subscriptions:    stored.Subscriptions,
+		ScheduledRefresh: stored.ScheduledRefresh,
 	}
 	if stored.CacheDefaults != nil {
 		value.SpecifyCacheDefaults(*stored.CacheDefaults)
@@ -70,16 +73,17 @@ func DecodeStored(body []byte) (domain.Settings, bool, error) {
 }
 
 type storedSettings struct {
-	SchemaVersion  int                         `json:"schema_version"`
-	HTTP           storedHTTPSettings          `json:"http"`
-	MCP            storedMCPSettings           `json:"mcp"`
-	LegacyWebUI    *storedWebUISettings        `json:"webui,omitempty"`
-	Log            domain.LogSettings          `json:"log"`
-	RemoteDefaults domain.RemoteDefaults       `json:"remote_defaults"`
-	ProbeDefaults  domain.ProbeDefaults        `json:"probe_defaults"`
-	CacheDefaults  *domain.CacheDefaults       `json:"cache_defaults"`
-	Appearance     domain.AppearanceSettings   `json:"appearance"`
-	Subscriptions  domain.SubscriptionSettings `json:"subscriptions"`
+	SchemaVersion    int                             `json:"schema_version"`
+	HTTP             storedHTTPSettings              `json:"http"`
+	MCP              storedMCPSettings               `json:"mcp"`
+	LegacyWebUI      *storedWebUISettings            `json:"webui,omitempty"`
+	Log              domain.LogSettings              `json:"log"`
+	RemoteDefaults   domain.RemoteDefaults           `json:"remote_defaults"`
+	ProbeDefaults    domain.ProbeDefaults            `json:"probe_defaults"`
+	CacheDefaults    *domain.CacheDefaults           `json:"cache_defaults"`
+	Appearance       domain.AppearanceSettings       `json:"appearance"`
+	Subscriptions    domain.SubscriptionSettings     `json:"subscriptions"`
+	ScheduledRefresh domain.ScheduledRefreshSettings `json:"scheduled_refresh"`
 }
 
 type storedHTTPSettings struct {
@@ -132,6 +136,10 @@ func Default() domain.Settings {
 		},
 		Subscriptions: domain.SubscriptionSettings{
 			AutoLoadTraffic: false,
+		},
+		ScheduledRefresh: domain.ScheduledRefreshSettings{
+			Schedule: "@every 10m",
+			Targets:  []domain.ScheduledRefreshTarget{},
 		},
 	}
 }
@@ -187,19 +195,24 @@ func Normalize(value domain.Settings) (domain.Settings, error) {
 		return domain.Settings{}, err
 	}
 	out.Subscriptions = value.Subscriptions
+	out.ScheduledRefresh, err = normalizeScheduledRefresh(value.ScheduledRefresh, defaults.ScheduledRefresh)
+	if err != nil {
+		return domain.Settings{}, err
+	}
 	return out, nil
 }
 
 func ApplyUpdate(update domain.SettingsUpdate) (domain.Settings, error) {
 	next := domain.Settings{
-		SchemaVersion:  update.SchemaVersion,
-		HTTP:           update.HTTP,
-		MCP:            update.MCP,
-		Log:            update.Log,
-		RemoteDefaults: update.RemoteDefaults,
-		ProbeDefaults:  update.ProbeDefaults,
-		Appearance:     update.Appearance,
-		Subscriptions:  update.Subscriptions,
+		SchemaVersion:    update.SchemaVersion,
+		HTTP:             update.HTTP,
+		MCP:              update.MCP,
+		Log:              update.Log,
+		RemoteDefaults:   update.RemoteDefaults,
+		ProbeDefaults:    update.ProbeDefaults,
+		Appearance:       update.Appearance,
+		Subscriptions:    update.Subscriptions,
+		ScheduledRefresh: update.ScheduledRefresh,
 	}
 	next.SpecifyCacheDefaults(update.CacheDefaults)
 	return Normalize(next)
@@ -207,16 +220,64 @@ func ApplyUpdate(update domain.SettingsUpdate) (domain.Settings, error) {
 
 func View(value domain.Settings) domain.SettingsView {
 	return domain.SettingsView{
-		SchemaVersion:  value.SchemaVersion,
-		HTTP:           value.HTTP,
-		MCP:            value.MCP,
-		Log:            value.Log,
-		RemoteDefaults: value.RemoteDefaults,
-		ProbeDefaults:  value.ProbeDefaults,
-		CacheDefaults:  value.CacheDefaults,
-		Appearance:     value.Appearance,
-		Subscriptions:  value.Subscriptions,
+		SchemaVersion:    value.SchemaVersion,
+		HTTP:             value.HTTP,
+		MCP:              value.MCP,
+		Log:              value.Log,
+		RemoteDefaults:   value.RemoteDefaults,
+		ProbeDefaults:    value.ProbeDefaults,
+		CacheDefaults:    value.CacheDefaults,
+		Appearance:       value.Appearance,
+		Subscriptions:    value.Subscriptions,
+		ScheduledRefresh: value.ScheduledRefresh,
 	}
+}
+
+func normalizeScheduledRefresh(value, defaults domain.ScheduledRefreshSettings) (domain.ScheduledRefreshSettings, error) {
+	out := domain.ScheduledRefreshSettings{
+		Enabled:  value.Enabled,
+		Schedule: firstNonEmpty(strings.TrimSpace(value.Schedule), defaults.Schedule),
+		Targets:  make([]domain.ScheduledRefreshTarget, 0, len(value.Targets)),
+	}
+	if strings.HasPrefix(out.Schedule, "CRON_TZ=") || strings.HasPrefix(out.Schedule, "TZ=") {
+		return domain.ScheduledRefreshSettings{}, invalid("scheduled refresh schedule must use the server local timezone")
+	}
+	if strings.HasPrefix(out.Schedule, "@every") {
+		parts := strings.Fields(out.Schedule)
+		if len(parts) != 2 {
+			return domain.ScheduledRefreshSettings{}, invalid("invalid scheduled refresh schedule %q", out.Schedule)
+		}
+		duration, err := time.ParseDuration(parts[1])
+		if err != nil || duration < time.Minute {
+			return domain.ScheduledRefreshSettings{}, invalid("scheduled refresh @every interval must be at least 1m")
+		}
+	}
+	if _, err := cron.ParseStandard(out.Schedule); err != nil {
+		return domain.ScheduledRefreshSettings{}, invalid("invalid scheduled refresh schedule: %v", err)
+	}
+	seen := make(map[string]struct{}, len(value.Targets))
+	for _, target := range value.Targets {
+		target.Kind = strings.TrimSpace(target.Kind)
+		target.Name = strings.TrimSpace(target.Name)
+		switch target.Kind {
+		case "subscription", "file":
+		default:
+			return domain.ScheduledRefreshSettings{}, invalid("unsupported scheduled refresh target kind %q", target.Kind)
+		}
+		if target.Name == "" {
+			return domain.ScheduledRefreshSettings{}, invalid("scheduled refresh target name is required")
+		}
+		key := target.Kind + "\x00" + target.Name
+		if _, ok := seen[key]; ok {
+			return domain.ScheduledRefreshSettings{}, invalid("duplicate scheduled refresh target %s %q", target.Kind, target.Name)
+		}
+		seen[key] = struct{}{}
+		out.Targets = append(out.Targets, target)
+	}
+	if out.Enabled && len(out.Targets) == 0 {
+		return domain.ScheduledRefreshSettings{}, invalid("enabled scheduled refresh requires at least one target")
+	}
+	return out, nil
 }
 
 func normalizeRemoteDefaults(value, defaults domain.RemoteDefaults) (domain.RemoteDefaults, error) {

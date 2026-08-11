@@ -52,6 +52,19 @@ describe("useResourcePreview", () => {
     expect(loadPreview).toHaveBeenCalledTimes(2);
   });
 
+  it("uses the force loader only for an explicit refresh", async () => {
+    const loadPreview = vi.fn().mockResolvedValue({ body: "initial" });
+    const refreshPreview = vi.fn().mockResolvedValue({ body: "forced" });
+    const { result } = renderHook(() => useResourcePreview("profile", loadPreview, refreshPreview));
+    await waitFor(() => expect(result.current.preview).toEqual({ body: "initial" }));
+
+    act(() => result.current.refreshPreview());
+
+    await waitFor(() => expect(result.current.preview).toEqual({ body: "forced" }));
+    expect(loadPreview).toHaveBeenCalledTimes(1);
+    expect(refreshPreview).toHaveBeenCalledTimes(1);
+  });
+
   it("ignores a stale result after the resource key changes", async () => {
     const first = deferred<{ body: string } | null>();
     const second = deferred<{ body: string } | null>();

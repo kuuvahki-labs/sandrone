@@ -27,6 +27,11 @@ func TestSettingsEndpointRoundTripOmitsRemovedStartupFields(t *testing.T) {
 	update.HTTP.Listen = "127.0.0.1:2237"
 	update.Appearance.ThemeMode = "light"
 	update.Subscriptions.AutoLoadTraffic = true
+	update.ScheduledRefresh = domain.ScheduledRefreshSettings{
+		Enabled:  true,
+		Schedule: "@daily",
+		Targets:  []domain.ScheduledRefreshTarget{{Kind: "file", Name: "missing.yaml"}},
+	}
 	put := httptest.NewRecorder()
 	server.Handler().ServeHTTP(put, httptest.NewRequest(http.MethodPut, "/v1/settings", jsonBody(t, update)))
 	require.Equal(t, http.StatusOK, put.Code)
@@ -45,6 +50,7 @@ func TestSettingsEndpointRoundTripOmitsRemovedStartupFields(t *testing.T) {
 	require.Equal(t, "127.0.0.1:2237", snapshot.Settings.HTTP.Listen)
 	require.Equal(t, "light", snapshot.Effective.Appearance.ThemeMode)
 	require.True(t, snapshot.Effective.Subscriptions.AutoLoadTraffic)
+	require.Equal(t, update.ScheduledRefresh, snapshot.Effective.ScheduledRefresh)
 	require.Contains(t, snapshot.RestartRequired, "http.listen")
 
 	body, err := os.ReadFile(filepath.Join(rt.Config.DataDir, "settings.json"))
@@ -52,6 +58,7 @@ func TestSettingsEndpointRoundTripOmitsRemovedStartupFields(t *testing.T) {
 	require.NotContains(t, string(body), `"token"`)
 	require.NotContains(t, string(body), `"transport"`)
 	require.NotContains(t, string(body), `"webui"`)
+	require.Contains(t, string(body), `"scheduled_refresh"`)
 }
 
 func TestSettingsEndpointRejectsRemovedStartupFields(t *testing.T) {
@@ -129,6 +136,28 @@ func TestSettingsEndpointUsesActiveStartupAuthentication(t *testing.T) {
 	require.Equal(t, http.StatusUnauthorized, response.Code)
 }
 
+func TestScheduledRefreshStatusEndpointUsesAuthenticationAndStableShape(t *testing.T) {
+	rt := testRuntime(t, app.Config{HTTP: app.HTTPConfig{Token: "active-secret"}})
+	server := httpapi.New(rt)
+
+	unauthorized := httptest.NewRecorder()
+	server.Handler().ServeHTTP(unauthorized, httptest.NewRequest(http.MethodGet, "/v1/settings/scheduled-refresh-status", nil))
+	require.Equal(t, http.StatusUnauthorized, unauthorized.Code)
+
+	request := httptest.NewRequest(http.MethodGet, "/v1/settings/scheduled-refresh-status", nil)
+	request.Header.Set("Authorization", "Bearer active-secret")
+	response := httptest.NewRecorder()
+	server.Handler().ServeHTTP(response, request)
+	require.Equal(t, http.StatusOK, response.Code)
+	var status domain.ScheduledRefreshStatus
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &status))
+	require.False(t, status.Enabled)
+	require.False(t, status.Running)
+	require.Zero(t, status.LastSuccessCount)
+	require.Zero(t, status.LastFailureCount)
+	require.Zero(t, status.SkippedCount)
+}
+
 func TestSettingsEndpointExcludesOverriddenStartupPathsFromRestartRequired(t *testing.T) {
 	rt := testRuntime(t, app.Config{HTTP: app.HTTPConfig{Listen: "127.0.0.1:3237"}})
 	server := httpapi.New(rt)
@@ -159,15 +188,16 @@ func TestSettingsEndpointLimitsRequestBody(t *testing.T) {
 func settingsUpdate() domain.SettingsUpdate {
 	value := projectsettings.Default()
 	return domain.SettingsUpdate{
-		SchemaVersion:  value.SchemaVersion,
-		HTTP:           value.HTTP,
-		MCP:            value.MCP,
-		Log:            value.Log,
-		RemoteDefaults: value.RemoteDefaults,
-		ProbeDefaults:  value.ProbeDefaults,
-		CacheDefaults:  value.CacheDefaults,
-		Appearance:     value.Appearance,
-		Subscriptions:  value.Subscriptions,
+		SchemaVersion:    value.SchemaVersion,
+		HTTP:             value.HTTP,
+		MCP:              value.MCP,
+		Log:              value.Log,
+		RemoteDefaults:   value.RemoteDefaults,
+		ProbeDefaults:    value.ProbeDefaults,
+		CacheDefaults:    value.CacheDefaults,
+		Appearance:       value.Appearance,
+		Subscriptions:    value.Subscriptions,
+		ScheduledRefresh: value.ScheduledRefresh,
 	}
 }
 

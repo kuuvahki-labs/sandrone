@@ -69,14 +69,15 @@ func newProjectSettingsServiceWithState(stored, effective domain.Settings, overr
 
 func settingsUpdate(value domain.SettingsView) domain.SettingsUpdate {
 	return domain.SettingsUpdate{
-		SchemaVersion:  value.SchemaVersion,
-		HTTP:           value.HTTP,
-		MCP:            value.MCP,
-		Log:            value.Log,
-		RemoteDefaults: value.RemoteDefaults,
-		ProbeDefaults:  value.ProbeDefaults,
-		CacheDefaults:  value.CacheDefaults,
-		Appearance:     value.Appearance,
-		Subscriptions:  value.Subscriptions,
+		SchemaVersion:    value.SchemaVersion,
+		HTTP:             value.HTTP,
+		MCP:              value.MCP,
+		Log:              value.Log,
+		RemoteDefaults:   value.RemoteDefaults,
+		ProbeDefaults:    value.ProbeDefaults,
+		CacheDefaults:    value.CacheDefaults,
+		Appearance:       value.Appearance,
+		Subscriptions:    value.Subscriptions,
+		ScheduledRefresh: value.ScheduledRefresh,
 	}
 }

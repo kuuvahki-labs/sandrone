@@ -7,6 +7,7 @@ require (
 	github.com/metacubex/age v0.0.0-20260603010618-28d156b4ea78
 	github.com/metacubex/mihomo v1.19.28
 	github.com/modelcontextprotocol/go-sdk v1.6.1
+	github.com/robfig/cron/v3 v3.0.1
 	github.com/sagernet/sing v0.8.11
 	github.com/sagernet/sing-box v1.13.14
 	github.com/spf13/afero v1.15.0

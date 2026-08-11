@@ -762,6 +762,43 @@ func TestServiceSubscriptionTrafficCachesUntilForcedRefresh(t *testing.T) {
 	require.Equal(t, 2, calls)
 }
 
+func TestServiceSubscriptionPreviewCachesUntilForcedRefresh(t *testing.T) {
+	ctx := context.Background()
+	body := "ss://aes-128-gcm:secret@example.com:8388#first"
+	calls := 0
+	subServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		_, _ = w.Write([]byte(body))
+	}))
+	defer subServer.Close()
+
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	putProjectSettings(t, svc, ctx, func(update *domain.SettingsUpdate) {
+		update.CacheDefaults.RemoteFetchTTLSeconds = 3600
+	})
+	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+		Name:   "remote/live",
+		Type:   domain.SubscriptionTypeRemote,
+		Format: "uri-list",
+		Remote: &domain.RemoteInput{URL: subServer.URL},
+	}))
+
+	first, err := svc.PreviewSubscriptionRequest(ctx, domain.SubscriptionPreviewRequest{Name: "remote/live"})
+	require.NoError(t, err)
+	require.Equal(t, 1, first.AfterCount)
+
+	body += "\nss://aes-128-gcm:secret@example.org:8389#second"
+	cached, err := svc.PreviewSubscriptionRequest(ctx, domain.SubscriptionPreviewRequest{Name: "remote/live"})
+	require.NoError(t, err)
+	require.Equal(t, 1, cached.AfterCount)
+	require.Equal(t, 1, calls)
+
+	fresh, err := svc.PreviewSubscriptionRequest(ctx, domain.SubscriptionPreviewRequest{Name: "remote/live", Refresh: true})
+	require.NoError(t, err)
+	require.Equal(t, 2, fresh.AfterCount)
+	require.Equal(t, 2, calls)
+}
+
 func TestServiceSubscriptionTrafficRuntimeTTLExpiresCache(t *testing.T) {
 	ctx := context.Background()
 	upload := "1024"

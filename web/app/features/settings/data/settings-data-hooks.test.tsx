@@ -5,6 +5,7 @@ import type { ApiClient } from "~/shared/api/client";
 import { createTranslator } from "~/shared/i18n/context";
 
 import { useBackupOperations } from "./use-backup-operations";
+import { useScheduledRefreshStatus } from "./use-scheduled-refresh-status";
 import { useVersionInfo } from "./use-version-info";
 
 describe("useVersionInfo", () => {
@@ -33,6 +34,33 @@ describe("useVersionInfo", () => {
 
     await waitFor(() => expect(getVersion).toHaveBeenCalledTimes(1));
     expect(result.current).toEqual({ revision: undefined, version: undefined });
+  });
+});
+
+describe("useScheduledRefreshStatus", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("loads independently and polls every 30 seconds", async () => {
+    vi.useFakeTimers();
+    const getScheduledRefreshStatus = vi.fn()
+      .mockResolvedValueOnce({ enabled: true, running: false, last_success_count: 1, last_failure_count: 0, skipped_count: 0 })
+      .mockResolvedValueOnce({ enabled: true, running: true, last_success_count: 1, last_failure_count: 0, skipped_count: 0 });
+    const client = { getScheduledRefreshStatus } as unknown as ApiClient;
+    const { result, unmount } = renderHook(() => useScheduledRefreshStatus(client));
+
+    await act(async () => Promise.resolve());
+    expect(getScheduledRefreshStatus).toHaveBeenCalledTimes(1);
+    expect(result.current?.running).toBe(false);
+
+    await act(async () => vi.advanceTimersByTimeAsync(30_000));
+    expect(getScheduledRefreshStatus).toHaveBeenCalledTimes(2);
+    expect(result.current?.running).toBe(true);
+
+    unmount();
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(getScheduledRefreshStatus).toHaveBeenCalledTimes(2);
   });
 });
 

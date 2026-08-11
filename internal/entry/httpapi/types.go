@@ -41,7 +41,8 @@ type subscriptionTrafficRequest struct {
 }
 
 type subscriptionPreviewRequest struct {
-	Args map[string]string `json:"args,omitempty"`
+	Args    map[string]string `json:"args,omitempty"`
+	Refresh bool              `json:"refresh,omitempty"`
 }
 
 type renderResponse struct {
