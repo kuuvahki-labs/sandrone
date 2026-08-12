@@ -22,6 +22,7 @@ export const shadowrocketFileDriverDefinition: FileDriverDefinition = {
     defaults: () => [],
     adapter: { normalize: processorsWithoutMihomoPresets },
     mergeModes: ["ini_override"],
+    presets: [],
     validate: () => [],
   },
 };

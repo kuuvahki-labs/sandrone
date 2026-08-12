@@ -21,6 +21,7 @@ export const staticFileDriverDefinition: FileDriverDefinition = {
     defaults: () => [],
     adapter: { normalize: processorsWithoutMihomoPresets },
     mergeModes: [],
+    presets: [],
     validate: () => [],
   },
 };

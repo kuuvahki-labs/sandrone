@@ -238,6 +238,7 @@ const rawOnlyDriver: FileDriverDefinition = {
   processors: {
     defaults: () => [],
     mergeModes: ["json_overlay", "json_override"],
+    presets: [],
     validate: () => [],
   },
 };

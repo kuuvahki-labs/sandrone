@@ -3,6 +3,10 @@ import type {
   FileDriverDefinition,
   StructuredFileConfigurationAdapter,
 } from "./file-driver";
+import {
+  type FileProcessorPreset,
+  validateFileProcessorPresetCatalog,
+} from "./processor-presets";
 
 export interface FileDriverRegistry {
   readonly drivers: readonly Readonly<FileDriverDefinition>[];
@@ -34,6 +38,7 @@ export function createFileDriverRegistry(
         throw new Error(`file configuration adapter kind must match its driver kind ${driver.kind}`);
       }
       const frozen = freezeDriver(driver);
+      validateFileProcessorPresetCatalog(frozen.processors.presets);
       byKind.set(frozen.kind, frozen);
       return frozen;
     });
@@ -57,6 +62,7 @@ export function createFileDriverRegistry(
 
 function freezeDriver(driver: FileDriverDefinition): Readonly<FileDriverDefinition> {
   const createPresets = Object.freeze(driver.createPresets.map((preset) => Object.freeze({ ...preset })));
+  const processorPresets = Object.freeze(driver.processors.presets.map(freezeProcessorPreset));
   const configuration = driver.configuration.mode === "structured"
     ? Object.freeze({
       ...driver.configuration,
@@ -73,8 +79,17 @@ function freezeDriver(driver: FileDriverDefinition): Readonly<FileDriverDefiniti
       ...driver.processors,
       adapter: driver.processors.adapter ? Object.freeze({ ...driver.processors.adapter }) : undefined,
       mergeModes: Object.freeze([...driver.processors.mergeModes]),
+      presets: processorPresets,
     }),
   }) as Readonly<FileDriverDefinition>;
+}
+
+function freezeProcessorPreset(preset: FileProcessorPreset): FileProcessorPreset {
+  return Object.freeze({
+    ...preset,
+    dependencies: Object.freeze([...preset.dependencies]),
+    conflicts: Object.freeze([...preset.conflicts]),
+  });
 }
 
 function freezeConfigurationAdapter(

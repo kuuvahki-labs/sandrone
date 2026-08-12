@@ -36,6 +36,8 @@ import type { Translator } from "~/shared/i18n/context";
 import type { ProcessorDraft } from "~/shared/processors/model";
 import type { ProcessorDetail } from "~/shared/resources/types";
 
+import type { FileProcessorPreset } from "./processor-presets";
+
 export type FileMergeMode = "yaml_overlay" | "yaml_override" | "json_overlay" | "json_override" | "ini_override";
 export type FileDriverIcon = string;
 
@@ -157,6 +159,7 @@ interface FileDriverBase {
     defaults: () => ProcessorDetail[];
     adapter?: FileProcessorAdapter;
     mergeModes: readonly FileMergeMode[];
+    presets: readonly FileProcessorPreset[];
     validate: (processors: ProcessorDetail[]) => FileProcessorValidationIssue[];
   };
 }

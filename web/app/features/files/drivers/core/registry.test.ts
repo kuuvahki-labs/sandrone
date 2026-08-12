@@ -5,6 +5,7 @@ import type {
   FileDriverDefinition,
   StructuredFileConfigurationAdapter,
 } from "./file-driver";
+import type { FileProcessorPreset } from "./processor-presets";
 import { createFileDriverRegistry } from "./registry";
 
 describe("file driver core registry", () => {
@@ -56,6 +57,10 @@ describe("file driver core registry", () => {
     expect(driver.processors.adapter).toBeDefined();
     expect(Object.isFrozen(driver.processors.adapter)).toBe(true);
     expect(Object.isFrozen(driver.processors.mergeModes)).toBe(true);
+    expect(Object.isFrozen(driver.processors.presets)).toBe(true);
+    expect(Object.isFrozen(driver.processors.presets[0])).toBe(true);
+    expect(Object.isFrozen(driver.processors.presets[0].dependencies)).toBe(true);
+    expect(Object.isFrozen(driver.processors.presets[0].conflicts)).toBe(true);
     expect(Object.isFrozen(driver.configuration.adapter)).toBe(true);
     expect(Object.isFrozen(driver.configuration.adapter.adaptive)).toBe(true);
     expect(Object.isFrozen(driver.configuration.adapter.adaptive.typeOptions)).toBe(true);
@@ -142,6 +147,37 @@ describe("file driver core registry", () => {
     expect(errorMessage(() => createFileDriverRegistry([malformed])))
       .toBe("file configuration adapter kind must match its driver kind future-client");
   });
+
+  it("rejects empty and duplicate processor preset IDs during registry construction", () => {
+    expect(errorMessage(() => registryWithPresets([processorPreset("")])))
+      .toBe("file processor preset id must not be empty");
+    expect(errorMessage(() => registryWithPresets([
+      processorPreset("duplicate"),
+      processorPreset("duplicate"),
+    ]))).toBe("duplicate file processor preset id: duplicate");
+  });
+
+  it("rejects missing processor preset dependency and conflict IDs during registry construction", () => {
+    expect(errorMessage(() => registryWithPresets([
+      processorPreset("dependent", { dependencies: ["missing"] }),
+    ]))).toBe("file processor preset dependent has unknown dependency: missing");
+    expect(errorMessage(() => registryWithPresets([
+      processorPreset("exclusive", { conflicts: ["missing"] }),
+    ]))).toBe("file processor preset exclusive has unknown conflict: missing");
+  });
+
+  it("rejects processor preset dependency cycles during registry construction", () => {
+    expect(errorMessage(() => registryWithPresets([
+      processorPreset("first", { dependencies: ["second"] }),
+      processorPreset("second", { dependencies: ["first"] }),
+    ]))).toBe("file processor preset dependency cycle: first -> second -> first");
+  });
+
+  it("rejects processor preset self-dependencies during registry construction", () => {
+    expect(errorMessage(() => registryWithPresets([
+      processorPreset("self", { dependencies: ["self"] }),
+    ]))).toBe("file processor preset self must not depend on itself");
+  });
 });
 
 function rawOnlyDriver(
@@ -174,6 +210,7 @@ function rawOnlyDriver(
     processors: {
       defaults: () => [],
       mergeModes: ["json_overlay", "json_override"],
+      presets: [],
       validate: () => [],
     },
   };
@@ -190,7 +227,36 @@ function structuredDriver(kind = "future-client"): FileDriverDefinition {
     processors: {
       ...raw.processors,
       adapter: { normalize: (processors) => processors },
+      presets: [processorPreset("base")],
     },
+  };
+}
+
+function registryWithPresets(presets: readonly FileProcessorPreset[]) {
+  const driver = rawOnlyDriver();
+  return createFileDriverRegistry([{
+    ...driver,
+    processors: { ...driver.processors, presets },
+  }]);
+}
+
+function processorPreset(
+  id: string,
+  edges: {
+    dependencies?: readonly string[];
+    conflicts?: readonly string[];
+  } = {},
+): FileProcessorPreset {
+  return {
+    id,
+    category: "network",
+    labelKey: "files.kind.static",
+    descriptionKey: "files.kind.static",
+    defaultOn: false,
+    dependencies: edges.dependencies ?? [],
+    conflicts: edges.conflicts ?? [],
+    build: () => ({ type: "merge", params: { content: id } }),
+    recognize: (processor) => processor.type === "merge" && processor.params?.content === id,
   };
 }
 

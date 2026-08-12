@@ -23,6 +23,7 @@ export const mihomoFileDriverDefinition: FileDriverDefinition = {
     defaults: defaultMihomoProcessors,
     adapter: mihomoProcessorAdapter,
     mergeModes: ["yaml_overlay", "yaml_override"],
+    presets: [],
     validate: () => [],
   },
 };

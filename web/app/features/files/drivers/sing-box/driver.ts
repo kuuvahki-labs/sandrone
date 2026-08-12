@@ -26,6 +26,7 @@ export const singBoxFileDriverDefinition: FileDriverDefinition = {
     defaults: defaultSingBoxProcessors,
     adapter: { normalize: processorsWithoutMihomoPresets },
     mergeModes: ["json_overlay", "json_override"],
+    presets: [],
     validate: validateJSONMergeProcessors,
   },
 };
