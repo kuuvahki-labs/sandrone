@@ -54,8 +54,11 @@ func (s *Server) Handler() http.Handler {
 	return mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
 		return s.server
 	}, &mcp.StreamableHTTPOptions{
-		JSONResponse: true,
-		Logger:       s.rt.Logger,
+		Stateless:                    true,
+		JSONResponse:                 true,
+		Logger:                       s.rt.Logger,
+		MaxRequestBodyBytes:          mcp.DefaultMaxRequestBodyBytes,
+		PropagateRequestCancellation: true,
 	})
 }
 
@@ -68,10 +71,17 @@ func SDKServer(rt *app.Runtime) *mcp.Server {
 }
 
 func newSDKServer(rt *app.Runtime) *mcp.Server {
-	return mcp.NewServer(&mcp.Implementation{Name: "sandrone", Version: buildinfo.Version()}, &mcp.ServerOptions{
+	server := mcp.NewServer(&mcp.Implementation{Name: "sandrone", Version: buildinfo.Version()}, &mcp.ServerOptions{
 		Instructions: "Sandrone converts node content and project resources through its service layer.",
 		Logger:       rt.Logger,
+		Capabilities: &mcp.ServerCapabilities{
+			Tools:     &mcp.ToolCapabilities{},
+			Resources: &mcp.ResourceCapabilities{},
+			Prompts:   &mcp.PromptCapabilities{},
+		},
 	})
+	server.AddReceivingMiddleware(protocolPolicyMiddleware)
+	return server
 }
 
 func registerTools(server *mcp.Server, rt *app.Runtime) {

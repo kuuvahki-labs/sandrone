@@ -53,12 +53,13 @@ func TestReadonlyToolsAndResourceRead(t *testing.T) {
 
 }
 
-func TestServerReportsBuildVersionDuringInitialize(t *testing.T) {
+func TestServerReportsBuildAndProtocolVersionDuringDiscovery(t *testing.T) {
 	ctx := context.Background()
 	session := connect(t, ctx, mcpapi.SDKServer(testRuntime(t, app.Config{})))
 	defer session.Close()
 
 	require.Equal(t, "0.1.1", session.InitializeResult().ServerInfo.Version)
+	require.Equal(t, mcpapi.ProtocolVersion, session.InitializeResult().ProtocolVersion)
 }
 
 func TestConvertToolAcceptsRemoteInput(t *testing.T) {
