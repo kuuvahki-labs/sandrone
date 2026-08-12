@@ -202,6 +202,10 @@ export class ApiClient {
     return this.request("/version", { auth: false });
   }
 
+  inspect(): Promise<unknown> {
+    return this.dedupedRequest("GET", "/v1/inspect");
+  }
+
   listSubscriptions(): Promise<unknown> {
     return this.dedupedRequest("GET", "/v1/subscriptions");
   }

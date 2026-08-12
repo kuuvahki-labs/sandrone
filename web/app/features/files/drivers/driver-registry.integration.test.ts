@@ -25,6 +25,13 @@ describe("file driver codecs", () => {
       ["sing-box", "structured"],
       ["shadowrocket", "structured"],
     ]);
+    expect(FILE_DRIVER_REGISTRY.drivers.map((driver) => [driver.kind, driver.targetRendererFormat])).toEqual([
+      ["static", undefined],
+      ["mihomo", "mihomo-proxies"],
+      ["sing-box", "sing-box-outbounds"],
+      ["shadowrocket", "shadowrocket-proxies"],
+    ]);
+    expect(FILE_DRIVER_REGISTRY.get("static")).not.toHaveProperty("targetRendererFormat");
     expect(FILE_DRIVER_REGISTRY.createPresets).toEqual([
       {
         kind: "static",

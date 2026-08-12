@@ -6,6 +6,7 @@ import { shadowrocketConfigurationAdapter } from "./configuration";
 
 export const shadowrocketFileDriverDefinition: FileDriverDefinition = {
   kind: "shadowrocket",
+  targetRendererFormat: "shadowrocket-proxies",
   presentation: { labelKey: "files.kind.shadowrocket", icon: "rocket" },
   configuration: { mode: "structured", adapter: shadowrocketConfigurationAdapter },
   createPresets: [{ kind: "shadowrocket", source: "shadowrocket", sourceType: "inline", order: 4, initialName: "shadowrocket.conf", icon: "rocket", labelKey: "files.kind.shadowrocket", accessibleLabelKey: "files.create.shadowrocket" }],

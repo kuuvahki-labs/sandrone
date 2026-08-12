@@ -1,4 +1,5 @@
 export const fileZhCN = {
+  "files.preview.targetCore": "目标核心：{revision}",
   "files.edit.unknownKindReadonly": "此文件类型未注册，只能查看定义和预览。",
   "files.edit.rawDefinition": "原始文件定义",
   "files.config.outputNames.group.select": "🚀 节点选择",

@@ -135,6 +135,7 @@ export interface StructuredFileConfigurationAdapter {
 
 interface FileDriverBase {
   kind: string;
+  targetRendererFormat?: string;
   presentation: {
     labelKey: Parameters<Translator>[0];
     icon: FileDriverIcon;

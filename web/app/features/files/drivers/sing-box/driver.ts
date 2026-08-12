@@ -13,6 +13,7 @@ import {
 
 export const singBoxFileDriverDefinition: FileDriverDefinition = {
   kind: "sing-box",
+  targetRendererFormat: "sing-box-outbounds",
   presentation: { labelKey: "files.kind.singBox", icon: "sing-box" },
   configuration: { mode: "structured", adapter: singBoxConfigurationAdapter, requiresValidOnCreate: true },
   createPresets: [{ kind: "sing-box", source: "sing-box", sourceType: "inline", order: 3, initialName: "sing-box.json", icon: "sing-box", labelKey: "files.kind.singBox", accessibleLabelKey: "files.create.singBox" }],

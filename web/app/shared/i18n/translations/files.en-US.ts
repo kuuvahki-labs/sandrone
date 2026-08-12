@@ -1,4 +1,5 @@
 export const fileEnUS = {
+  "files.preview.targetCore": "Target core: {revision}",
   "files.edit.unknownKindReadonly": "This file kind is not registered. Its definition is read-only, but preview remains available.",
   "files.edit.rawDefinition": "Raw file definition",
   "files.config.outputNames.group.select": "Proxy",

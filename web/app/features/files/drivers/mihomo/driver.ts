@@ -10,6 +10,7 @@ import {
 
 export const mihomoFileDriverDefinition: FileDriverDefinition = {
   kind: "mihomo",
+  targetRendererFormat: "mihomo-proxies",
   presentation: { labelKey: "files.kind.mihomo", icon: "mihomo" },
   configuration: { mode: "structured", adapter: mihomoConfigurationAdapter },
   createPresets: [{ kind: "mihomo", source: "mihomo", sourceType: "inline", order: 2, initialName: "mihomo.yaml", icon: "mihomo", labelKey: "files.kind.mihomo", accessibleLabelKey: "files.create.mihomo" }],

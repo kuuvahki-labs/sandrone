@@ -450,6 +450,32 @@ describe("ApiClient", () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
+  it("loads inspect with bearer auth and coalesces concurrent requests", async () => {
+    saveAdminToken("secret");
+    let resolveResponse: (() => void) | undefined;
+    const responseReady = new Promise<void>((resolve) => {
+      resolveResponse = resolve;
+    });
+    const calls: Array<{ input: FetchInput; init?: FetchOptions }> = [];
+    const fetcher = vi.fn(async (input: FetchInput, init?: FetchOptions) => {
+      calls.push({ input, init });
+      await responseReady;
+      return new Response(JSON.stringify({ capabilities: {} }), {
+        headers: { "content-type": "application/json" },
+      });
+    });
+    const client = new ApiClient({ fetcher });
+
+    const first = client.inspect();
+    const second = client.inspect();
+    resolveResponse?.();
+    await Promise.all([first, second]);
+
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(String(calls[0]?.input)).toBe("/v1/inspect");
+    expect(calls[0]?.init?.headers).toEqual({ Authorization: "Bearer secret" });
+  });
+
   it("bypasses a pending project settings request when a fresh read is requested", async () => {
     let resolveStale: ((response: Response) => void) | undefined;
     let resolveFresh: ((response: Response) => void) | undefined;
