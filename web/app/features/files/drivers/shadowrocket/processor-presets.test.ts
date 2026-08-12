@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { recognizedFileProcessorPresetID } from "~/features/files/drivers/core/processor-presets";
+import { enUS } from "~/shared/i18n/translations/en-US";
+import { zhCN } from "~/shared/i18n/translations/zh-CN";
 
 import {
   defaultShadowrocketProcessors,
@@ -28,7 +30,6 @@ describe("Shadowrocket processor presets", () => {
   it("recognizes only the exact managed NTP script", () => {
     const preset = defaultShadowrocketProcessors()[0]!;
 
-    expect(shadowrocketProcessorPresets.map((descriptor) => descriptor.id)).toEqual(["ntp-direct"]);
     expect(recognizedFileProcessorPresetID(shadowrocketProcessorPresets, preset)).toBe("ntp-direct");
     expect(recognizedFileProcessorPresetID(shadowrocketProcessorPresets, {
       ...preset,
@@ -38,4 +39,123 @@ describe("Shadowrocket processor presets", () => {
       },
     })).toBeNull();
   });
+
+  it("builds the exact optional INI override scenarios", () => {
+    expect(Object.fromEntries(SCENARIOS.map(({ id }) => {
+      const processor = presetDescriptor(id).build();
+      return [id, {
+        type: processor.type,
+        stage: processor.stage,
+        params: processor.params,
+      }];
+    }))).toEqual(Object.fromEntries(SCENARIOS.map(({ id, content }) => [id, {
+      type: "merge",
+      stage: "file",
+      params: { mode: "ini_override", content },
+    }])));
+  });
+
+  it("declares every optional scenario default off without dependencies or conflicts", () => {
+    expect(shadowrocketProcessorPresets.map((descriptor) => descriptor.id)).toEqual([
+      "ntp-direct",
+      "webrtc-privacy",
+      "disable-ipv6",
+      "udp-unsupported-direct",
+      "restricted-network-dns-fallback",
+    ]);
+    expect(SCENARIOS.map(({ id }) => {
+      const descriptor = presetDescriptor(id);
+      return {
+        id,
+        defaultOn: descriptor.defaultOn,
+        dependencies: descriptor.dependencies,
+        conflicts: descriptor.conflicts,
+      };
+    })).toEqual(SCENARIOS.map(({ id }) => ({
+      id,
+      defaultOn: false,
+      dependencies: [],
+      conflicts: [],
+    })));
+    expect(defaultShadowrocketProcessors().map((processor) => processor.name)).toEqual([
+      "Traditional NTP Direct",
+    ]);
+  });
+
+  it.each(SCENARIOS)("recognizes only the exact INI override for $id", ({ id }) => {
+    const preset = presetDescriptor(id).build();
+
+    expect(recognizedFileProcessorPresetID(shadowrocketProcessorPresets, preset)).toBe(id);
+    expect(recognizedFileProcessorPresetID(shadowrocketProcessorPresets, {
+      ...preset,
+      params: { ...preset.params, content: `${String(preset.params?.content)}\n# user edit` },
+    })).toBeNull();
+    expect(recognizedFileProcessorPresetID(shadowrocketProcessorPresets, {
+      ...preset,
+      params: { ...preset.params, mode: "append" },
+    })).toBeNull();
+    expect(recognizedFileProcessorPresetID(shadowrocketProcessorPresets, {
+      ...preset,
+      type: "script",
+    })).toBeNull();
+  });
+
+  it("uses the fixed risk copy and exposes no Shadowrocket QUIC preset surface", () => {
+    expect(zhCN["processors.filePreset.shadowrocket.webrtcPrivacy.risk"]).toBe(
+      "可能导致语音通话、视频会议、WebRTC 或 P2P 连接降级或失效。",
+    );
+    expect(enUS["processors.filePreset.shadowrocket.disableIPv6.risk"]).toBe(
+      "This controls only the IPv6 behavior expressible in Shadowrocket configuration and does not guarantee that underlying node transport never uses IPv6.",
+    );
+    expect(enUS["processors.filePreset.shadowrocket.udpUnsupportedDirect.risk"]).toBe(
+      "Matching traffic bypasses the proxy, so the real egress address, carrier path, and local DNS may be exposed.",
+    );
+    expect(enUS["processors.filePreset.shadowrocket.restrictedNetworkDNSFallback.risk"]).toBe(
+      "Domains intended for direct resolution may instead be resolved through the proxy.",
+    );
+
+    const surface = shadowrocketProcessorPresets.map((preset) => ({
+      id: preset.id,
+      labelKey: preset.labelKey,
+      labelEN: enUS[preset.labelKey],
+      labelZH: zhCN[preset.labelKey],
+      processor: preset.build(),
+    }));
+    expect(JSON.stringify(surface).toLowerCase()).not.toContain("quic");
+  });
 });
+
+const SCENARIOS = [
+  {
+    id: "webrtc-privacy",
+    content: `# sandrone:shadowrocket-preset=webrtc-privacy
+[General]
+stun-response-ip = 1.1.1.1
+stun-response-ipv6 = ::1`,
+  },
+  {
+    id: "disable-ipv6",
+    content: `# sandrone:shadowrocket-preset=disable-ipv6
+[General]
+ipv6 = false
+prefer-ipv6 = false`,
+  },
+  {
+    id: "udp-unsupported-direct",
+    content: `# sandrone:shadowrocket-preset=udp-unsupported-direct
+[General]
+udp-policy-not-supported-behaviour = DIRECT`,
+  },
+  {
+    id: "restricted-network-dns-fallback",
+    content: `# sandrone:shadowrocket-preset=restricted-network-dns-fallback
+[General]
+dns-direct-fallback-proxy = true`,
+  },
+] as const;
+
+function presetDescriptor(id: string) {
+  const descriptor = shadowrocketProcessorPresets.find((preset) => preset.id === id);
+  if (!descriptor) throw new Error(`missing Shadowrocket processor preset: ${id}`);
+  return descriptor;
+}

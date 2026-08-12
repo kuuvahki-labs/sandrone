@@ -99,6 +99,150 @@ func TestServiceCommunityPresetOrderedNTPUsesExactRawAssets(t *testing.T) {
 	}
 }
 
+func TestServiceCommunityPresetShadowrocketINIOverrideScenariosApplyOnlyNamedGeneralAssignments(t *testing.T) {
+	base := "\ufeff# preserve file comment\r\n" +
+		"[General]\r\n" +
+		"# preserve general comment\r\n" +
+		"profile = keep\r\n" +
+		"stun-response-ip = 9.9.9.9\r\n" +
+		"stun-response-ipv6 = 2001:db8::9\r\n" +
+		"ipv6 = true\r\n" +
+		"prefer-ipv6 = true\r\n" +
+		"udp-policy-not-supported-behaviour = REJECT\r\n" +
+		"dns-direct-fallback-proxy = false\r\n" +
+		"; preserve general tail\r\n" +
+		"[Host]\r\n" +
+		"# preserve host comment\r\n" +
+		"example.com = 192.0.2.1\r\n" +
+		"[Custom]\r\n" +
+		"; preserve custom comment\r\n" +
+		"value = keep\r\n" +
+		"[Proxy]\r\n" +
+		"[Proxy Group]\r\n" +
+		"[Rule]\r\n"
+	render := func(t *testing.T, processor *domain.ProcessorSpec) inidoc.Model {
+		t.Helper()
+		processors := []domain.ProcessorSpec(nil)
+		if processor != nil {
+			processors = []domain.ProcessorSpec{*processor}
+		}
+		spec := domain.FileSpec{
+			Name:       "shadowrocket-scenario.conf",
+			Kind:       domain.FileKindShadowrocket,
+			Source:     domain.FileSource{Type: "inline", Content: base},
+			Config:     &domain.FileConfig{Settings: raw(t, map[string]any{"groups": []any{}, "rules": []any{}})},
+			Processors: processors,
+		}
+
+		result, err := service.New().GetFile(context.Background(), domain.FileRequest{Spec: &spec})
+
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		model, err := inidoc.ParseModel(result.Content)
+		require.NoError(t, err)
+		return model
+	}
+
+	baseline := render(t, nil)
+	require.True(t, baseline.BOM)
+	require.Equal(t, "\r\n", baseline.Newline)
+	require.True(t, baseline.TrailingNewline)
+	require.Equal(t, []string{"# preserve file comment"}, baseline.Preamble)
+	require.Equal(t, []string{"General", "Host", "Custom", "Proxy", "Proxy Group", "Rule"}, modelSectionNames(baseline))
+	require.Contains(t, baseline.Sections[0].Lines, "udp-policy-not-supported-behaviour = REJECT")
+	require.NotContains(t, baseline.Sections[0].Lines, "udp-policy-not-supported-behaviour = DIRECT")
+
+	tests := []struct {
+		name        string
+		content     string
+		wantGeneral []string
+	}{
+		{
+			name: "WebRTC privacy",
+			content: `# sandrone:shadowrocket-preset=webrtc-privacy
+[General]
+stun-response-ip = 1.1.1.1
+stun-response-ipv6 = ::1`,
+			wantGeneral: []string{
+				"# preserve general comment",
+				"profile = keep",
+				"stun-response-ip = 1.1.1.1",
+				"stun-response-ipv6 = ::1",
+				"ipv6 = true",
+				"prefer-ipv6 = true",
+				"udp-policy-not-supported-behaviour = REJECT",
+				"dns-direct-fallback-proxy = false",
+				"; preserve general tail",
+			},
+		},
+		{
+			name: "disable IPv6",
+			content: `# sandrone:shadowrocket-preset=disable-ipv6
+[General]
+ipv6 = false
+prefer-ipv6 = false`,
+			wantGeneral: []string{
+				"# preserve general comment",
+				"profile = keep",
+				"stun-response-ip = 9.9.9.9",
+				"stun-response-ipv6 = 2001:db8::9",
+				"ipv6 = false",
+				"prefer-ipv6 = false",
+				"udp-policy-not-supported-behaviour = REJECT",
+				"dns-direct-fallback-proxy = false",
+				"; preserve general tail",
+			},
+		},
+		{
+			name: "unsupported UDP direct",
+			content: `# sandrone:shadowrocket-preset=udp-unsupported-direct
+[General]
+udp-policy-not-supported-behaviour = DIRECT`,
+			wantGeneral: []string{
+				"# preserve general comment",
+				"profile = keep",
+				"stun-response-ip = 9.9.9.9",
+				"stun-response-ipv6 = 2001:db8::9",
+				"ipv6 = true",
+				"prefer-ipv6 = true",
+				"udp-policy-not-supported-behaviour = DIRECT",
+				"dns-direct-fallback-proxy = false",
+				"; preserve general tail",
+			},
+		},
+		{
+			name: "restricted-network DNS fallback",
+			content: `# sandrone:shadowrocket-preset=restricted-network-dns-fallback
+[General]
+dns-direct-fallback-proxy = true`,
+			wantGeneral: []string{
+				"# preserve general comment",
+				"profile = keep",
+				"stun-response-ip = 9.9.9.9",
+				"stun-response-ipv6 = 2001:db8::9",
+				"ipv6 = true",
+				"prefer-ipv6 = true",
+				"udp-policy-not-supported-behaviour = REJECT",
+				"dns-direct-fallback-proxy = true",
+				"; preserve general tail",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			processor := shadowrocketINIOverrideProcessor(t, test.name, test.content)
+			got := render(t, &processor)
+			want := baseline
+			want.Preamble = append([]string(nil), baseline.Preamble...)
+			want.Sections = append([]inidoc.ModelSection(nil), baseline.Sections...)
+			want.Sections[0].Lines = test.wantGeneral
+
+			require.Equal(t, want, got)
+		})
+	}
+}
+
 func TestServiceCommunityPresetMihomoOrderedScenariosUseExactRawAsset(t *testing.T) {
 	script := communityPresetRawScript(t, "insert-mihomo-rules.js")
 	spec := domain.FileSpec{
@@ -604,6 +748,19 @@ func mihomoMergeProcessor(t *testing.T, name, content string) domain.ProcessorSp
 		Stage: domain.StageFile,
 		Params: params(t, map[string]any{
 			"mode":    "yaml_override",
+			"content": content,
+		}),
+	}
+}
+
+func shadowrocketINIOverrideProcessor(t *testing.T, name, content string) domain.ProcessorSpec {
+	t.Helper()
+	return domain.ProcessorSpec{
+		Name:  name,
+		Type:  "merge",
+		Stage: domain.StageFile,
+		Params: params(t, map[string]any{
+			"mode":    "ini_override",
 			"content": content,
 		}),
 	}
