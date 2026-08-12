@@ -852,6 +852,37 @@ describe("adaptive Mihomo group reconciliation", () => {
     expect(proxyMembers(result.config).filter((name) => name === "Hong Kong")).toHaveLength(1);
  });
 
+  it("upgrades a legacy canonical url-test group that omitted tolerance", () => {
+    const base = createConfigFromTemplate("mihomo", "minimal");
+    const generation = generateAdaptiveGroups(
+      ["HK-01", "HK-02"],
+      { type: "url-test" },
+    );
+    const current = mergeAdaptiveGroups(base, generation).config;
+    const legacy = {
+      ...current,
+      groups: current.groups?.map((group) => {
+        if (group.name !== "Hong Kong") return group;
+        const { tolerance: _tolerance, ...withoutTolerance } = group;
+        return withoutTolerance;
+      }),
+    };
+
+    expect(canonicalAdaptiveGroupNames(legacy.groups ?? [])).toEqual(["Hong Kong"]);
+    expect(canonicalAdaptiveGroupNames((legacy.groups ?? []).map((group) => (
+      group.name === "Hong Kong" ? { ...group, tolerance: 75 } : group
+    )))).toEqual([]);
+
+    const result = mergeAdaptiveGroups(legacy, generation);
+
+    expect(result.warnings).not.toContainEqual({ code: "group_name_conflict", groupName: "Hong Kong" });
+    expect(result.generatedGroupNames).toEqual(["Hong Kong"]);
+    expect(result.config.groups?.filter((group) => group.name === "Hong Kong")).toEqual([
+      expect.objectContaining({ type: "url-test", tolerance: 50 }),
+    ]);
+    expect(proxyMembers(result.config).filter((name) => name === "Hong Kong")).toHaveLength(1);
+  });
+
   it("recognizes and replaces a legacy Chinese canonical group on regeneration", () => {
     const base = createConfigFromTemplate("mihomo", "minimal");
     const generation = generateAdaptiveGroups(

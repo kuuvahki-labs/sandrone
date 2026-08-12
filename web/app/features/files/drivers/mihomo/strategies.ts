@@ -203,7 +203,13 @@ function mihomoAdaptiveDialect(
       for (const definition of CANONICAL_ADAPTIVE_GROUP_DEFINITIONS) {
         for (const name of [definition.name, ...(definition.legacyNames ?? [])]) {
           for (const { value: type } of ADAPTIVE_TYPE_OPTIONS) {
-            if (nativeValuesEqual(group, materialize({ ...definition, name }, type, []))) return name;
+            const current = materialize({ ...definition, name }, type, []);
+            if (nativeValuesEqual(group, current)) return name;
+            if (type === "url-test") {
+              const legacy = { ...current };
+              delete legacy.tolerance;
+              if (nativeValuesEqual(group, legacy)) return name;
+            }
           }
         }
       }
