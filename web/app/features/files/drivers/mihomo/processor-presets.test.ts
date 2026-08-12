@@ -417,12 +417,32 @@ tun:
     );
     expect(eimPlan.removedPresetIDs).toEqual(["stun-block"]);
 
+    const editedTailnetShare = mihomoProcessorPreset("tailnet-share");
+    editedTailnetShare.params = {
+      ...editedTailnetShare.params,
+      content: `${String(editedTailnetShare.params?.content)}\n# user edit`,
+    };
+    const nativeCurrent = [
+      mihomoProcessorPreset("stun-block"),
+      mihomoProcessorPreset("tailscale-external"),
+      mihomoProcessorPreset("tailnet-share"),
+      editedTailnetShare,
+    ];
     const nativePlan = planFileProcessorPresetAddition(
       mihomoProcessorPresets,
       "tailscale-native",
-      [mihomoProcessorPreset("stun-block"), mihomoProcessorPreset("tailscale-external")],
+      nativeCurrent,
     );
-    expect(nativePlan.removedPresetIDs).toEqual(["stun-block", "tailscale-external"]);
+    expect(nativePlan.removeIndices).toEqual([0, 1, 2]);
+    expect(nativePlan.removedPresetIDs).toEqual([
+      "stun-block",
+      "tailscale-external",
+      "tailnet-share",
+    ]);
+    const nativeRemovals = new Set(nativePlan.removeIndices);
+    const nativeSurvivors = nativeCurrent.filter((_, index) => !nativeRemovals.has(index));
+    expect(nativeSurvivors).toEqual([editedTailnetShare]);
+    expect(nativeSurvivors[0]).toBe(editedTailnetShare);
     const stunPlanWithTailscale = planFileProcessorPresetAddition(
       mihomoProcessorPresets,
       "stun-block",

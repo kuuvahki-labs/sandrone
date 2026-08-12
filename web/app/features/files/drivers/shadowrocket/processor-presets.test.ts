@@ -136,7 +136,11 @@ describe("Shadowrocket processor presets", () => {
     );
     expect(nativePlan.removeIndices).toEqual([1]);
     expect(nativePlan.removedPresetIDs).toEqual(["webrtc-privacy"]);
-    expect(nativePlan.additions).toEqual([tailscale]);
+    expect(nativePlan.additions).toEqual([{
+      presetID: "tailscale-native",
+      processor: tailscale,
+      beforeIndex: null,
+    }]);
 
     const stunPlan = planFileProcessorPresetAddition(
       shadowrocketProcessorPresets,

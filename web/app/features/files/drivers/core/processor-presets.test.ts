@@ -16,7 +16,42 @@ describe("file processor preset planner", () => {
 
     expect(plan.addedPresetIDs).toEqual(["tun", "linux-acceleration", "mptcp"]);
     expect(plan.dependencyPresetIDs).toEqual(["tun", "linux-acceleration"]);
-    expect(plan.additions.map((item) => item.name)).toEqual(["TUN", "Linux", "MPTCP"]);
+    expect(plan.additions.map((item) => item.processor.name)).toEqual(["TUN", "Linux", "MPTCP"]);
+    expect(plan.additions.map((item) => item.beforeIndex)).toEqual([null, null, null]);
+  });
+
+  it("inserts missing dependencies before an existing managed consumer", () => {
+    const before = custom("before");
+    const native = built("tailscale-native");
+    const after = custom("after");
+    const current = [before, native, after];
+
+    const plan = planFileProcessorPresetAddition(catalog, "tailscale-native", current);
+
+    expect(plan.additions).toEqual([{
+      presetID: "ensure-tun",
+      processor: built("ensure-tun"),
+      beforeIndex: 1,
+    }]);
+    expect(plan.removeIndices).toEqual([]);
+    const applied = applyPlan(current, plan);
+    expect(applied.map(nameOf)).toEqual(["before", "Ensure TUN", "Tailscale Native", "after"]);
+    expect(applied[0]).toBe(before);
+    expect(applied[2]).toBe(native);
+    expect(applied[3]).toBe(after);
+  });
+
+  it("keeps same-slot additions in stable topological order", () => {
+    const mptcp = built("mptcp");
+
+    const plan = planFileProcessorPresetAddition(catalog, "mptcp", [mptcp]);
+
+    expect(plan.additions.map(({ presetID, beforeIndex }) => ({ presetID, beforeIndex })))
+      .toEqual([
+        { presetID: "tun", beforeIndex: 0 },
+        { presetID: "linux-acceleration", beforeIndex: 0 },
+      ]);
+    expect(applyPlan([mptcp], plan).map(nameOf)).toEqual(["TUN", "Linux", "MPTCP"]);
   });
 
   it("atomically removes recognized conflicts and preserves every other relative position", () => {
@@ -39,6 +74,69 @@ describe("file processor preset planner", () => {
     const plan = planFileProcessorPresetAddition(catalog, "tailscale-native", [edited]);
 
     expect(plan.removeIndices).toEqual([]);
+  });
+
+  it("cascades conflict removal through exact managed reverse dependents", () => {
+    const transitive = built("tailnet-access");
+    const external = built("tailscale-external");
+    const share = built("tailnet-share");
+    const current = [transitive, custom("middle"), external, share];
+
+    const plan = planFileProcessorPresetAddition(catalog, "tailscale-native", current);
+
+    expect(plan.removeIndices).toEqual([0, 2, 3]);
+    expect(plan.removedPresetIDs).toEqual([
+      "tailnet-access",
+      "tailscale-external",
+      "tailnet-share",
+    ]);
+  });
+
+  it("preserves edited and unrecognized reverse dependents", () => {
+    const editedShare = {
+      ...built("tailnet-share"),
+      params: { mode: "yaml_override", content: "edited share" },
+    };
+    const unknown = custom("unknown");
+    const current = [built("tailscale-external"), editedShare, unknown];
+
+    const plan = planFileProcessorPresetAddition(catalog, "tailscale-native", current);
+
+    expect(plan.removeIndices).toEqual([0]);
+    const applied = applyPlan(current, plan);
+    expect(applied.filter((processor) => processor === editedShare || processor === unknown))
+      .toEqual([editedShare, unknown]);
+  });
+
+  it("does not cascade a dependent when the requested closure restores its dependency", () => {
+    const native = built("tailscale-native");
+
+    const plan = planFileProcessorPresetAddition(catalog, "tailscale-native", [native]);
+
+    expect(plan.removeIndices).toEqual([]);
+    expect(plan.addedPresetIDs).toEqual(["ensure-tun"]);
+    expect(applyPlan([native], plan)).toEqual([built("ensure-tun"), native]);
+  });
+
+  it("preserves every surviving current processor by identity and relative order", () => {
+    const before = custom("before");
+    const unrelated = built("unrelated");
+    const editedShare = {
+      ...built("tailnet-share"),
+      params: { mode: "yaml_override", content: "edited share" },
+    };
+    const after = custom("after");
+    const current = [before, built("tailscale-external"), unrelated, editedShare, after];
+
+    const plan = planFileProcessorPresetAddition(catalog, "tailscale-native", current);
+    const applied = applyPlan(current, plan);
+    const survivingCurrent = applied.filter((processor) => current.includes(processor));
+
+    expect(survivingCurrent).toEqual([before, unrelated, editedShare, after]);
+    expect(survivingCurrent[0]).toBe(before);
+    expect(survivingCurrent[1]).toBe(unrelated);
+    expect(survivingCurrent[2]).toBe(editedShare);
+    expect(survivingCurrent[3]).toBe(after);
   });
 
   it("deduplicates removed IDs in processor order for dependency conflicts", () => {
@@ -99,11 +197,16 @@ const catalog: readonly FileProcessorPreset[] = [
   preset("tun", "TUN"),
   preset("linux-acceleration", "Linux", { dependencies: ["tun"], conflicts: ["stun"] }),
   preset("mptcp", "MPTCP", { dependencies: ["linux-acceleration", "tun"] }),
+  preset("ensure-tun", "Ensure TUN"),
   preset("tailscale-external", "Tailscale External"),
+  preset("tailnet-share", "Tailnet Share", { dependencies: ["tailscale-external"] }),
+  preset("tailnet-access", "Tailnet Access", { dependencies: ["tailnet-share"] }),
   preset("stun", "STUN"),
   preset("tailscale-native", "Tailscale Native", {
+    dependencies: ["ensure-tun"],
     conflicts: ["tailscale-external", "stun"],
   }),
+  preset("unrelated", "Unrelated"),
 ];
 
 function preset(
@@ -170,10 +273,19 @@ function applyPlan(
   plan: FileProcessorPresetPlan,
 ): ProcessorDetail[] {
   const removals = new Set(plan.removeIndices);
-  return [
-    ...current.filter((_, index) => !removals.has(index)),
-    ...plan.additions,
-  ];
+  const additionsByIndex = new Map<number | null, ProcessorDetail[]>();
+  for (const addition of plan.additions) {
+    const additions = additionsByIndex.get(addition.beforeIndex) ?? [];
+    additions.push(addition.processor);
+    additionsByIndex.set(addition.beforeIndex, additions);
+  }
+  const applied: ProcessorDetail[] = [];
+  current.forEach((processor, index) => {
+    applied.push(...(additionsByIndex.get(index) ?? []));
+    if (!removals.has(index)) applied.push(processor);
+  });
+  applied.push(...(additionsByIndex.get(null) ?? []));
+  return applied;
 }
 
 function isCustom(processor: ProcessorDetail): boolean {

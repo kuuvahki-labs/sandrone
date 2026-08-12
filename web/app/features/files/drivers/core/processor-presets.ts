@@ -17,12 +17,19 @@ export interface FileProcessorPreset {
 }
 
 export interface FileProcessorPresetPlan {
-  readonly additions: readonly ProcessorDetail[];
+  readonly additions: readonly FileProcessorPresetAddition[];
   readonly addedPresetIDs: readonly string[];
   readonly dependencyPresetIDs: readonly string[];
   readonly removeIndices: readonly number[];
   readonly removedPresetIDs: readonly string[];
   readonly requestedPresetID: string;
+}
+
+export interface FileProcessorPresetAddition {
+  readonly presetID: string;
+  readonly processor: ProcessorDetail;
+  /** Original `current` index to insert before, or `null` to append. */
+  readonly beforeIndex: number | null;
 }
 
 export function planFileProcessorPresetAddition(
@@ -37,33 +44,52 @@ export function planFileProcessorPresetAddition(
 
   const ordered = dependencyOrder(byID, requested);
   const dependencyPresetIDs = ordered.slice(0, -1).map((preset) => preset.id);
+  const requestedClosureIDs = new Set(ordered.map((preset) => preset.id));
   const conflictIDs = new Set(ordered.flatMap((preset) => preset.conflicts));
-  const removeIndices: number[] = [];
+  const recognizedCurrent = current.map((processor) => (
+    recognizedFileProcessorPresetID(catalog, processor)
+  ));
+  const removalIndices = new Set<number>();
+
+  recognizedCurrent.forEach((presetID, index) => {
+    if (presetID !== null && conflictIDs.has(presetID)) removalIndices.add(index);
+  });
+  cascadeRemovedDependents(
+    catalog,
+    recognizedCurrent,
+    requestedClosureIDs,
+    removalIndices,
+  );
+
+  const removeIndices = current.flatMap((_, index) => removalIndices.has(index) ? [index] : []);
   const removedPresetIDs: string[] = [];
   const seenRemovedPresetIDs = new Set<string>();
-
-  current.forEach((processor, index) => {
-    const conflict = catalog.find((preset) => (
-      conflictIDs.has(preset.id) && preset.recognize(processor)
-    ));
-    if (!conflict) return;
-    removeIndices.push(index);
-    if (!seenRemovedPresetIDs.has(conflict.id)) {
-      seenRemovedPresetIDs.add(conflict.id);
-      removedPresetIDs.push(conflict.id);
-    }
+  removeIndices.forEach((index) => {
+    const presetID = recognizedCurrent[index];
+    if (presetID === null || seenRemovedPresetIDs.has(presetID)) return;
+    seenRemovedPresetIDs.add(presetID);
+    removedPresetIDs.push(presetID);
   });
-
   const removedIndices = new Set(removeIndices);
-  const remaining = current.filter((_, index) => !removedIndices.has(index));
-  const additions: ProcessorDetail[] = [];
+  const survivingPresetIDs = new Set(recognizedCurrent.flatMap((presetID, index) => (
+    presetID !== null && !removedIndices.has(index) ? [presetID] : []
+  )));
+  const additions: FileProcessorPresetAddition[] = [];
   const addedPresetIDs: string[] = [];
   for (const preset of ordered) {
-    if (remaining.some((processor) => preset.recognize(processor))) continue;
-    const addition = preset.build();
-    additions.push(addition);
+    if (survivingPresetIDs.has(preset.id)) continue;
+    additions.push({
+      presetID: preset.id,
+      processor: preset.build(),
+      beforeIndex: earliestSurvivingConsumerIndex(
+        preset.id,
+        byID,
+        recognizedCurrent,
+        removedIndices,
+      ),
+    });
     addedPresetIDs.push(preset.id);
-    remaining.push(addition);
+    survivingPresetIDs.add(preset.id);
   }
 
   return {
@@ -74,6 +100,92 @@ export function planFileProcessorPresetAddition(
     removedPresetIDs,
     requestedPresetID,
   };
+}
+
+function cascadeRemovedDependents(
+  catalog: readonly FileProcessorPreset[],
+  recognizedCurrent: readonly (string | null)[],
+  requestedClosureIDs: ReadonlySet<string>,
+  removalIndices: Set<number>,
+): void {
+  const reverseDependencies = new Map<string, string[]>();
+  for (const preset of catalog) {
+    for (const dependencyID of preset.dependencies) {
+      const dependents = reverseDependencies.get(dependencyID) ?? [];
+      dependents.push(preset.id);
+      reverseDependencies.set(dependencyID, dependents);
+    }
+  }
+
+  const initiallyRemovedIDs = new Set(recognizedCurrent.flatMap((presetID, index) => (
+    presetID !== null && removalIndices.has(index) ? [presetID] : []
+  )));
+  const unavailableIDs = new Set<string>();
+  const queue: string[] = [];
+  for (const presetID of initiallyRemovedIDs) {
+    if (requestedClosureIDs.has(presetID)) continue;
+    if (hasSurvivingPreset(presetID, recognizedCurrent, removalIndices)) continue;
+    unavailableIDs.add(presetID);
+    queue.push(presetID);
+  }
+
+  for (let queueIndex = 0; queueIndex < queue.length; queueIndex += 1) {
+    const unavailableID = queue[queueIndex];
+    for (const dependentID of reverseDependencies.get(unavailableID) ?? []) {
+      if (requestedClosureIDs.has(dependentID)) continue;
+      let removedDependent = false;
+      recognizedCurrent.forEach((presetID, index) => {
+        if (presetID !== dependentID || removalIndices.has(index)) return;
+        removalIndices.add(index);
+        removedDependent = true;
+      });
+      if (!removedDependent || unavailableIDs.has(dependentID)) continue;
+      if (hasSurvivingPreset(dependentID, recognizedCurrent, removalIndices)) continue;
+      unavailableIDs.add(dependentID);
+      queue.push(dependentID);
+    }
+  }
+}
+
+function hasSurvivingPreset(
+  presetID: string,
+  recognizedCurrent: readonly (string | null)[],
+  removalIndices: ReadonlySet<number>,
+): boolean {
+  return recognizedCurrent.some((recognizedID, index) => (
+    recognizedID === presetID && !removalIndices.has(index)
+  ));
+}
+
+function earliestSurvivingConsumerIndex(
+  dependencyID: string,
+  byID: ReadonlyMap<string, FileProcessorPreset>,
+  recognizedCurrent: readonly (string | null)[],
+  removedIndices: ReadonlySet<number>,
+): number | null {
+  for (let index = 0; index < recognizedCurrent.length; index += 1) {
+    const consumerID = recognizedCurrent[index];
+    if (consumerID === null || removedIndices.has(index)) continue;
+    if (presetTransitivelyDependsOn(consumerID, dependencyID, byID)) return index;
+  }
+  return null;
+}
+
+function presetTransitivelyDependsOn(
+  presetID: string,
+  dependencyID: string,
+  byID: ReadonlyMap<string, FileProcessorPreset>,
+): boolean {
+  const visited = new Set<string>();
+  const visit = (candidateID: string): boolean => {
+    if (visited.has(candidateID)) return false;
+    visited.add(candidateID);
+    const candidate = byID.get(candidateID)!;
+    return candidate.dependencies.some((directDependencyID) => (
+      directDependencyID === dependencyID || visit(directDependencyID)
+    ));
+  };
+  return visit(presetID);
 }
 
 export function recognizedFileProcessorPresetID(

@@ -9,7 +9,7 @@
 - Mihomo 产物固定面向 v1.19.25，sing-box 固定面向 v1.13.14，Shadowrocket
   配置基线固定到源码 revision `5f1916b5897fc59fb7172aca59ae52050a3532fe`。
   这些 revision 来自已鉴权的 `GET /v1/inspect` capability payload，并显示在 Web
-  预览/报告中；不写入 `FileSpec`，也不在 Web 预设目录另存一份版本号。
+  文件预览中；不写入 `FileSpec`，也不在 Web 预设目录另存一份版本号。
 - 基础默认和默认开启的 processor 只影响之后创建的新文件；分组默认只影响之后
   创建的新分组。编辑已有文件或分组不会自动回填或迁移。
 - 选择预设会复制一个普通、可编辑的 file-stage `merge` 或 `script` processor。
@@ -32,7 +32,7 @@
 | --- | --- | --- | --- |
 | Mihomo | `allow-lan: true`；`lan-allowed-ips` 只含 RFC1918 IPv4 与 `fc00::/7`；Geo 数据自动更新且间隔 24 小时；新建 `url-test` 分组写入 `tolerance: 50`。 | LAN 监听仍需配合端口和访问控制；不会给已有分组补写 tolerance。 | [Mihomo 全局配置](https://wiki.metacubex.one/en/config/general/)、[Mihomo TUN](https://wiki.metacubex.one/en/config/inbound/tun/) |
 | sing-box | 新建 selector/urltest 分组可表达 `interrupt_exist_connections`；默认关闭且 false 在序列化时省略，已有值原样保留。 | urltest 开启后，自动切换出站会中断现有连接。 | [sing-box Selector](https://sing-box.sagernet.org/configuration/outbound/selector/)、[sing-box URLTest](https://sing-box.sagernet.org/configuration/outbound/urltest/) |
-| Shadowrocket | `close-if-proxy-chain-missing=true`、`dns-direct-fallback-proxy=false`、`udp-policy-not-supported-behaviour=REJECT`、`block-quic=all-proxy`、`ipv6=true`。 | 兼容性放宽必须显式选择下表中的可选预设。 | [Shadowrocket 社区配置](https://github.com/LOWERTOP/Shadowrocket/blob/5f1916b5897fc59fb7172aca59ae52050a3532fe/lazy.conf) |
+| Shadowrocket | `close-if-proxy-chain-missing=true`、`dns-direct-fallback-proxy=false`、`udp-policy-not-supported-behaviour=REJECT`、`block-quic=all-proxy`、`ipv6=true`、`prefer-ipv6=false`。 | 兼容性放宽必须显式选择下表中的可选预设。 | [Shadowrocket 社区配置](https://github.com/LOWERTOP/Shadowrocket/blob/5f1916b5897fc59fb7172aca59ae52050a3532fe/lazy.conf) |
 
 ## 通用与 Mihomo 预设
 

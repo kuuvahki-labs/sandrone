@@ -206,6 +206,31 @@ describe("sing-box file processor defaults", () => {
     });
   });
 
+  it("plans a missing TUN dependency before an existing exact native Tailscale processor", () => {
+    const before = customProcessor("before");
+    const native = singBoxProcessorPreset("tailscale-native");
+    const after = customProcessor("after");
+    const current = [before, native, after];
+
+    const plan = planFileProcessorPresetAddition(
+      singBoxProcessorPresets,
+      "tailscale-native",
+      current,
+    );
+
+    expect(plan.additions).toEqual([{
+      presetID: "ensure-tun",
+      processor: singBoxProcessorPreset("ensure-tun"),
+      beforeIndex: 1,
+    }]);
+    expect(applyPlan(current, plan)).toEqual([
+      before,
+      singBoxProcessorPreset("ensure-tun"),
+      native,
+      after,
+    ]);
+  });
+
   it("applies external Tailscale coexistence atomically and idempotently", () => {
     const ownedDNS = { type: "udp", tag: "ts-dns", server: "100.100.100.100" };
     const ownedDNSRule = {
@@ -670,5 +695,17 @@ function applyPlan(
   plan: ReturnType<typeof planFileProcessorPresetAddition>,
 ) {
   const removals = new Set(plan.removeIndices);
-  return [...current.filter((_, index) => !removals.has(index)), ...plan.additions];
+  const additionsByIndex = new Map<number | null, ReturnType<typeof singBoxProcessorPreset>[]>();
+  for (const addition of plan.additions) {
+    const additions = additionsByIndex.get(addition.beforeIndex) ?? [];
+    additions.push(addition.processor);
+    additionsByIndex.set(addition.beforeIndex, additions);
+  }
+  const applied: ReturnType<typeof singBoxProcessorPreset>[] = [];
+  current.forEach((processor, index) => {
+    applied.push(...(additionsByIndex.get(index) ?? []));
+    if (!removals.has(index)) applied.push(processor);
+  });
+  applied.push(...(additionsByIndex.get(null) ?? []));
+  return applied;
 }

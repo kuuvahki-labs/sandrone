@@ -4,6 +4,7 @@ import Alert from "@mui/material/Alert";
 import type { FileDriverDefinition, FileMergeMode } from "~/features/files/drivers/core/file-driver";
 import {
   type FileProcessorPresetCategory,
+  type FileProcessorPresetPlan,
   filterForeignManagedProcessors,
   planFileProcessorPresetAddition,
 } from "~/features/files/drivers/core/processor-presets";
@@ -120,7 +121,6 @@ export function FileProcessorBuilder({ defaultValue = [], kind, onDirty, onValid
         presetID,
         current.map(serializeProcessorDraft),
       );
-      const removals = new Set(plan.removeIndices);
       const addedIDs = new Set(plan.addedPresetIDs);
       setPresetNotice({
         description: t(requested.descriptionKey),
@@ -130,10 +130,7 @@ export function FileProcessorBuilder({ defaultValue = [], kind, onDirty, onValid
           .map((id) => presetLabel(driver, id, t)),
         removedLabels: plan.removedPresetIDs.map((id) => presetLabel(driver, id, t)),
       });
-      return [
-        ...current.filter((_, index) => !removals.has(index)),
-        ...plan.additions.map((processor) => draftFromProcessor(processor)),
-      ];
+      return applyFileProcessorPresetPlan(current, plan);
     }
     return [...current, { id: createProcessorID(), name: "", type, params: defaultParams(type, kind) }];
   }, [driver, kind, serializeProcessorDraft, t]);
@@ -202,6 +199,27 @@ function draftProcessors(processors: ProcessorDetail[]): ProcessorDraft[] {
 
 function draftFromProcessor(processor: ProcessorDetail, index = Date.now()): ProcessorDraft {
   return { id: createProcessorID(index), name: stringValue(processor.name), type: processor.type || "script", params: cleanParams(processor.params ?? {}) };
+}
+
+function applyFileProcessorPresetPlan(
+  current: readonly ProcessorDraft[],
+  plan: FileProcessorPresetPlan,
+): ProcessorDraft[] {
+  const removals = new Set(plan.removeIndices);
+  const additionsByBeforeIndex = new Map<number | null, ProcessorDraft[]>();
+  for (const addition of plan.additions) {
+    const drafts = additionsByBeforeIndex.get(addition.beforeIndex) ?? [];
+    drafts.push(draftFromProcessor(addition.processor));
+    additionsByBeforeIndex.set(addition.beforeIndex, drafts);
+  }
+
+  const next: ProcessorDraft[] = [];
+  current.forEach((draft, index) => {
+    next.push(...(additionsByBeforeIndex.get(index) ?? []));
+    if (!removals.has(index)) next.push(draft);
+  });
+  next.push(...(additionsByBeforeIndex.get(null) ?? []));
+  return next;
 }
 
 function serializeDraft(draft: ProcessorDraft, t: Translator, kind: FileKind): ProcessorDetail {

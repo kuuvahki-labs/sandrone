@@ -79,7 +79,7 @@ describe("FileProcessorBuilder", () => {
     expect(currentProcessors()).toEqual([added[1]]);
   });
 
-  it("replaces STUN with native Tailscale atomically and reports the dependency and conflict", async () => {
+  it("inserts a missing dependency before native Tailscale while removing STUN atomically", async () => {
     localStorage.setItem("sandrone.locale", "en-US");
     const user = userEvent.setup();
     const before: ProcessorDetail = {
@@ -97,9 +97,17 @@ describe("FileProcessorBuilder", () => {
     render(
       <FileProcessorBuilder
         kind="sing-box"
-        defaultValue={[before, singBoxProcessorPreset("stun-block"), after]}
+        defaultValue={[
+          before,
+          singBoxProcessorPreset("tailscale-native"),
+          singBoxProcessorPreset("stun-block"),
+          after,
+        ]}
       />,
     );
+
+    await user.click(screen.getAllByRole("button", { name: "Edit name" })[0]);
+    expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue("Before");
 
     await user.click(screen.getByRole("combobox", { name: "Type" }));
     expect(screen.getByRole("option", { name: "Native Tailscale" })).toBeInTheDocument();
@@ -109,10 +117,11 @@ describe("FileProcessorBuilder", () => {
 
     expect(currentProcessors().map((processor) => processor.name)).toEqual([
       "Before",
-      "After",
       "Ensure TUN",
       "Tailscale 原生接管",
+      "After",
     ]);
+    expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue("Before");
     expect(screen.getByRole("alert")).toHaveTextContent("Added dependencies: Ensure TUN inbound");
     expect(screen.getByRole("alert")).toHaveTextContent("Removed conflicts: STUN blocking");
   });
