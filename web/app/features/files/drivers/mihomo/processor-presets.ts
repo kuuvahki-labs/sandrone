@@ -6,8 +6,20 @@ import {
 } from "~/features/files/processors/ordered-rule-preset";
 import type { ProcessorDetail } from "~/shared/resources/types";
 
-export type MihomoProcessorPresetID = "sniffer" | "tun" | "ntp-direct" | "fake-ip-compat" | "tailscale-external" | "tailnet-share";
-type MihomoMergeProcessorPresetID = Exclude<MihomoProcessorPresetID, "ntp-direct">;
+export type MihomoProcessorPresetID =
+  | "sniffer"
+  | "tun"
+  | "ntp-direct"
+  | "fake-ip-compat"
+  | "stun-block"
+  | "quic-fallback"
+  | "udp-p2p-eim"
+  | "linux-tun-acceleration"
+  | "windows-relaxed-route"
+  | "tailscale-external"
+  | "tailnet-share";
+type MihomoOrderedRuleProcessorPresetID = "ntp-direct" | "stun-block" | "quic-fallback";
+type MihomoMergeProcessorPresetID = Exclude<MihomoProcessorPresetID, MihomoOrderedRuleProcessorPresetID>;
 
 const PRESET_CONTENT: Record<MihomoMergeProcessorPresetID, string> = {
   sniffer: `# sandrone:mihomo-preset=sniffer
@@ -105,6 +117,17 @@ dns:
     - "ps.res.netease.com"
     - "+.oray.com"
     - "+.orayimg.com"`,
+  "udp-p2p-eim": `# sandrone:mihomo-preset=udp-p2p-eim
+tun:
+  endpoint-independent-nat: true`,
+  "linux-tun-acceleration": `# sandrone:mihomo-preset=linux-tun-acceleration
+find-process-mode: strict
+tun:
+  auto-route: true
+  auto-redirect: true`,
+  "windows-relaxed-route": `# sandrone:mihomo-preset=windows-relaxed-route
+tun:
+  strict-route: false`,
   "tailscale-external": `# sandrone:mihomo-preset=tailscale
 dns:
   fake-ip-filter+:
@@ -127,19 +150,41 @@ const PRESET_NAMES: Record<MihomoProcessorPresetID, string> = {
   tun: "TUN",
   "ntp-direct": "Traditional NTP Direct",
   "fake-ip-compat": "Fake-IP 兼容扩展",
+  "stun-block": "STUN Block",
+  "quic-fallback": "QUIC Fallback",
+  "udp-p2p-eim": "UDP/P2P EIM",
+  "linux-tun-acceleration": "Linux/OpenWrt TUN Acceleration",
+  "windows-relaxed-route": "Windows Relaxed Route",
   "tailscale-external": "Tailscale 共存",
   "tailnet-share": "Tailnet 代理共享",
 };
 
-const NTP_DIRECT_PRESET: OrderedRuleProcessorPresetOptions = {
-  id: "ntp-direct",
-  kind: "mihomo",
-  name: PRESET_NAMES["ntp-direct"],
-  rules: ["AND,((NETWORK,UDP),(DST-PORT,123)),DIRECT"],
+const ORDERED_RULE_PRESETS: Record<MihomoOrderedRuleProcessorPresetID, OrderedRuleProcessorPresetOptions> = {
+  "ntp-direct": {
+    id: "ntp-direct",
+    kind: "mihomo",
+    name: PRESET_NAMES["ntp-direct"],
+    rules: ["AND,((NETWORK,UDP),(DST-PORT,123)),DIRECT"],
+  },
+  "stun-block": {
+    id: "stun-block",
+    kind: "mihomo",
+    name: PRESET_NAMES["stun-block"],
+    rules: [
+      "AND,((NETWORK,UDP),(DST-PORT,3478)),REJECT",
+      "AND,((NETWORK,UDP),(DST-PORT,5349)),REJECT",
+    ],
+  },
+  "quic-fallback": {
+    id: "quic-fallback",
+    kind: "mihomo",
+    name: PRESET_NAMES["quic-fallback"],
+    rules: ["AND,((NETWORK,UDP),(DST-PORT,443)),REJECT"],
+  },
 };
 
 export function mihomoProcessorPreset(id: MihomoProcessorPresetID): ProcessorDetail {
-  if (id === "ntp-direct") return orderedRuleProcessorPreset(NTP_DIRECT_PRESET);
+  if (isOrderedRulePresetID(id)) return orderedRuleProcessorPreset(ORDERED_RULE_PRESETS[id]);
   return {
     name: PRESET_NAMES[id],
     type: "merge",
@@ -165,13 +210,63 @@ export const mihomoProcessorPresets: readonly FileProcessorPreset[] = [
     "processors.filePreset.mihomo.tun.risk",
     true,
   ),
-  orderedRuleDescriptor(NTP_DIRECT_PRESET, true),
+  orderedRuleDescriptor(
+    ORDERED_RULE_PRESETS["ntp-direct"],
+    "network",
+    "processors.filePreset.ntpDirect.label",
+    "processors.filePreset.ntpDirect.description",
+    "processors.filePreset.ntpDirect.risk",
+    true,
+  ),
   descriptor(
     "fake-ip-compat",
     "network",
     "processor.mihomoPreset.fakeIpCompat",
     "processors.filePreset.mihomo.fakeIpCompat.description",
     "processors.filePreset.mihomo.fakeIpCompat.risk",
+  ),
+  orderedRuleDescriptor(
+    ORDERED_RULE_PRESETS["stun-block"],
+    "privacy",
+    "processors.filePreset.mihomo.stunBlock.label",
+    "processors.filePreset.mihomo.stunBlock.description",
+    "processors.filePreset.mihomo.stunBlock.risk",
+    false,
+    [],
+    ["udp-p2p-eim"],
+  ),
+  orderedRuleDescriptor(
+    ORDERED_RULE_PRESETS["quic-fallback"],
+    "network",
+    "processors.filePreset.mihomo.quicFallback.label",
+    "processors.filePreset.mihomo.quicFallback.description",
+    "processors.filePreset.mihomo.quicFallback.risk",
+  ),
+  descriptor(
+    "udp-p2p-eim",
+    "network",
+    "processors.filePreset.mihomo.udpP2pEim.label",
+    "processors.filePreset.mihomo.udpP2pEim.description",
+    "processors.filePreset.mihomo.udpP2pEim.risk",
+    false,
+    [],
+    ["stun-block"],
+  ),
+  descriptor(
+    "linux-tun-acceleration",
+    "platform",
+    "processors.filePreset.mihomo.linuxTunAcceleration.label",
+    "processors.filePreset.mihomo.linuxTunAcceleration.description",
+    "processors.filePreset.mihomo.linuxTunAcceleration.risk",
+    false,
+    ["tun"],
+  ),
+  descriptor(
+    "windows-relaxed-route",
+    "platform",
+    "processors.filePreset.mihomo.windowsRelaxedRoute.label",
+    "processors.filePreset.mihomo.windowsRelaxedRoute.description",
+    "processors.filePreset.mihomo.windowsRelaxedRoute.risk",
   ),
   descriptor(
     "tailscale-external",
@@ -207,6 +302,7 @@ function descriptor(
   riskKey: NonNullable<FileProcessorPreset["riskKey"]>,
   defaultOn = false,
   dependencies: readonly MihomoProcessorPresetID[] = [],
+  conflicts: readonly MihomoProcessorPresetID[] = [],
 ): FileProcessorPreset {
   const content = PRESET_CONTENT[id];
   return {
@@ -217,7 +313,7 @@ function descriptor(
     riskKey,
     defaultOn,
     dependencies,
-    conflicts: [],
+    conflicts,
     build: () => mihomoProcessorPreset(id),
     recognize: (processor) => (
       processor.type === "merge"
@@ -229,18 +325,28 @@ function descriptor(
 
 function orderedRuleDescriptor(
   options: OrderedRuleProcessorPresetOptions,
+  category: FileProcessorPresetCategory,
+  labelKey: FileProcessorPreset["labelKey"],
+  descriptionKey: FileProcessorPreset["descriptionKey"],
+  riskKey: NonNullable<FileProcessorPreset["riskKey"]>,
   defaultOn = false,
+  dependencies: readonly MihomoProcessorPresetID[] = [],
+  conflicts: readonly MihomoProcessorPresetID[] = [],
 ): FileProcessorPreset {
   return {
     id: options.id,
-    category: "network",
-    labelKey: "processors.filePreset.ntpDirect.label",
-    descriptionKey: "processors.filePreset.ntpDirect.description",
-    riskKey: "processors.filePreset.ntpDirect.risk",
+    category,
+    labelKey,
+    descriptionKey,
+    riskKey,
     defaultOn,
-    dependencies: [],
-    conflicts: [],
+    dependencies,
+    conflicts,
     build: () => orderedRuleProcessorPreset(options),
     recognize: (processor) => recognizeOrderedRuleProcessorPreset(processor, options),
   };
+}
+
+function isOrderedRulePresetID(id: MihomoProcessorPresetID): id is MihomoOrderedRuleProcessorPresetID {
+  return id === "ntp-direct" || id === "stun-block" || id === "quic-fallback";
 }

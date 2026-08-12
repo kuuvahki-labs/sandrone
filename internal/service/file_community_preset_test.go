@@ -99,6 +99,116 @@ func TestServiceCommunityPresetOrderedNTPUsesExactRawAssets(t *testing.T) {
 	}
 }
 
+func TestServiceCommunityPresetMihomoOrderedScenariosUseExactRawAsset(t *testing.T) {
+	script := communityPresetRawScript(t, "insert-mihomo-rules.js")
+	spec := domain.FileSpec{
+		Name:   "mihomo-scenarios.yaml",
+		Kind:   domain.FileKindMihomo,
+		Source: domain.FileSource{Type: "inline", Content: "{}\n"},
+		Config: &domain.FileConfig{Settings: raw(t, map[string]any{
+			"rules": []string{
+				"RULE-SET,private,DIRECT",
+				"MATCH,Proxy",
+			},
+		})},
+		Processors: []domain.ProcessorSpec{
+			orderedRuleProcessor(t, script, "stun-block", "STUN Block", `[
+				"AND,((NETWORK,UDP),(DST-PORT,3478)),REJECT",
+				"AND,((NETWORK,UDP),(DST-PORT,5349)),REJECT"
+			]`),
+			orderedRuleProcessor(t, script, "quic-fallback", "QUIC Fallback", `[
+				"AND,((NETWORK,UDP),(DST-PORT,443)),REJECT"
+			]`),
+		},
+	}
+
+	result, err := service.New().GetFile(context.Background(), domain.FileRequest{Spec: &spec})
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	doc := decodeMihomoCommunityPresetResult(t, result.Content)
+	require.Equal(t, []any{
+		"AND,((NETWORK,UDP),(DST-PORT,3478)),REJECT",
+		"AND,((NETWORK,UDP),(DST-PORT,5349)),REJECT",
+		"AND,((NETWORK,UDP),(DST-PORT,443)),REJECT",
+		"RULE-SET,private,DIRECT",
+		"MATCH,Proxy",
+	}, doc["rules"])
+	require.NotEqual(t, "off", doc["find-process-mode"])
+	require.False(t, hasCaseInsensitiveKeyFragment(doc, "keepalive"))
+}
+
+func TestServiceCommunityPresetMihomoMergeScenariosApplyExactFields(t *testing.T) {
+	tests := []struct {
+		name            string
+		processorName   string
+		content         string
+		wantTun         map[string]any
+		wantProcessMode string
+	}{
+		{
+			name:          "UDP P2P EIM",
+			processorName: "UDP/P2P EIM",
+			content: `# sandrone:mihomo-preset=udp-p2p-eim
+tun:
+  endpoint-independent-nat: true`,
+			wantTun: map[string]any{"endpoint-independent-nat": true},
+		},
+		{
+			name:          "Linux TUN acceleration",
+			processorName: "Linux/OpenWrt TUN Acceleration",
+			content: `# sandrone:mihomo-preset=linux-tun-acceleration
+find-process-mode: strict
+tun:
+  auto-route: true
+  auto-redirect: true`,
+			wantTun: map[string]any{
+				"auto-route":    true,
+				"auto-redirect": true,
+			},
+			wantProcessMode: "strict",
+		},
+		{
+			name:          "Windows relaxed route",
+			processorName: "Windows Relaxed Route",
+			content: `# sandrone:mihomo-preset=windows-relaxed-route
+tun:
+  strict-route: false`,
+			wantTun: map[string]any{"strict-route": false},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			spec := domain.FileSpec{
+				Name:   "mihomo-merge-scenario.yaml",
+				Kind:   domain.FileKindMihomo,
+				Source: domain.FileSource{Type: "inline", Content: "{}\n"},
+				Config: &domain.FileConfig{Settings: raw(t, map[string]any{
+					"rules": []string{"MATCH,Proxy"},
+				})},
+				Processors: []domain.ProcessorSpec{
+					mihomoMergeProcessor(t, test.processorName, test.content),
+				},
+			}
+
+			result, err := service.New().GetFile(context.Background(), domain.FileRequest{Spec: &spec})
+
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			doc := decodeMihomoCommunityPresetResult(t, result.Content)
+			require.Equal(t, test.wantTun, doc["tun"])
+			if test.wantProcessMode == "" {
+				require.NotContains(t, doc, "find-process-mode")
+			} else {
+				require.Equal(t, test.wantProcessMode, doc["find-process-mode"])
+			}
+			require.NotEqual(t, "off", doc["find-process-mode"])
+			require.False(t, hasCaseInsensitiveKeyFragment(doc, "keepalive"))
+		})
+	}
+}
+
 func TestServiceCommunityPresetOrderedNTPRejectsNoSafeAnchorWithoutPartial(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -247,18 +357,62 @@ func TestServiceCommunityPresetOrderedNTPRejectsManagedRequestArgOverrides(t *te
 
 func orderedNTPProcessor(t *testing.T, script, rulesJSON string) domain.ProcessorSpec {
 	t.Helper()
+	return orderedRuleProcessor(t, script, "ntp-direct", "Traditional NTP Direct", rulesJSON)
+}
+
+func orderedRuleProcessor(t *testing.T, script, presetID, name, rulesJSON string) domain.ProcessorSpec {
+	t.Helper()
 	return domain.ProcessorSpec{
-		Name:  "Traditional NTP Direct",
+		Name:  name,
 		Type:  "script",
 		Stage: domain.StageFile,
 		Params: params(t, map[string]any{
 			"source": inlineScriptSource(script),
 			"args": map[string]any{
-				"preset_id":  "ntp-direct",
+				"preset_id":  presetID,
 				"rules_json": rulesJSON,
 			},
 		}),
 	}
+}
+
+func mihomoMergeProcessor(t *testing.T, name, content string) domain.ProcessorSpec {
+	t.Helper()
+	return domain.ProcessorSpec{
+		Name:  name,
+		Type:  "merge",
+		Stage: domain.StageFile,
+		Params: params(t, map[string]any{
+			"mode":    "yaml_override",
+			"content": content,
+		}),
+	}
+}
+
+func decodeMihomoCommunityPresetResult(t *testing.T, body []byte) map[string]any {
+	t.Helper()
+	var doc map[string]any
+	require.NoError(t, yaml.Unmarshal(body, &doc))
+	return doc
+}
+
+func hasCaseInsensitiveKeyFragment(value any, fragment string) bool {
+	fragment = strings.ToLower(fragment)
+	switch typed := value.(type) {
+	case map[string]any:
+		for key, child := range typed {
+			if strings.Contains(strings.ToLower(key), fragment) || hasCaseInsensitiveKeyFragment(child, fragment) {
+				return true
+			}
+		}
+	case []any:
+		for _, child := range typed {
+			if hasCaseInsensitiveKeyFragment(child, fragment) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func communityPresetRawScript(t *testing.T, name string) string {

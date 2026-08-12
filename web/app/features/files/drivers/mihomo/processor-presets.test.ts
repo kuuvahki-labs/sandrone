@@ -1,7 +1,12 @@
 import { load } from "js-yaml";
 import { describe, expect, it } from "vitest";
 
-import { recognizedFileProcessorPresetID } from "~/features/files/drivers/core/processor-presets";
+import {
+  planFileProcessorPresetAddition,
+  recognizedFileProcessorPresetID,
+} from "~/features/files/drivers/core/processor-presets";
+import { enUS } from "~/shared/i18n/translations/en-US";
+import { zhCN } from "~/shared/i18n/translations/zh-CN";
 
 import {
   defaultMihomoProcessors,
@@ -113,24 +118,136 @@ describe("Mihomo processor presets", () => {
         ],
       },
     });
+
+    expect(presetContent("udp-p2p-eim")).toBe(`# sandrone:mihomo-preset=udp-p2p-eim
+tun:
+  endpoint-independent-nat: true`);
+    expect(presetYAML("udp-p2p-eim")).toEqual({
+      tun: { "endpoint-independent-nat": true },
+    });
+
+    expect(presetContent("linux-tun-acceleration")).toBe(`# sandrone:mihomo-preset=linux-tun-acceleration
+find-process-mode: strict
+tun:
+  auto-route: true
+  auto-redirect: true`);
+    expect(presetYAML("linux-tun-acceleration")).toEqual({
+      "find-process-mode": "strict",
+      tun: { "auto-route": true, "auto-redirect": true },
+    });
+
+    expect(presetContent("windows-relaxed-route")).toBe(`# sandrone:mihomo-preset=windows-relaxed-route
+tun:
+  strict-route: false`);
+    expect(presetYAML("windows-relaxed-route")).toEqual({
+      tun: { "strict-route": false },
+    });
   });
 
-  it("declares the existing dependency chain in the managed catalog", () => {
+  it("builds exact STUN and QUIC ordered-rule processors", () => {
+    expect(mihomoProcessorPreset("stun-block")).toMatchObject({
+      type: "script",
+      stage: "file",
+      params: {
+        source: { type: "inline", content: expect.any(String) },
+        args: {
+          preset_id: "stun-block",
+          rules_json: JSON.stringify([
+            "AND,((NETWORK,UDP),(DST-PORT,3478)),REJECT",
+            "AND,((NETWORK,UDP),(DST-PORT,5349)),REJECT",
+          ]),
+        },
+      },
+    });
+    expect(mihomoProcessorPreset("quic-fallback")).toMatchObject({
+      type: "script",
+      stage: "file",
+      params: {
+        source: { type: "inline", content: expect.any(String) },
+        args: {
+          preset_id: "quic-fallback",
+          rules_json: JSON.stringify([
+            "AND,((NETWORK,UDP),(DST-PORT,443)),REJECT",
+          ]),
+        },
+      },
+    });
+  });
+
+  it("declares the complete dependency, conflict, and default matrix", () => {
     expect(mihomoProcessorPresets.map((preset) => preset.id)).toEqual([
       "sniffer",
       "tun",
       "ntp-direct",
       "fake-ip-compat",
+      "stun-block",
+      "quic-fallback",
+      "udp-p2p-eim",
+      "linux-tun-acceleration",
+      "windows-relaxed-route",
       "tailscale-external",
       "tailnet-share",
     ]);
     expect(presetDescriptor("tailscale-external").dependencies).toEqual(["tun"]);
     expect(presetDescriptor("tailnet-share").dependencies).toEqual(["tun", "tailscale-external"]);
+    const scenarioIDs = [
+      "stun-block",
+      "quic-fallback",
+      "udp-p2p-eim",
+      "linux-tun-acceleration",
+      "windows-relaxed-route",
+    ] as const;
+    expect(scenarioIDs.map((id) => {
+      const preset = presetDescriptor(id);
+      return {
+        id,
+        defaultOn: preset.defaultOn,
+        dependencies: preset.dependencies,
+        conflicts: preset.conflicts,
+      };
+    })).toEqual([
+      { id: "stun-block", defaultOn: false, dependencies: [], conflicts: ["udp-p2p-eim"] },
+      { id: "quic-fallback", defaultOn: false, dependencies: [], conflicts: [] },
+      { id: "udp-p2p-eim", defaultOn: false, dependencies: [], conflicts: ["stun-block"] },
+      { id: "linux-tun-acceleration", defaultOn: false, dependencies: ["tun"], conflicts: [] },
+      { id: "windows-relaxed-route", defaultOn: false, dependencies: [], conflicts: [] },
+    ]);
+
+    const stunPlan = planFileProcessorPresetAddition(
+      mihomoProcessorPresets,
+      "stun-block",
+      [mihomoProcessorPreset("udp-p2p-eim")],
+    );
+    expect(stunPlan.removedPresetIDs).toEqual(["udp-p2p-eim"]);
+    const eimPlan = planFileProcessorPresetAddition(
+      mihomoProcessorPresets,
+      "udp-p2p-eim",
+      [mihomoProcessorPreset("stun-block")],
+    );
+    expect(eimPlan.removedPresetIDs).toEqual(["stun-block"]);
   });
 
-  it("recognizes only exact YAML override content, not a surviving marker", () => {
-    const preset = mihomoProcessorPreset("tailscale-external");
-    expect(recognizedFileProcessorPresetID(mihomoProcessorPresets, preset)).toBe("tailscale-external");
+  it("has no keepalive preset surface and never disables process lookup", () => {
+    const managedSurface = mihomoProcessorPresets.map((preset) => ({
+      id: preset.id,
+      labelKey: preset.labelKey,
+      labels: [enUS[preset.labelKey], zhCN[preset.labelKey]],
+      processor: preset.build(),
+    }));
+    const serialized = JSON.stringify(managedSurface).toLowerCase();
+
+    expect(serialized).not.toContain("keepalive");
+    expect(serialized).not.toContain("find-process-mode: off");
+  });
+
+  it.each([
+    "tailscale-external",
+    "udp-p2p-eim",
+    "linux-tun-acceleration",
+    "windows-relaxed-route",
+  ] as const)("recognizes only exact YAML override content for %s", (id) => {
+    const preset = mihomoProcessorPreset(id);
+    expect(recognizedFileProcessorPresetID(mihomoProcessorPresets, preset)).toBe(id);
     expect(recognizedFileProcessorPresetID(mihomoProcessorPresets, {
       ...preset,
       params: { ...preset.params, content: `${String(preset.params?.content)}\n# user edit` },
@@ -138,6 +255,20 @@ describe("Mihomo processor presets", () => {
     expect(recognizedFileProcessorPresetID(mihomoProcessorPresets, { ...preset, type: "script" })).toBeNull();
     expect(recognizedFileProcessorPresetID(mihomoProcessorPresets, { ...preset, params: { ...preset.params, mode: "yaml_overlay" } })).toBeNull();
   });
+
+  it.each(["stun-block", "quic-fallback"] as const)(
+    "recognizes only the exact ordered-rule processor for %s",
+    (id) => {
+      const preset = mihomoProcessorPreset(id);
+      expect(recognizedFileProcessorPresetID(mihomoProcessorPresets, preset)).toBe(id);
+      const params = preset.params as Record<string, unknown>;
+      const args = params.args as Record<string, unknown>;
+      expect(recognizedFileProcessorPresetID(mihomoProcessorPresets, {
+        ...preset,
+        params: { ...params, args: { ...args, rules_json: "[]" } },
+      })).toBeNull();
+    },
+  );
 });
 
 function presetDescriptor(id: MihomoProcessorPresetID) {
@@ -147,7 +278,11 @@ function presetDescriptor(id: MihomoProcessorPresetID) {
 }
 
 function presetYAML(id: MihomoProcessorPresetID): Record<string, unknown> {
+  return load(presetContent(id)) as Record<string, unknown>;
+}
+
+function presetContent(id: MihomoProcessorPresetID): string {
   const content = mihomoProcessorPreset(id).params?.content;
   expect(typeof content).toBe("string");
-  return load(String(content)) as Record<string, unknown>;
+  return String(content);
 }
