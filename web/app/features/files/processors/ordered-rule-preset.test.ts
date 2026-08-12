@@ -1,0 +1,201 @@
+import { runInNewContext } from "node:vm";
+
+import { describe, expect, it } from "vitest";
+
+import type { ProcessorDetail } from "~/shared/resources/types";
+
+import {
+  orderedRuleProcessorPreset,
+  type OrderedRuleProcessorPresetOptions,
+  recognizeOrderedRuleProcessorPreset,
+} from "./ordered-rule-preset";
+
+const CASES: readonly OrderedRuleProcessorPresetOptions[] = [
+  {
+    id: "ntp-direct",
+    kind: "mihomo",
+    name: "Traditional NTP Direct",
+    rules: ["AND,((NETWORK,UDP),(DST-PORT,123)),DIRECT"],
+  },
+  {
+    id: "ntp-direct",
+    kind: "sing-box",
+    name: "Traditional NTP Direct",
+    rules: [{ network: "udp", port: 123, outbound: "direct" }],
+  },
+  {
+    id: "ntp-direct",
+    kind: "shadowrocket",
+    name: "Traditional NTP Direct",
+    rules: ["AND,((PROTOCOL,UDP),(DST-PORT,123)),DIRECT"],
+  },
+];
+
+describe("ordered rule processor presets", () => {
+  it.each(CASES)("builds the exact editable $kind inline script params", (options) => {
+    const processor = orderedRuleProcessorPreset(options);
+
+    expect(processor).toEqual({
+      name: options.name,
+      type: "script",
+      stage: "file",
+      params: {
+        source: {
+          type: "inline",
+          content: expect.any(String),
+        },
+        args: {
+          preset_id: options.id,
+          rules_json: JSON.stringify(options.rules),
+        },
+      },
+    });
+    expect(inlineSource(processor)).toContain(`safe ${options.kind} rule anchor`);
+    expect(recognizeOrderedRuleProcessorPreset(processor, options)).toBe(true);
+  });
+
+  it.each(CASES)("requires exact source and args when recognizing $kind", (options) => {
+    const processor = orderedRuleProcessorPreset(options);
+    const params = processor.params as Record<string, unknown>;
+    const source = params.source as Record<string, unknown>;
+    const args = params.args as Record<string, unknown>;
+
+    expect(recognizeOrderedRuleProcessorPreset({
+      ...processor,
+      params: { ...params, source: { ...source, content: `${String(source.content)}\n// user edit` } },
+    }, options)).toBe(false);
+    expect(recognizeOrderedRuleProcessorPreset({
+      ...processor,
+      params: { ...params, args: { ...args, preset_id: "edited" } },
+    }, options)).toBe(false);
+    expect(recognizeOrderedRuleProcessorPreset({
+      ...processor,
+      params: { ...params, args: { ...args, rules_json: "[]" } },
+    }, options)).toBe(false);
+  });
+
+  it("prefers Mihomo private rule sets, then CN GeoIP, then MATCH", () => {
+    const rules = [
+      "DOMAIN,user.example,DIRECT",
+      "MATCH,Proxy",
+      "GEOIP,CN,DIRECT",
+      "RULE-SET,private,DIRECT",
+    ];
+
+    const output = runPreset(CASES[0], "rules:\n" + rules.map((rule) => `  - ${rule}`).join("\n") + "\n", yamlAPI());
+
+    expect(output).toContain([
+      "  - DOMAIN,user.example,DIRECT",
+      "  - MATCH,Proxy",
+      "  - GEOIP,CN,DIRECT",
+      "  - AND,((NETWORK,UDP),(DST-PORT,123)),DIRECT",
+      "  - RULE-SET,private,DIRECT",
+    ].join("\n"));
+  });
+
+  it("accepts a sing-box match-all route action and ignores non-final route actions", () => {
+    const content = JSON.stringify({
+      route: {
+        rules: [
+          { domain_suffix: ["user.example"], outbound: "direct" },
+          { action: "route", outbound: "service", network: "tcp" },
+          { action: "route", outbound: "Proxy" },
+        ],
+      },
+    });
+
+    const output = JSON.parse(runPreset(CASES[1], content, jsonAPI())) as {
+      route: { rules: unknown[] };
+    };
+
+    expect(output.route.rules).toEqual([
+      { domain_suffix: ["user.example"], outbound: "direct" },
+      { action: "route", outbound: "service", network: "tcp" },
+      { network: "udp", port: 123, outbound: "direct" },
+      { action: "route", outbound: "Proxy" },
+    ]);
+  });
+
+  it("inserts into the physical Shadowrocket Rule section that owns the preferred anchor", () => {
+    const document = {
+      bom: false,
+      newline: "\n",
+      trailing_newline: true,
+      preamble: [],
+      sections: [
+        { name: "Rule", lines: ["DOMAIN,user.example,DIRECT", "FINAL,First"] },
+        { name: "Host", lines: ["example.com = 192.0.2.1"] },
+        { name: "Rule", lines: ["IP-CIDR,10.0.0.0/8,DIRECT,no-resolve", "FINAL,Second"] },
+      ],
+    };
+
+    const output = JSON.parse(runPreset(CASES[2], JSON.stringify(document), iniModelAPI())) as typeof document;
+
+    expect(output.sections).toEqual([
+      { name: "Rule", lines: ["DOMAIN,user.example,DIRECT", "FINAL,First"] },
+      { name: "Host", lines: ["example.com = 192.0.2.1"] },
+      {
+        name: "Rule",
+        lines: [
+          "AND,((PROTOCOL,UDP),(DST-PORT,123)),DIRECT",
+          "IP-CIDR,10.0.0.0/8,DIRECT,no-resolve",
+          "FINAL,Second",
+        ],
+      },
+    ]);
+  });
+});
+
+function inlineSource(processor: ProcessorDetail): string {
+  const source = processor.params?.source as Record<string, unknown> | undefined;
+  if (typeof source?.content !== "string") throw new Error("expected inline script content");
+  return source.content;
+}
+
+function runPreset(
+  options: OrderedRuleProcessorPresetOptions,
+  content: string,
+  api: Record<string, unknown>,
+): string {
+  const processor = orderedRuleProcessorPreset(options);
+  const params = processor.params as {
+    args: Record<string, string>;
+  };
+  const input = { file: { content }, args: params.args };
+  const context: { api: Record<string, unknown>; input: typeof input; output?: typeof input } = {
+    api,
+    input,
+  };
+  runInNewContext(`${inlineSource(processor)}\nglobalThis.output = main(input, api);`, context);
+  if (!context.output) throw new Error("expected script output");
+  return context.output.file.content;
+}
+
+function jsonAPI(): Record<string, unknown> {
+  return {
+    json: {
+      parse: JSON.parse,
+      stringify: JSON.stringify,
+    },
+  };
+}
+
+function yamlAPI(): Record<string, unknown> {
+  return {
+    ...jsonAPI(),
+    yaml: {
+      parse: (content: string) => ({ rules: content.trim().split("\n").slice(1).map((line) => line.slice(4)) }),
+      stringify: (document: { rules: string[] }) => `rules:\n${document.rules.map((rule) => `  - ${rule}`).join("\n")}\n`,
+    },
+  };
+}
+
+function iniModelAPI(): Record<string, unknown> {
+  return {
+    ...jsonAPI(),
+    ini: {
+      parse: JSON.parse,
+      stringify: JSON.stringify,
+    },
+  };
+}

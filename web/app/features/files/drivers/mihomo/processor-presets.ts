@@ -1,9 +1,15 @@
 import type { FileProcessorPreset, FileProcessorPresetCategory } from "~/features/files/drivers/core/processor-presets";
+import {
+  orderedRuleProcessorPreset,
+  type OrderedRuleProcessorPresetOptions,
+  recognizeOrderedRuleProcessorPreset,
+} from "~/features/files/processors/ordered-rule-preset";
 import type { ProcessorDetail } from "~/shared/resources/types";
 
-export type MihomoProcessorPresetID = "sniffer" | "tun" | "fake-ip-compat" | "tailscale-external" | "tailnet-share";
+export type MihomoProcessorPresetID = "sniffer" | "tun" | "ntp-direct" | "fake-ip-compat" | "tailscale-external" | "tailnet-share";
+type MihomoMergeProcessorPresetID = Exclude<MihomoProcessorPresetID, "ntp-direct">;
 
-const PRESET_CONTENT: Record<MihomoProcessorPresetID, string> = {
+const PRESET_CONTENT: Record<MihomoMergeProcessorPresetID, string> = {
   sniffer: `# sandrone:mihomo-preset=sniffer
 sniffer!:
   enable: true
@@ -119,12 +125,21 @@ lan-allowed-ips+:
 const PRESET_NAMES: Record<MihomoProcessorPresetID, string> = {
   sniffer: "Sniffer",
   tun: "TUN",
+  "ntp-direct": "Traditional NTP Direct",
   "fake-ip-compat": "Fake-IP 兼容扩展",
   "tailscale-external": "Tailscale 共存",
   "tailnet-share": "Tailnet 代理共享",
 };
 
+const NTP_DIRECT_PRESET: OrderedRuleProcessorPresetOptions = {
+  id: "ntp-direct",
+  kind: "mihomo",
+  name: PRESET_NAMES["ntp-direct"],
+  rules: ["AND,((NETWORK,UDP),(DST-PORT,123)),DIRECT"],
+};
+
 export function mihomoProcessorPreset(id: MihomoProcessorPresetID): ProcessorDetail {
+  if (id === "ntp-direct") return orderedRuleProcessorPreset(NTP_DIRECT_PRESET);
   return {
     name: PRESET_NAMES[id],
     type: "merge",
@@ -150,6 +165,7 @@ export const mihomoProcessorPresets: readonly FileProcessorPreset[] = [
     "processors.filePreset.mihomo.tun.risk",
     true,
   ),
+  orderedRuleDescriptor(NTP_DIRECT_PRESET, true),
   descriptor(
     "fake-ip-compat",
     "network",
@@ -184,7 +200,7 @@ export function defaultMihomoProcessors(): ProcessorDetail[] {
 }
 
 function descriptor(
-  id: MihomoProcessorPresetID,
+  id: MihomoMergeProcessorPresetID,
   category: FileProcessorPresetCategory,
   labelKey: FileProcessorPreset["labelKey"],
   descriptionKey: FileProcessorPreset["descriptionKey"],
@@ -208,5 +224,23 @@ function descriptor(
       && processor.params?.mode === "yaml_override"
       && processor.params.content === content
     ),
+  };
+}
+
+function orderedRuleDescriptor(
+  options: OrderedRuleProcessorPresetOptions,
+  defaultOn = false,
+): FileProcessorPreset {
+  return {
+    id: options.id,
+    category: "network",
+    labelKey: "processors.filePreset.ntpDirect.label",
+    descriptionKey: "processors.filePreset.ntpDirect.description",
+    riskKey: "processors.filePreset.ntpDirect.risk",
+    defaultOn,
+    dependencies: [],
+    conflicts: [],
+    build: () => orderedRuleProcessorPreset(options),
+    recognize: (processor) => recognizeOrderedRuleProcessorPreset(processor, options),
   };
 }

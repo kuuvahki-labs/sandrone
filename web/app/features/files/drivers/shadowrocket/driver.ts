@@ -3,6 +3,10 @@ import { validateRemoteConfigSource } from "~/features/files/model/input-validat
 
 import { shadowrocketDefaultBase } from "./base";
 import { shadowrocketConfigurationAdapter } from "./configuration";
+import {
+  defaultShadowrocketProcessors,
+  shadowrocketProcessorPresets,
+} from "./processor-presets";
 
 export const shadowrocketFileDriverDefinition: FileDriverDefinition = {
   kind: "shadowrocket",
@@ -19,9 +23,9 @@ export const shadowrocketFileDriverDefinition: FileDriverDefinition = {
     validate: validateRemoteConfigSource,
   },
   processors: {
-    defaults: () => [],
+    defaults: defaultShadowrocketProcessors,
     mergeModes: ["ini_override"],
-    presets: [],
+    presets: shadowrocketProcessorPresets,
     validate: () => [],
   },
 };

@@ -11,8 +11,24 @@ import {
 } from "./processor-presets";
 
 describe("Mihomo processor presets", () => {
-  it("uses Sniffer then TUN as the new-file default chain", () => {
-    expect(defaultMihomoProcessors().map((processor) => processor.name)).toEqual(["Sniffer", "TUN"]);
+  it("uses Sniffer, TUN, then traditional NTP direct as the new-file default chain", () => {
+    expect(defaultMihomoProcessors().map((processor) => processor.name)).toEqual([
+      "Sniffer",
+      "TUN",
+      "Traditional NTP Direct",
+    ]);
+    expect(mihomoProcessorPreset("ntp-direct")).toMatchObject({
+      name: "Traditional NTP Direct",
+      type: "script",
+      stage: "file",
+      params: {
+        source: { type: "inline", content: expect.any(String) },
+        args: {
+          preset_id: "ntp-direct",
+          rules_json: JSON.stringify(["AND,((NETWORK,UDP),(DST-PORT,123)),DIRECT"]),
+        },
+      },
+    });
   });
 
   it("defines the complete editable YAML override contents", () => {
@@ -103,6 +119,7 @@ describe("Mihomo processor presets", () => {
     expect(mihomoProcessorPresets.map((preset) => preset.id)).toEqual([
       "sniffer",
       "tun",
+      "ntp-direct",
       "fake-ip-compat",
       "tailscale-external",
       "tailnet-share",
