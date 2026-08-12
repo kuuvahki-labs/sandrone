@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import SaveIcon from "@mui/icons-material/Save";
 import Alert from "@mui/material/Alert";
-import Button from "@mui/material/Button";
-import Paper from "@mui/material/Paper";
 
 import { settingsUpdateFromView } from "~/features/settings/model/project-settings";
 import type { ScheduledRefreshResourceChoice } from "~/features/settings/model/scheduled-refresh-targets";
@@ -45,6 +43,14 @@ export function SettingsRuntimePage({
       <PageHeader
         backAction={{ label: t("actions.back"), onSelect: onBack }}
         label=""
+        primaryAction={{
+          accessibleLabel: t("settings.save"),
+          icon: <SaveIcon aria-hidden fontSize="small" />,
+          label: t("actions.save"),
+          onSelect: () => void onSave(settingsUpdateFromView(draft)),
+          variant: "contained",
+        }}
+        sticky
         title={t("settings.advanced.title")}
       />
       {restartRequired.length > 0 ? (
@@ -72,17 +78,6 @@ export function SettingsRuntimePage({
         value={draft}
         onChange={(runtime) => setDraft((current) => ({ ...current, ...runtime }))}
       />
-      <Paper className="sticky bottom-14 z-10 flex justify-end p-3 min-[820px]:bottom-0" component="footer" elevation={4}>
-        <Button
-          aria-label={t("settings.save")}
-          startIcon={<SaveIcon aria-hidden />}
-          type="button"
-          variant="contained"
-          onClick={() => void onSave(settingsUpdateFromView(draft))}
-        >
-          {t("actions.save")}
-        </Button>
-      </Paper>
     </section>
   );
 }

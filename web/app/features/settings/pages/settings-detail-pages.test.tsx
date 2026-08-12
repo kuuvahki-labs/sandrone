@@ -73,7 +73,9 @@ describe("settings runtime page", () => {
       target: { value: "300" },
     });
 
-    const saveRuntimeDefaults = screen.getByRole("button", { name: "保存设置" });
+    const pageHeader = screen.getByRole("heading", { name: "高级设置" }).closest("header");
+    expect(pageHeader).not.toBeNull();
+    const saveRuntimeDefaults = within(pageHeader as HTMLElement).getByRole("button", { name: "保存设置" });
     await user.click(saveRuntimeDefaults);
 
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
