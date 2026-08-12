@@ -1,6 +1,7 @@
 /* eslint-disable unused-imports/no-unused-vars */
 
 function main(input, api) {
+  rejectManagedRequestArgOverrides(input);
   const presetID = stringArgument(input, "preset_id");
   const presetRules = api.json.parse(stringArgument(input, "rules_json"));
   if (!Array.isArray(presetRules) || presetRules.some((rule) => !isObject(rule))) {
@@ -24,6 +25,18 @@ function main(input, api) {
   const content = api.json.stringify(document);
   input.file.content = content;
   return input;
+}
+
+function rejectManagedRequestArgOverrides(input) {
+  const request = isObject(input) ? input.request : null;
+  const requestArgs = isObject(request) ? request.args : null;
+  if (!isObject(requestArgs)) return;
+  if (
+    Object.prototype.hasOwnProperty.call(requestArgs, "preset_id")
+    || Object.prototype.hasOwnProperty.call(requestArgs, "rules_json")
+  ) {
+    throw new Error("Sandrone preset arguments cannot be overridden by request args");
+  }
 }
 
 function firstAnchorIndex(rules) {

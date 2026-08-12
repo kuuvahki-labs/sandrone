@@ -162,6 +162,89 @@ func TestServiceCommunityPresetOrderedNTPRejectsNoSafeAnchorWithoutPartial(t *te
 	}
 }
 
+func TestServiceCommunityPresetOrderedNTPRejectsManagedRequestArgOverrides(t *testing.T) {
+	tests := []struct {
+		name      string
+		asset     string
+		kind      domain.FileKind
+		filename  string
+		rulesJSON string
+		settings  map[string]any
+	}{
+		{
+			name:      "Mihomo",
+			asset:     "insert-mihomo-rules.js",
+			kind:      domain.FileKindMihomo,
+			filename:  "managed-args.yaml",
+			rulesJSON: `["AND,((NETWORK,UDP),(DST-PORT,123)),DIRECT"]`,
+			settings: map[string]any{"rules": []string{
+				"RULE-SET,private,DIRECT",
+				"MATCH,Proxy",
+			}},
+		},
+		{
+			name:      "SingBox",
+			asset:     "insert-sing-box-rules.js",
+			kind:      domain.FileKindSingBox,
+			filename:  "managed-args.json",
+			rulesJSON: `[{"network":"udp","port":123,"outbound":"direct"}]`,
+			settings: map[string]any{"rules": []map[string]any{
+				{"rule_set": []string{"private"}, "outbound": "direct"},
+				{"outbound": "Proxy"},
+			}},
+		},
+		{
+			name:      "Shadowrocket",
+			asset:     "insert-shadowrocket-rules.js",
+			kind:      domain.FileKindShadowrocket,
+			filename:  "managed-args.conf",
+			rulesJSON: `["AND,((PROTOCOL,UDP),(DST-PORT,123)),DIRECT"]`,
+			settings: map[string]any{
+				"groups": []map[string]any{{"name": "Proxy", "type": "select", "proxies": []string{"DIRECT"}}},
+				"rules": []string{
+					"IP-CIDR,10.0.0.0/8,DIRECT,no-resolve",
+					"FINAL,Proxy",
+				},
+			},
+		},
+	}
+	overrides := []struct {
+		name  string
+		key   string
+		value string
+	}{
+		{name: "rules_json", key: "rules_json", value: `[]`},
+		{name: "preset_id", key: "preset_id", value: "request-controlled"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			for _, override := range overrides {
+				t.Run(override.name, func(t *testing.T) {
+					spec := domain.FileSpec{
+						Name:       test.filename,
+						Kind:       test.kind,
+						Config:     &domain.FileConfig{Settings: raw(t, test.settings)},
+						Processors: []domain.ProcessorSpec{orderedNTPProcessor(t, communityPresetRawScript(t, test.asset), test.rulesJSON)},
+					}
+
+					result, err := service.New().GetFile(context.Background(), domain.FileRequest{
+						Spec: &spec,
+						Request: domain.RequestInfo{Args: map[string]string{
+							override.key: override.value,
+						}},
+					})
+
+					require.Error(t, err)
+					require.Nil(t, result)
+					require.True(t, domain.IsCode(err, domain.CodeScriptRuntime), "got %v", err)
+					require.Contains(t, err.Error(), "Sandrone preset arguments cannot be overridden by request args")
+				})
+			}
+		})
+	}
+}
+
 func orderedNTPProcessor(t *testing.T, script, rulesJSON string) domain.ProcessorSpec {
 	t.Helper()
 	return domain.ProcessorSpec{
