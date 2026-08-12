@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 
@@ -351,6 +352,178 @@ tun:
 			require.False(t, hasCaseInsensitiveKeyFragment(doc, "keepalive"))
 		})
 	}
+}
+
+func TestServiceCommunityPresetMihomoTailscaleNativeGeneratesFullFile(t *testing.T) {
+	ctx := context.Background()
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+		Name:    "native-node",
+		Type:    domain.SubscriptionTypeLocal,
+		Format:  "uri-list",
+		Content: "ss://aes-128-gcm:example-password@example.com:8388#Native-Node",
+	}))
+	script := communityPresetRawScript(t, "mihomo-tailscale-native.js")
+	spec := domain.FileSpec{
+		Name: "mihomo-tailscale-native.yaml",
+		Kind: domain.FileKindMihomo,
+		Source: domain.FileSource{Type: "inline", Content: `dns:
+  fake-ip-filter:
+    - base.example
+    - +.ts.net
+    - +.ts.net
+  nameserver-policy:
+    existing.example: system
+tun:
+  route-exclude-address:
+    - 192.0.2.0/24
+    - 100.64.0.0/10
+    - fd7a:115c:a1e0::/48
+    - 100.64.0.0/10
+`},
+		Config: &domain.FileConfig{
+			Subscriptions: []string{"native-node"},
+			Settings: raw(t, map[string]any{
+				"rules": []string{
+					"DOMAIN,user.example,DIRECT",
+					"RULE-SET,private,DIRECT",
+					"MATCH,LockedFinal",
+				},
+			}),
+		},
+		Processors: []domain.ProcessorSpec{
+			mihomoTailscaleNativeProcessor(t, script),
+			mihomoTailscaleNativeProcessor(t, script),
+		},
+	}
+
+	result, err := svc.GetFile(ctx, domain.FileRequest{Spec: &spec})
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	doc := decodeMihomoCommunityPresetResult(t, result.Content)
+	proxies := requireAnySlice(t, doc["proxies"])
+	require.Len(t, proxies, 2)
+	require.Equal(t, "Native-Node", requireStringMap(t, proxies[0])["name"])
+	require.Equal(t, map[string]any{
+		"name":          "TAILSCALE",
+		"type":          "tailscale",
+		"ephemeral":     false,
+		"udp":           true,
+		"accept-routes": false,
+	}, requireStringMap(t, proxies[1]))
+	require.Equal(t, []any{
+		"DOMAIN,user.example,DIRECT",
+		"DOMAIN-SUFFIX,ts.net,TAILSCALE",
+		"IP-CIDR,100.64.0.0/10,TAILSCALE,no-resolve",
+		"IP-CIDR6,fd7a:115c:a1e0::/48,TAILSCALE,no-resolve",
+		"RULE-SET,private,DIRECT",
+		"MATCH,LockedFinal",
+	}, doc["rules"])
+	dns := requireStringMap(t, doc["dns"])
+	require.Equal(t, []any{"base.example", "+.ts.net"}, dns["fake-ip-filter"])
+	require.Equal(t, map[string]any{
+		"existing.example": "system",
+		"+.ts.net":         "100.100.100.100",
+	}, dns["nameserver-policy"])
+	tun := requireStringMap(t, doc["tun"])
+	require.Equal(t, []any{"192.0.2.0/24"}, tun["route-exclude-address"])
+	assertNoTailscaleSecretsOrExitNode(t, doc, result.Content)
+}
+
+func TestServiceCommunityPresetMihomoTailscaleExternalGeneratesDistinctFullFile(t *testing.T) {
+	ctx := context.Background()
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+		Name:    "external-node",
+		Type:    domain.SubscriptionTypeLocal,
+		Format:  "uri-list",
+		Content: "ss://aes-128-gcm:example-password@example.com:8388#External-Node",
+	}))
+	spec := domain.FileSpec{
+		Name: "mihomo-tailscale-external.yaml",
+		Kind: domain.FileKindMihomo,
+		Source: domain.FileSource{Type: "inline", Content: `dns:
+  fake-ip-filter:
+    - base.example
+tun:
+  route-exclude-address:
+    - 192.0.2.0/24
+`},
+		Config: &domain.FileConfig{
+			Subscriptions: []string{"external-node"},
+			Settings: raw(t, map[string]any{
+				"rules": []string{
+					"DOMAIN,user.example,DIRECT",
+					"RULE-SET,private,DIRECT",
+					"MATCH,LockedFinal",
+				},
+			}),
+		},
+		Processors: []domain.ProcessorSpec{mihomoMergeProcessor(t, "Tailscale 共存", `# sandrone:mihomo-preset=tailscale
+dns:
+  fake-ip-filter+:
+    - "+.ts.net"
+  nameserver-policy:
+    "<+.ts.net>": 100.100.100.100
+tun:
+  route-exclude-address+:
+    - 100.64.0.0/10
+    - fd7a:115c:a1e0::/48`)},
+	}
+
+	result, err := svc.GetFile(ctx, domain.FileRequest{Spec: &spec})
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	doc := decodeMihomoCommunityPresetResult(t, result.Content)
+	proxies := requireAnySlice(t, doc["proxies"])
+	require.Len(t, proxies, 1)
+	require.Equal(t, "External-Node", requireStringMap(t, proxies[0])["name"])
+	require.NotEqual(t, "tailscale", requireStringMap(t, proxies[0])["type"])
+	require.Equal(t, []any{
+		"DOMAIN,user.example,DIRECT",
+		"RULE-SET,private,DIRECT",
+		"MATCH,LockedFinal",
+	}, doc["rules"])
+	dns := requireStringMap(t, doc["dns"])
+	require.Equal(t, []any{"base.example", "+.ts.net"}, dns["fake-ip-filter"])
+	require.Equal(t, "100.100.100.100", requireStringMap(t, dns["nameserver-policy"])["+.ts.net"])
+	tun := requireStringMap(t, doc["tun"])
+	require.Equal(t, []any{"192.0.2.0/24", "100.64.0.0/10", "fd7a:115c:a1e0::/48"}, tun["route-exclude-address"])
+	assertNoTailscaleSecretsOrExitNode(t, doc, result.Content)
+}
+
+func TestServiceCommunityPresetMihomoTailscaleNativeRejectsIncompatibleNamedProxy(t *testing.T) {
+	ctx := context.Background()
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+		Name:    "incompatible-node",
+		Type:    domain.SubscriptionTypeLocal,
+		Format:  "uri-list",
+		Content: "ss://aes-128-gcm:example-password@example.com:8388#TAILSCALE",
+	}))
+	spec := domain.FileSpec{
+		Name:   "mihomo-tailscale-incompatible.yaml",
+		Kind:   domain.FileKindMihomo,
+		Source: domain.FileSource{Type: "inline", Content: "dns: {}\ntun: {}\n"},
+		Config: &domain.FileConfig{
+			Subscriptions: []string{"incompatible-node"},
+			Settings: raw(t, map[string]any{
+				"rules": []string{"MATCH,LockedFinal"},
+			}),
+		},
+		Processors: []domain.ProcessorSpec{
+			mihomoTailscaleNativeProcessor(t, communityPresetRawScript(t, "mihomo-tailscale-native.js")),
+		},
+	}
+
+	result, err := svc.GetFile(ctx, domain.FileRequest{Spec: &spec})
+
+	require.Nil(t, result)
+	require.Error(t, err)
+	require.True(t, domain.IsCode(err, domain.CodeScriptRuntime), "got %v", err)
+	require.Contains(t, err.Error(), "Sandrone Mihomo Tailscale native preset found incompatible proxy named TAILSCALE")
 }
 
 func TestServiceCommunityPresetSingBoxStructureScenariosUseExactRawAsset(t *testing.T) {
@@ -753,6 +926,18 @@ func mihomoMergeProcessor(t *testing.T, name, content string) domain.ProcessorSp
 	}
 }
 
+func mihomoTailscaleNativeProcessor(t *testing.T, script string) domain.ProcessorSpec {
+	t.Helper()
+	return domain.ProcessorSpec{
+		Name:  "Tailscale 原生接管",
+		Type:  "script",
+		Stage: domain.StageFile,
+		Params: params(t, map[string]any{
+			"source": inlineScriptSource(script),
+		}),
+	}
+}
+
 func shadowrocketINIOverrideProcessor(t *testing.T, name, content string) domain.ProcessorSpec {
 	t.Helper()
 	return domain.ProcessorSpec{
@@ -861,6 +1046,14 @@ func hasCaseInsensitiveKeyFragment(value any, fragment string) bool {
 		}
 	}
 	return false
+}
+
+func assertNoTailscaleSecretsOrExitNode(t *testing.T, doc map[string]any, body []byte) {
+	t.Helper()
+	for _, fragment := range []string{"auth_key", "auth-key", "control_url", "control-url", "exit_node", "exit-node"} {
+		require.False(t, hasCaseInsensitiveKeyFragment(doc, fragment), "unexpected key fragment %q", fragment)
+		require.NotContains(t, strings.ToLower(string(body)), fragment)
+	}
 }
 
 func communityPresetRawScript(t *testing.T, name string) string {
