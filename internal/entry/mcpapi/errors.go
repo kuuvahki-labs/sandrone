@@ -70,13 +70,11 @@ func newToolErrorResult(err error, context toolErrorContext) *mcp.CallToolResult
 	}
 	envelope := toolErrorEnvelope{Error: detail}
 	text := fmt.Sprintf("%s: %s", detail.Code, detail.Message)
-	safeErr := errors.New(text)
-	result := &mcp.CallToolResult{
+	return &mcp.CallToolResult{
+		IsError:           true,
+		Content:           []mcp.Content{&mcp.TextContent{Text: text}},
 		StructuredContent: envelope,
 	}
-	result.SetError(safeErr)
-	result.Content = []mcp.Content{&mcp.TextContent{Text: text}}
-	return result
 }
 
 func publicErrorSource(source string) string {

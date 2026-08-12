@@ -3,7 +3,6 @@ package mcpapi
 import (
 	"encoding/json"
 	"os"
-	"os/exec"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -11,34 +10,6 @@ import (
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
-
-func TestToolErrorCompatibilityModeDoesNotExposeCause(t *testing.T) {
-	command := exec.Command(os.Args[0], "-test.run=TestToolErrorCompatibilityHelper")
-	command.Env = append(os.Environ(),
-		"MCPGODEBUG=seterroroverwrite=1",
-		"SANDRONE_TEST_MCP_ERROR_HELPER=1",
-	)
-	output, err := command.CombinedOutput()
-	require.NoError(t, err, string(output))
-	require.NotContains(t, string(output), "cause-secret")
-	require.Contains(t, string(output), "processor_config_invalid")
-}
-
-func TestToolErrorCompatibilityHelper(t *testing.T) {
-	if os.Getenv("SANDRONE_TEST_MCP_ERROR_HELPER") != "1" {
-		t.Skip("subprocess helper")
-	}
-	result := newToolErrorResult(&domain.AppError{
-		Code:      domain.CodeProcessorConfigInvalid,
-		Message:   "invalid processor configuration",
-		Processor: "rename",
-		Cause:     sensitiveTestError("cause-secret"),
-	}, toolErrorContext{})
-	body, err := json.Marshal(result)
-	require.NoError(t, err)
-	_, err = os.Stdout.Write(body)
-	require.NoError(t, err)
-}
 
 func TestToolErrorPreservesNonURLSource(t *testing.T) {
 	result := newToolErrorResult(&domain.AppError{
@@ -82,7 +53,3 @@ func TestToolErrorSanitizesBarePathNotExist(t *testing.T) {
 		require.NotContains(t, public, privateOp)
 	}
 }
-
-type sensitiveTestError string
-
-func (err sensitiveTestError) Error() string { return string(err) }

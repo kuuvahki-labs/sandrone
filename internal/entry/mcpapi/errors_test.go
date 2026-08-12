@@ -319,10 +319,13 @@ func callStructuredToolError(
 	result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: tool, Arguments: arguments})
 	require.NoError(t, err)
 	require.True(t, result.IsError)
-	require.NotEmpty(t, result.Content)
+	require.Len(t, result.Content, 1)
+	text, ok := result.Content[0].(*mcp.TextContent)
+	require.True(t, ok)
 	bodyJSON, err := json.Marshal(result.StructuredContent)
 	require.NoError(t, err)
 	var body structuredToolError
 	require.NoError(t, json.Unmarshal(bodyJSON, &body))
+	require.Equal(t, body.Error.Code+": "+body.Error.Message, text.Text)
 	return body
 }
