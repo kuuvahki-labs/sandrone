@@ -82,15 +82,18 @@ YAML、JSON、INI override 能力。本设计将社区实践拆成可审阅的�
 
 ### 两类处理器
 
-仅修改设置或结构字段的预设生成普通 merge 处理器：
+仅修改设置或结构字段、且 merge 能精确定位而不会覆盖用户数组的预设生成普通
+merge 处理器：
 
 - Mihomo 使用 yaml_override；
 - sing-box 使用 json_override；
 - Shadowrocket 使用 ini_override。
 
-需要把规则放在特定语义层之间的预设生成现有 file-stage inline script 处理器。
-脚本使用 Sandrone sandbox 中已有的 YAML/INI API 和内建 JSON，不引入新的
-处理器类型。
+需要把规则放在特定语义层之间，或需要安全修改数组中某个具名元素的预设，生成
+现有 file-stage inline script 处理器。后者包括 sing-box 的 TUN inbound、DNS
+server 和 Tailscale endpoint 等数组结构；使用 JSON override 整体替换这些数组会
+吞掉用户的其它元素。脚本使用 Sandrone sandbox 中已有的 YAML/INI API 和内建
+JSON，不引入新的处理器类型。
 采用脚本是因为 override 数组操作只能前插、后插或整体替换，无法安全实现：
 
 1. 用户规则；
@@ -345,8 +348,10 @@ Headscale 或自定义控制服务器预设。
 MagicDNS 只处理 Tailnet 名称，不作为普通查询的全局 DNS：
 
 - Mihomo 只将 ts.net 相关名称交给 100.100.100.100，并排除对应 fake IP；
-- sing-box 使用固定目标版本官方提供的 MagicDNS-only Tailscale DNS 模式，
-  不接受默认 resolver 作为普通查询 fallback；
+- sing-box 使用固定目标 v1.13.14 官方提供的 MagicDNS-only Tailscale DNS 模式：
+  DNS server 关闭默认 resolver，并使用该版本的 `ip_accept_any` DNS 规则写法；
+  不使用 v1.14.0 才加入 DNS 规则的 `preferred_by`，也不接受默认 resolver 作为
+  普通查询 fallback；
 - Shadowrocket 按其 TAILSCALE policy 能力生成规则，不新增全局 DNS 接管。
 
 ### 子网路由和 Exit Node
