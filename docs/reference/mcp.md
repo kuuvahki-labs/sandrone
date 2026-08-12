@@ -5,12 +5,40 @@ resources、prompts、输出限制与安全边界。启动 flags 见 [CLI 参考
 领域字段继续以 [FileSpec](file-spec.md)、[Processors](processors.md)、
 [脚本 API](scripting-api.md)和 [HTTP API](http-api/README.md)为准。
 
-## Streamable HTTP 与启动
+## 协议版本与 Streamable HTTP
 
-Sandrone 的 MCP server 使用 Streamable HTTP。`sandrone serve mcp` 启动只挂载
-MCP 的 HTTP listener；`sandrone serve all` 在同一个 listener 上同时提供 HTTP
-API、可选 Web UI 和 MCP。`--path` 可以修改 MCP 路径，但必须以 `/` 开头。
-handler 使用 JSON response mode，并复用 HTTP server 的静态 bearer token：
+Sandrone 只接受并广告 MCP `2026-07-28`，不与旧版本协商。客户端先用
+`server/discover` 读取 server identity、能力和唯一支持版本，随后直接发送无状态
+请求；不发送 `initialize` 或 `notifications/initialized`。每个请求的 `_meta` 都要
+包含：
+
+- `io.modelcontextprotocol/protocolVersion: "2026-07-28"`；
+- `io.modelcontextprotocol/clientInfo`；
+- `io.modelcontextprotocol/clientCapabilities`。
+
+旧 `initialize` 请求会收到 JSON-RPC `UnsupportedProtocolVersion`（`-32022`），
+其 `data.supported` 只有 `2026-07-28`。缺少当前协议所需 metadata 的请求不会回退
+到旧初始化流程。
+
+MCP endpoint 使用 JSON response mode 的无状态 Streamable HTTP。每个 POST 都是
+完整请求生命周期，server 不签发、读取或要求 `Mcp-Session-Id`；独立 GET 与
+DELETE 返回 `405 Method Not Allowed`。请求取消会传递到正在执行的 Sandrone
+service 调用。单个请求体上限为官方 Go SDK 的 `4 MiB`，超限返回 HTTP `413`。
+
+`2026-07-28` 请求必须用标准 HTTP header 镜像 JSON-RPC body：
+
+- `Mcp-Protocol-Version` 必须是 `2026-07-28`；
+- `Mcp-Method` 必须精确匹配 body 的 method；
+- `tools/call`、`prompts/get` 和 `resources/read` 还必须用 `Mcp-Name` 精确匹配
+  tool 名、prompt 名或 resource URI。
+
+header 与 body 不一致时返回 JSON-RPC `HeaderMismatch`（`-32020`）和 HTTP
+`400`。Sandrone 当前 schema 没有 `x-mcp-header` 参数，因此不定义
+`Mcp-Param-*` routing hint。
+
+`sandrone serve mcp` 启动只挂载 MCP 的 HTTP listener；`sandrone serve all` 在
+同一个 listener 上同时提供 HTTP API、可选 Web UI 和 MCP。`--path` 可以修改
+MCP 路径，但必须以 `/` 开头。handler 复用 HTTP server 的静态 bearer token：
 
 ```http
 Authorization: Bearer <token>
@@ -19,6 +47,30 @@ Authorization: Bearer <token>
 只要配置了 token，该 header 就必须精确匹配。绑定非 loopback 地址时必须提供
 token；完整启动与鉴权规则见 [CLI 参考的 serve 章节](cli.md#serve)和
 [HTTP API 鉴权](http-api/README.md#鉴权)。
+
+## 能力与缓存
+
+Sandrone 只广告 `tools`、`resources` 和 `prompts`。三者的 `listChanged` 都为
+`false`，resource `subscribe` 为 `false`。不广告 Logging、Roots、Sampling、
+Completions、实验能力或 extension，也不打开列表变更流；catalog 在 server 构建
+完成后保持固定。
+
+所有 cacheable result 都明确使用 `private`，防止共享缓存跨客户端复用经过鉴权的
+Sandrone metadata 或定义：
+
+| result | `ttlMs` | `cacheScope` |
+| --- | ---: | --- |
+| `server/discover` | `300000` | `private` |
+| `tools/list` | `300000` | `private` |
+| `prompts/list` | `300000` | `private` |
+| `resources/list` | `300000` | `private` |
+| `resources/templates/list` | `300000` | `private` |
+| `resources/read` | `0` | `private` |
+
+成功响应由 SDK 标记 `resultType: "complete"`，并在 `_meta` 的
+`io.modelcontextprotocol/serverInfo` 中携带 Sandrone identity。`resources/read`
+使用零 TTL，因为保存的 subscription 和 FileSpec 定义可能随时变化且可能包含
+凭据；调用方每次使用前都应重新读取。
 
 ## Agent Skill
 
