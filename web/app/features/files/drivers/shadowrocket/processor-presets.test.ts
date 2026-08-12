@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { recognizedFileProcessorPresetID } from "~/features/files/drivers/core/processor-presets";
+import {
+  planFileProcessorPresetAddition,
+  recognizedFileProcessorPresetID,
+} from "~/features/files/drivers/core/processor-presets";
 import { enUS } from "~/shared/i18n/translations/en-US";
 import { zhCN } from "~/shared/i18n/translations/zh-CN";
 
@@ -62,6 +65,7 @@ describe("Shadowrocket processor presets", () => {
       "disable-ipv6",
       "udp-unsupported-direct",
       "restricted-network-dns-fallback",
+      "tailscale-native",
     ]);
     expect(SCENARIOS.map(({ id }) => {
       const descriptor = presetDescriptor(id);
@@ -75,11 +79,77 @@ describe("Shadowrocket processor presets", () => {
       id,
       defaultOn: false,
       dependencies: [],
-      conflicts: [],
+      conflicts: id === "webrtc-privacy" ? ["tailscale-native"] : [],
     })));
     expect(defaultShadowrocketProcessors().map((processor) => processor.name)).toEqual([
       "Traditional NTP Direct",
     ]);
+  });
+
+  it("builds the exact native Tailscale ordered rules without a module warning", () => {
+    const descriptor = presetDescriptor("tailscale-native");
+    const processor = descriptor.build();
+
+    expect(processor).toEqual({
+      name: "Tailscale 原生接管",
+      type: "script",
+      stage: "file",
+      params: {
+        source: { type: "inline", content: expect.any(String) },
+        args: {
+          preset_id: "tailscale-native",
+          rules_json: JSON.stringify([
+            "DOMAIN-SUFFIX,ts.net,TAILSCALE",
+            "IP-CIDR,100.64.0.0/10,TAILSCALE,no-resolve",
+            "IP-CIDR,fd7a:115c:a1e0::/48,TAILSCALE,no-resolve",
+          ]),
+        },
+      },
+    });
+    expect(descriptor).toMatchObject({
+      category: "tailscale",
+      defaultOn: false,
+      dependencies: [],
+      conflicts: ["webrtc-privacy"],
+    });
+    expect(recognizedFileProcessorPresetID(shadowrocketProcessorPresets, processor))
+      .toBe("tailscale-native");
+    expect(`${enUS[descriptor.descriptionKey]} ${enUS[descriptor.riskKey!]}`.toLowerCase())
+      .not.toContain("module");
+    expect(`${zhCN[descriptor.descriptionKey]} ${zhCN[descriptor.riskKey!]}`)
+      .not.toContain("模块");
+  });
+
+  it("replaces managed WebRTC privacy and Tailscale reciprocally but preserves edits", () => {
+    const tailscale = presetDescriptor("tailscale-native").build();
+    const privacy = presetDescriptor("webrtc-privacy").build();
+    const editedPrivacy = {
+      ...privacy,
+      params: { ...privacy.params, content: `${String(privacy.params?.content)}\n# user edit` },
+    };
+    expect(presetDescriptor("webrtc-privacy").conflicts).toEqual(["tailscale-native"]);
+
+    const nativePlan = planFileProcessorPresetAddition(
+      shadowrocketProcessorPresets,
+      "tailscale-native",
+      [editedPrivacy, privacy],
+    );
+    expect(nativePlan.removeIndices).toEqual([1]);
+    expect(nativePlan.removedPresetIDs).toEqual(["webrtc-privacy"]);
+    expect(nativePlan.additions).toEqual([tailscale]);
+
+    const stunPlan = planFileProcessorPresetAddition(
+      shadowrocketProcessorPresets,
+      "webrtc-privacy",
+      [tailscale],
+    );
+    expect(stunPlan.removedPresetIDs).toEqual(["tailscale-native"]);
+
+    expect(planFileProcessorPresetAddition(
+      shadowrocketProcessorPresets,
+      "tailscale-native",
+      [tailscale],
+    ).additions).toEqual([]);
   });
 
   it.each(SCENARIOS)("recognizes only the exact INI override for $id", ({ id }) => {

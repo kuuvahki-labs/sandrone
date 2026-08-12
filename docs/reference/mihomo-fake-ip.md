@@ -181,33 +181,11 @@ dns:
 
 ## Tailscale 与 MagicDNS
 
-Tailscale 兼容是 Web 中的可选 processor preset，不属于新建默认。添加 `Tailscale 共存` 时，Web 会确保 `TUN` 在前，并追加：
-
-```yaml
-dns:
-  fake-ip-filter:
-    - "+.tailscale.com"
-    - "+.ts.net"
-  nameserver-policy:
-    "<+.ts.net>": 100.100.100.100
-
-tun:
-  route-exclude-address:
-    - 100.64.0.0/10
-    - fd7a:115c:a1e0::/48
-```
-
-preset 使用 `yaml_override` 的 `+` 运算追加数组，实际保存内容中的键为 `fake-ip-filter+` 与 `route-exclude-address+`；上面展示的是 merge 后的语义。
-
-这些设置分别处理三个边界：
-
-1. `+.tailscale.com` 与 `+.ts.net` 请求真实解析；
-2. `<host>.<tailnet>.ts.net` 的查询由 `nameserver-policy` 指向 Tailscale resolver；
-3. Tailscale IPv4/IPv6 地址从 Mihomo TUN 自动路由中排除。
-
-`+.tailscale.com` 不匹配 `*.ts.net`，而 `+.ts.net` 也不能单独保证系统已接受 Tailscale DNS 设置。MagicDNS 同时支持单标签 machine name 和 `<machine>.<tailnet>.ts.net` FQDN，并依赖客户端/系统 resolver 与 search domain；见 Tailscale [MagicDNS](https://tailscale.com/docs/features/magicdns)和 [DNS 参考](https://tailscale.com/docs/reference/dns-in-tailscale)。
-
-若还要从 tailnet 设备访问 Mihomo 的 LAN 入站，需要另加 `Tailnet 代理共享`。它在上述依赖之后把 `100.64.0.0/10`、`fd7a:115c:a1e0::/48` 追加到 `lan-allowed-ips`。DNS 解析、TUN 目标绕行和入站来源 ACL 是彼此独立的三项配置。
+Tailscale 模式、MagicDNS、规则、标准地址段、依赖与风险统一见
+[社区配置预设](community-config-presets.md#tailscale-三态与安全边界)。本页只强调
+fake-IP 边界：`+.ts.net` 例外决定 Tailnet FQDN 是否获得真实 DNS 结果，不会单独
+选择 TAILSCALE 路由、排除 TUN 地址或放宽 LAN 入站；应检查最终渲染结果中的 DNS
+与连接路径，而不是只看 `fake-ip-filter`。
 
 ## 何时修改
 

@@ -746,6 +746,233 @@ func TestServiceCommunityPresetSingBoxOrderedScenariosUseExactRawAsset(t *testin
 	}, route["rules"])
 }
 
+func TestServiceCommunityPresetSingBoxTailscaleNativeGeneratesFullFile(t *testing.T) {
+	ctx := context.Background()
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+		Name:    "sing-box-native-node",
+		Type:    domain.SubscriptionTypeLocal,
+		Format:  "uri-list",
+		Content: "ss://aes-128-gcm:example-password@example.com:8388#Native-Node",
+	}))
+	script := communityPresetRawScript(t, "sing-box-tailscale-native.js")
+	processor := singBoxTailscaleProcessor(t, "Tailscale 原生接管", script)
+	spec := domain.FileSpec{
+		Name: "sing-box-tailscale-native.json",
+		Kind: domain.FileKindSingBox,
+		Source: domain.FileSource{Type: "inline", Content: `{
+			"dns": {
+				"servers": [{"type":"local","tag":"dns-local"}],
+				"rules": [{"domain_suffix":["user-dns.example"],"server":"dns-local"}],
+				"final": "LockedDNSFinal"
+			},
+			"inbounds": [{
+				"type":"tun",
+				"tag":"tun-in",
+				"address":["172.19.0.1/30","fdfe:dcba:9876::1/126"],
+				"route_exclude_address":["192.0.2.0/24","100.64.0.0/10","fd7a:115c:a1e0::/48","100.64.0.0/10"]
+			}],
+			"outbounds": [],
+			"endpoints": [],
+			"route": {"final":"LockedRouteFinal","rule_set":[],"rules":[]}
+		}`},
+		Config: &domain.FileConfig{
+			Subscriptions: []string{"sing-box-native-node"},
+			Settings: raw(t, map[string]any{
+				"rules": []map[string]any{
+					{"domain_suffix": []string{"user.example"}, "outbound": "direct"},
+					{"rule_set": []string{"private"}, "outbound": "direct"},
+					{"outbound": "LockedFinal"},
+				},
+			}),
+		},
+		Processors: []domain.ProcessorSpec{processor, processor},
+	}
+
+	result, err := svc.GetFile(ctx, domain.FileRequest{Spec: &spec})
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	doc := decodeSingBoxCommunityPresetResult(t, result.Content)
+	outbounds := requireAnySlice(t, doc["outbounds"])
+	node := requireStringMapWithField(t, outbounds, "tag", "Native-Node")
+	require.Equal(t, "shadowsocks", node["type"])
+	require.Equal(t, []any{
+		map[string]any{
+			"type":          "tailscale",
+			"tag":           "ts-ep",
+			"ephemeral":     false,
+			"accept_routes": false,
+		},
+	}, doc["endpoints"])
+	dns := requireStringMap(t, doc["dns"])
+	require.Equal(t, "LockedDNSFinal", dns["final"])
+	require.Equal(t, []any{
+		map[string]any{"type": "local", "tag": "dns-local"},
+		map[string]any{
+			"type":                     "tailscale",
+			"tag":                      "ts-dns",
+			"endpoint":                 "ts-ep",
+			"accept_default_resolvers": false,
+		},
+	}, dns["servers"])
+	require.Equal(t, []any{
+		map[string]any{"domain_suffix": []any{"user-dns.example"}, "server": "dns-local"},
+		map[string]any{"ip_accept_any": true, "server": "ts-dns"},
+	}, dns["rules"])
+	inbounds := requireAnySlice(t, doc["inbounds"])
+	require.Equal(t, []any{"192.0.2.0/24"}, requireStringMap(t, inbounds[0])["route_exclude_address"])
+	route := requireStringMap(t, doc["route"])
+	require.Equal(t, "LockedRouteFinal", route["final"])
+	require.Equal(t, []any{
+		map[string]any{"domain_suffix": []any{"user.example"}, "outbound": "direct"},
+		map[string]any{
+			"preferred_by": []any{"ts-ep"},
+			"action":       "route",
+			"outbound":     "ts-ep",
+		},
+		map[string]any{"rule_set": []any{"private"}, "outbound": "direct"},
+		map[string]any{"outbound": "LockedFinal"},
+	}, route["rules"])
+	assertNoTailscaleSecretsOrExitNode(t, doc, result.Content)
+}
+
+func TestServiceCommunityPresetSingBoxTailscaleExternalGeneratesDistinctFullFile(t *testing.T) {
+	ctx := context.Background()
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+		Name:    "sing-box-external-node",
+		Type:    domain.SubscriptionTypeLocal,
+		Format:  "uri-list",
+		Content: "ss://aes-128-gcm:example-password@example.com:8388#External-Node",
+	}))
+	script := communityPresetRawScript(t, "sing-box-tailscale-external.js")
+	processor := singBoxTailscaleProcessor(t, "Tailscale 共存", script)
+	spec := domain.FileSpec{
+		Name: "sing-box-tailscale-external.json",
+		Kind: domain.FileKindSingBox,
+		Source: domain.FileSource{Type: "inline", Content: `{
+			"dns": {
+				"servers": [{"type":"local","tag":"dns-local"}],
+				"rules": [{"domain_suffix":["user-dns.example"],"server":"dns-local"}],
+				"final": "LockedDNSFinal"
+			},
+			"inbounds": [{
+				"type":"tun",
+				"tag":"tun-in",
+				"address":["172.19.0.1/30","fdfe:dcba:9876::1/126"],
+				"route_exclude_address":["192.0.2.0/24","100.64.0.0/10","100.64.0.0/10"]
+			}],
+			"outbounds": [],
+			"endpoints": [],
+			"route": {"final":"LockedRouteFinal","rule_set":[],"rules":[]}
+		}`},
+		Config: &domain.FileConfig{
+			Subscriptions: []string{"sing-box-external-node"},
+			Settings: raw(t, map[string]any{
+				"rules": []map[string]any{
+					{"domain_suffix": []string{"user.example"}, "outbound": "direct"},
+					{"rule_set": []string{"private"}, "outbound": "direct"},
+					{"outbound": "LockedFinal"},
+				},
+			}),
+		},
+		Processors: []domain.ProcessorSpec{processor, processor},
+	}
+
+	result, err := svc.GetFile(ctx, domain.FileRequest{Spec: &spec})
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	doc := decodeSingBoxCommunityPresetResult(t, result.Content)
+	outbounds := requireAnySlice(t, doc["outbounds"])
+	node := requireStringMapWithField(t, outbounds, "tag", "External-Node")
+	require.Equal(t, "shadowsocks", node["type"])
+	require.Empty(t, requireAnySlice(t, doc["endpoints"]))
+	dns := requireStringMap(t, doc["dns"])
+	require.Equal(t, "LockedDNSFinal", dns["final"])
+	require.Equal(t, []any{
+		map[string]any{"type": "local", "tag": "dns-local"},
+		map[string]any{"type": "udp", "tag": "ts-dns", "server": "100.100.100.100"},
+	}, dns["servers"])
+	require.Equal(t, []any{
+		map[string]any{"domain_suffix": []any{"user-dns.example"}, "server": "dns-local"},
+		map[string]any{
+			"domain_suffix": []any{"ts.net"},
+			"action":        "route",
+			"server":        "ts-dns",
+		},
+	}, dns["rules"])
+	inbounds := requireAnySlice(t, doc["inbounds"])
+	require.Equal(t, []any{
+		"192.0.2.0/24",
+		"100.64.0.0/10",
+		"fd7a:115c:a1e0::/48",
+	}, requireStringMap(t, inbounds[0])["route_exclude_address"])
+	route := requireStringMap(t, doc["route"])
+	require.Equal(t, "LockedRouteFinal", route["final"])
+	require.Equal(t, []any{
+		map[string]any{"domain_suffix": []any{"user.example"}, "outbound": "direct"},
+		map[string]any{"rule_set": []any{"private"}, "outbound": "direct"},
+		map[string]any{"outbound": "LockedFinal"},
+	}, route["rules"])
+	assertNoTailscaleSecretsOrExitNode(t, doc, result.Content)
+}
+
+func TestServiceCommunityPresetShadowrocketTailscaleNativeGeneratesFullFile(t *testing.T) {
+	ctx := context.Background()
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+		Name:    "shadowrocket-native-node",
+		Type:    domain.SubscriptionTypeLocal,
+		Format:  "uri-list",
+		Content: "ss://aes-128-gcm:example-password@example.com:8388#Shadow-Node",
+	}))
+	script := communityPresetRawScript(t, "insert-shadowrocket-rules.js")
+	processor := orderedRuleProcessor(t, script, "tailscale-native", "Tailscale 原生接管", `[
+		"DOMAIN-SUFFIX,ts.net,TAILSCALE",
+		"IP-CIDR,100.64.0.0/10,TAILSCALE,no-resolve",
+		"IP-CIDR,fd7a:115c:a1e0::/48,TAILSCALE,no-resolve"
+	]`)
+	spec := domain.FileSpec{
+		Name:   "shadowrocket-tailscale-native.conf",
+		Kind:   domain.FileKindShadowrocket,
+		Source: domain.FileSource{Type: "inline", Content: "[General]\nprofile = keep\n"},
+		Config: &domain.FileConfig{
+			Subscriptions: []string{"shadowrocket-native-node"},
+			Settings: raw(t, map[string]any{
+				"groups": []map[string]any{
+					{"name": "Proxy", "type": "select", "proxies": []string{"$nodes", "DIRECT"}},
+				},
+				"rules": []string{
+					"DOMAIN,user.example,DIRECT",
+					"IP-CIDR,10.0.0.0/8,DIRECT,no-resolve",
+					"FINAL,Proxy",
+				},
+			}),
+		},
+		Processors: []domain.ProcessorSpec{processor, processor},
+	}
+
+	result, err := svc.GetFile(ctx, domain.FileRequest{Spec: &spec})
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	model, err := inidoc.ParseModel(result.Content)
+	require.NoError(t, err)
+	require.Contains(t, modelSectionLines(t, model, "Proxy"), "Shadow-Node = ss, example.com, 8388, password=example-password, method=aes-128-gcm")
+	require.Equal(t, []string{
+		"DOMAIN,user.example,DIRECT",
+		"DOMAIN-SUFFIX,ts.net,TAILSCALE",
+		"IP-CIDR,100.64.0.0/10,TAILSCALE,no-resolve",
+		"IP-CIDR,fd7a:115c:a1e0::/48,TAILSCALE,no-resolve",
+		"IP-CIDR,10.0.0.0/8,DIRECT,no-resolve",
+		"FINAL,Proxy",
+	}, modelSectionLines(t, model, "Rule"))
+	require.NotContains(t, strings.ToLower(string(result.Content)), "module")
+	assertNoTailscaleSecretsOrExitNode(t, map[string]any{}, result.Content)
+}
+
 func TestServiceCommunityPresetOrderedNTPRejectsNoSafeAnchorWithoutPartial(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -964,6 +1191,18 @@ func singBoxStructureProcessor(t *testing.T, script, operation string) domain.Pr
 	}
 }
 
+func singBoxTailscaleProcessor(t *testing.T, name, script string) domain.ProcessorSpec {
+	t.Helper()
+	return domain.ProcessorSpec{
+		Name:  name,
+		Type:  "script",
+		Stage: domain.StageFile,
+		Params: params(t, map[string]any{
+			"source": inlineScriptSource(script),
+		}),
+	}
+}
+
 func decodeMihomoCommunityPresetResult(t *testing.T, body []byte) map[string]any {
 	t.Helper()
 	var doc map[string]any
@@ -990,6 +1229,18 @@ func requireStringMap(t *testing.T, value any) map[string]any {
 	item, ok := value.(map[string]any)
 	require.True(t, ok, "expected map[string]any, got %T", value)
 	return item
+}
+
+func requireStringMapWithField(t *testing.T, values []any, field string, expected any) map[string]any {
+	t.Helper()
+	for _, value := range values {
+		item, ok := value.(map[string]any)
+		if ok && item[field] == expected {
+			return item
+		}
+	}
+	require.FailNow(t, "missing object with field", "%s=%v", field, expected)
+	return nil
 }
 
 func singBoxStructureScenarioBase() string {
@@ -1050,10 +1301,30 @@ func hasCaseInsensitiveKeyFragment(value any, fragment string) bool {
 
 func assertNoTailscaleSecretsOrExitNode(t *testing.T, doc map[string]any, body []byte) {
 	t.Helper()
-	for _, fragment := range []string{"auth_key", "auth-key", "control_url", "control-url", "exit_node", "exit-node"} {
+	for _, fragment := range []string{
+		"auth_key",
+		"auth-key",
+		"control_url",
+		"control-url",
+		"headscale",
+		"exit_node",
+		"exit-node",
+		"exit node",
+	} {
 		require.False(t, hasCaseInsensitiveKeyFragment(doc, fragment), "unexpected key fragment %q", fragment)
 		require.NotContains(t, strings.ToLower(string(body)), fragment)
 	}
+}
+
+func modelSectionLines(t *testing.T, model inidoc.Model, name string) []string {
+	t.Helper()
+	for _, section := range model.Sections {
+		if section.Name == name {
+			return section.Lines
+		}
+	}
+	require.FailNow(t, "missing INI section", "section %q", name)
+	return nil
 }
 
 func communityPresetRawScript(t *testing.T, name string) string {

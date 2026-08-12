@@ -237,6 +237,10 @@ file-stage `script` 可修改完整文件 envelope，并可使用受控资源 AP
 
 ### Web 内置规则源地址替换
 
+Web 中所有受管社区配置预设的默认状态、精确输出、风险、依赖、冲突与版本边界
+统一见[社区配置预设](community-config-presets.md)。它们只复制普通 `merge` 或
+`script` processor，不改变本页定义的 processor type 和执行顺序。
+
 Web 文件处理器编辑器为 Mihomo、sing-box 和 Shadowrocket 提供
 “GitHub 规则源地址替换”快捷项。它不是新的 processor type；选择后会在链末尾
 追加一个普通的 file-stage `script`，脚本来源是可编辑的 `inline` 内容。

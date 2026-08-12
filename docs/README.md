@@ -21,6 +21,7 @@
   prompts、结构化输出和安全边界。
 - [FileSpec](reference/file-spec.md)：文件类型、来源、typed config 和 settings。
 - [Processors](reference/processors.md)：nodes/file stages、内建处理器和执行语义。
+- [社区配置预设](reference/community-config-presets.md)：Web 预设的精确生成行为、默认、风险、依赖、冲突和来源。
 - [JavaScript 脚本 API](reference/scripting-api.md)：envelope、注入 API、sandbox 和失败边界。
 - [格式与能力](reference/capabilities.md)：parser、renderer、协议字段与有损转换。
 - [错误与诊断](reference/errors.md)：error、warning、report 和敏感信息边界。

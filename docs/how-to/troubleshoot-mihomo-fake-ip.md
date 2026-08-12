@@ -79,8 +79,8 @@ curl -fsS \
 ## Tailscale / MagicDNS
 
 若故障涉及 Tailscale，先按
-[Tailscale 与 MagicDNS 参考](../reference/mihomo-fake-ip.md#tailscale-与-magicdns)
-核对 preset 的精确 DNS、TUN 与入站边界。本页只补充现场验证：渲染最终 YAML，
+[社区配置预设](../reference/community-config-presets.md#tailscale-三态与安全边界)
+核对模式、精确 DNS、TUN、规则与入站边界。本页只补充现场验证：渲染最终 YAML，
 确认系统实际采用预期 resolver，并分别检查名称解析、目标路由和入站 ACL。
 
 Windows 上若控制面域名曾返回 fake IP，可在重载配置后刷新 DNS 并重启 Tailscale：

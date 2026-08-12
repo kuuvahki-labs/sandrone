@@ -15,6 +15,11 @@ type ShadowrocketINIOverridePresetID =
   | "udp-unsupported-direct"
   | "restricted-network-dns-fallback";
 
+export type ShadowrocketProcessorPresetID =
+  | "ntp-direct"
+  | ShadowrocketINIOverridePresetID
+  | "tailscale-native";
+
 const PRESET_CONTENT: Record<ShadowrocketINIOverridePresetID, string> = {
   "webrtc-privacy": `# sandrone:shadowrocket-preset=webrtc-privacy
 [General]
@@ -46,6 +51,17 @@ const NTP_DIRECT_PRESET: OrderedRuleProcessorPresetOptions = {
   rules: ["AND,((PROTOCOL,UDP),(DST-PORT,123)),DIRECT"],
 };
 
+const TAILSCALE_NATIVE_PRESET: OrderedRuleProcessorPresetOptions = {
+  id: "tailscale-native",
+  kind: "shadowrocket",
+  name: "Tailscale 原生接管",
+  rules: [
+    "DOMAIN-SUFFIX,ts.net,TAILSCALE",
+    "IP-CIDR,100.64.0.0/10,TAILSCALE,no-resolve",
+    "IP-CIDR,fd7a:115c:a1e0::/48,TAILSCALE,no-resolve",
+  ],
+};
+
 export const shadowrocketProcessorPresets: readonly FileProcessorPreset[] = [
   {
     id: NTP_DIRECT_PRESET.id,
@@ -65,6 +81,7 @@ export const shadowrocketProcessorPresets: readonly FileProcessorPreset[] = [
     "processors.filePreset.shadowrocket.webrtcPrivacy.label",
     "processors.filePreset.shadowrocket.webrtcPrivacy.description",
     "processors.filePreset.shadowrocket.webrtcPrivacy.risk",
+    ["tailscale-native"],
   ),
   iniOverrideDescriptor(
     "disable-ipv6",
@@ -87,6 +104,20 @@ export const shadowrocketProcessorPresets: readonly FileProcessorPreset[] = [
     "processors.filePreset.shadowrocket.restrictedNetworkDNSFallback.description",
     "processors.filePreset.shadowrocket.restrictedNetworkDNSFallback.risk",
   ),
+  {
+    id: TAILSCALE_NATIVE_PRESET.id,
+    category: "tailscale",
+    labelKey: "processors.filePreset.shadowrocket.tailscaleNative.label",
+    descriptionKey: "processors.filePreset.shadowrocket.tailscaleNative.description",
+    riskKey: "processors.filePreset.shadowrocket.tailscaleNative.risk",
+    defaultOn: false,
+    dependencies: [],
+    conflicts: ["webrtc-privacy"],
+    build: () => orderedRuleProcessorPreset(TAILSCALE_NATIVE_PRESET),
+    recognize: (processor) => (
+      recognizeOrderedRuleProcessorPreset(processor, TAILSCALE_NATIVE_PRESET)
+    ),
+  },
 ];
 
 export function defaultShadowrocketProcessors(): ProcessorDetail[] {
@@ -101,6 +132,7 @@ function iniOverrideDescriptor(
   labelKey: FileProcessorPreset["labelKey"],
   descriptionKey: FileProcessorPreset["descriptionKey"],
   riskKey: NonNullable<FileProcessorPreset["riskKey"]>,
+  conflicts: readonly ShadowrocketProcessorPresetID[] = [],
 ): FileProcessorPreset {
   const content = PRESET_CONTENT[id];
   return {
@@ -111,7 +143,7 @@ function iniOverrideDescriptor(
     riskKey,
     defaultOn: false,
     dependencies: [],
-    conflicts: [],
+    conflicts,
     build: () => ({
       name: PRESET_NAMES[id],
       type: "merge",

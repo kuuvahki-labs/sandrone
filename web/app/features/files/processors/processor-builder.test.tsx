@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
+import { singBoxProcessorPreset } from "~/features/files/drivers/sing-box/processor-presets";
 import type { ProcessorDetail } from "~/shared/resources/types";
 
 import { FileMergeParamsEditor } from "./merge-params-editor";
@@ -78,23 +79,42 @@ describe("FileProcessorBuilder", () => {
     expect(currentProcessors()).toEqual([added[1]]);
   });
 
-  it("groups managed presets and reports Tailnet Share dependencies in one update", async () => {
+  it("replaces STUN with native Tailscale atomically and reports the dependency and conflict", async () => {
     localStorage.setItem("sandrone.locale", "en-US");
     const user = userEvent.setup();
-    render(<FileProcessorBuilder kind="mihomo" />);
+    const before: ProcessorDetail = {
+      name: "Before",
+      type: "script",
+      stage: "file",
+      params: { source: { type: "inline", content: "// before" } },
+    };
+    const after: ProcessorDetail = {
+      name: "After",
+      type: "script",
+      stage: "file",
+      params: { source: { type: "inline", content: "// after" } },
+    };
+    render(
+      <FileProcessorBuilder
+        kind="sing-box"
+        defaultValue={[before, singBoxProcessorPreset("stun-block"), after]}
+      />,
+    );
 
     await user.click(screen.getByRole("combobox", { name: "Type" }));
-    expect(screen.getByRole("option", { name: "Tailscale coexistence" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Native Tailscale" })).toBeInTheDocument();
     expect(screen.getByText("Tailscale")).toBeInTheDocument();
-    await user.click(screen.getByRole("option", { name: "Tailnet proxy sharing" }));
+    await user.click(screen.getByRole("option", { name: "Native Tailscale" }));
     await user.click(screen.getByRole("button", { name: "Add processor" }));
 
     expect(currentProcessors().map((processor) => processor.name)).toEqual([
-      "TUN",
-      "Tailscale 共存",
-      "Tailnet 代理共享",
+      "Before",
+      "After",
+      "Ensure TUN",
+      "Tailscale 原生接管",
     ]);
-    expect(screen.getByRole("alert")).toHaveTextContent("Added dependencies: TUN, Tailscale coexistence");
+    expect(screen.getByRole("alert")).toHaveTextContent("Added dependencies: Ensure TUN inbound");
+    expect(screen.getByRole("alert")).toHaveTextContent("Removed conflicts: STUN blocking");
   });
 
   it("preserves unsupported processors byte-for-byte in their original order", () => {

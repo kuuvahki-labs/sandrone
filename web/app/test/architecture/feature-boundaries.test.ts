@@ -723,6 +723,11 @@ describe("FileDriver boundaries", () => {
         target: `${corePrefix}file-driver.ts`,
         typeOnly: true,
       },
+      {
+        source: "./processor-presets",
+        target: `${corePrefix}processor-presets.ts`,
+        typeOnly: false,
+      },
     ]);
 
     const testTargets = appGraph.get(`${corePrefix}registry.test.ts`)?.imports
@@ -732,6 +737,7 @@ describe("FileDriver boundaries", () => {
       .sort();
     expect(testTargets).toEqual([
       `${corePrefix}file-driver.ts`,
+      `${corePrefix}processor-presets.ts`,
       `${corePrefix}registry.ts`,
     ]);
   });

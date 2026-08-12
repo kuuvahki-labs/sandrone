@@ -7,6 +7,8 @@ import {
   type OrderedRuleProcessorPresetOptions,
   recognizeOrderedRuleProcessorPreset,
 } from "~/features/files/processors/ordered-rule-preset";
+import singBoxTailscaleExternalScript from "~/features/files/processors/scripts/sing-box-tailscale-external.js?raw";
+import singBoxTailscaleNativeScript from "~/features/files/processors/scripts/sing-box-tailscale-native.js?raw";
 import {
   recognizeSingBoxStructureProcessorPreset,
   singBoxStructureProcessorPreset,
@@ -24,11 +26,14 @@ export type SingBoxProcessorPresetID =
   | "udp-p2p-eim"
   | "linux-tun-acceleration"
   | "mptcp-direct"
-  | "windows-relaxed-route";
+  | "windows-relaxed-route"
+  | "tailscale-native"
+  | "tailscale-external";
 type SingBoxOrderedRuleProcessorPresetID = "ntp-direct" | "stun-block" | "quic-fallback";
+type SingBoxTailscaleProcessorPresetID = "tailscale-native" | "tailscale-external";
 type SingBoxStructureProcessorPresetID = Exclude<
   SingBoxProcessorPresetID,
-  "sniff" | SingBoxOrderedRuleProcessorPresetID
+  "sniff" | SingBoxOrderedRuleProcessorPresetID | SingBoxTailscaleProcessorPresetID
 >;
 
 const SNIFF_AND_DNS_HIJACK_CONTENT = JSON.stringify({
@@ -63,6 +68,13 @@ const PRESET_NAMES: Record<SingBoxProcessorPresetID, string> = {
   "linux-tun-acceleration": "Linux/OpenWrt TUN Acceleration",
   "mptcp-direct": "MPTCP Direct",
   "windows-relaxed-route": "Windows Relaxed Route",
+  "tailscale-native": "Tailscale 原生接管",
+  "tailscale-external": "Tailscale 共存",
+};
+
+const TAILSCALE_SCRIPTS: Readonly<Record<SingBoxTailscaleProcessorPresetID, string>> = {
+  "tailscale-native": singBoxTailscaleNativeScript,
+  "tailscale-external": singBoxTailscaleExternalScript,
 };
 
 const ORDERED_RULE_PRESETS: Record<
@@ -105,6 +117,7 @@ const STRUCTURE_PRESETS: Record<
 export function singBoxProcessorPreset(id: SingBoxProcessorPresetID): ProcessorDetail {
   if (id === "sniff") return sniffAndDNSHijackProcessor();
   if (isOrderedRulePresetID(id)) return orderedRuleProcessorPreset(ORDERED_RULE_PRESETS[id]);
+  if (isTailscalePresetID(id)) return tailscaleProcessor(id);
   return singBoxStructureProcessorPreset(STRUCTURE_PRESETS[id]);
 }
 
@@ -151,7 +164,7 @@ export const singBoxProcessorPresets: readonly FileProcessorPreset[] = [
     "processors.filePreset.singBox.stunBlock.description",
     "processors.filePreset.singBox.stunBlock.risk",
     ["sniff"],
-    ["udp-p2p-eim"],
+    ["udp-p2p-eim", "tailscale-native", "tailscale-external"],
   ),
   orderedRuleDescriptor(
     ORDERED_RULE_PRESETS["quic-fallback"],
@@ -199,6 +212,20 @@ export const singBoxProcessorPresets: readonly FileProcessorPreset[] = [
     "processors.filePreset.singBox.windowsRelaxedRoute.label",
     "processors.filePreset.singBox.windowsRelaxedRoute.description",
     "processors.filePreset.singBox.windowsRelaxedRoute.risk",
+  ),
+  tailscaleDescriptor(
+    "tailscale-native",
+    "processors.filePreset.singBox.tailscaleNative.label",
+    "processors.filePreset.singBox.tailscaleNative.description",
+    "processors.filePreset.singBox.tailscaleNative.risk",
+    ["tailscale-external", "stun-block"],
+  ),
+  tailscaleDescriptor(
+    "tailscale-external",
+    "processors.filePreset.singBox.tailscaleExternal.label",
+    "processors.filePreset.singBox.tailscaleExternal.description",
+    "processors.filePreset.singBox.tailscaleExternal.risk",
+    ["tailscale-native", "stun-block"],
   ),
 ];
 
@@ -267,8 +294,66 @@ function structureDescriptor(
   };
 }
 
+function tailscaleProcessor(id: SingBoxTailscaleProcessorPresetID): ProcessorDetail {
+  return {
+    name: PRESET_NAMES[id],
+    type: "script",
+    stage: "file",
+    params: {
+      source: {
+        type: "inline",
+        content: TAILSCALE_SCRIPTS[id],
+      },
+    },
+  };
+}
+
+function tailscaleDescriptor(
+  id: SingBoxTailscaleProcessorPresetID,
+  labelKey: FileProcessorPreset["labelKey"],
+  descriptionKey: FileProcessorPreset["descriptionKey"],
+  riskKey: NonNullable<FileProcessorPreset["riskKey"]>,
+  conflicts: readonly SingBoxProcessorPresetID[],
+): FileProcessorPreset {
+  return {
+    id,
+    category: "tailscale",
+    labelKey,
+    descriptionKey,
+    riskKey,
+    defaultOn: false,
+    dependencies: ["ensure-tun"],
+    conflicts,
+    build: () => tailscaleProcessor(id),
+    recognize: (processor) => {
+      if (processor.type !== "script") return false;
+      if (!isExactRecord(processor.params, ["source"])) return false;
+      const source = processor.params.source;
+      return isExactRecord(source, ["content", "type"])
+        && source.type === "inline"
+        && source.content === TAILSCALE_SCRIPTS[id];
+    },
+  };
+}
+
+function isExactRecord(
+  value: unknown,
+  expectedKeys: readonly string[],
+): value is Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const keys = Object.keys(value).sort();
+  return keys.length === expectedKeys.length
+    && keys.every((key, index) => key === expectedKeys[index]);
+}
+
 function isOrderedRulePresetID(
   id: SingBoxProcessorPresetID,
 ): id is SingBoxOrderedRuleProcessorPresetID {
   return id === "ntp-direct" || id === "stun-block" || id === "quic-fallback";
+}
+
+function isTailscalePresetID(
+  id: SingBoxProcessorPresetID,
+): id is SingBoxTailscaleProcessorPresetID {
+  return id === "tailscale-native" || id === "tailscale-external";
 }

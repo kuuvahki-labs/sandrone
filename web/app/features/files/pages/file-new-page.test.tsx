@@ -71,12 +71,27 @@ describe("FileNewPage", () => {
       },
     });
     const processors = JSON.parse(String(saved.get("processors")));
-    expect(processors).toMatchObject([{
-      name: "Sniff & DNS Hijack",
-      type: "merge",
-      stage: "file",
-      params: { mode: "json_override" },
-    }]);
+    expect(processors).toHaveLength(2);
+    expect(processors).toMatchObject([
+      {
+        name: "Sniff & DNS Hijack",
+        type: "merge",
+        stage: "file",
+        params: { mode: "json_override" },
+      },
+      {
+        name: "Traditional NTP Direct",
+        type: "script",
+        stage: "file",
+        params: {
+          source: { type: "inline", content: expect.any(String) },
+          args: {
+            preset_id: "ntp-direct",
+            rules_json: JSON.stringify([{ network: "udp", port: 123, outbound: "direct" }]),
+          },
+        },
+      },
+    ]);
     expect(JSON.parse(processors[0].params.content)).toEqual({
       route: {
         "+rules": [
