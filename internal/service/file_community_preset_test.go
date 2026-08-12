@@ -209,6 +209,226 @@ tun:
 	}
 }
 
+func TestServiceCommunityPresetSingBoxStructureScenariosUseExactRawAsset(t *testing.T) {
+	script := communityPresetRawScript(t, "update-sing-box-tun.js")
+	base := singBoxStructureScenarioBase()
+	original := decodeSingBoxCommunityPresetResult(t, []byte(base))
+	originalInbounds := requireAnySlice(t, original["inbounds"])
+	originalDNS := requireStringMap(t, original["dns"])
+
+	tests := []struct {
+		operation string
+		assertTun func(*testing.T, map[string]any)
+	}{
+		{
+			operation: "ensure-tun",
+			assertTun: func(t *testing.T, tun map[string]any) {
+				require.Equal(t, originalInbounds[2], tun)
+			},
+		},
+		{
+			operation: "ipv4-only",
+			assertTun: func(t *testing.T, tun map[string]any) {
+				require.Equal(t, []any{"172.19.0.1/30"}, tun["address"])
+				require.Equal(t, originalInbounds[2].(map[string]any)["custom"], tun["custom"])
+				require.Equal(t, originalInbounds[2].(map[string]any)["route_exclude_address"], tun["route_exclude_address"])
+			},
+		},
+		{
+			operation: "udp-p2p-eim",
+			assertTun: func(t *testing.T, tun map[string]any) {
+				require.True(t, tun["endpoint_independent_nat"].(bool))
+			},
+		},
+		{
+			operation: "linux-tun-acceleration",
+			assertTun: func(t *testing.T, tun map[string]any) {
+				require.True(t, tun["auto_route"].(bool))
+				require.True(t, tun["auto_redirect"].(bool))
+			},
+		},
+		{
+			operation: "mptcp-direct",
+			assertTun: func(t *testing.T, tun map[string]any) {
+				require.True(t, tun["exclude_mptcp"].(bool))
+			},
+		},
+		{
+			operation: "windows-relaxed-route",
+			assertTun: func(t *testing.T, tun map[string]any) {
+				require.False(t, tun["strict_route"].(bool))
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.operation, func(t *testing.T) {
+			spec := domain.FileSpec{
+				Name:   "sing-box-" + test.operation + ".json",
+				Kind:   domain.FileKindSingBox,
+				Source: domain.FileSource{Type: "inline", Content: base},
+				Config: &domain.FileConfig{Settings: raw(t, map[string]any{
+					"rules": []map[string]any{{"outbound": "LockedFinal"}},
+				})},
+				Processors: []domain.ProcessorSpec{singBoxStructureProcessor(t, script, test.operation)},
+			}
+
+			result, err := service.New().GetFile(context.Background(), domain.FileRequest{Spec: &spec})
+
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			doc := decodeSingBoxCommunityPresetResult(t, result.Content)
+			inbounds := requireAnySlice(t, doc["inbounds"])
+			require.Len(t, inbounds, 3)
+			require.Equal(t, originalInbounds[0], inbounds[0], "mixed inbound changed or moved")
+			require.Equal(t, originalInbounds[1], inbounds[1], "custom inbound changed or moved")
+			tun := requireStringMap(t, inbounds[2])
+			test.assertTun(t, tun)
+			require.Equal(t, original["experimental"], doc["experimental"])
+
+			dns := requireStringMap(t, doc["dns"])
+			require.Equal(t, originalDNS["servers"], dns["servers"])
+			require.Equal(t, originalDNS["rules"], dns["rules"])
+			if test.operation == "ipv4-only" {
+				require.Equal(t, "ipv4_only", dns["strategy"])
+			} else {
+				require.Equal(t, originalDNS["strategy"], dns["strategy"])
+			}
+		})
+	}
+}
+
+func TestServiceCommunityPresetSingBoxEnsureTunAppendsOnlyWhenAbsent(t *testing.T) {
+	script := communityPresetRawScript(t, "update-sing-box-tun.js")
+	spec := domain.FileSpec{
+		Name: "sing-box-ensure-tun.json",
+		Kind: domain.FileKindSingBox,
+		Source: domain.FileSource{Type: "inline", Content: `{
+			"inbounds": [
+				{"type":"mixed","tag":"mixed-in","listen":"::1"},
+				{"type":"direct","tag":"custom-in","metadata":{"ipv6":"2001:db8::8"}}
+			],
+			"route":{"rules":[]}
+		}`},
+		Config: &domain.FileConfig{Settings: raw(t, map[string]any{
+			"rules": []map[string]any{{"outbound": "LockedFinal"}},
+		})},
+		Processors: []domain.ProcessorSpec{
+			singBoxStructureProcessor(t, script, "ensure-tun"),
+			singBoxStructureProcessor(t, script, "ensure-tun"),
+		},
+	}
+
+	result, err := service.New().GetFile(context.Background(), domain.FileRequest{Spec: &spec})
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	doc := decodeSingBoxCommunityPresetResult(t, result.Content)
+	inbounds := requireAnySlice(t, doc["inbounds"])
+	require.Equal(t, []any{
+		map[string]any{"type": "mixed", "tag": "mixed-in", "listen": "::1"},
+		map[string]any{"type": "direct", "tag": "custom-in", "metadata": map[string]any{"ipv6": "2001:db8::8"}},
+		map[string]any{
+			"type":         "tun",
+			"tag":          "tun-in",
+			"address":      []any{"172.19.0.1/30", "fdfe:dcba:9876::1/126"},
+			"auto_route":   true,
+			"strict_route": true,
+		},
+	}, inbounds)
+}
+
+func TestServiceCommunityPresetSingBoxStructureRejectsAmbiguousTunWithoutPartial(t *testing.T) {
+	script := communityPresetRawScript(t, "update-sing-box-tun.js")
+	spec := domain.FileSpec{
+		Name: "sing-box-ambiguous-tun.json",
+		Kind: domain.FileKindSingBox,
+		Source: domain.FileSource{Type: "inline", Content: `{
+			"inbounds": [
+				{"type":"tun","tag":"first"},
+				{"type":"tun","tag":"second"}
+			],
+			"route":{"rules":[]}
+		}`},
+		Config: &domain.FileConfig{Settings: raw(t, map[string]any{
+			"rules": []map[string]any{{"outbound": "LockedFinal"}},
+		})},
+		Processors: []domain.ProcessorSpec{singBoxStructureProcessor(t, script, "ensure-tun")},
+	}
+
+	result, err := service.New().GetFile(context.Background(), domain.FileRequest{Spec: &spec})
+
+	require.Nil(t, result)
+	require.Error(t, err)
+	require.True(t, domain.IsCode(err, domain.CodeScriptRuntime), "got %v", err)
+	require.Contains(t, err.Error(), "Sandrone sing-box structure preset found ambiguous TUN inbounds")
+}
+
+func TestServiceCommunityPresetSingBoxStructureRejectsManagedOperationOverride(t *testing.T) {
+	script := communityPresetRawScript(t, "update-sing-box-tun.js")
+	spec := domain.FileSpec{
+		Name:   "sing-box-managed-operation.json",
+		Kind:   domain.FileKindSingBox,
+		Source: domain.FileSource{Type: "inline", Content: singBoxStructureScenarioBase()},
+		Config: &domain.FileConfig{Settings: raw(t, map[string]any{
+			"rules": []map[string]any{{"outbound": "LockedFinal"}},
+		})},
+		Processors: []domain.ProcessorSpec{singBoxStructureProcessor(t, script, "mptcp-direct")},
+	}
+
+	result, err := service.New().GetFile(context.Background(), domain.FileRequest{
+		Spec: &spec,
+		Request: domain.RequestInfo{Args: map[string]string{
+			"operation": "windows-relaxed-route",
+		}},
+	})
+
+	require.Nil(t, result)
+	require.Error(t, err)
+	require.True(t, domain.IsCode(err, domain.CodeScriptRuntime), "got %v", err)
+	require.Contains(t, err.Error(), "Sandrone sing-box structure preset operation cannot be overridden by request args")
+}
+
+func TestServiceCommunityPresetSingBoxOrderedScenariosUseExactRawAsset(t *testing.T) {
+	script := communityPresetRawScript(t, "insert-sing-box-rules.js")
+	spec := domain.FileSpec{
+		Name: "sing-box-ordered-scenarios.json",
+		Kind: domain.FileKindSingBox,
+		Source: domain.FileSource{Type: "inline", Content: `{
+			"route": {
+				"final": "LockedRouteFinal",
+				"rules": []
+			}
+		}`},
+		Config: &domain.FileConfig{Settings: raw(t, map[string]any{
+			"rules": []map[string]any{
+				{"domain_suffix": []string{"user.example"}, "outbound": "direct"},
+				{"rule_set": []string{"private"}, "outbound": "direct"},
+				{"outbound": "LockedFinal"},
+			},
+		})},
+		Processors: []domain.ProcessorSpec{
+			orderedRuleProcessor(t, script, "stun-block", "STUN Block", `[{"protocol":"stun","action":"reject"}]`),
+			orderedRuleProcessor(t, script, "quic-fallback", "QUIC Fallback", `[{"protocol":"quic","action":"reject"}]`),
+		},
+	}
+
+	result, err := service.New().GetFile(context.Background(), domain.FileRequest{Spec: &spec})
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	doc := decodeSingBoxCommunityPresetResult(t, result.Content)
+	route := requireStringMap(t, doc["route"])
+	require.Equal(t, "LockedRouteFinal", route["final"])
+	require.Equal(t, []any{
+		map[string]any{"domain_suffix": []any{"user.example"}, "outbound": "direct"},
+		map[string]any{"protocol": "stun", "action": "reject"},
+		map[string]any{"protocol": "quic", "action": "reject"},
+		map[string]any{"rule_set": []any{"private"}, "outbound": "direct"},
+		map[string]any{"outbound": "LockedFinal"},
+	}, route["rules"])
+}
+
 func TestServiceCommunityPresetOrderedNTPRejectsNoSafeAnchorWithoutPartial(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -389,11 +609,82 @@ func mihomoMergeProcessor(t *testing.T, name, content string) domain.ProcessorSp
 	}
 }
 
+func singBoxStructureProcessor(t *testing.T, script, operation string) domain.ProcessorSpec {
+	t.Helper()
+	return domain.ProcessorSpec{
+		Name:  operation,
+		Type:  "script",
+		Stage: domain.StageFile,
+		Params: params(t, map[string]any{
+			"source": inlineScriptSource(script),
+			"args":   map[string]any{"operation": operation},
+		}),
+	}
+}
+
 func decodeMihomoCommunityPresetResult(t *testing.T, body []byte) map[string]any {
 	t.Helper()
 	var doc map[string]any
 	require.NoError(t, yaml.Unmarshal(body, &doc))
 	return doc
+}
+
+func decodeSingBoxCommunityPresetResult(t *testing.T, body []byte) map[string]any {
+	t.Helper()
+	var doc map[string]any
+	require.NoError(t, json.Unmarshal(body, &doc))
+	return doc
+}
+
+func requireAnySlice(t *testing.T, value any) []any {
+	t.Helper()
+	items, ok := value.([]any)
+	require.True(t, ok, "expected []any, got %T", value)
+	return items
+}
+
+func requireStringMap(t *testing.T, value any) map[string]any {
+	t.Helper()
+	item, ok := value.(map[string]any)
+	require.True(t, ok, "expected map[string]any, got %T", value)
+	return item
+}
+
+func singBoxStructureScenarioBase() string {
+	return `{
+		"dns": {
+			"strategy": "prefer_ipv4",
+			"servers": [{"type":"udp","tag":"dns-v6","server":"2001:db8::53"}],
+			"rules": [{"domain_suffix":["v6.example"],"server":"dns-v6"}]
+		},
+		"inbounds": [
+			{
+				"type":"mixed",
+				"tag":"mixed-in",
+				"listen":"::1",
+				"listen_port":2080,
+				"users":[{"username":"keep","password":"example"}]
+			},
+			{
+				"type":"direct",
+				"tag":"custom-in",
+				"listen":"2001:db8::2",
+				"network":["tcp","udp"],
+				"custom":{"cidr":"2001:db8:1::/64"}
+			},
+			{
+				"type":"tun",
+				"tag":"tun-in",
+				"address":["172.19.0.1/30","fdfe:dcba:9876::1/126"],
+				"auto_route":false,
+				"strict_route":true,
+				"route_exclude_address":["2001:db8:ffff::/48"],
+				"custom":{"ipv6":"2001:db8::9"}
+			}
+		],
+		"experimental":{"unrelated_ipv6":"2001:db8::10"},
+		"route":{"final":"LockedFinal","rule_set":[],"rules":[]}
+	}`
 }
 
 func hasCaseInsensitiveKeyFragment(value any, fragment string) bool {
