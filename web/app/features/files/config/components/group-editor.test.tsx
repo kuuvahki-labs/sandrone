@@ -143,6 +143,7 @@ describe("ProxyGroupEditor runtime-filtered Mihomo groups", () => {
 
     await user.click(screen.getByRole("button", { name: "展开代理组 Balanced" }));
     await choose(user, "类型", "load-balance");
+    expect(screen.queryByRole("spinbutton", { name: /容差|Tolerance/i })).not.toBeInTheDocument();
     expect(onChange).toHaveBeenLastCalledWith([{
       name: "Balanced",
       type: "load-balance",
@@ -246,6 +247,64 @@ describe("ProxyGroupEditor Shadowrocket schema", () => {
       type: "url-test",
       proxies: ["DIRECT"],
       tolerance: 50,
+    }]);
+  });
+});
+
+describe("ProxyGroupEditor sing-box schema", () => {
+  it.each([
+    ["selector", true, false],
+    ["selector", false, false],
+    ["urltest", true, true],
+    ["urltest", false, false],
+  ] as const)(
+    "shows interrupt controls for %s with checked=%s and warning=%s",
+    async (type, interruptExistingConnections, warningVisible) => {
+      const user = userEvent.setup();
+      render(
+        <ControlledEditor
+          initialGroups={[{
+            type,
+            tag: "Proxy",
+            outbounds: ["$nodes", "direct"],
+            ...(type === "urltest"
+              ? { url: "https://cp.cloudflare.com", interval: "5m" }
+              : {}),
+            interrupt_exist_connections: interruptExistingConnections,
+          }]}
+          kind="sing-box"
+          onChange={vi.fn()}
+        />,
+      );
+
+      await user.click(screen.getByRole("button", { name: "展开代理组 Proxy" }));
+
+      expect(screen.getByRole("checkbox", { name: /中断现有连接|Interrupt existing connections/i }))
+        .toHaveProperty("checked", interruptExistingConnections);
+      const warning = screen.queryByText(/自动切换会中断现有连接。|Automatic switching interrupts existing connections\./i);
+      expect(Boolean(warning)).toBe(warningVisible);
+    },
+  );
+
+  it("serializes the interrupt switch after it is checked", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <ControlledEditor
+        initialGroups={[{ type: "selector", tag: "Proxy", outbounds: ["$nodes", "direct"] }]}
+        kind="sing-box"
+        onChange={onChange}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "展开代理组 Proxy" }));
+    await user.click(screen.getByRole("checkbox", { name: /中断现有连接|Interrupt existing connections/i }));
+
+    expect(onChange).toHaveBeenLastCalledWith([{
+      type: "selector",
+      tag: "Proxy",
+      outbounds: ["$nodes", "direct"],
+      interrupt_exist_connections: true,
     }]);
   });
 });

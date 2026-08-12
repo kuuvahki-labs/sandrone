@@ -80,5 +80,7 @@ export const fileZhCN = {
   "files.config.groupTimeout": "超时",
   "files.config.groupTolerance": "容差",
   "files.config.groupHidden": "隐藏分组",
+  "files.config.interruptExistingConnections": "中断现有连接",
+  "files.config.interruptExistingConnectionsWarning": "自动切换会中断现有连接。",
   "processor.merge.jsonInvalid": "合并内容必须是有效的 JSON 对象，数组操作符的值必须是数组。",
 } as const;

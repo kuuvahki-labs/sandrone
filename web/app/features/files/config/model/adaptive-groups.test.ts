@@ -285,6 +285,7 @@ describe("adaptive Mihomo group generation", () => {
       type: "url-test",
       url: "https://cp.cloudflare.com",
       interval: 300,
+      tolerance: 50,
       lazy: true,
    }],
     ["load-balance", {

@@ -71,7 +71,7 @@ always-reject-url-rewrite = false
 private-ip-answer = true
 
 # 直连域名解析失败后使用代理。false 表示不启用。
-dns-direct-fallback-proxy = true
+dns-direct-fallback-proxy = false
 
 # TUN 包含路由。默认情况下，Shadowrocket 接口会声明自己为默认路由，但由于 Wi-Fi 接口的路由较小，有些流量可能不会通过 Shadowrocket 接口。使用此选项可以添加一个较小的路由表。
 # tun-included-routes =
@@ -102,7 +102,7 @@ udp-policy-not-supported-behaviour = REJECT
 proxy-dns-server = https://223.5.5.5/dns-query,https://223.6.6.6/dns-query
 
 # 代理链丢失关闭连接。若 代理链 中的中转节点丢失则 Reject 代理连接；当设置为 false 时等同于不设置该命令，即若 代理链 中的中转节点丢失则跳过中转节点直接连接落地节点使用。
-# close-if-proxy-chain-missing =
+close-if-proxy-chain-missing = true
 
 # 如果设备在网络环境中仅获取到 IPv6 的 DNS 而未获取到 IPv4 的 DNS，此时软件将认为网络环境是 IPv6 Only 网络，当设置为 true 时启用该命令。
 # ipv6-only-if-no-ipv4-dns =

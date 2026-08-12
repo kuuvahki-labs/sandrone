@@ -10,6 +10,8 @@ describe("file driver default bases", () => {
 
     expect(parsed).toMatchObject({
       "mixed-port": 7890,
+      "geo-auto-update": true,
+      "geo-update-interval": 24,
       "allow-lan": true,
       "bind-address": "*",
       "lan-allowed-ips": ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fc00::/7"],
@@ -77,6 +79,7 @@ describe("file driver default bases", () => {
     expect(parsed).not.toHaveProperty("auto-redirect");
     expect(parsed).not.toHaveProperty("sniffer");
     expect(parsed).not.toHaveProperty("tun");
+    expect(parsed).not.toHaveProperty("geox-url");
     expect(base).not.toContain("tailscale");
     expect(base).not.toContain("100.64.0.0/10");
   });
@@ -153,7 +156,12 @@ describe("file driver default bases", () => {
     expect(base).toContain("hijack-dns = :53");
     expect(base).not.toMatch(/^dns-server\s*=.*(?:^|,)\s*(?:223\.5\.5\.5|119\.29\.29\.29)(?:,|$)/mu);
     expect(base).not.toContain("fallback-dns-server = system");
-    expect(base).toContain("block-quic = all-proxy");
+    expect(base).toMatch(/^dns-direct-fallback-proxy = false$/mu);
+    expect(base).toMatch(/^close-if-proxy-chain-missing = true$/mu);
+    expect(base).toMatch(/^udp-policy-not-supported-behaviour = REJECT$/mu);
+    expect(base).toMatch(/^block-quic = all-proxy$/mu);
+    expect(base).toMatch(/^ipv6 = true$/mu);
+    expect(base).toMatch(/^prefer-ipv6 = false$/mu);
     expect(base).toMatch(/^\[Proxy\]$[\s\S]*^\[Proxy Group\]$[\s\S]*^\[Rule\]$[\s\S]*^\[Host\]$/mu);
     expect(base).toContain("*.apple.com = server:system");
     expect(base).toContain("*.icloud.com = server:system");

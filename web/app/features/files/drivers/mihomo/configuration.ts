@@ -121,6 +121,7 @@ function mihomoGroups(): StructuredFileConfigurationAdapter["groups"] {
     excludeFilter: stringField(value["exclude-filter"]),
     healthCheckURL: stringField(value.url),
     healthCheckInterval: scalarString(value.interval),
+    healthCheckTolerance: typeof value.tolerance === "number" ? value.tolerance : undefined,
     hidden: typeof value.hidden === "boolean" ? value.hidden : undefined,
     adapterState: opaqueGroupState(value),
   }));
@@ -136,6 +137,7 @@ function mihomoGroups(): StructuredFileConfigurationAdapter["groups"] {
     if (isHealthCheck(draft.type)) {
       value.url = draft.healthCheckURL;
       value.interval = positiveInteger(draft.healthCheckInterval) ?? 300;
+      if (draft.healthCheckTolerance !== undefined) value.tolerance = draft.healthCheckTolerance;
     }
     if (draft.hidden !== undefined) value.hidden = draft.hidden;
     return value;
@@ -180,6 +182,7 @@ function mihomoGroups(): StructuredFileConfigurationAdapter["groups"] {
         type,
         healthCheckURL: group.healthCheckURL || DEFAULT_PROBE_URL,
         healthCheckInterval: group.healthCheckInterval || "300",
+        healthCheckTolerance: type === "url-test" ? group.healthCheckTolerance ?? 50 : undefined,
       };
     },
     typeOptions: GROUP_TYPE_OPTIONS,
@@ -188,7 +191,7 @@ function mihomoGroups(): StructuredFileConfigurationAdapter["groups"] {
 }
 
 function opaqueGroupState(value: ConfigMap): ConfigMap {
-  const state = omitKeys(value, ["name", "type", "proxies", "include-all-proxies", "filter", "exclude-filter", "url", "interval", "hidden"]);
+  const state = omitKeys(value, ["name", "type", "proxies", "include-all-proxies", "filter", "exclude-filter", "url", "interval", "tolerance", "hidden"]);
   if (Object.hasOwn(value, "exclude-filter") && typeof value["exclude-filter"] !== "string") {
     state["exclude-filter"] = value["exclude-filter"];
   }
@@ -334,12 +337,12 @@ function defaultGroups(preset: string, locale: ConfigNamingLocale): ConfigMap[] 
       { name: anchor, type: "select", proxies: [auto, ...(["hk", "tw", "jp", "sg", "us"] as const).map((id) => configRegionName(id, locale)), other, "$nodes", "DIRECT"] },
       ...(["hk", "tw", "jp", "sg", "us"] as const).map((id) => ({ name: configRegionName(id, locale), type: "select", proxies: ["$nodes"] })),
       { name: other, type: "select", proxies: ["$nodes"] },
-      { name: auto, type: "url-test", proxies: ["$nodes"], url: DEFAULT_PROBE_URL, interval: 300 },
+      { name: auto, type: "url-test", proxies: ["$nodes"], url: DEFAULT_PROBE_URL, interval: 300, tolerance: 50 },
     ];
   }
   return [
     { name: anchor, type: "select", proxies: [auto, fallback, "$nodes", "DIRECT"] },
-    { name: auto, type: "url-test", proxies: ["$nodes"], url: DEFAULT_PROBE_URL, interval: 300 },
+    { name: auto, type: "url-test", proxies: ["$nodes"], url: DEFAULT_PROBE_URL, interval: 300, tolerance: 50 },
     { name: fallback, type: "fallback", proxies: ["$nodes"], url: DEFAULT_PROBE_URL, interval: 300 },
   ];
 }

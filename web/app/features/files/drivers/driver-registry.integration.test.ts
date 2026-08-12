@@ -240,6 +240,80 @@ describe("file driver codecs", () => {
     expect(adapter.encode(decoded)).toEqual({ settings });
   });
 
+  it("defaults only new Mihomo url-test groups to tolerance 50", () => {
+    const adapter = structuredAdapter("mihomo");
+    const transitioned = adapter.groups.transitionType(adapter.groups.create("en-US"), "url-test");
+    const generated = adapter.groups.serialize(adapter.groups.defaults("standard", "en-US"));
+
+    expect(adapter.groups.serialize([transitioned])).toEqual([
+      expect.objectContaining({ type: "url-test", tolerance: 50 }),
+    ]);
+    expect(generated.find((group) => group.type === "url-test"))
+      .toEqual(expect.objectContaining({ tolerance: 50 }));
+  });
+
+  it("does not backfill omitted Mihomo tolerance and preserves explicit values", () => {
+    const adapter = structuredAdapter("mihomo");
+    const withoutTolerance = {
+      name: "Auto",
+      type: "url-test",
+      proxies: ["$nodes"],
+      url: "https://cp.cloudflare.com",
+      interval: 300,
+    };
+    const explicitTolerance = { ...withoutTolerance, tolerance: 75 };
+
+    const withoutDraft = adapter.groups.project([withoutTolerance]);
+    const explicitDraft = adapter.groups.project([explicitTolerance]);
+
+    expect(withoutDraft).not.toBeNull();
+    expect(withoutDraft?.[0].healthCheckTolerance).toBeUndefined();
+    expect(adapter.groups.serialize(withoutDraft!)).toEqual([withoutTolerance]);
+    expect(explicitDraft).not.toBeNull();
+    expect(explicitDraft?.[0].healthCheckTolerance).toBe(75);
+    expect(explicitDraft?.[0].adapterState).not.toHaveProperty("tolerance");
+    expect(adapter.groups.serialize(explicitDraft!)).toEqual([explicitTolerance]);
+  });
+
+  it.each([
+    ["selector", true],
+    ["selector", false],
+    ["urltest", true],
+    ["urltest", false],
+  ] as const)(
+    "round-trips sing-box %s interrupt_exist_connections=%s as semantic state",
+    (nativeType, interruptExistingConnections) => {
+      const adapter = structuredAdapter("sing-box");
+      const nativeGroup = {
+        type: nativeType,
+        tag: "Proxy",
+        outbounds: ["$nodes", "direct"],
+        ...(nativeType === "urltest"
+          ? { url: "https://cp.cloudflare.com", interval: "5m" }
+          : {}),
+        interrupt_exist_connections: interruptExistingConnections,
+      };
+
+      const drafts = adapter.groups.project([nativeGroup]);
+
+      expect(drafts).not.toBeNull();
+      expect(drafts?.[0]).toMatchObject({ interruptExistingConnections });
+      expect(drafts?.[0].adapterState).not.toHaveProperty("interrupt_exist_connections");
+      const serialized = adapter.groups.serialize(drafts!);
+      expect(serialized).toEqual([nativeGroup]);
+      expect(Object.keys(serialized[0])).not.toContain("__sandroneInterruptExistingConnectionsExplicit");
+    },
+  );
+
+  it("omits unchecked interrupt_exist_connections from new sing-box groups", () => {
+    const adapter = structuredAdapter("sing-box");
+    const selector = { ...adapter.groups.create("en-US"), interruptExistingConnections: false };
+    const urltest = adapter.groups.transitionType(selector, "url-test");
+
+    expect(adapter.groups.serialize([selector])[0]).not.toHaveProperty("interrupt_exist_connections");
+    expect(adapter.groups.serialize([urltest])[0]).not.toHaveProperty("interrupt_exist_connections");
+  });
+
   it("accepts trimmed Shadowrocket rule-set types and URLs", () => {
     const adapter = structuredAdapter("shadowrocket");
     const settings = {

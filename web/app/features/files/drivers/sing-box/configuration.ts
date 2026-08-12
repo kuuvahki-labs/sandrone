@@ -39,6 +39,7 @@ const GROUP_TYPE_OPTIONS = [
   { value: "select", label: "selector" },
   { value: "url-test", label: "urltest" },
 ] as const;
+const INTERRUPT_EXPLICIT_SENTINEL = "__sandroneInterruptExistingConnectionsExplicit";
 
 const groups = singBoxGroups();
 const ruleSets = singBoxRuleSets();
@@ -98,11 +99,20 @@ function singBoxGroups(): StructuredFileConfigurationAdapter["groups"] {
     excludeFilter: "",
     healthCheckURL: stringField(value.url),
     healthCheckInterval: scalarString(value.interval),
-    adapterState: omitKeys(value, ["type", "tag", "outbounds", "url", "interval"]),
+    interruptExistingConnections: typeof value.interrupt_exist_connections === "boolean"
+      ? value.interrupt_exist_connections
+      : undefined,
+    adapterState: {
+      ...omitKeys(value, ["type", "tag", "outbounds", "url", "interval", "interrupt_exist_connections"]),
+      ...(Object.hasOwn(value, "interrupt_exist_connections")
+        ? { [INTERRUPT_EXPLICIT_SENTINEL]: true }
+        : {}),
+    },
   }));
   const serialize = (values: GroupDraft[]): ConfigMap[] => values.map((draft) => {
+    const adapterState = omitKeys(stateRecord(draft.adapterState), [INTERRUPT_EXPLICIT_SENTINEL]);
     const value: ConfigMap = {
-      ...stateRecord(draft.adapterState),
+      ...adapterState,
       type: draft.type === "url-test" ? "urltest" : "selector",
       tag: draft.name,
       outbounds: [...draft.members],
@@ -110,6 +120,9 @@ function singBoxGroups(): StructuredFileConfigurationAdapter["groups"] {
     if (draft.type === "url-test") {
       value.url = draft.healthCheckURL;
       value.interval = draft.healthCheckInterval;
+    }
+    if (draft.interruptExistingConnections === true || interruptWasExplicit(draft.adapterState)) {
+      value.interrupt_exist_connections = Boolean(draft.interruptExistingConnections);
     }
     return value;
   });
@@ -148,6 +161,10 @@ function singBoxGroups(): StructuredFileConfigurationAdapter["groups"] {
     typeOptions: GROUP_TYPE_OPTIONS,
     validateFilter: () => false,
   };
+}
+
+function interruptWasExplicit(adapterState: unknown): boolean {
+  return stateRecord(adapterState)[INTERRUPT_EXPLICIT_SENTINEL] === true;
 }
 
 function singBoxRuleSets(): StructuredFileConfigurationAdapter["ruleSets"] {

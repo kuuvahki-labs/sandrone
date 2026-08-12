@@ -23,6 +23,7 @@ export interface GroupDraft {
   healthCheckURL: string;
   hidden?: boolean;
   id: string;
+  interruptExistingConnections?: boolean;
   memberMode: ProxyGroupMemberMode;
   members: string[];
   name: string;

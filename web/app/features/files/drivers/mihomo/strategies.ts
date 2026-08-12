@@ -193,6 +193,7 @@ function mihomoAdaptiveDialect(
       group.interval = 300;
       group.lazy = true;
     }
+    if (type === "url-test") group.tolerance = 50;
     if (type === "load-balance") group.strategy = "sticky-sessions";
     return group;
   };
@@ -274,7 +275,7 @@ function materializeMihomoTemplate(
     const targets = templateGroupTargets(item, selectName, autoName, "DIRECT", "REJECT")
       .filter((target) => target !== name);
     return item.groupMode === "url-test"
-      ? { name, type: "url-test", proxies: targets, url: DEFAULT_PROBE_URL, interval: 300 }
+      ? { name, type: "url-test", proxies: targets, url: DEFAULT_PROBE_URL, interval: 300, tolerance: 50 }
       : { name, type: "select", proxies: targets };
   });
   const ruleSets = blueprint.ruleEntries.map(({ ruleID }) => {

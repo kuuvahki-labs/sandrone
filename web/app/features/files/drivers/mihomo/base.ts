@@ -1,4 +1,6 @@
 const MIHOMO_BASE = `mixed-port: 7890
+geo-auto-update: true
+geo-update-interval: 24
 allow-lan: true
 bind-address: "*"
 lan-allowed-ips:

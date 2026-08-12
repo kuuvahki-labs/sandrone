@@ -80,5 +80,7 @@ export const fileEnUS = {
   "files.config.groupTimeout": "Timeout",
   "files.config.groupTolerance": "Tolerance",
   "files.config.groupHidden": "Hide group",
+  "files.config.interruptExistingConnections": "Interrupt existing connections",
+  "files.config.interruptExistingConnectionsWarning": "Automatic switching interrupts existing connections.",
   "processor.merge.jsonInvalid": "Merge content must be a valid JSON object; array operators require array values.",
 } as const;
