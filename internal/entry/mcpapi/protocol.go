@@ -1,8 +1,11 @@
 package mcpapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"io"
+	"net/http"
 
 	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -45,7 +48,7 @@ func requestProtocolVersion(method string, req mcp.Request) string {
 	return ""
 }
 
-func unsupportedProtocolVersion(requested string) error {
+func unsupportedProtocolVersion(requested string) *jsonrpc.Error {
 	data, err := json.Marshal(mcp.UnsupportedProtocolVersionData{
 		Supported: []string{ProtocolVersion},
 		Requested: requested,
@@ -58,6 +61,80 @@ func unsupportedProtocolVersion(requested string) error {
 		Message: "unsupported protocol version",
 		Data:    data,
 	}
+}
+
+func strictProtocolHTTPHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		requested := req.Header.Get("Mcp-Protocol-Version")
+		if req.Method != http.MethodPost || requested == "" || requested == ProtocolVersion {
+			next.ServeHTTP(w, req)
+			return
+		}
+
+		request, ok := decodeProtocolRequest(req)
+		if !ok {
+			next.ServeHTTP(w, req)
+			return
+		}
+		if bodyVersion := protocolVersionFromParams(request.Params); bodyVersion != "" && bodyVersion != requested {
+			// Let the SDK preserve the standard HeaderMismatch error when the
+			// version mirror disagrees with the JSON-RPC body.
+			next.ServeHTTP(w, req)
+			return
+		}
+
+		response, err := jsonrpc.EncodeMessage(&jsonrpc.Response{
+			ID:    request.ID,
+			Error: unsupportedProtocolVersion(requested),
+		})
+		if err != nil {
+			http.Error(w, "failed to encode protocol error", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write(response)
+	})
+}
+
+func decodeProtocolRequest(req *http.Request) (*jsonrpc.Request, bool) {
+	if req.Body == nil {
+		return nil, false
+	}
+	original := req.Body
+	prefix, err := io.ReadAll(io.LimitReader(original, mcp.DefaultMaxRequestBodyBytes+1))
+	req.Body = &replayReadCloser{
+		Reader: io.MultiReader(bytes.NewReader(prefix), original),
+		Closer: original,
+	}
+	if err != nil || int64(len(prefix)) > mcp.DefaultMaxRequestBodyBytes {
+		return nil, false
+	}
+	message, err := jsonrpc.DecodeMessage(prefix)
+	if err != nil {
+		return nil, false
+	}
+	request, ok := message.(*jsonrpc.Request)
+	return request, ok
+}
+
+func protocolVersionFromParams(params json.RawMessage) string {
+	var values struct {
+		Meta            map[string]any `json:"_meta"`
+		ProtocolVersion string         `json:"protocolVersion"`
+	}
+	if err := json.Unmarshal(params, &values); err != nil {
+		return ""
+	}
+	if version, ok := values.Meta[mcp.MetaKeyProtocolVersion].(string); ok && version != "" {
+		return version
+	}
+	return values.ProtocolVersion
+}
+
+type replayReadCloser struct {
+	io.Reader
+	io.Closer
 }
 
 func applyProtocolPolicy(result mcp.Result) {

@@ -152,17 +152,73 @@ func TestStreamableHTTPRejectsLegacyInitialize(t *testing.T) {
 		"Mcp-Protocol-Version": "2025-11-25",
 	})
 	defer response.Body.Close()
-	// The SDK applies SEP-2575 HTTP status overrides only after it has identified
-	// a 2026-07-28 request. A rejected legacy initialize therefore carries the
-	// required JSON-RPC error in a legacy HTTP 200 response.
-	require.Equal(t, http.StatusOK, response.StatusCode)
+	require.Equal(t, http.StatusBadRequest, response.StatusCode)
 
 	envelope := decodeRPCError(t, response.Body)
+	require.Equal(t, "2.0", envelope.JSONRPC)
+	require.Equal(t, float64(2), envelope.ID)
 	require.Equal(t, int64(mcp.CodeUnsupportedProtocolVersion), envelope.Error.Code)
 	var data mcp.UnsupportedProtocolVersionData
 	require.NoError(t, json.Unmarshal(envelope.Error.Data, &data))
 	require.Equal(t, []string{mcpapi.ProtocolVersion}, data.Supported)
 	require.Equal(t, "2025-11-25", data.Requested)
+}
+
+func TestStreamableHTTPRejectsFutureProtocolVersion(t *testing.T) {
+	server := httptest.NewServer(mcpapi.New(testRuntime(t, app.Config{})).Handler())
+	defer server.Close()
+
+	const futureVersion = "2027-01-01"
+	meta := currentRequestMeta()
+	meta[mcp.MetaKeyProtocolVersion] = futureVersion
+	body, err := json.Marshal(map[string]any{
+		"jsonrpc": "2.0",
+		"id":      3,
+		"method":  "server/discover",
+		"params": map[string]any{
+			"_meta": meta,
+		},
+	})
+	require.NoError(t, err)
+	response := doMCPRequest(t, http.MethodPost, server.URL, bytes.NewReader(body), map[string]string{
+		"Mcp-Protocol-Version": futureVersion,
+		"Mcp-Method":           "server/discover",
+	})
+	defer response.Body.Close()
+	require.Equal(t, http.StatusBadRequest, response.StatusCode)
+
+	envelope := decodeRPCError(t, response.Body)
+	require.Equal(t, "2.0", envelope.JSONRPC)
+	require.Equal(t, float64(3), envelope.ID)
+	require.Equal(t, int64(mcp.CodeUnsupportedProtocolVersion), envelope.Error.Code)
+	var data mcp.UnsupportedProtocolVersionData
+	require.NoError(t, json.Unmarshal(envelope.Error.Data, &data))
+	require.Equal(t, []string{mcpapi.ProtocolVersion}, data.Supported)
+	require.Equal(t, futureVersion, data.Requested)
+}
+
+func TestStreamableHTTPPreservesProtocolHeaderMismatch(t *testing.T) {
+	server := httptest.NewServer(mcpapi.New(testRuntime(t, app.Config{})).Handler())
+	defer server.Close()
+
+	body, err := json.Marshal(map[string]any{
+		"jsonrpc": "2.0",
+		"id":      4,
+		"method":  "tools/list",
+		"params": map[string]any{
+			"_meta": currentRequestMeta(),
+		},
+	})
+	require.NoError(t, err)
+	response := doMCPRequest(t, http.MethodPost, server.URL, bytes.NewReader(body), map[string]string{
+		"Mcp-Protocol-Version": "2025-11-25",
+		"Mcp-Method":           "tools/list",
+	})
+	defer response.Body.Close()
+	require.Equal(t, http.StatusBadRequest, response.StatusCode)
+
+	envelope := decodeRPCError(t, response.Body)
+	require.Equal(t, int64(mcp.CodeHeaderMismatch), envelope.Error.Code)
 }
 
 func TestStreamableHTTPRejectsHeaderMismatch(t *testing.T) {
@@ -207,7 +263,9 @@ func TestStreamableHTTPRejectsOversizedBody(t *testing.T) {
 	defer server.Close()
 
 	response := doMCPRequest(t, http.MethodPost, server.URL,
-		bytes.NewReader(make([]byte, mcp.DefaultMaxRequestBodyBytes+1)), nil)
+		bytes.NewReader(make([]byte, mcp.DefaultMaxRequestBodyBytes+1)), map[string]string{
+			"Mcp-Protocol-Version": "2027-01-01",
+		})
 	defer response.Body.Close()
 	require.Equal(t, http.StatusRequestEntityTooLarge, response.StatusCode)
 }
@@ -216,6 +274,12 @@ type rpcError struct {
 	Code    int64           `json:"code"`
 	Message string          `json:"message"`
 	Data    json.RawMessage `json:"data"`
+}
+
+type rpcErrorEnvelope struct {
+	JSONRPC string    `json:"jsonrpc"`
+	ID      any       `json:"id"`
+	Error   *rpcError `json:"error"`
 }
 
 func currentRequestMeta() map[string]any {
@@ -240,15 +304,11 @@ func doMCPRequest(t *testing.T, method string, url string, body io.Reader, heade
 	return response
 }
 
-func decodeRPCError(t *testing.T, body io.Reader) struct {
-	Error *rpcError `json:"error"`
-} {
+func decodeRPCError(t *testing.T, body io.Reader) rpcErrorEnvelope {
 	t.Helper()
 	responseBody, err := io.ReadAll(body)
 	require.NoError(t, err)
-	var envelope struct {
-		Error *rpcError `json:"error"`
-	}
+	var envelope rpcErrorEnvelope
 	require.NoError(t, json.Unmarshal(responseBody, &envelope), string(responseBody))
 	require.NotNil(t, envelope.Error, string(responseBody))
 	return envelope

@@ -51,7 +51,7 @@ func New(rt *app.Runtime) *Server {
 }
 
 func (s *Server) Handler() http.Handler {
-	return mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
+	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
 		return s.server
 	}, &mcp.StreamableHTTPOptions{
 		Stateless:                    true,
@@ -60,6 +60,7 @@ func (s *Server) Handler() http.Handler {
 		MaxRequestBodyBytes:          mcp.DefaultMaxRequestBodyBytes,
 		PropagateRequestCancellation: true,
 	})
+	return strictProtocolHTTPHandler(handler)
 }
 
 func SDKServer(rt *app.Runtime) *mcp.Server {
