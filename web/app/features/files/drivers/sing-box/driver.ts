@@ -1,5 +1,4 @@
 import type { FileDriverDefinition } from "~/features/files/drivers/core/file-driver";
-import { processorsWithoutMihomoPresets } from "~/features/files/drivers/mihomo/processor-adapter";
 import {
   validateJSONConfigSource,
   validateJSONMergeProcessors,
@@ -7,7 +6,10 @@ import {
 
 import { singBoxDefaultBase } from "./base";
 import { singBoxConfigurationAdapter } from "./configuration";
-import { defaultSingBoxProcessors } from "./processor-presets";
+import {
+  defaultSingBoxProcessors,
+  singBoxProcessorPresets,
+} from "./processor-presets";
 
 export const singBoxFileDriverDefinition: FileDriverDefinition = {
   kind: "sing-box",
@@ -24,9 +26,8 @@ export const singBoxFileDriverDefinition: FileDriverDefinition = {
   },
   processors: {
     defaults: defaultSingBoxProcessors,
-    adapter: { normalize: processorsWithoutMihomoPresets },
     mergeModes: ["json_overlay", "json_override"],
-    presets: [],
+    presets: singBoxProcessorPresets,
     validate: validateJSONMergeProcessors,
   },
 };

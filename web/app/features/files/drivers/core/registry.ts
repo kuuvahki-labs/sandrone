@@ -77,7 +77,6 @@ function freezeDriver(driver: FileDriverDefinition): Readonly<FileDriverDefiniti
     source: Object.freeze({ ...driver.source }),
     processors: Object.freeze({
       ...driver.processors,
-      adapter: driver.processors.adapter ? Object.freeze({ ...driver.processors.adapter }) : undefined,
       mergeModes: Object.freeze([...driver.processors.mergeModes]),
       presets: processorPresets,
     }),

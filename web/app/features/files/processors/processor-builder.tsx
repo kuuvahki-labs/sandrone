@@ -2,7 +2,15 @@ import { useCallback, useState } from "react";
 import Alert from "@mui/material/Alert";
 
 import type { FileDriverDefinition, FileMergeMode } from "~/features/files/drivers/core/file-driver";
-import { requireFileDriver } from "~/features/files/drivers/registry";
+import {
+  type FileProcessorPresetCategory,
+  filterForeignManagedProcessors,
+  planFileProcessorPresetAddition,
+} from "~/features/files/drivers/core/processor-presets";
+import {
+  FILE_DRIVER_REGISTRY,
+  requireFileDriver,
+} from "~/features/files/drivers/registry";
 import type { FileKind } from "~/features/files/model/types";
 import { type Translator, useI18n } from "~/shared/i18n/context";
 import {
@@ -24,6 +32,7 @@ import {
   stringValue,
 } from "~/shared/processors/model";
 import type { ProcessorDetail, ResourceOption } from "~/shared/resources/types";
+import type { SelectOption } from "~/shared/ui/form-fields";
 
 import { FileMergeParamsEditor } from "./merge-params-editor";
 import {
@@ -33,19 +42,54 @@ import {
 } from "./rule-source-rewrite-preset";
 
 const RULE_SOURCE_REWRITE_KINDS = new Set(["mihomo", "sing-box", "shadowrocket"]);
+const FILE_PRESET_OPTION_PREFIX = "file-preset:";
+const FILE_PRESET_CATEGORIES: readonly FileProcessorPresetCategory[] = [
+  "privacy",
+  "network",
+  "platform",
+  "tailscale",
+];
+const FILE_PRESET_CATEGORY_LABEL_KEYS: Record<FileProcessorPresetCategory, Parameters<Translator>[0]> = {
+  privacy: "processors.filePreset.category.privacy",
+  network: "processors.filePreset.category.network",
+  platform: "processors.filePreset.category.platform",
+  tailscale: "processors.filePreset.category.tailscale",
+};
+const FILE_PROCESSOR_PRESET_CATALOGS = FILE_DRIVER_REGISTRY.drivers
+  .map((driver) => driver.processors.presets);
+
+type PresetNotice = {
+  description: string;
+  risk?: string;
+  dependencyLabels: string[];
+  removedLabels: string[];
+};
 
 export function FileProcessorBuilder({ defaultValue = [], kind, onDirty, onValidityChange, scriptFiles = [] }: { defaultValue?: ProcessorDetail[]; kind: FileKind; onDirty?: () => void; onValidityChange?: (valid: boolean) => void; scriptFiles?: ResourceOption[] }) {
   const { t } = useI18n();
+  const [presetNotice, setPresetNotice] = useState<PresetNotice | null>(null);
   const [validationIssueCount, setValidationIssueCount] = useState(0);
   const driver = requireFileDriver(kind);
-  const processorOptions = [
+  const processorOptions: SelectOption[] = [
     { value: "script", label: t("model.processor.script") },
     ...(driver.processors.mergeModes.length ? [{ value: "merge", label: t("model.processor.merge") }] : []),
-    ...(RULE_SOURCE_REWRITE_KINDS.has(kind) ? [{
-      value: RULE_SOURCE_REWRITE_PRESET_OPTION,
-      label: t("files.processor.ruleSourceRewritePreset"),
-    }] : []),
-    ...(driver.processors.adapter?.options?.(t) ?? []),
+    ...FILE_PRESET_CATEGORIES.flatMap((category) => {
+      const group = t(FILE_PRESET_CATEGORY_LABEL_KEYS[category]);
+      return [
+        ...(category === "network" && RULE_SOURCE_REWRITE_KINDS.has(kind) ? [{
+          value: RULE_SOURCE_REWRITE_PRESET_OPTION,
+          label: t("files.processor.ruleSourceRewritePreset"),
+          group,
+        }] : []),
+        ...driver.processors.presets
+          .filter((preset) => preset.category === category)
+          .map((preset) => ({
+            value: `${FILE_PRESET_OPTION_PREFIX}${preset.id}`,
+            label: t(preset.labelKey),
+            group,
+          })),
+      ];
+    }),
   ];
 
   function ParamsEditor(props: ProcessorParamsEditorProps) {
@@ -61,15 +105,52 @@ export function FileProcessorBuilder({ defaultValue = [], kind, onDirty, onValid
     setValidationIssueCount(issues.length);
     onValidityChange?.(issues.length === 0);
   }, [driver, onValidityChange]);
+  const addProcessorDrafts = useCallback((type: string, current: ProcessorDraft[]): ProcessorDraft[] => {
+    setPresetNotice(null);
+    if (type === RULE_SOURCE_REWRITE_PRESET_OPTION) {
+      if (current.some(recognizeRuleSourceRewriteProcessorPreset)) return current;
+      return [...current, draftFromProcessor(ruleSourceRewriteProcessorPreset())];
+    }
+    if (type.startsWith(FILE_PRESET_OPTION_PREFIX)) {
+      const presetID = type.slice(FILE_PRESET_OPTION_PREFIX.length);
+      const requested = driver.processors.presets.find((preset) => preset.id === presetID);
+      if (!requested) throw new Error(`unknown file processor preset: ${presetID}`);
+      const plan = planFileProcessorPresetAddition(
+        driver.processors.presets,
+        presetID,
+        current.map(serializeProcessorDraft),
+      );
+      const removals = new Set(plan.removeIndices);
+      const addedIDs = new Set(plan.addedPresetIDs);
+      setPresetNotice({
+        description: t(requested.descriptionKey),
+        ...(requested.riskKey ? { risk: t(requested.riskKey) } : {}),
+        dependencyLabels: plan.dependencyPresetIDs
+          .filter((id) => addedIDs.has(id))
+          .map((id) => presetLabel(driver, id, t)),
+        removedLabels: plan.removedPresetIDs.map((id) => presetLabel(driver, id, t)),
+      });
+      return [
+        ...current.filter((_, index) => !removals.has(index)),
+        ...plan.additions.map((processor) => draftFromProcessor(processor)),
+      ];
+    }
+    return [...current, { id: createProcessorID(), name: "", type, params: defaultParams(type, kind) }];
+  }, [driver, kind, serializeProcessorDraft, t]);
+  const normalizedDefaultValue = filterForeignManagedProcessors(
+    driver.processors.presets,
+    FILE_PROCESSOR_PRESET_CATALOGS,
+    defaultValue,
+  );
 
   return (
     <div className="grid gap-3">
       <ProcessorEditorList
-        addProcessorDrafts={(type, current) => addFileProcessorDrafts(type, current, kind, driver)}
+        addProcessorDrafts={addProcessorDrafts}
         createDraftId={createProcessorID}
         defaultParams={(type) => defaultParams(type, kind)}
         defaultType="script"
-        defaultValue={driver.processors.adapter?.normalize(defaultValue) ?? defaultValue}
+        defaultValue={normalizedDefaultValue}
         draftProcessors={draftProcessors}
         paramsEditor={ParamsEditor}
         processorOptions={processorOptions}
@@ -77,6 +158,20 @@ export function FileProcessorBuilder({ defaultValue = [], kind, onDirty, onValid
         onDirty={onDirty}
         onValueChange={handleValueChange}
       />
+      {presetNotice ? (
+        <Alert severity={presetNotice.risk ? "warning" : "info"}>
+          <div className="grid gap-1">
+            <div><strong>{t("processors.filePreset.notice.description")}:</strong> {presetNotice.description}</div>
+            {presetNotice.risk ? <div>{presetNotice.risk}</div> : null}
+            {presetNotice.dependencyLabels.length ? (
+              <div><strong>{t("processors.filePreset.notice.addedDependencies")}:</strong> {presetNotice.dependencyLabels.join(", ")}</div>
+            ) : null}
+            {presetNotice.removedLabels.length ? (
+              <div><strong>{t("processors.filePreset.notice.removedConflicts")}:</strong> {presetNotice.removedLabels.join(", ")}</div>
+            ) : null}
+          </div>
+        </Alert>
+      ) : null}
       {validationIssueCount > 0 ? <Alert severity="error">{t("processor.merge.jsonInvalid")}</Alert> : null}
     </div>
   );
@@ -105,7 +200,7 @@ function draftProcessors(processors: ProcessorDetail[]): ProcessorDraft[] {
 	});
 }
 
-function draftFromProcessor(processor: ProcessorDetail, index: number): ProcessorDraft {
+function draftFromProcessor(processor: ProcessorDetail, index = Date.now()): ProcessorDraft {
   return { id: createProcessorID(index), name: stringValue(processor.name), type: processor.type || "script", params: cleanParams(processor.params ?? {}) };
 }
 
@@ -145,19 +240,16 @@ function mergeParams(params: Record<string, unknown>, kind: FileKind): Record<st
   return { mode, ...(content ? { content } : {}) };
 }
 
-function addFileProcessorDrafts(type: string, current: ProcessorDraft[], kind: FileKind, driver: Readonly<FileDriverDefinition>): ProcessorDraft[] {
-  if (type === RULE_SOURCE_REWRITE_PRESET_OPTION) {
-    if (current.some(recognizeRuleSourceRewriteProcessorPreset)) return current;
-    return [...current, draftFromProcessor(ruleSourceRewriteProcessorPreset(), Date.now())];
-  }
-  return driver.processors.adapter?.addPreset?.(type, current)
-    ?? [...current, { id: createProcessorID(), name: "", type, params: defaultParams(type, kind) }];
-}
-
 function mergeMode(kind: FileKind): FileMergeMode {
   return requireFileDriver(kind).processors.mergeModes[0] ?? "yaml_overlay";
 }
 
 function createProcessorID(index = Date.now()): string {
   return createProcessorDraftId("file-processor", index);
+}
+
+function presetLabel(driver: Readonly<FileDriverDefinition>, id: string, t: Translator): string {
+  const preset = driver.processors.presets.find((candidate) => candidate.id === id);
+  if (!preset) throw new Error(`unknown file processor preset: ${id}`);
+  return t(preset.labelKey);
 }

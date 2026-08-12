@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CodeBlock, HighlightedTextarea } from "./code-editor";
+import { SelectField } from "./form-fields";
 import { PageHeader } from "./page";
 import { ProbeURLField } from "./probe-url-field";
 import { RenderCachePolicyField } from "./render-cache-policy-field";
@@ -21,6 +22,51 @@ afterEach(() => {
 });
 
 describe("shared UI primitives", () => {
+  it("renders select group headers in option order without changing ungrouped selects", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <SelectField
+        label="Preset"
+        onChange={vi.fn()}
+        options={[
+          { value: "script", label: "Script" },
+          { value: "block-stun", label: "Block STUN", group: "Privacy" },
+          { value: "block-quic", label: "Block QUIC", group: "Privacy" },
+          { value: "tailscale", label: "Tailscale", group: "Platform" },
+        ]}
+        value="script"
+      />,
+    );
+
+    await user.click(screen.getByRole("combobox", { name: "Preset" }));
+    const groupedListbox = screen.getByRole("listbox");
+    expect([...groupedListbox.children].map((child) => child.textContent)).toEqual([
+      "Script",
+      "Privacy",
+      "Block STUN",
+      "Block QUIC",
+      "Platform",
+      "Tailscale",
+    ]);
+    await user.keyboard("{Escape}");
+
+    rerender(
+      <SelectField
+        label="Preset"
+        onChange={vi.fn()}
+        options={[
+          { value: "script", label: "Script" },
+          { value: "merge", label: "Merge" },
+        ]}
+        value="merge"
+      />,
+    );
+    expect(screen.getByRole("combobox", { name: "Preset" })).toHaveTextContent("Merge");
+    await user.click(screen.getByRole("combobox", { name: "Preset" }));
+    const ungroupedListbox = screen.getByRole("listbox");
+    expect([...ungroupedListbox.children].map((child) => child.textContent)).toEqual(["Script", "Merge"]);
+  });
+
   it("collapses sticky page headers after their scroll sentinel leaves the viewport", () => {
     const onBack = vi.fn();
     const { container } = render(

@@ -1,11 +1,13 @@
 import { load } from "js-yaml";
 import { describe, expect, it } from "vitest";
 
+import { recognizedFileProcessorPresetID } from "~/features/files/drivers/core/processor-presets";
+
 import {
   defaultMihomoProcessors,
   mihomoProcessorPreset,
   type MihomoProcessorPresetID,
-  recognizeMihomoProcessorPreset,
+  mihomoProcessorPresets,
 } from "./processor-presets";
 
 describe("Mihomo processor presets", () => {
@@ -32,7 +34,7 @@ describe("Mihomo processor presets", () => {
     });
     expect(tun).not.toHaveProperty("device");
 
-    const tailscale = presetYAML("tailscale");
+    const tailscale = presetYAML("tailscale-external");
     expect(tailscale).toMatchObject({
       dns: {
         "fake-ip-filter+": ["+.tailscale.com", "+.ts.net"],
@@ -97,16 +99,35 @@ describe("Mihomo processor presets", () => {
     });
   });
 
-  it("recognizes only marked YAML overrides", () => {
-    const preset = mihomoProcessorPreset("tailscale");
-    expect(recognizeMihomoProcessorPreset(preset)).toBe("tailscale");
-    expect(recognizeMihomoProcessorPreset({
+  it("declares the existing dependency chain in the managed catalog", () => {
+    expect(mihomoProcessorPresets.map((preset) => preset.id)).toEqual([
+      "sniffer",
+      "tun",
+      "fake-ip-compat",
+      "tailscale-external",
+      "tailnet-share",
+    ]);
+    expect(presetDescriptor("tailscale-external").dependencies).toEqual(["tun"]);
+    expect(presetDescriptor("tailnet-share").dependencies).toEqual(["tun", "tailscale-external"]);
+  });
+
+  it("recognizes only exact YAML override content, not a surviving marker", () => {
+    const preset = mihomoProcessorPreset("tailscale-external");
+    expect(recognizedFileProcessorPresetID(mihomoProcessorPresets, preset)).toBe("tailscale-external");
+    expect(recognizedFileProcessorPresetID(mihomoProcessorPresets, {
       ...preset,
-      params: { ...preset.params, content: "dns:\n  enable: true" },
+      params: { ...preset.params, content: `${String(preset.params?.content)}\n# user edit` },
     })).toBeNull();
-    expect(recognizeMihomoProcessorPreset({ ...preset, params: { ...preset.params, mode: "yaml_overlay" } })).toBeNull();
+    expect(recognizedFileProcessorPresetID(mihomoProcessorPresets, { ...preset, type: "script" })).toBeNull();
+    expect(recognizedFileProcessorPresetID(mihomoProcessorPresets, { ...preset, params: { ...preset.params, mode: "yaml_overlay" } })).toBeNull();
   });
 });
+
+function presetDescriptor(id: MihomoProcessorPresetID) {
+  const descriptor = mihomoProcessorPresets.find((preset) => preset.id === id);
+  if (!descriptor) throw new Error(`missing Mihomo processor preset: ${id}`);
+  return descriptor;
+}
 
 function presetYAML(id: MihomoProcessorPresetID): Record<string, unknown> {
   const content = mihomoProcessorPreset(id).params?.content;

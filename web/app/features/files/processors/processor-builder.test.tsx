@@ -78,24 +78,23 @@ describe("FileProcessorBuilder", () => {
     expect(currentProcessors()).toEqual([added[1]]);
   });
 
-  it("adds preset dependencies once and removes Mihomo presets for another kind", async () => {
+  it("groups managed presets and reports Tailnet Share dependencies in one update", async () => {
+    localStorage.setItem("sandrone.locale", "en-US");
     const user = userEvent.setup();
-    const { rerender } = render(<FileProcessorBuilder kind="mihomo" />);
+    render(<FileProcessorBuilder kind="mihomo" />);
 
-    await selectMuiOption(user, screen.getByRole("combobox", { name: "类型" }), "Tailnet 代理共享");
-    await user.click(screen.getByRole("button", { name: "添加处理器" }));
+    await user.click(screen.getByRole("combobox", { name: "Type" }));
+    expect(screen.getByRole("option", { name: "Tailscale coexistence" })).toBeInTheDocument();
+    expect(screen.getByText("Tailscale")).toBeInTheDocument();
+    await user.click(screen.getByRole("option", { name: "Tailnet proxy sharing" }));
+    await user.click(screen.getByRole("button", { name: "Add processor" }));
+
     expect(currentProcessors().map((processor) => processor.name)).toEqual([
       "TUN",
       "Tailscale 共存",
       "Tailnet 代理共享",
     ]);
-
-    await user.click(screen.getByRole("button", { name: "添加处理器" }));
-    expect(currentProcessors()).toHaveLength(3);
-
-    const presets = currentProcessors();
-    rerender(<FileProcessorBuilder key="sing-box" kind="sing-box" defaultValue={presets} />);
-    expect(currentProcessors()).toEqual([]);
+    expect(screen.getByRole("alert")).toHaveTextContent("Added dependencies: TUN, Tailscale coexistence");
   });
 
   it("preserves unsupported processors byte-for-byte in their original order", () => {

@@ -33,7 +33,6 @@ import type {
   RuleSetCatalogTarget,
 } from "~/features/files/model/types";
 import type { Translator } from "~/shared/i18n/context";
-import type { ProcessorDraft } from "~/shared/processors/model";
 import type { ProcessorDetail } from "~/shared/resources/types";
 
 import type { FileProcessorPreset } from "./processor-presets";
@@ -134,12 +133,6 @@ export interface StructuredFileConfigurationAdapter {
   validate: (draft: ConfigEditorDraft) => ConfigValidationIssue[];
 }
 
-export interface FileProcessorAdapter {
-  options?: (t: Translator) => Array<{ value: string; label: string }>;
-  addPreset?: (type: string, current: ProcessorDraft[]) => ProcessorDraft[] | undefined;
-  normalize: (processors: ProcessorDetail[]) => ProcessorDetail[];
-}
-
 interface FileDriverBase {
   kind: string;
   presentation: {
@@ -157,7 +150,6 @@ interface FileDriverBase {
   };
   processors: {
     defaults: () => ProcessorDetail[];
-    adapter?: FileProcessorAdapter;
     mergeModes: readonly FileMergeMode[];
     presets: readonly FileProcessorPreset[];
     validate: (processors: ProcessorDetail[]) => FileProcessorValidationIssue[];

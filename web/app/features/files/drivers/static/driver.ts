@@ -1,5 +1,4 @@
 import type { FileDriverDefinition } from "~/features/files/drivers/core/file-driver";
-import { processorsWithoutMihomoPresets } from "~/features/files/drivers/mihomo/processor-adapter";
 
 export const staticFileDriverDefinition: FileDriverDefinition = {
   kind: "static",
@@ -19,7 +18,6 @@ export const staticFileDriverDefinition: FileDriverDefinition = {
   },
   processors: {
     defaults: () => [],
-    adapter: { normalize: processorsWithoutMihomoPresets },
     mergeModes: [],
     presets: [],
     validate: () => [],

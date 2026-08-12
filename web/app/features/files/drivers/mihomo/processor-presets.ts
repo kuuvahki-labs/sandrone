@@ -1,8 +1,7 @@
+import type { FileProcessorPreset, FileProcessorPresetCategory } from "~/features/files/drivers/core/processor-presets";
 import type { ProcessorDetail } from "~/shared/resources/types";
 
-export type MihomoProcessorPresetID = "sniffer" | "tun" | "fake-ip-compat" | "tailscale" | "tailnet-share";
-
-const PRESET_MARKER_PREFIX = "# sandrone:mihomo-preset=";
+export type MihomoProcessorPresetID = "sniffer" | "tun" | "fake-ip-compat" | "tailscale-external" | "tailnet-share";
 
 const PRESET_CONTENT: Record<MihomoProcessorPresetID, string> = {
   sniffer: `# sandrone:mihomo-preset=sniffer
@@ -100,7 +99,7 @@ dns:
     - "ps.res.netease.com"
     - "+.oray.com"
     - "+.orayimg.com"`,
-  tailscale: `# sandrone:mihomo-preset=tailscale
+  "tailscale-external": `# sandrone:mihomo-preset=tailscale
 dns:
   fake-ip-filter+:
     - "+.tailscale.com"
@@ -121,7 +120,7 @@ const PRESET_NAMES: Record<MihomoProcessorPresetID, string> = {
   sniffer: "Sniffer",
   tun: "TUN",
   "fake-ip-compat": "Fake-IP 兼容扩展",
-  tailscale: "Tailscale 共存",
+  "tailscale-external": "Tailscale 共存",
   "tailnet-share": "Tailnet 代理共享",
 };
 
@@ -134,16 +133,80 @@ export function mihomoProcessorPreset(id: MihomoProcessorPresetID): ProcessorDet
   };
 }
 
+export const mihomoProcessorPresets: readonly FileProcessorPreset[] = [
+  descriptor(
+    "sniffer",
+    "network",
+    "processor.mihomoPreset.sniffer",
+    "processors.filePreset.mihomo.sniffer.description",
+    "processors.filePreset.mihomo.sniffer.risk",
+    true,
+  ),
+  descriptor(
+    "tun",
+    "network",
+    "processor.mihomoPreset.tun",
+    "processors.filePreset.mihomo.tun.description",
+    "processors.filePreset.mihomo.tun.risk",
+    true,
+  ),
+  descriptor(
+    "fake-ip-compat",
+    "network",
+    "processor.mihomoPreset.fakeIpCompat",
+    "processors.filePreset.mihomo.fakeIpCompat.description",
+    "processors.filePreset.mihomo.fakeIpCompat.risk",
+  ),
+  descriptor(
+    "tailscale-external",
+    "tailscale",
+    "processor.mihomoPreset.tailscale",
+    "processors.filePreset.mihomo.tailscaleExternal.description",
+    "processors.filePreset.mihomo.tailscaleExternal.risk",
+    false,
+    ["tun"],
+  ),
+  descriptor(
+    "tailnet-share",
+    "tailscale",
+    "processor.mihomoPreset.tailnetShare",
+    "processors.filePreset.mihomo.tailnetShare.description",
+    "processors.filePreset.mihomo.tailnetShare.risk",
+    false,
+    ["tun", "tailscale-external"],
+  ),
+];
+
 export function defaultMihomoProcessors(): ProcessorDetail[] {
-  return [mihomoProcessorPreset("sniffer"), mihomoProcessorPreset("tun")];
+  return mihomoProcessorPresets
+    .filter((preset) => preset.defaultOn)
+    .map((preset) => preset.build());
 }
 
-export function recognizeMihomoProcessorPreset(processor: Pick<ProcessorDetail, "type" | "params">): MihomoProcessorPresetID | null {
-  if (processor.type !== "merge" || processor.params?.mode !== "yaml_override" || typeof processor.params.content !== "string") {
-    return null;
-  }
-  for (const id of Object.keys(PRESET_CONTENT) as MihomoProcessorPresetID[]) {
-    if (processor.params.content.includes(`${PRESET_MARKER_PREFIX}${id}`)) return id;
-  }
-  return null;
+function descriptor(
+  id: MihomoProcessorPresetID,
+  category: FileProcessorPresetCategory,
+  labelKey: FileProcessorPreset["labelKey"],
+  descriptionKey: FileProcessorPreset["descriptionKey"],
+  riskKey: NonNullable<FileProcessorPreset["riskKey"]>,
+  defaultOn = false,
+  dependencies: readonly MihomoProcessorPresetID[] = [],
+): FileProcessorPreset {
+  const content = PRESET_CONTENT[id];
+  return {
+    id,
+    category,
+    labelKey,
+    descriptionKey,
+    riskKey,
+    defaultOn,
+    dependencies,
+    conflicts: [],
+    build: () => mihomoProcessorPreset(id),
+    recognize: (processor) => (
+      processor.type === "merge"
+      && processor.params?.mode === "yaml_override"
+      && processor.params.content === content
+    ),
+  };
 }

@@ -1,5 +1,4 @@
 import type { FileDriverDefinition } from "~/features/files/drivers/core/file-driver";
-import { processorsWithoutMihomoPresets } from "~/features/files/drivers/mihomo/processor-adapter";
 import { validateRemoteConfigSource } from "~/features/files/model/input-validation";
 
 import { shadowrocketDefaultBase } from "./base";
@@ -20,7 +19,6 @@ export const shadowrocketFileDriverDefinition: FileDriverDefinition = {
   },
   processors: {
     defaults: () => [],
-    adapter: { normalize: processorsWithoutMihomoPresets },
     mergeModes: ["ini_override"],
     presets: [],
     validate: () => [],

@@ -54,8 +54,6 @@ describe("file driver core registry", () => {
     expect(Object.isFrozen(driver.createPresets[0])).toBe(true);
     expect(Object.isFrozen(driver.source)).toBe(true);
     expect(Object.isFrozen(driver.processors)).toBe(true);
-    expect(driver.processors.adapter).toBeDefined();
-    expect(Object.isFrozen(driver.processors.adapter)).toBe(true);
     expect(Object.isFrozen(driver.processors.mergeModes)).toBe(true);
     expect(Object.isFrozen(driver.processors.presets)).toBe(true);
     expect(Object.isFrozen(driver.processors.presets[0])).toBe(true);
@@ -226,7 +224,6 @@ function structuredDriver(kind = "future-client"): FileDriverDefinition {
     },
     processors: {
       ...raw.processors,
-      adapter: { normalize: (processors) => processors },
       presets: [processorPreset("base")],
     },
   };

@@ -3,8 +3,10 @@ import { validateRemoteConfigSource } from "~/features/files/model/input-validat
 
 import { mihomoDefaultBase } from "./base";
 import { mihomoConfigurationAdapter } from "./configuration";
-import { mihomoProcessorAdapter } from "./processor-adapter";
-import { defaultMihomoProcessors } from "./processor-presets";
+import {
+  defaultMihomoProcessors,
+  mihomoProcessorPresets,
+} from "./processor-presets";
 
 export const mihomoFileDriverDefinition: FileDriverDefinition = {
   kind: "mihomo",
@@ -21,9 +23,8 @@ export const mihomoFileDriverDefinition: FileDriverDefinition = {
   },
   processors: {
     defaults: defaultMihomoProcessors,
-    adapter: mihomoProcessorAdapter,
     mergeModes: ["yaml_overlay", "yaml_override"],
-    presets: [],
+    presets: mihomoProcessorPresets,
     validate: () => [],
   },
 };
