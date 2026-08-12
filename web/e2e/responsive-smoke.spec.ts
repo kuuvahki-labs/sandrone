@@ -11,6 +11,29 @@ const manifest = {
 };
 
 const longPreviewNode = "node-with-an-extremely-long-generated-name-abcdefghijklmnopqrstuvwxyz-0123456789";
+const subscriptionPreview = {
+  subscription_name: "provider",
+  format: "uri-list",
+  before_count: 1,
+  after_count: 1,
+  status_counts: { added: 0, modified: 0, removed: 0, unchanged: 1 },
+  nodes: [{
+    identity: "sha256:probe",
+    status: "unchanged",
+    after: {
+      name: longPreviewNode,
+      type: "ss",
+      server: "example.com",
+      port: 8388,
+      meta: {
+        "probe.alive": "true",
+        "probe.duration_ms": "42",
+        "probe.method": "url_test",
+      },
+    },
+  }],
+  warnings: [],
+};
 const filePreview = {
   content_type: "application/yaml",
   body: [
@@ -73,6 +96,9 @@ test.beforeEach(async ({ page }) => {
   await page.route("**/v1/subscriptions", async (route) => {
     await route.fulfill({ json: { items: manifest.subscriptions } });
   });
+  await page.route("**/v1/subscriptions/provider/preview", async (route) => {
+    await route.fulfill({ json: subscriptionPreview });
+  });
   await page.route("**/v1/files", async (route) => {
     await route.fulfill({ json: { items: manifest.files } });
   });
@@ -112,6 +138,7 @@ test.beforeEach(async ({ page }) => {
 
 const routes = [
   { path: "/subscriptions", heading: "我的订阅", content: "default", focus: false },
+  { path: "/subscriptions/remote/provider/preview", heading: "节点预览", content: longPreviewNode, focus: true },
   { path: "/files", heading: "我的文件", content: "default.yaml", focus: false },
   { path: "/files/new?source=mihomo", heading: "新建文件", content: "节点来源", focus: true },
   { path: "/files/default.yaml/preview", heading: "文件预览", content: longPreviewNode, focus: true },
@@ -148,6 +175,9 @@ for (const route of routes) {
       }));
       expect(previewMetrics.overflowY).toBe("auto");
       expect(previewMetrics.scrollHeight).toBeGreaterThan(previewMetrics.clientHeight);
+    }
+    if (route.path === "/subscriptions/remote/provider/preview") {
+      await expect(page.getByText("42 ms")).toBeVisible();
     }
 
     const pageMetrics = await page.evaluate(() => ({

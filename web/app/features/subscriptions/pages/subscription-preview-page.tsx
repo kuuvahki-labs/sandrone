@@ -12,9 +12,10 @@ import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
 import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
+import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 
-import type { SubscriptionItem, SubscriptionPreview, SubscriptionPreviewNode, SubscriptionPreviewNodeDiff, SubscriptionPreviewStatus } from "~/features/subscriptions/model/types";
+import type { SubscriptionItem, SubscriptionPreview, SubscriptionPreviewNode, SubscriptionPreviewNodeDiff, SubscriptionPreviewProbe, SubscriptionPreviewStatus } from "~/features/subscriptions/model/types";
 import { type Translator, useI18n } from "~/shared/i18n/context";
 import { CollapsibleWarningPanel } from "~/shared/resources/warning-panel";
 import { CodeBlock } from "~/shared/ui/code-editor";
@@ -25,6 +26,7 @@ type PreviewDetailMode = "diff" | "meta";
 type StatusColor = "success" | "warning" | "error" | "info";
 
 const maxSummaryChanges = 3;
+const previewDateTimeFormatters = new Map<string, Intl.DateTimeFormat>();
 
 export interface SubscriptionPreviewPageProps {
   backLabel: string;
@@ -129,7 +131,7 @@ export function SubscriptionPreviewPage({ backLabel, failed = false, pending = f
 }
 
 function PreviewNodeCard({ diff }: { diff: SubscriptionPreviewNodeDiff }) {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const [detailMode, setDetailMode] = useState<PreviewDetailMode>("diff");
   const detailsId = useId();
@@ -137,6 +139,10 @@ function PreviewNodeCard({ diff }: { diff: SubscriptionPreviewNodeDiff }) {
   const nodeDiff = formatNodeDiff(diff);
   const detailValue = detailMode === "meta" ? formatNodeMetadataDiff(diff) : nodeDiff;
   const nodeName = node?.name || t("subscriptions.preview.unnamedNode");
+  const probeSummary = previewProbePresentation(diff.after?.probe, locale, t);
+  const detailLabel = probeSummary
+    ? t("subscriptions.preview.detailWithNameAndProbe", { name: nodeName, probe: probeSummary.accessibleLabel })
+    : t("subscriptions.preview.detailWithName", { name: nodeName });
   const hasMetadata = Boolean(nodeMetadataPayload(diff));
   const detailModeControl = (
     <ToggleButtonGroup
@@ -161,13 +167,14 @@ function PreviewNodeCard({ diff }: { diff: SubscriptionPreviewNodeDiff }) {
         <CardActionArea
           aria-controls={detailsId}
           aria-expanded={expanded}
-          aria-label={t("subscriptions.preview.detailWithName", { name: nodeName })}
+          aria-label={detailLabel}
           className="block text-left"
           onClick={() => setExpanded((value) => !value)}
         >
           <CardContent className="min-w-0 [&:last-child]:pb-4">
-            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto] items-start gap-3">
               <PreviewNodeSummary diff={diff} />
+              {probeSummary ? <PreviewProbeSummary summary={probeSummary} /> : null}
               <span className="pt-1 text-text-secondary">
                 {expanded ? <KeyboardArrowUpIcon aria-hidden fontSize="small" /> : <KeyboardArrowDownIcon aria-hidden fontSize="small" />}
               </span>
@@ -182,6 +189,67 @@ function PreviewNodeCard({ diff }: { diff: SubscriptionPreviewNodeDiff }) {
       </Card>
     </ListItem>
   );
+}
+
+interface PreviewProbePresentation {
+  accessibleLabel: string;
+  alive: boolean;
+  label: string;
+  tooltip: string;
+}
+
+function PreviewProbeSummary({ summary }: { summary: PreviewProbePresentation }) {
+  return (
+    <Tooltip describeChild placement="top" title={summary.tooltip}>
+      <span
+        aria-label={summary.accessibleLabel}
+        className="mt-0.5 inline-flex items-center gap-1.5 self-start whitespace-nowrap rounded-full border border-divider px-2 py-0.5"
+      >
+        <span aria-hidden className={`size-2 shrink-0 rounded-full ${summary.alive ? "bg-success" : "bg-error"}`} />
+        <Typography className="tabular-nums" color={summary.alive ? "text.secondary" : "error.main"} component="span" variant="body2">
+          {summary.label}
+        </Typography>
+      </span>
+    </Tooltip>
+  );
+}
+
+function previewProbePresentation(probe: SubscriptionPreviewProbe | undefined, locale: string, t: Translator): PreviewProbePresentation | undefined {
+  if (!probe) {
+    return undefined;
+  }
+  const label = probe.alive
+    ? probe.durationMs !== undefined
+      ? t("subscriptions.preview.probeDuration", { duration: probe.durationMs })
+      : t("subscriptions.preview.probeAvailable")
+    : t("subscriptions.preview.probeFailed");
+  const accessibleLabel = probe.alive && probe.durationMs !== undefined
+    ? t("subscriptions.preview.probeDurationAccessible", { duration: probe.durationMs })
+    : t("subscriptions.preview.probeStatusAccessible", { status: label });
+  const details = [accessibleLabel];
+  if (probe.method) {
+    details.push(t("subscriptions.preview.probeMethod", { method: probe.method }));
+  }
+  if (probe.checkedAt) {
+    details.push(t("subscriptions.preview.probeCheckedAt", { checkedAt: formatPreviewCheckedAt(probe.checkedAt, locale) }));
+  }
+  if (!probe.alive && probe.errorCode) {
+    details.push(t("subscriptions.preview.probeErrorCode", { errorCode: probe.errorCode }));
+  }
+  return { accessibleLabel, alive: probe.alive, label, tooltip: details.join(" · ") };
+}
+
+function formatPreviewCheckedAt(value: string, locale: string): string {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) {
+    return value;
+  }
+  let formatter = previewDateTimeFormatters.get(locale);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "medium" });
+    previewDateTimeFormatters.set(locale, formatter);
+  }
+  return formatter.format(timestamp);
 }
 
 function PreviewNodeSummary({ diff }: { diff: SubscriptionPreviewNodeDiff }) {

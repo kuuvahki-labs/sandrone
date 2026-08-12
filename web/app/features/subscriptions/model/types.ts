@@ -38,12 +38,21 @@ export interface SubscriptionDefinition {
 
 export type SubscriptionPreviewStatus = "added" | "modified" | "removed" | "unchanged";
 
+export interface SubscriptionPreviewProbe {
+  alive: boolean;
+  durationMs?: number;
+  method?: string;
+  checkedAt?: string;
+  errorCode?: string;
+}
+
 export interface SubscriptionPreviewNode {
   name: string;
   type?: string;
   server?: string;
   port?: number;
   endpoint: string;
+  probe?: SubscriptionPreviewProbe;
   raw?: Record<string, unknown>;
 }
 

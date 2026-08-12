@@ -8,11 +8,14 @@ import type {
   SubscriptionPreview,
   SubscriptionPreviewNode,
   SubscriptionPreviewNodeDiff,
+  SubscriptionPreviewProbe,
   SubscriptionPreviewStatus,
   SubscriptionPreviewWarning,
   SubscriptionTraffic,
   SubscriptionTrafficItem,
 } from "./types";
+
+const positiveIntegerPattern = /^[1-9]\d*$/;
 
 export function subscriptionsFromResourceList(list: unknown): SubscriptionItem[] {
   return arrayField(asRecord(list).items).map(subscriptionFromAPI).filter(hasName);
@@ -146,13 +149,36 @@ function previewNodeFromAPI(value: unknown): SubscriptionPreviewNode | undefined
   }
   const server = stringField(item.server);
   const port = numberField(item.port);
+  const probe = previewProbeFromAPI(item.meta);
   return {
     name: stringField(item.name),
     type: stringField(item.type) || undefined,
     server: server || undefined,
     port: port || undefined,
     endpoint: server ? (port ? `${server}:${port}` : server) : "-",
+    ...(probe ? { probe } : {}),
     raw: item,
+  };
+}
+
+function previewProbeFromAPI(value: unknown): SubscriptionPreviewProbe | undefined {
+  const meta = asRecord(value);
+  const aliveValue = stringField(meta["probe.alive"]);
+  if (aliveValue !== "true" && aliveValue !== "false") {
+    return undefined;
+  }
+  const durationText = stringField(meta["probe.duration_ms"]).trim();
+  const durationValue = positiveIntegerPattern.test(durationText) ? Number(durationText) : Number.NaN;
+  const durationMs = Number.isSafeInteger(durationValue) ? durationValue : undefined;
+  const method = stringField(meta["probe.method"]).trim();
+  const checkedAt = stringField(meta["probe.checked_at"]).trim();
+  const errorCode = stringField(meta["probe.error_code"]).trim();
+  return {
+    alive: aliveValue === "true",
+    ...(durationMs !== undefined ? { durationMs } : {}),
+    ...(method ? { method } : {}),
+    ...(checkedAt ? { checkedAt } : {}),
+    ...(errorCode ? { errorCode } : {}),
   };
 }
 

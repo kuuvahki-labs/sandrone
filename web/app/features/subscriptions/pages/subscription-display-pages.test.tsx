@@ -205,6 +205,91 @@ describe("SubscriptionPreviewPage", () => {
     expect(detailBlock).not.toHaveTextContent('"before"');
     expect(detailBlock).not.toHaveTextContent('"server": "example.com"');
   });
+  it("shows current probe summaries without reusing removed-node metadata", async () => {
+    const user = userEvent.setup();
+    const previewWithProbeSummaries: SubscriptionPreview = {
+      ...subscriptionPreview,
+      beforeCount: 5,
+      afterCount: 4,
+      statusCounts: { added: 0, modified: 0, removed: 1, unchanged: 4 },
+      warnings: [],
+      nodes: [
+        {
+          identity: "sha256:duration",
+          status: "unchanged",
+          after: {
+            name: "duration-node",
+            type: "ss",
+            endpoint: "duration.example.com:8388",
+            probe: {
+              alive: true,
+              durationMs: 42,
+              method: "url_test",
+              checkedAt: "2026-08-12T01:02:03Z",
+            },
+          },
+        },
+        {
+          identity: "sha256:available",
+          status: "unchanged",
+          after: {
+            name: "available-node",
+            type: "vmess",
+            endpoint: "available.example.com:443",
+            probe: { alive: true },
+          },
+        },
+        {
+          identity: "sha256:failed",
+          status: "unchanged",
+          after: {
+            name: "failed-node",
+            type: "vless",
+            endpoint: "failed.example.com:443",
+            probe: { alive: false, errorCode: "probe_tcp_failed" },
+          },
+        },
+        {
+          identity: "sha256:missing",
+          status: "unchanged",
+          after: {
+            name: "missing-node",
+            type: "trojan",
+            endpoint: "missing.example.com:443",
+          },
+        },
+        {
+          identity: "sha256:removed",
+          status: "removed",
+          before: {
+            name: "removed-node",
+            type: "ss",
+            endpoint: "removed.example.com:8388",
+            probe: { alive: true, durationMs: 99 },
+          },
+        },
+      ],
+    };
+
+    render(<SubscriptionPreviewPage {...previewPageActions} item={subscriptions[0]} preview={previewWithProbeSummaries} />);
+
+    expect(screen.getByText("42 ms")).toBeInTheDocument();
+    expect(screen.getByText("可用")).toBeInTheDocument();
+    expect(screen.getByText("失败")).toBeInTheDocument();
+    expect(screen.queryByText("99 ms")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "duration-node 节点详情，测活耗时 42 毫秒" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "available-node 节点详情，测活状态：可用" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "failed-node 节点详情，测活状态：失败" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "missing-node 节点详情" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "removed-node 节点详情" })).toBeInTheDocument();
+
+    await user.hover(screen.getByLabelText("测活耗时 42 毫秒"));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("方式：url_test");
+    expect(screen.getByRole("tooltip")).toHaveTextContent("测活时间：");
+    await user.unhover(screen.getByLabelText("测活耗时 42 毫秒"));
+    await user.hover(screen.getByLabelText("测活状态：失败"));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("错误：probe_tcp_failed");
+  });
   it("puts name changes first in modified node diffs", async () => {
     const user = userEvent.setup();
     render(<SubscriptionPreviewPage {...previewPageActions} item={subscriptions[0]} preview={allStatusSubscriptionPreview} />);

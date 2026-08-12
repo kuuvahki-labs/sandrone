@@ -126,6 +126,69 @@ describe("subscription model codec", () => {
     expect(subscriptionPreviewFromAPI({ traffic: { used_bytes: 123 } })).not.toHaveProperty("traffic");
   });
 
+  it("decodes strict probe summaries without inventing zero durations", () => {
+    const preview = subscriptionPreviewFromAPI({
+      nodes: [
+        {
+          identity: "sha256:alive",
+          status: "unchanged",
+          after: {
+            name: "alive",
+            meta: {
+              "probe.alive": "true",
+              "probe.duration_ms": "42",
+              "probe.method": "url_test",
+              "probe.checked_at": "2026-08-12T01:02:03Z",
+            },
+          },
+        },
+        {
+          identity: "sha256:available",
+          status: "unchanged",
+          after: {
+            name: "available",
+            meta: { "probe.alive": "true", "probe.duration_ms": "0" },
+          },
+        },
+        {
+          identity: "sha256:failed",
+          status: "unchanged",
+          after: {
+            name: "failed",
+            meta: {
+              "probe.alive": "false",
+              "probe.duration_ms": "invalid",
+              "probe.error_code": "probe_tcp_failed",
+            },
+          },
+        },
+        {
+          identity: "sha256:invalid",
+          status: "unchanged",
+          after: {
+            name: "invalid",
+            meta: { "probe.alive": "yes", "probe.duration_ms": "7" },
+          },
+        },
+      ],
+    });
+
+    expect(preview.nodes[0].after).toMatchObject({
+      probe: {
+        alive: true,
+        durationMs: 42,
+        method: "url_test",
+        checkedAt: "2026-08-12T01:02:03Z",
+      },
+      raw: expect.objectContaining({
+        meta: expect.objectContaining({ "probe.duration_ms": "42" }),
+      }),
+    });
+    expect(preview.nodes[1].after?.probe).toEqual({ alive: true });
+    expect(preview.nodes[2].after?.probe).toEqual({ alive: false, errorCode: "probe_tcp_failed" });
+    expect(preview.nodes[3].after).not.toHaveProperty("probe");
+  });
+
   it("maps subscription traffic", () => {
     expect(subscriptionTrafficFromAPI({
       subscription_name: "provider",
