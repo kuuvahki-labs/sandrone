@@ -15,6 +15,7 @@ export const mihomoProcessorAdapter: FileProcessorAdapter = {
   options: (t: Translator) => [
     { value: `${PRESET_OPTION_PREFIX}sniffer`, label: t("processor.mihomoPreset.sniffer") },
     { value: `${PRESET_OPTION_PREFIX}tun`, label: t("processor.mihomoPreset.tun") },
+    { value: `${PRESET_OPTION_PREFIX}fake-ip-compat`, label: t("processor.mihomoPreset.fakeIpCompat") },
     { value: `${PRESET_OPTION_PREFIX}tailscale`, label: t("processor.mihomoPreset.tailscale") },
     { value: `${PRESET_OPTION_PREFIX}tailnet-share`, label: t("processor.mihomoPreset.tailnetShare") },
   ],
@@ -24,6 +25,7 @@ export const mihomoProcessorAdapter: FileProcessorAdapter = {
     const dependencies: Record<MihomoProcessorPresetID, MihomoProcessorPresetID[]> = {
       sniffer: ["sniffer"],
       tun: ["tun"],
+      "fake-ip-compat": ["fake-ip-compat"],
       tailscale: ["tun", "tailscale"],
       "tailnet-share": ["tun", "tailscale", "tailnet-share"],
     };

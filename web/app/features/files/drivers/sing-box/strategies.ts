@@ -332,10 +332,18 @@ function materializeSingBoxTemplate(
       url: `${RULE_BASE}/${source.directory}/${source.file}.srs`,
     };
   });
-  const rules: unknown[] = blueprint.ruleEntries.map(({ module, ruleID }) => ({
+  const domainEntries = blueprint.ruleEntries.filter(({ ruleID }) => !ruleID.endsWith("-ip"));
+  const ipEntries = blueprint.ruleEntries.filter(({ ruleID }) => ruleID.endsWith("-ip"));
+  const materializeRule = ({ module, ruleID }: ConfigTemplateBlueprint["ruleEntries"][number]) => ({
     rule_set: [ruleID],
     outbound: configGroupName(module.id, blueprint.namingLocale),
-  }));
+  });
+  const rules: unknown[] = [
+    { port: 853, outbound: configGroupName("select", blueprint.namingLocale) },
+    ...domainEntries.map(materializeRule),
+    { action: "resolve" },
+    ...ipEntries.map(materializeRule),
+  ];
   rules.push({ outbound: configGroupName("final", blueprint.namingLocale) });
   return {
     group_preset: "basic",

@@ -55,6 +55,7 @@ const RULE_NAMES: Readonly<Record<string, string>> = {
   domain: "DOMAIN",
   "domain-suffix": "DOMAIN-SUFFIX",
   "domain-keyword": "DOMAIN-KEYWORD",
+  "dst-port": "DST-PORT",
   geoip: "GEOIP",
   "ip-cidr": "IP-CIDR",
   "user-agent": "USER-AGENT",
@@ -91,7 +92,11 @@ export const shadowrocketConfigurationAdapter = createStructuredConfigurationAda
       validate: validateGroup,
     },
     ruleSets: { validate: validateRuleSet },
-    rules: { validate: validateRule },
+    rules: {
+      requiresPolicy: rules.requiresPolicy,
+      requiresValue: rules.requiresValue,
+      validate: validateRule,
+    },
   }),
 });
 
@@ -273,6 +278,7 @@ function shadowrocketRules(): StructuredFileConfigurationAdapter["rules"] {
     }),
     project,
     referencesRuleSet: (type) => type === "rule-set" || type === "domain-set",
+    requiresPolicy: () => true,
     requiresValue: (type) => type !== "final",
     serialize: serializeShadowrocketRules,
     supportsNoResolve: (type) => NO_RESOLVE_TYPES.has(type),
@@ -427,6 +433,9 @@ function validateRule(rule: RuleDraft, index: number) {
   const issues = [];
   if (!validRuleComponent(rule.policy)) issues.push(issue("rule_policy_invalid", "rules", `rule-${index}`, "Rule policy is invalid."));
   if (rule.type !== "final" && !validRuleComponent(rule.value)) issues.push(issue("rule_value_invalid", "rules", `rule-${index}`, "Rule match value is invalid."));
+  if (rule.type === "dst-port" && !validPort(rule.value)) {
+    issues.push(issue("rule_port_invalid", "rules", `rule-${index}`, "Destination port must be an integer from 1 to 65535."));
+  }
   return issues;
 }
 
@@ -450,6 +459,11 @@ function validateFilter(value: unknown): boolean {
 
 function validRuleComponent(value: unknown): value is string {
   return typeof value === "string" && Boolean(value.trim()) && !/[\r\n,]/.test(value);
+}
+
+function validPort(value: string): boolean {
+  const port = Number(value.trim());
+  return Number.isInteger(port) && port >= 1 && port <= 65535;
 }
 
 function isHealthCheck(type: string): boolean {
@@ -477,6 +491,7 @@ function shadowrocketRuleTypeOptions(_t: Translator) {
     { value: "domain", label: "DOMAIN" },
     { value: "domain-suffix", label: "DOMAIN-SUFFIX" },
     { value: "domain-keyword", label: "DOMAIN-KEYWORD" },
+    { value: "dst-port", label: "DST-PORT" },
     { value: "rule-set", label: "RULE-SET" },
     { value: "domain-set", label: "DOMAIN-SET" },
     { value: "geoip", label: "GEOIP" },

@@ -79,7 +79,11 @@ export const mihomoConfigurationAdapter = createStructuredConfigurationAdapter({
       validInterval: (value) => positiveInteger(value) !== undefined,
     },
     ruleSets: { validInterval: (value) => positiveInteger(value) !== undefined },
-    rules: {},
+    rules: {
+      requiresPolicy: rules.requiresPolicy,
+      requiresValue: rules.requiresValue,
+      validate: validateMihomoRule,
+    },
   }),
 });
 
@@ -268,6 +272,8 @@ function mihomoRules(): StructuredFileConfigurationAdapter["rules"] {
         ? { id: draftID("rule", index), type: "rule-set", value: parts[1] ?? "", policy: parts[2] ?? "", noResolve: parts[3]?.toLowerCase() === "no-resolve" }
         : parts[0] === "GEOIP"
           ? { id: draftID("rule", index), type: "geoip", value: parts[1] ?? "", policy: parts[2] ?? "", noResolve: parts[3]?.toLowerCase() === "no-resolve" }
+          : parts[0] === "DST-PORT"
+            ? { id: draftID("rule", index), type: "dst-port", value: parts[1] ?? "", policy: parts[2] ?? "" }
           : parts[0] === "MATCH"
             ? { id: draftID("rule", index), type: "match", value: "", policy: parts[1] ?? "" }
             : null;
@@ -280,6 +286,7 @@ function mihomoRules(): StructuredFileConfigurationAdapter["rules"] {
     create: (index, locale = "en-US") => ({ id: draftID("rule", Date.now() + index), type: "rule-set", value: "custom", policy: configAnchorName(locale) }),
     project,
     referencesRuleSet: (type) => type === "rule-set",
+    requiresPolicy: () => true,
     requiresValue: (type) => type !== "match",
     serialize: serializeMihomoRules,
     supportsNoResolve: (type) => type === "rule-set" || type === "geoip",
@@ -300,8 +307,20 @@ function serializeMihomoRules(drafts: RuleDraft[]): string[] {
     const suffix = draft.noResolve ? ",no-resolve" : "";
     if (draft.type === "rule-set" && draft.value.trim()) return [`RULE-SET,${draft.value.trim()},${draft.policy.trim()}${suffix}`];
     if (draft.type === "geoip" && draft.value.trim()) return [`GEOIP,${draft.value.trim()},${draft.policy.trim()}${suffix}`];
+    if (draft.type === "dst-port" && validPort(draft.value)) return [`DST-PORT,${draft.value.trim()},${draft.policy.trim()}`];
     return draft.type === "match" ? [`MATCH,${draft.policy.trim()}`] : [];
   });
+}
+
+function validateMihomoRule(rule: RuleDraft, index: number) {
+  return rule.type === "dst-port" && !validPort(rule.value)
+    ? [issue("rule_port_invalid", "rules", `rule-${index}`, "Destination port must be an integer from 1 to 65535.")]
+    : [];
+}
+
+function validPort(value: string): boolean {
+  const port = Number(value.trim());
+  return Number.isInteger(port) && port >= 1 && port <= 65535;
 }
 
 function defaultGroups(preset: string, locale: ConfigNamingLocale): ConfigMap[] {
@@ -363,6 +382,7 @@ function mihomoRuleSetBehaviorOptions(t: Translator) {
 function mihomoRuleTypeOptions(t: Translator) {
   return [
     { value: "rule-set", label: t("files.config.ruleTypeRuleSet") },
+    { value: "dst-port", label: "DST-PORT" },
     { value: "geoip", label: "GEOIP" },
     { value: "match", label: "MATCH" },
   ];

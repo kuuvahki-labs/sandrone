@@ -26,6 +26,7 @@
 - [错误与诊断](reference/errors.md)：error、warning、report 和敏感信息边界。
 - [构建身份](reference/build-info.md)：版本、Git revision、二进制与容器追溯。
 - [Mihomo fake-IP](reference/mihomo-fake-ip.md)：当前默认、适用范围和上游依据。
+- [客户端路由与 DNS](reference/client-routing-dns.md)：三种客户端的规则顺序、解析路径、`no-resolve` 与中国 IP 兜底。
 
 ## 理解系统
 

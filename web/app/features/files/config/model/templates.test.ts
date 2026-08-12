@@ -11,6 +11,15 @@ const CONFIG_KINDS = ["mihomo", "sing-box", "shadowrocket"] as const;
 type ConfigKind = typeof CONFIG_KINDS[number];
 const TEMPLATE_IDS = ["minimal", "standard", "full"] as const satisfies readonly ConfigTemplateID[];
 const SHADOWROCKET_RULE_BASE = "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket";
+const SHADOWROCKET_METACUBEX_RULE_BASE = "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite";
+const SHADOWROCKET_METACUBEX_RULE_IDS = new Set([
+  "apple-cn",
+  "category-companies@cn",
+  "category-doh",
+  "category-games@cn",
+  "douyin",
+  "microsoft@cn",
+]);
 const SHADOWROCKET_TEMPLATE_ARTIFACTS = new Set([
   "Abema", "Amazon", "AmazonPrimeVideo", "Anthropic", "Apple", "AppleTV", "Atlassian", "BBC",
   "Bahamut", "BiliBili", "BiliBiliIntl", "Binance", "Blizzard", "Bloomberg", "CNN", "China", "Cloudflare", "DAZN",
@@ -216,15 +225,11 @@ describe("config templates", () => {
         type: "domain-set",
         url: `${SHADOWROCKET_RULE_BASE}/China/China_Domain.list`,
       },
-      {
-        name: "cn",
-        type: "rule-set",
-        url: `${SHADOWROCKET_RULE_BASE}/China/China.list`,
-      },
     ]));
+    expect(shadowrocket.rule_sets?.some((ruleSet) => ruleSet.name === "cn")).toBe(false);
     expect(shadowrocket.rules).toEqual(expect.arrayContaining([
       "DOMAIN-SET,cn-domain,China",
-      "RULE-SET,cn,China",
+      "GEOIP,CN,China",
     ]));
   });
 
@@ -242,7 +247,7 @@ describe("config templates", () => {
     );
   });
 
-  it.each(CONFIG_KINDS)("places broad China routing after specific services in the %s standard template", (kind) => {
+  it.each(CONFIG_KINDS)("places China domain routing before global domains and the resolving IP fallback after them in the %s standard template", (kind) => {
     const config = createConfigFromTemplate(kind, "standard");
     const rules = config.rules ?? [];
     const policy = (rule: Record<string, unknown>): string => kind === "sing-box"
@@ -253,15 +258,28 @@ describe("config templates", () => {
       : String(rule).split(",")[1] ?? "";
     const firstPolicy = (name: string): number => rules.findIndex((rule) =>
       policy(rule as Record<string, unknown>) === name);
-    const broadChina = rules.findIndex((rule) =>
-      ruleSetID(rule as Record<string, unknown>) === "cn");
+    const chinaDomain = rules.findIndex((rule) =>
+      ruleSetID(rule as Record<string, unknown>) === (kind === "shadowrocket" ? "cn-domain" : "cn"));
+    const globalDomain = firstPolicy("Global");
+    const chinaIP = kind === "shadowrocket"
+      ? rules.indexOf("GEOIP,CN,China")
+      : rules.findIndex((rule) => ruleSetID(rule as Record<string, unknown>) === "cn-ip");
+    const final = rules.length - 1;
 
     expect(firstPolicy("YouTube")).toBeGreaterThanOrEqual(0);
-    expect(broadChina).toBeGreaterThan(firstPolicy("YouTube"));
-    expect(firstPolicy("Global")).toBeGreaterThan(broadChina);
+    expect(chinaDomain).toBeGreaterThan(firstPolicy("YouTube"));
+    expect(globalDomain).toBeGreaterThan(chinaDomain);
+    expect(chinaIP).toBeGreaterThan(globalDomain);
+    expect(final).toBeGreaterThan(chinaIP);
+
+    if (kind === "sing-box") {
+      const resolve = rules.findIndex((rule) => isRecord(rule) && rule.action === "resolve");
+      expect(resolve).toBeGreaterThan(globalDomain);
+      expect(resolve).toBeLessThan(chinaIP);
+    }
   });
 
-  it.each(["mihomo", "sing-box"] as const)("places domestic service exceptions before broad %s service rules", (kind) => {
+  it.each(CONFIG_KINDS)("places canonical DNS and domestic service exceptions before broad %s service rules", (kind) => {
     const standard = createConfigFromTemplate(kind, "standard");
     const full = createConfigFromTemplate(kind, "full");
     const ruleSetID = (rule: unknown): string => {
@@ -272,14 +290,38 @@ describe("config templates", () => {
     const indexOf = (config: FileConfigDraft, id: string): number =>
       (config.rules ?? []).findIndex((rule) => ruleSetID(rule) === id);
 
-    expect(indexOf(standard, "category-ads-all")).toBeLessThan(indexOf(standard, "microsoft@cn"));
-    expect(indexOf(standard, "private-ip")).toBeLessThan(indexOf(standard, "microsoft@cn"));
+    if (kind !== "shadowrocket") {
+      expect(indexOf(standard, "category-ads-all")).toBeLessThan(indexOf(standard, "category-doh"));
+    }
+    expect(indexOf(standard, "category-doh")).toBeLessThan(indexOf(standard, "category-companies@cn"));
+    expect(indexOf(standard, "private")).toBeLessThan(indexOf(standard, "microsoft@cn"));
     expect(indexOf(standard, "microsoft@cn")).toBeLessThan(indexOf(standard, "microsoft"));
     expect(indexOf(standard, "apple-cn")).toBeLessThan(indexOf(standard, "apple"));
+    expect(indexOf(standard, "category-companies@cn")).toBeLessThan(indexOf(standard, "microsoft"));
     expect(indexOf(standard, "steam@cn")).toBe(-1);
     expect(indexOf(standard, "category-games@cn")).toBe(-1);
     expect(indexOf(full, "steam@cn")).toBeLessThan(indexOf(full, "steam"));
     expect(indexOf(full, "category-games@cn")).toBeLessThan(indexOf(full, "epicgames"));
+    expect(indexOf(full, "douyin")).toBeLessThan(indexOf(full, "tiktok"));
+  });
+
+  it.each(CONFIG_KINDS)("routes application-owned encrypted DNS through the main %s proxy policy", (kind) => {
+    const config = createConfigFromTemplate(kind, "minimal");
+    const rules = config.rules ?? [];
+    const encryptedDNSRule = kind === "sing-box"
+      ? rules.find((rule) => isRecord(rule) && Array.isArray(rule.rule_set) && rule.rule_set[0] === "category-doh")
+      : rules.find((rule) => typeof rule === "string" && rule.includes(",category-doh,"));
+    const encryptedDNSPort = kind === "sing-box"
+      ? rules.find((rule) => isRecord(rule) && rule.port === 853)
+      : rules.find((rule) => typeof rule === "string" && rule.startsWith("DST-PORT,853,"));
+    const policy = "Proxy";
+
+    expect(encryptedDNSRule).toEqual(kind === "sing-box"
+      ? { rule_set: ["category-doh"], outbound: policy }
+      : expect.stringContaining(`,${policy}`));
+    expect(encryptedDNSPort).toEqual(kind === "sing-box"
+      ? { port: 853, outbound: policy }
+      : expect.stringContaining(`,${policy}`));
   });
 
   it("uses the available SteamCN exception before Steam in the full Shadowrocket template", () => {
@@ -299,7 +341,7 @@ describe("config templates", () => {
     expect(steamCN).toBeLessThan(steam);
   });
 
-  it.each(TEMPLATE_IDS)("uses live Blackmatrix rule lists for the %s Shadowrocket template", (templateID) => {
+  it.each(TEMPLATE_IDS)("uses live Blackmatrix and canonical MetaCubeX lists for the %s Shadowrocket template", (templateID) => {
     const config = createConfigFromTemplate("shadowrocket", templateID);
     const ruleTypesByName = new Map((config.rule_sets ?? []).map((ruleSet) => [ruleSet.name, ruleSet.type]));
     const groupsByName = new Map((config.groups ?? []).map((group) => [group.name, group]));
@@ -319,11 +361,15 @@ describe("config templates", () => {
       expect(ruleSet).toEqual({
         name: expect.any(String),
         type: expect.stringMatching(/^(rule-set|domain-set)$/),
-        url: expect.stringMatching(
-          /^https:\/\/raw\.githubusercontent\.com\/blackmatrix7\/ios_rule_script\/master\/rule\/Shadowrocket\//,
-        ),
-     });
-      expect(String(ruleSet.url)).not.toContain("MetaCubeX");
+        url: expect.stringMatching(/^https:\/\/raw\.githubusercontent\.com\/(?:blackmatrix7\/ios_rule_script\/master\/rule\/Shadowrocket|MetaCubeX\/meta-rules-dat\/meta\/geo\/geosite)\//),
+      });
+      if (SHADOWROCKET_METACUBEX_RULE_IDS.has(String(ruleSet.name))) {
+        expect(ruleSet).toEqual({
+          name: ruleSet.name,
+          type: "domain-set",
+          url: `${SHADOWROCKET_METACUBEX_RULE_BASE}/${String(ruleSet.name)}.list`,
+        });
+      }
    }
     for (const rule of config.rules ?? []) {
       if (typeof rule !== "string") continue;
@@ -344,7 +390,9 @@ describe("config templates", () => {
 
   it.each(TEMPLATE_IDS)("uses each fixed Blackmatrix catalog URL once in the %s Shadowrocket template", (templateID) => {
     const config = createConfigFromTemplate("shadowrocket", templateID);
-    const urls = (config.rule_sets ?? []).map((ruleSet) => String(ruleSet.url));
+    const urls = (config.rule_sets ?? [])
+      .map((ruleSet) => String(ruleSet.url))
+      .filter((url) => url.startsWith(SHADOWROCKET_RULE_BASE));
     const artifacts: string[] = [];
 
     expect(new Set(urls).size).toBe(urls.length);
@@ -596,7 +644,8 @@ function referenceProblems(kind: ConfigKind, config: FileConfigDraft): string[] 
         if (!ruleSetNames.has(ruleSet)) problems.push(`unknown rule-set: ${ruleSet}`);
      }
       const policy = stringValue(rule.outbound);
-      if (!groupNames.has(policy) && !literals.has(policy)) problems.push(`unknown policy: ${policy}`);
+      if (policy && !groupNames.has(policy) && !literals.has(policy)) problems.push(`unknown policy: ${policy}`);
+      if (!policy && rule.action !== "resolve") problems.push("missing sing-box policy");
       continue;
    }
 

@@ -61,7 +61,12 @@ func singBoxWebDefaultSpec(t *testing.T, autoMembers []any) *domain.FileSpec {
   "dns": {
     "servers": [
       { "type": "local", "tag": "dns-local" },
+      { "type": "https", "tag": "dns-cn", "server": "223.5.5.5", "detour": "direct" },
       { "type": "https", "tag": "dns-remote", "server": "1.1.1.1", "detour": "Proxy" }
+    ],
+    "rules": [
+      { "rule_set": ["private"], "action": "route", "server": "dns-local" },
+      { "rule_set": ["cn"], "action": "route", "server": "dns-cn" }
     ],
     "final": "dns-remote",
     "strategy": "prefer_ipv4"
@@ -72,9 +77,11 @@ func singBoxWebDefaultSpec(t *testing.T, autoMembers []any) *domain.FileSpec {
       "tag": "tun-in",
       "address": ["172.19.0.1/30", "fdfe:dcba:9876::1/126"],
       "auto_route": true,
+      "strict_route": true,
       "route_exclude_address": [
         "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16",
-        "169.254.0.0/16", "fe80::/10", "fc00::/7"
+        "169.254.0.0/16", "fe80::/10", "fc00::/7",
+        "224.0.0.251/32", "ff02::fb/128"
       ]
     },
     { "type": "mixed", "tag": "mixed-in", "listen": "127.0.0.1", "listen_port": 2080 }
@@ -82,7 +89,7 @@ func singBoxWebDefaultSpec(t *testing.T, autoMembers []any) *domain.FileSpec {
   "outbounds": [],
   "route": {
     "auto_detect_interface": true,
-    "default_domain_resolver": "dns-local",
+    "default_domain_resolver": "dns-cn",
     "rule_set": [],
     "rules": []
   },
@@ -107,18 +114,24 @@ func singBoxWebDefaultSpec(t *testing.T, autoMembers []any) *domain.FileSpec {
 					singBoxRemoteRuleSet("category-ads-all", "geosite", "category-ads-all"),
 					singBoxRemoteRuleSet("private", "geosite", "private"),
 					singBoxRemoteRuleSet("private-ip", "geoip", "private"),
-					singBoxRemoteRuleSet("geolocation-cn", "geosite", "geolocation-cn"),
+					singBoxRemoteRuleSet("category-doh", "geosite", "category-doh"),
+					singBoxRemoteRuleSet("category-companies@cn", "geosite", "category-companies@cn"),
+					singBoxRemoteRuleSet("cn", "geosite", "cn"),
 					singBoxRemoteRuleSet("cn-ip", "geoip", "cn"),
 					singBoxRemoteRuleSet("geolocation-!cn", "geosite", "geolocation-!cn"),
 				},
 				"rules": []map[string]any{
-					map[string]any{"rule_set": []any{"category-ads-all"}, "outbound": "Ad Block"},
-					map[string]any{"rule_set": []any{"private"}, "outbound": "Private"},
-					map[string]any{"rule_set": []any{"private-ip"}, "outbound": "Private"},
-					map[string]any{"rule_set": []any{"geolocation-cn"}, "outbound": "China"},
-					map[string]any{"rule_set": []any{"cn-ip"}, "outbound": "China"},
-					map[string]any{"rule_set": []any{"geolocation-!cn"}, "outbound": "Global"},
-					map[string]any{"outbound": "Final"},
+					{"port": 853, "outbound": "Proxy"},
+					{"rule_set": []any{"category-ads-all"}, "outbound": "Ad Block"},
+					{"rule_set": []any{"private"}, "outbound": "Private"},
+					{"rule_set": []any{"category-doh"}, "outbound": "Proxy"},
+					{"rule_set": []any{"category-companies@cn"}, "outbound": "China"},
+					{"rule_set": []any{"cn"}, "outbound": "China"},
+					{"rule_set": []any{"geolocation-!cn"}, "outbound": "Global"},
+					{"action": "resolve"},
+					{"rule_set": []any{"private-ip"}, "outbound": "Private"},
+					{"rule_set": []any{"cn-ip"}, "outbound": "China"},
+					{"outbound": "Final"},
 				},
 			}),
 		},
@@ -128,7 +141,7 @@ func singBoxWebDefaultSpec(t *testing.T, autoMembers []any) *domain.FileSpec {
 			Stage: domain.StageFile,
 			Params: params(t, map[string]any{
 				"mode":    "json_override",
-				"content": `{"route":{"+rules":[{"action":"sniff"},{"protocol":"dns","action":"hijack-dns"}]}}`,
+				"content": `{"route":{"+rules":[{"action":"sniff"},{"type":"logical","mode":"or","rules":[{"protocol":"dns"},{"port":53}],"action":"hijack-dns"}]}}`,
 			}),
 		}},
 	}

@@ -18,6 +18,99 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/service"
 )
 
+func TestServiceMihomoWebDNSIsAcceptedByLockedCore(t *testing.T) {
+	spec := domain.FileSpec{
+		Name: "dns.yaml",
+		Kind: domain.FileKindMihomo,
+		Source: domain.FileSource{Type: "inline", Content: `mixed-port: 7890
+mode: rule
+dns:
+  enable: true
+  ipv6: false
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  default-nameserver:
+    - "https://223.5.5.5/dns-query#DIRECT"
+    - "https://223.6.6.6/dns-query#DIRECT"
+  nameserver-policy:
+    "geosite:private":
+      - system
+    "rule-set:cn":
+      - "https://223.5.5.5/dns-query#DIRECT"
+      - "https://223.6.6.6/dns-query#DIRECT"
+  nameserver:
+    - "https://cloudflare-dns.com/dns-query#RULES"
+    - "https://dns.google/dns-query#RULES"
+  proxy-server-nameserver:
+    - "https://223.5.5.5/dns-query#DIRECT"
+    - "https://223.6.6.6/dns-query#DIRECT"
+  direct-nameserver:
+    - "https://223.5.5.5/dns-query#DIRECT"
+    - "https://223.6.6.6/dns-query#DIRECT"
+  direct-nameserver-follow-policy: false
+  respect-rules: true
+proxies: []
+proxy-groups: []
+rule-providers: {}
+rules: []
+`},
+		Config: &domain.FileConfig{Settings: raw(t, map[string]any{
+			"groups": []map[string]any{
+				{"name": "Proxy", "type": "select", "proxies": []any{"DIRECT"}},
+			},
+			"rule_sets": []map[string]any{
+				{
+					"name": "cn", "type": "inline", "behavior": "domain",
+					"payload": []any{"DOMAIN-SUFFIX,cn"},
+				},
+			},
+			"rules": []any{
+				"DST-PORT,853,Proxy",
+				"RULE-SET,cn,DIRECT",
+				"MATCH,Proxy",
+			},
+		})},
+		Processors: []domain.ProcessorSpec{{
+			Name:  "TUN",
+			Type:  "merge",
+			Stage: domain.StageFile,
+			Params: params(t, map[string]any{
+				"mode": "yaml_override",
+				"content": `tun!:
+  enable: true
+  stack: mixed
+  auto-route: true
+  strict-route: true
+  auto-detect-interface: true
+  dns-hijack:
+    - any:53
+    - tcp://any:53
+  route-exclude-address:
+    - 10.0.0.0/8
+    - 172.16.0.0/12
+    - 192.168.0.0/16
+    - 169.254.0.0/16
+    - fe80::/10
+    - fc00::/7
+    - 224.0.0.251/32
+    - ff02::fb/128
+`,
+			}),
+		}},
+	}
+
+	result, err := service.New().GetFile(context.Background(), domain.FileRequest{Spec: &spec})
+	require.NoError(t, err)
+
+	parsed, err := mihomoconfig.Parse(result.Content)
+	require.NoError(t, err)
+	for _, proxy := range parsed.Proxies {
+		proxy := proxy
+		t.Cleanup(func() { require.NoError(t, proxy.Close()) })
+	}
+	require.Contains(t, parsed.Proxies, "Proxy")
+}
+
 func TestServiceMihomoAdaptiveGroupIsAcceptedByLockedCore(t *testing.T) {
 	ctx := context.Background()
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))

@@ -1,6 +1,6 @@
 import type { ProcessorDetail } from "~/shared/resources/types";
 
-export type MihomoProcessorPresetID = "sniffer" | "tun" | "tailscale" | "tailnet-share";
+export type MihomoProcessorPresetID = "sniffer" | "tun" | "fake-ip-compat" | "tailscale" | "tailnet-share";
 
 const PRESET_MARKER_PREFIX = "# sandrone:mihomo-preset=";
 
@@ -33,6 +33,7 @@ tun!:
   enable: true
   stack: mixed
   auto-route: true
+  strict-route: true
   auto-detect-interface: true
   dns-hijack:
     - any:53
@@ -43,7 +44,62 @@ tun!:
     - 192.168.0.0/16
     - 169.254.0.0/16
     - fe80::/10
-    - fc00::/7`,
+    - fc00::/7
+    - 224.0.0.251/32
+    - ff02::fb/128`,
+  "fake-ip-compat": `# sandrone:mihomo-preset=fake-ip-compat
+dns:
+  fake-ip-filter+:
+    # Extended NTP endpoints used by common systems and Chinese cloud services.
+    - "time-ios.apple.com"
+    - "ntp1.aliyun.com"
+    - "ntp2.aliyun.com"
+    - "ntp3.aliyun.com"
+    - "ntp4.aliyun.com"
+    - "ntp5.aliyun.com"
+    - "ntp6.aliyun.com"
+    - "ntp7.aliyun.com"
+    - "time1.cloud.tencent.com"
+    - "time2.cloud.tencent.com"
+    - "time3.cloud.tencent.com"
+    - "time4.cloud.tencent.com"
+    - "time5.cloud.tencent.com"
+    - "*.ntp.org.cn"
+    - "ntp.ntsc.ac.cn"
+    # Apple software update endpoints.
+    - "mesu.apple.com"
+    - "swscan.apple.com"
+    - "swquery.apple.com"
+    - "swdownload.apple.com"
+    - "swcdn.apple.com"
+    - "swdist.apple.com"
+    # Selected media and local-login compatibility endpoints.
+    - "music.163.com"
+    - "*.music.163.com"
+    - "y.qq.com"
+    - "*.y.qq.com"
+    - "streamoc.music.tc.qq.com"
+    - "mobileoc.music.tc.qq.com"
+    - "isure.stream.qqmusic.qq.com"
+    - "dl.stream.qqmusic.qq.com"
+    - "aqqmusic.tc.qq.com"
+    - "amobile.music.tc.qq.com"
+    - "songsearch.kugou.com"
+    - "trackercdn.kugou.com"
+    - "*.kuwo.cn"
+    - "music.migu.cn"
+    - "*.music.migu.cn"
+    - "localhost.*.weixin.qq.com"
+    - "*.mcdn.bilivideo.cn"
+    # Banking, P2P, accelerator, and remote-access compatibility endpoints.
+    - "+.cmbchina.com"
+    - "+.cmbimg.com"
+    - "+.sandai.net"
+    - "+.n0808.com"
+    - "+.uu.163.com"
+    - "ps.res.netease.com"
+    - "+.oray.com"
+    - "+.orayimg.com"`,
   tailscale: `# sandrone:mihomo-preset=tailscale
 dns:
   fake-ip-filter+:
@@ -64,6 +120,7 @@ lan-allowed-ips+:
 const PRESET_NAMES: Record<MihomoProcessorPresetID, string> = {
   sniffer: "Sniffer",
   tun: "TUN",
+  "fake-ip-compat": "Fake-IP 兼容扩展",
   tailscale: "Tailscale 共存",
   "tailnet-share": "Tailnet 代理共享",
 };

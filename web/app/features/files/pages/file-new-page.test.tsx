@@ -78,7 +78,17 @@ describe("FileNewPage", () => {
       params: { mode: "json_override" },
     }]);
     expect(JSON.parse(processors[0].params.content)).toEqual({
-      route: { "+rules": [{ action: "sniff" }, { protocol: "dns", action: "hijack-dns" }] },
+      route: {
+        "+rules": [
+          { action: "sniff" },
+          {
+            type: "logical",
+            mode: "or",
+            rules: [{ protocol: "dns" }, { port: 53 }],
+            action: "hijack-dns",
+          },
+        ],
+      },
     });
   });
 });

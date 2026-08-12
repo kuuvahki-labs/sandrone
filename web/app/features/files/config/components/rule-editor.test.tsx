@@ -178,7 +178,7 @@ describe("config rule editors", () => {
     await user.click(within(first).getByRole("combobox", { name: "类型" }));
     const ruleTypes = (await screen.findAllByRole("option")).map((option) => option.textContent);
     expect(ruleTypes).toEqual(expect.arrayContaining([
-      "DOMAIN-SUFFIX", "RULE-SET", "DOMAIN-SET", "GEOIP", "IP-CIDR", "FINAL",
+      "DOMAIN-SUFFIX", "DST-PORT", "RULE-SET", "DOMAIN-SET", "GEOIP", "IP-CIDR", "FINAL",
     ]));
     expect(ruleTypes).not.toEqual(expect.arrayContaining(["PROCESS-NAME", "IP-CIDR6"]));
     await user.click(screen.getByRole("option", { name: "IP-CIDR" }));
@@ -188,6 +188,19 @@ describe("config rule editors", () => {
     await user.click(screen.getByRole("option", { name: "FINAL" }));
     expect(within(first).queryByRole("checkbox", { name: "no-resolve" })).not.toBeInTheDocument();
     expect(within(first).getByRole("textbox", { name: /匹配值|Rule value/i })).toBeDisabled();
+  });
+
+  it("renders sing-box resolve as a policy-free non-terminal action", async () => {
+    const user = userEvent.setup();
+    const config = initialConfig("sing-box", { rules: [{ action: "resolve" }] });
+    render(<RuleHarness initial={config.rules} ruleSets={[]} kind="sing-box" />);
+
+    await user.click(screen.getByRole("button", { name: "展开规则 1" }));
+    const rule = screen.getByRole("group", { name: "规则 1" });
+
+    expect(within(rule).getByRole("textbox", { name: /匹配值|Rule value/i })).toBeDisabled();
+    expect(within(rule).getByRole("textbox", { name: /策略|Policy/i })).toBeDisabled();
+    expect(within(rule).queryByText("→")).not.toBeInTheDocument();
   });
 });
 
@@ -219,11 +232,14 @@ function RuleHarness({ initial, kind = "mihomo", nodes = [], ruleSets }: {
 }) {
   const [rules, setRules] = useState(initial);
   const adapter = structuredAdapter(kind);
+  const nativeGroup = kind === "sing-box"
+    ? { type: "selector", tag: "Proxy", outbounds: ["$nodes", "direct"] }
+    : { name: "Proxy", type: "select", proxies: ["$nodes", "DIRECT"] };
   return (
     <RuleListEditor
       adapter={adapter}
       defaultExpanded
-      groups={adapter.groups.project([{ name: "Proxy", type: "select", proxies: ["$nodes", "DIRECT"] }]) ?? []}
+      groups={adapter.groups.project([nativeGroup]) ?? []}
       issues={[]}
       nodes={nodes}
       rules={rules}

@@ -38,14 +38,24 @@ dns:
     - "stun.*.*"
     - "stun.*.*.*"
   default-nameserver:
-    - 223.5.5.5
-    - 1.1.1.1
+    - "https://223.5.5.5/dns-query#DIRECT"
+    - "https://223.6.6.6/dns-query#DIRECT"
+  nameserver-policy:
+    "geosite:private":
+      - system
+    "rule-set:cn":
+      - "https://223.5.5.5/dns-query#DIRECT"
+      - "https://223.6.6.6/dns-query#DIRECT"
   nameserver:
-    - https://dns.alidns.com/dns-query
-    - https://cloudflare-dns.com/dns-query
+    - "https://cloudflare-dns.com/dns-query#RULES"
+    - "https://dns.google/dns-query#RULES"
   proxy-server-nameserver:
-    - https://dns.alidns.com/dns-query
-    - https://cloudflare-dns.com/dns-query
+    - "https://223.5.5.5/dns-query#DIRECT"
+    - "https://223.6.6.6/dns-query#DIRECT"
+  direct-nameserver:
+    - "https://223.5.5.5/dns-query#DIRECT"
+    - "https://223.6.6.6/dns-query#DIRECT"
+  direct-nameserver-follow-policy: false
   respect-rules: true
 
 proxies: []

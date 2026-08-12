@@ -90,6 +90,8 @@ export interface DraftValidationOptions {
     validInterval?: (value: string) => boolean;
   };
   rules: {
+    requiresPolicy: (type: string) => boolean;
+    requiresValue: (type: string) => boolean;
     validate?: (rule: RuleDraft, index: number) => ConfigValidationIssue[];
   };
 }
@@ -132,8 +134,10 @@ export function validateDraft(
     issues.push(...(options.ruleSets.validate?.(ruleSet, index) ?? []));
   });
   draft.rules.forEach((rule, index) => {
-    if (!rule.policy.trim()) issues.push(issue("rule_policy_empty", "rules", `rule-${index}`, "Rule policy is required."));
-    if (rule.type !== "match" && rule.type !== "private" && rule.type !== "final" && !rule.value.trim()) {
+    if (options.rules.requiresPolicy(rule.type) && !rule.policy.trim()) {
+      issues.push(issue("rule_policy_empty", "rules", `rule-${index}`, "Rule policy is required."));
+    }
+    if (options.rules.requiresValue(rule.type) && !rule.value.trim()) {
       issues.push(issue("rule_value_empty", "rules", `rule-${index}`, "Rule match value is required."));
     }
     issues.push(...(options.rules.validate?.(rule, index) ?? []));

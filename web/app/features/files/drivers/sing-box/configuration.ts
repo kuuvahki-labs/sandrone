@@ -12,6 +12,7 @@ import {
   catalogResult,
   draftID,
   hasOnlyKeys,
+  issue,
   nativeValuesEqual,
   ruleLines,
   scalarString,
@@ -65,7 +66,11 @@ export const singBoxConfigurationAdapter = createStructuredConfigurationAdapter(
       validInterval: validDuration,
     },
     ruleSets: { validInterval: validDuration },
-    rules: {},
+    rules: {
+      requiresPolicy: rules.requiresPolicy,
+      requiresValue: rules.requiresValue,
+      validate: validateSingBoxRule,
+    },
   }),
 });
 
@@ -221,8 +226,18 @@ function singBoxRules(): StructuredFileConfigurationAdapter["rules"] {
     const drafts: RuleDraft[] = [];
     for (const [index, value] of values.entries()) {
       if (!isRecord(value)) return null;
+      if (value.action === "resolve") {
+        if (!hasOnlyKeys(value, ["action"])) return null;
+        drafts.push({ id: draftID("rule", index), type: "resolve", value: "", policy: "" });
+        continue;
+      }
       const outbound = stringField(value.outbound);
       if (!outbound) return null;
+      if (Object.hasOwn(value, "port")) {
+        if (!hasOnlyKeys(value, ["port", "outbound"]) || !validPort(value.port)) return null;
+        drafts.push({ id: draftID("rule", index), type: "port", value: String(value.port), policy: outbound });
+        continue;
+      }
       const ruleSet = stringList(value.rule_set);
       if (ruleSet?.length) {
         drafts.push({ id: draftID("rule", index), type: "rule-set", value: ruleSet[0], policy: outbound });
@@ -246,13 +261,15 @@ function singBoxRules(): StructuredFileConfigurationAdapter["rules"] {
     }),
     project,
     referencesRuleSet: (type) => type === "rule-set",
-    requiresValue: (type) => type !== "private" && type !== "match",
+    requiresPolicy: (type) => type !== "resolve",
+    requiresValue: (type) => type !== "private" && type !== "match" && type !== "resolve",
     serialize: serializeRoutingRules,
     supportsNoResolve: () => false,
     transitionType: (rule, type) => ({
       ...rule,
       type,
-      value: type === "private" || type === "match" ? "" : rule.value,
+      value: type === "private" || type === "match" || type === "resolve" ? "" : rule.value,
+      policy: type === "resolve" ? "" : rule.policy,
       noResolve: false,
     }),
     typeOptions: singBoxRuleTypeOptions,
@@ -277,13 +294,26 @@ function serializeRuleSets(drafts: RuleSetDraft[]): ConfigMap[] {
 }
 
 function serializeRoutingRules(drafts: RuleDraft[]): unknown[] {
-  return drafts.flatMap((draft) => {
+  return drafts.flatMap((draft): unknown[] => {
+    if (draft.type === "resolve") return [{ action: "resolve" }];
     const policy = draft.policy.trim();
     if (!policy) return [];
+    if (draft.type === "port" && validPort(draft.value)) return [{ port: Number(draft.value.trim()), outbound: policy }];
     if (draft.type === "rule-set" && draft.value.trim()) return [{ rule_set: [draft.value.trim()], outbound: policy }];
     if (draft.type === "private") return [{ ip_is_private: true, outbound: policy }];
     return draft.type === "match" ? [{ outbound: policy }] : [];
   });
+}
+
+function validateSingBoxRule(rule: RuleDraft, index: number) {
+  return rule.type === "port" && !validPort(rule.value)
+    ? [issue("rule_port_invalid", "rules", `rule-${index}`, "Destination port must be an integer from 1 to 65535.")]
+    : [];
+}
+
+function validPort(value: unknown): boolean {
+  const port = typeof value === "number" ? value : Number(String(value).trim());
+  return Number.isInteger(port) && port >= 1 && port <= 65535;
 }
 
 function defaultGroups(preset: string, locale: ConfigNamingLocale): ConfigMap[] {
@@ -372,6 +402,8 @@ function classicalBehaviorOptions(t: Translator) {
 function singBoxRuleTypeOptions(t: Translator) {
   return [
     { value: "rule-set", label: t("files.config.ruleTypeRuleSet") },
+    { value: "port", label: t("files.config.ruleTypePort") },
+    { value: "resolve", label: t("files.config.ruleTypeResolve") },
     { value: "private", label: t("files.config.ruleTypePrivate") },
     { value: "match", label: t("files.config.ruleTypeDefault") },
   ];

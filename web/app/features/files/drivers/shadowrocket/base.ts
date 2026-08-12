@@ -47,10 +47,10 @@ tun-excluded-routes = 10.0.0.0/8, 127.0.0.0/8, 169.254.0.0/16, 172.16.0.0/12, 19
 # 2、ecs=子网范围。ecs 参数用于设置 EDNS Client Subnet (ECS)，向 DNS 服务器传递客户端的子网信息。ECS 允许 DNS 服务器根据指定的子网范围（而非实际客户端 IP）来返回最优结果。
 # 3、ecs-override=true。ecs 参数的强制覆盖。即使客户端的实际 IP 提供了不同的地理位置，查询会强制使用 ecs 指定的子网范围。
 
-dns-server = https://doh.pub/dns-query,https://dns.alidns.com/dns-query,223.5.5.5,119.29.29.29
+dns-server = https://223.5.5.5/dns-query,https://223.6.6.6/dns-query
 
 # 备用 DNS。当覆写 DNS 查询失败或查询时间超过 2 秒，Shadowrocket 会自动回退备用 DNS。如需指定多个 DNS，可用逗号分隔。system 表示回退到系统 DNS。
-fallback-dns-server = system
+fallback-dns-server = https://1.1.1.1/dns-query#proxy,https://8.8.8.8/dns-query#proxy
 
 # 启用 IPv6 支持。false 表示不启用，true 表示启用。启用会同时查询 A 记录和 AAAA 记录，优先使用 IPv4 地址解析。
 ipv6 = true
@@ -80,7 +80,7 @@ dns-direct-fallback-proxy = true
 # always-real-ip =
 
 # DNS 劫持。有些设备或软件总是使用硬编码的 DNS 服务器，例如 Netflix 通过 Google DNS(8.8.8.8或8.8.4.4)发送请求，您可以使用此选项来劫持查询。
-hijack-dns = 8.8.8.8:53,8.8.4.4:53
+hijack-dns = :53
 
 # 当 UDP 流量匹配到规则里不支持 UDP 转发的节点策略时重新选择回退行为，可选行为包括 DIRECT、REJECT。DIRECT 表示直连转发 UDP 流量，REJECT 表示拒绝转发 UDP 流量。
 udp-policy-not-supported-behaviour = REJECT
@@ -99,7 +99,7 @@ udp-policy-not-supported-behaviour = REJECT
 # always-ip-address =
 
 # 使用指定 DNS 解析所有节点域名。若未设置此参数，节点域名默认使用 dns-server 进行解析，对于 DNS-over-PROXY 则使用系统 DNS 解析。
-# proxy-dns-server =
+proxy-dns-server = https://223.5.5.5/dns-query,https://223.6.6.6/dns-query
 
 # 代理链丢失关闭连接。若 代理链 中的中转节点丢失则 Reject 代理连接；当设置为 false 时等同于不设置该命令，即若 代理链 中的中转节点丢失则跳过中转节点直接连接落地节点使用。
 # close-if-proxy-chain-missing =

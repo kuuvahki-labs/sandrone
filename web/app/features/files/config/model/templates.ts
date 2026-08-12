@@ -120,10 +120,13 @@ const RULE_ORDER: readonly ConfigGroupID[] = [
   "storage", "payment", "crypto", "news", "shopping", "cn", "global",
 ];
 const RULE_EXCEPTIONS: readonly ConfigTemplateRuleException[] = [
+  { moduleID: "select", requiresModuleID: "select", ruleID: "category-doh" },
+  { moduleID: "cn", requiresModuleID: "cn", ruleID: "category-companies@cn" },
   { moduleID: "cn", requiresModuleID: "microsoft", ruleID: "microsoft@cn" },
   { moduleID: "cn", requiresModuleID: "apple", ruleID: "apple-cn" },
   { moduleID: "cn", requiresModuleID: "steam", ruleID: "steam@cn" },
   { moduleID: "cn", requiresModuleID: "gaming-pc", ruleID: "category-games@cn" },
+  { moduleID: "cn", requiresModuleID: "social-other", ruleID: "douyin" },
 ];
 
 export function createConfigTemplateStrategy(

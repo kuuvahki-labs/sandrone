@@ -288,9 +288,16 @@ function materializeMihomoTemplate(
       url: `${RULE_BASE}/${source.directory}/${source.file}.mrs`,
     };
   });
-  const rules = blueprint.ruleEntries.map(({ module, ruleID }) => (
-    `RULE-SET,${ruleID},${configGroupName(module.id, blueprint.namingLocale)}${ruleID.endsWith("-ip") && ruleID !== "cn-ip" ? ",no-resolve" : ""}`
-  ));
+  const domainEntries = blueprint.ruleEntries.filter(({ ruleID }) => !ruleID.endsWith("-ip"));
+  const ipEntries = blueprint.ruleEntries.filter(({ ruleID }) => ruleID.endsWith("-ip"));
+  const materializeRule = ({ module, ruleID }: ConfigTemplateBlueprint["ruleEntries"][number]) => (
+    `RULE-SET,${ruleID},${configGroupName(module.id, blueprint.namingLocale)}${ruleID !== "cn-ip" && ruleID.endsWith("-ip") ? ",no-resolve" : ""}`
+  );
+  const rules = [
+    `DST-PORT,853,${configGroupName("select", blueprint.namingLocale)}`,
+    ...domainEntries.map(materializeRule),
+    ...ipEntries.map(materializeRule),
+  ];
   rules.push(`MATCH,${configGroupName("final", blueprint.namingLocale)}`);
   return {
     group_preset: "basic",

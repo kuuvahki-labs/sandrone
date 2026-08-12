@@ -49,23 +49,9 @@ dns:
 
 列表及顺序是当前 Web source 的完整默认。Tailscale 域名和地址不在其中。
 
-同一 base 还设置：
-
-```yaml
-dns:
-  default-nameserver:
-    - 223.5.5.5
-    - 1.1.1.1
-  nameserver:
-    - https://dns.alidns.com/dns-query
-    - https://cloudflare-dns.com/dns-query
-  proxy-server-nameserver:
-    - https://dns.alidns.com/dns-query
-    - https://cloudflare-dns.com/dns-query
-  respect-rules: true
-```
-
-这些 resolver 设置参与实际 DNS 路径，但不改变 `fake-ip-filter` 的匹配语义。
+同一 base 的 bootstrap、国内、境外、节点域名 resolver 及其出站路径由
+[客户端路由、DNS 与 IP 兜底](client-routing-dns.md#mihomo)统一说明。这些
+resolver 设置参与实际 DNS 路径，但不改变 `fake-ip-filter` 的匹配语义。
 
 ## `fake-ip-filter` 的效果
 
@@ -118,7 +104,80 @@ sniffer:
     - "+.push.apple.com"
 ```
 
-这控制域名嗅探是否改写连接目标，不是 fake-IP 过滤。默认 `TUN` processor 则启用 DNS hijack，并绕开 RFC 1918、IPv4/IPv6 link-local 和 IPv6 ULA 等地址；它同样不会把域名加入 `fake-ip-filter`。
+这控制域名嗅探是否改写连接目标，不是 fake-IP 过滤。默认 `TUN` processor 则启用 strict route 与 DNS hijack，并绕开 RFC 1918、IPv4/IPv6 link-local、IPv6 ULA，以及 `224.0.0.251/32`、`ff02::fb/128` 两个 mDNS 组播目标；它同样不会把域名加入 `fake-ip-filter`。
+
+## Fake-IP 兼容扩展
+
+`Fake-IP 兼容扩展` 是 Web 中默认关闭的可选 file-stage processor preset，不属于
+Web base，也不在新建文件默认的 `Sniffer`、`TUN` 处理链中。选择后，它通过
+`yaml_override` 的 `fake-ip-filter+` 运算追加以下静态清单：
+
+```yaml
+dns:
+  fake-ip-filter:
+    # 扩展 NTP
+    - "time-ios.apple.com"
+    - "ntp1.aliyun.com"
+    - "ntp2.aliyun.com"
+    - "ntp3.aliyun.com"
+    - "ntp4.aliyun.com"
+    - "ntp5.aliyun.com"
+    - "ntp6.aliyun.com"
+    - "ntp7.aliyun.com"
+    - "time1.cloud.tencent.com"
+    - "time2.cloud.tencent.com"
+    - "time3.cloud.tencent.com"
+    - "time4.cloud.tencent.com"
+    - "time5.cloud.tencent.com"
+    - "*.ntp.org.cn"
+    - "ntp.ntsc.ac.cn"
+
+    # Apple 软件更新
+    - "mesu.apple.com"
+    - "swscan.apple.com"
+    - "swquery.apple.com"
+    - "swdownload.apple.com"
+    - "swcdn.apple.com"
+    - "swdist.apple.com"
+
+    # 媒体与本地登录兼容
+    - "music.163.com"
+    - "*.music.163.com"
+    - "y.qq.com"
+    - "*.y.qq.com"
+    - "streamoc.music.tc.qq.com"
+    - "mobileoc.music.tc.qq.com"
+    - "isure.stream.qqmusic.qq.com"
+    - "dl.stream.qqmusic.qq.com"
+    - "aqqmusic.tc.qq.com"
+    - "amobile.music.tc.qq.com"
+    - "songsearch.kugou.com"
+    - "trackercdn.kugou.com"
+    - "*.kuwo.cn"
+    - "music.migu.cn"
+    - "*.music.migu.cn"
+    - "localhost.*.weixin.qq.com"
+    - "*.mcdn.bilivideo.cn"
+
+    # 银行、P2P、加速器与远控兼容
+    - "+.cmbchina.com"
+    - "+.cmbimg.com"
+    - "+.sandai.net"
+    - "+.n0808.com"
+    - "+.uu.163.com"
+    - "ps.res.netease.com"
+    - "+.oray.com"
+    - "+.orayimg.com"
+```
+
+上面展示的是 merge 后的语义；实际 preset 内容中的键是
+`fake-ip-filter+`。它只让匹配域名获得真实 IP，不把它们改为 `DIRECT`，也不改变
+`nameserver-policy`、DNS 出站或 TUN 路由。
+
+该清单由项目静态维护，不在运行时下载第三方列表；有意不包含 `geosite:cn`、
+`rule-set:cn` 或整个 `qq.com`、`163.com` 等宽泛后缀。某个条目只有在多数环境中
+可复现必须使用真实 IP 时，才考虑移入 Web base；单一应用或设备的兼容需求继续
+留在此可选 preset，用户也可以直接编辑其 YAML。
 
 ## Tailscale 与 MagicDNS
 

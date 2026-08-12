@@ -105,6 +105,7 @@ export interface StructuredRuleDraftAdapter {
   create: (index: number, namingLocale?: ConfigNamingLocale) => RuleDraft;
   project: (rules: unknown[]) => RuleDraft[] | null;
   referencesRuleSet: (type: string) => boolean;
+  requiresPolicy: (type: string) => boolean;
   requiresValue: (type: string) => boolean;
   serialize: (rules: RuleDraft[]) => unknown[];
   supportsNoResolve: (type: string) => boolean;

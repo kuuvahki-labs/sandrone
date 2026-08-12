@@ -41,9 +41,30 @@ describe("file driver default bases", () => {
           "stun.*.*",
           "stun.*.*.*",
         ],
-        "default-nameserver": ["223.5.5.5", "1.1.1.1"],
-        nameserver: ["https://dns.alidns.com/dns-query", "https://cloudflare-dns.com/dns-query"],
-        "proxy-server-nameserver": ["https://dns.alidns.com/dns-query", "https://cloudflare-dns.com/dns-query"],
+        "default-nameserver": [
+          "https://223.5.5.5/dns-query#DIRECT",
+          "https://223.6.6.6/dns-query#DIRECT",
+        ],
+        "nameserver-policy": {
+          "geosite:private": ["system"],
+          "rule-set:cn": [
+            "https://223.5.5.5/dns-query#DIRECT",
+            "https://223.6.6.6/dns-query#DIRECT",
+          ],
+        },
+        nameserver: [
+          "https://cloudflare-dns.com/dns-query#RULES",
+          "https://dns.google/dns-query#RULES",
+        ],
+        "proxy-server-nameserver": [
+          "https://223.5.5.5/dns-query#DIRECT",
+          "https://223.6.6.6/dns-query#DIRECT",
+        ],
+        "direct-nameserver": [
+          "https://223.5.5.5/dns-query#DIRECT",
+          "https://223.6.6.6/dns-query#DIRECT",
+        ],
+        "direct-nameserver-follow-policy": false,
         "respect-rules": true,
       },
       proxies: [],
@@ -68,7 +89,12 @@ describe("file driver default bases", () => {
       dns: {
         servers: [
           { type: "local", tag: "dns-local" },
+          { type: "https", tag: "dns-cn", server: "223.5.5.5", detour: "direct" },
           { type: "https", tag: "dns-remote", server: "1.1.1.1", detour: "Proxy" },
+        ],
+        rules: [
+          { rule_set: ["private"], action: "route", server: "dns-local" },
+          { rule_set: ["cn"], action: "route", server: "dns-cn" },
         ],
         final: "dns-remote",
         strategy: "prefer_ipv4",
@@ -79,6 +105,7 @@ describe("file driver default bases", () => {
           tag: "tun-in",
           address: ["172.19.0.1/30", "fdfe:dcba:9876::1/126"],
           auto_route: true,
+          strict_route: true,
           route_exclude_address: [
             "10.0.0.0/8",
             "172.16.0.0/12",
@@ -86,6 +113,8 @@ describe("file driver default bases", () => {
             "169.254.0.0/16",
             "fe80::/10",
             "fc00::/7",
+            "224.0.0.251/32",
+            "ff02::fb/128",
           ],
         },
         { type: "mixed", tag: "mixed-in", listen: "127.0.0.1", listen_port: 2080 },
@@ -93,14 +122,14 @@ describe("file driver default bases", () => {
       outbounds: [],
       route: {
         auto_detect_interface: true,
-        default_domain_resolver: "dns-local",
+        default_domain_resolver: "dns-cn",
         final: "Proxy",
         rule_set: [],
         rules: [],
       },
       experimental: { cache_file: { enabled: true } },
     });
-    expect(base).not.toMatch(/strict_route|auto_redirect|"stack"|"path"|cache_id|fakeip|clash_api/);
+    expect(base).not.toMatch(/auto_redirect|"stack"|"path"|cache_id|fakeip|clash_api/);
   });
 
   it("keeps localized base references on the registered sing-box driver", () => {
@@ -109,7 +138,7 @@ describe("file driver default bases", () => {
       route: { final?: string };
     };
 
-    expect(base.dns.servers[1]?.detour).toBe("🚀 节点选择");
+    expect(base.dns.servers[2]?.detour).toBe("🚀 节点选择");
     expect(base.route.final).toBe("🚀 节点选择");
   });
 
@@ -118,8 +147,12 @@ describe("file driver default bases", () => {
 
     expect(base.match(/^\[General\]$/gmu)).toHaveLength(1);
     expect(base).not.toMatch(/^\s*bypass-system\s*=/mu);
-    expect(base).toContain("dns-server = https://doh.pub/dns-query,https://dns.alidns.com/dns-query,223.5.5.5,119.29.29.29");
-    expect(base).toContain("fallback-dns-server = system");
+    expect(base).toContain("dns-server = https://223.5.5.5/dns-query,https://223.6.6.6/dns-query");
+    expect(base).toContain("fallback-dns-server = https://1.1.1.1/dns-query#proxy,https://8.8.8.8/dns-query#proxy");
+    expect(base).toContain("proxy-dns-server = https://223.5.5.5/dns-query,https://223.6.6.6/dns-query");
+    expect(base).toContain("hijack-dns = :53");
+    expect(base).not.toMatch(/^dns-server\s*=.*(?:^|,)\s*(?:223\.5\.5\.5|119\.29\.29\.29)(?:,|$)/mu);
+    expect(base).not.toContain("fallback-dns-server = system");
     expect(base).toContain("block-quic = all-proxy");
     expect(base).toMatch(/^\[Proxy\]$[\s\S]*^\[Proxy Group\]$[\s\S]*^\[Rule\]$[\s\S]*^\[Host\]$/mu);
     expect(base).toContain("*.apple.com = server:system");

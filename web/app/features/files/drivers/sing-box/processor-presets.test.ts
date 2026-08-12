@@ -17,7 +17,12 @@ describe("sing-box file processor defaults", () => {
       route: {
         "+rules": [
           { action: "sniff" },
-          { protocol: "dns", action: "hijack-dns" },
+          {
+            type: "logical",
+            mode: "or",
+            rules: [{ protocol: "dns" }, { port: 53 }],
+            action: "hijack-dns",
+          },
         ],
       },
     });

@@ -102,7 +102,7 @@ describe("file form drivers", () => {
       dns: { servers: Array<{ detour?: string }> };
       route: { final?: string };
     };
-    expect(base.dns.servers[1]?.detour).toBe("🚀 节点选择");
+    expect(base.dns.servers[2]?.detour).toBe("🚀 节点选择");
     expect(base.route.final).toBe("🚀 节点选择");
   });
 

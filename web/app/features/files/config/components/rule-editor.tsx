@@ -321,6 +321,7 @@ function SortableRuleRow({ adapter, focusFirstField, id, index, onDelete, onMove
 }) {
   const { t } = useI18n();
   const { attributes, listeners, setActivatorNodeRef, setNodeRef, transform, transition } = useSortable({ id });
+  const hasPolicy = adapter.rules.requiresPolicy(rule.type);
   const hasValue = adapter.rules.requiresValue(rule.type);
   const referencesRuleSet = adapter.rules.referencesRuleSet(rule.type);
   const currentRuleSetNames = referencesRuleSet && rule.value && !ruleSetNames.includes(rule.value) ? [...ruleSetNames, rule.value] : ruleSetNames;
@@ -336,7 +337,7 @@ function SortableRuleRow({ adapter, focusFirstField, id, index, onDelete, onMove
           onToggle={onOpenChange}
         >
           <ConfigRowSummary
-            primary={<><span>{rule.type.toUpperCase()}</span>{rule.value ? <span> {rule.value}</span> : null}<span> → </span><span>{rule.policy || t("files.config.policy")}</span></>}
+            primary={<><span>{rule.type.toUpperCase()}</span>{rule.value ? <span> {rule.value}</span> : null}{hasPolicy ? <><span> → </span><span>{rule.policy || t("files.config.policy")}</span></> : null}</>}
             secondary={rule.noResolve ? ["no-resolve"] : []}
           />
         </ConfigRowDisclosure>
@@ -357,7 +358,9 @@ function SortableRuleRow({ adapter, focusFirstField, id, index, onDelete, onMove
             ) : (
               <TextField fullWidth required label={t("files.config.ruleValue")} size="small" value={rule.value} onChange={(event) => onUpdate({ value: event.target.value })} />
             ) : <TextField disabled fullWidth label={t("files.config.ruleValue")} placeholder={t("files.config.ruleValueNotRequired")} size="small" value="" />}
-            <CreatableReferenceField label={t("files.config.policy")} options={policyOptions} value={rule.policy} onChange={(policy) => onUpdate({ policy })} />
+            {hasPolicy
+              ? <CreatableReferenceField label={t("files.config.policy")} options={policyOptions} value={rule.policy} onChange={(policy) => onUpdate({ policy })} />
+              : <TextField disabled fullWidth label={t("files.config.policy")} placeholder={t("files.config.policyNotRequired")} size="small" value="" />}
             <ui.RuleFields
               draft={rule}
               supportsNoResolve={adapter.rules.supportsNoResolve(rule.type)}

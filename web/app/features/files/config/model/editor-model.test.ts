@@ -251,6 +251,22 @@ describe("file config model", () => {
     }]);
   });
 
+  it("round-trips sing-box DNS transport and resolving fallback rules through wizard mode", () => {
+    const rules = [
+      { port: 853, outbound: "Proxy" },
+      { action: "resolve" },
+      { rule_set: ["cn-ip"], outbound: "direct" },
+      { outbound: "Proxy" },
+    ];
+    const config = initialConfig("sing-box", { rules });
+
+    expect(config.mode).toBe("wizard");
+    expect(config.rules.map((rule) => rule.type)).toEqual(["port", "resolve", "rule-set", "match"]);
+    expect(config.rules[1]).toMatchObject({ type: "resolve", value: "", policy: "" });
+    expect(ruleRequiresPolicy("sing-box", "resolve")).toBe(false);
+    expect(serializeRules("sing-box", config.rules)).toEqual(rules);
+  });
+
   it("round-trips strict Shadowrocket rule sets and ordered string rules", () => {
     const settings = {
       rule_sets: [
@@ -259,6 +275,7 @@ describe("file config model", () => {
       ],
       rules: [
         "DOMAIN-SUFFIX,example.com,Proxy",
+        "DST-PORT,853,Proxy",
         "DOMAIN-SET,ads,REJECT",
         "RULE-SET,lan,DIRECT,no-resolve",
         "GEOIP,CN,DIRECT,no-resolve",
@@ -272,7 +289,7 @@ describe("file config model", () => {
     expect(serializeRuleSets("shadowrocket", config.ruleSets)).toEqual(settings.rule_sets);
     expect(serializeRules("shadowrocket", config.rules)).toEqual(settings.rules);
     expect(config.rules.map((rule) => rule.type)).toEqual([
-      "domain-suffix", "domain-set", "rule-set", "geoip", "final",
+      "domain-suffix", "dst-port", "domain-set", "rule-set", "geoip", "final",
     ]);
   });
 
@@ -328,6 +345,19 @@ describe("file config model", () => {
       expect(config.mode).toBe("wizard");
       expect(config.rules.some((rule) => rule.noResolve)).toBe(true);
       expect(serializeRules("mihomo", config.rules)).toEqual(template.rules);
+    },
+  );
+
+  it.each(["sing-box", "shadowrocket"] as const)(
+    "round-trips every generated %s template through wizard mode",
+    (kind) => {
+      for (const templateID of ["minimal", "standard", "full"] satisfies ConfigTemplateID[]) {
+        const template = createConfigFromTemplate(kind, templateID);
+        const config = initialConfig(kind, template);
+
+        expect(config.mode).toBe("wizard");
+        expect(serializeRules(kind, config.rules)).toEqual(template.rules);
+      }
     },
   );
 
@@ -413,6 +443,10 @@ function ruleSetFormatPatch(kind: FileKind, url: string, format: string) {
 
 function ruleSupportsNoResolve(kind: FileKind, type: string) {
   return structuredAdapter(kind).rules.supportsNoResolve(type);
+}
+
+function ruleRequiresPolicy(kind: FileKind, type: string) {
+  return structuredAdapter(kind).rules.requiresPolicy(type);
 }
 
 function proxyGroupMemberMode(kind: FileKind, group: ConfigMap) {

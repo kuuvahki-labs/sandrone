@@ -48,7 +48,15 @@ const ADAPTIVE_TYPE_OPTIONS = [
   { value: "load-balance", label: "load-balance" },
 ] as const;
 const RULE_BASE = "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket";
-const UNSUPPORTED_TEMPLATE_RULES = new Set(["apple-cn", "category-games@cn", "microsoft@cn"]);
+const METACUBEX_RULE_BASE = "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite";
+const METACUBEX_RULE_IDS = new Set([
+  "apple-cn",
+  "category-companies@cn",
+  "category-doh",
+  "category-games@cn",
+  "douyin",
+  "microsoft@cn",
+]);
 
 const relations = shadowrocketRelations();
 const adaptive = shadowrocketAdaptive(shadowrocketAdaptiveDialect(relations));
@@ -372,19 +380,21 @@ function materializeShadowrocketTemplate(
       : { name, type: "select", proxies: targets };
   });
   const ruleEntries = blueprint.ruleEntries
-    .filter(({ ruleID }) => canonicalRuleID(ruleID) === ruleID && !UNSUPPORTED_TEMPLATE_RULES.has(ruleID))
+    .filter(({ ruleID }) => canonicalRuleID(ruleID) === ruleID)
     .flatMap(({ module, ruleID }) => ruleArtifacts(ruleID).map((artifact) => ({ artifact, module })));
-  const ruleSets = ruleEntries.map(({ artifact }) => {
-    return {
-      name: artifact.id,
-      type: artifact.type,
-      url: `${RULE_BASE}/${artifact.name}/${artifact.filename}`,
-    };
-  });
-  const rules = ruleEntries.map(({ artifact, module }) => {
-    const type = artifact.type === "domain-set" ? "DOMAIN-SET" : "RULE-SET";
-    return `${type},${artifact.id},${configGroupName(module.id, blueprint.namingLocale)}`;
-  });
+  const ruleSets = ruleEntries.map(({ artifact }) => ({
+    name: artifact.id,
+    type: artifact.type,
+    url: artifact.url,
+  }));
+  const rules = [
+    `DST-PORT,853,${configGroupName("select", blueprint.namingLocale)}`,
+    ...ruleEntries.map(({ artifact, module }) => {
+      const type = artifact.type === "domain-set" ? "DOMAIN-SET" : "RULE-SET";
+      return `${type},${artifact.id},${configGroupName(module.id, blueprint.namingLocale)}`;
+    }),
+    `GEOIP,CN,${configGroupName("cn", blueprint.namingLocale)}`,
+  ];
   rules.push(`FINAL,${configGroupName("final", blueprint.namingLocale)}`);
   return {
     group_preset: "basic",
@@ -425,22 +435,21 @@ function canonicalRuleID(ruleID: string): string {
 }
 
 interface ShadowrocketRuleArtifact {
-  filename: string;
   id: string;
-  name: string;
   type: "rule-set" | "domain-set";
+  url: string;
 }
 
 function ruleArtifacts(ruleID: string): ShadowrocketRuleArtifact[] {
+  if (METACUBEX_RULE_IDS.has(ruleID)) {
+    return [{ id: ruleID, type: "domain-set", url: `${METACUBEX_RULE_BASE}/${ruleID}.list` }];
+  }
   const name = ARTIFACT_NAMES[canonicalRuleID(ruleID)];
   if (!name) throw new Error(`Unknown Shadowrocket template rule: ${ruleID}`);
   if (ruleID === "cn") {
-    return [
-      { filename: `${name}_Domain.list`, id: "cn-domain", name, type: "domain-set" },
-      { filename: `${name}.list`, id: ruleID, name, type: "rule-set" },
-    ];
+    return [{ id: "cn-domain", type: "domain-set", url: `${RULE_BASE}/${name}/${name}_Domain.list` }];
   }
-  return [{ filename: `${name}.list`, id: ruleID, name, type: "rule-set" }];
+  return [{ id: ruleID, type: "rule-set", url: `${RULE_BASE}/${name}/${name}.list` }];
 }
 
 function policyFilter(item: { filter: string; excludeFilter?: string }): string {

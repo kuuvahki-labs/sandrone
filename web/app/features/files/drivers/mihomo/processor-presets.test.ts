@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   defaultMihomoProcessors,
   mihomoProcessorPreset,
+  type MihomoProcessorPresetID,
   recognizeMihomoProcessorPreset,
 } from "./processor-presets";
 
@@ -24,9 +25,10 @@ describe("Mihomo processor presets", () => {
       enable: true,
       stack: "mixed",
       "auto-route": true,
+      "strict-route": true,
       "auto-detect-interface": true,
       "dns-hijack": ["any:53", "tcp://any:53"],
-      "route-exclude-address": ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16", "fe80::/10", "fc00::/7"],
+      "route-exclude-address": ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16", "fe80::/10", "fc00::/7", "224.0.0.251/32", "ff02::fb/128"],
     });
     expect(tun).not.toHaveProperty("device");
 
@@ -41,6 +43,58 @@ describe("Mihomo processor presets", () => {
     expect(presetYAML("tailnet-share")).toEqual({
       "lan-allowed-ips+": ["100.64.0.0/10", "fd7a:115c:a1e0::/48"],
     });
+    expect(presetYAML("fake-ip-compat")).toEqual({
+      dns: {
+        "fake-ip-filter+": [
+          "time-ios.apple.com",
+          "ntp1.aliyun.com",
+          "ntp2.aliyun.com",
+          "ntp3.aliyun.com",
+          "ntp4.aliyun.com",
+          "ntp5.aliyun.com",
+          "ntp6.aliyun.com",
+          "ntp7.aliyun.com",
+          "time1.cloud.tencent.com",
+          "time2.cloud.tencent.com",
+          "time3.cloud.tencent.com",
+          "time4.cloud.tencent.com",
+          "time5.cloud.tencent.com",
+          "*.ntp.org.cn",
+          "ntp.ntsc.ac.cn",
+          "mesu.apple.com",
+          "swscan.apple.com",
+          "swquery.apple.com",
+          "swdownload.apple.com",
+          "swcdn.apple.com",
+          "swdist.apple.com",
+          "music.163.com",
+          "*.music.163.com",
+          "y.qq.com",
+          "*.y.qq.com",
+          "streamoc.music.tc.qq.com",
+          "mobileoc.music.tc.qq.com",
+          "isure.stream.qqmusic.qq.com",
+          "dl.stream.qqmusic.qq.com",
+          "aqqmusic.tc.qq.com",
+          "amobile.music.tc.qq.com",
+          "songsearch.kugou.com",
+          "trackercdn.kugou.com",
+          "*.kuwo.cn",
+          "music.migu.cn",
+          "*.music.migu.cn",
+          "localhost.*.weixin.qq.com",
+          "*.mcdn.bilivideo.cn",
+          "+.cmbchina.com",
+          "+.cmbimg.com",
+          "+.sandai.net",
+          "+.n0808.com",
+          "+.uu.163.com",
+          "ps.res.netease.com",
+          "+.oray.com",
+          "+.orayimg.com",
+        ],
+      },
+    });
   });
 
   it("recognizes only marked YAML overrides", () => {
@@ -54,7 +108,7 @@ describe("Mihomo processor presets", () => {
   });
 });
 
-function presetYAML(id: "sniffer" | "tun" | "tailscale" | "tailnet-share"): Record<string, unknown> {
+function presetYAML(id: MihomoProcessorPresetID): Record<string, unknown> {
   const content = mihomoProcessorPreset(id).params?.content;
   expect(typeof content).toBe("string");
   return load(String(content)) as Record<string, unknown>;

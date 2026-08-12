@@ -7,7 +7,12 @@ export function singBoxDefaultBase(namingLocale: ConfigNamingLocale): string {
   "dns": {
     "servers": [
       { "type": "local", "tag": "dns-local" },
+      { "type": "https", "tag": "dns-cn", "server": "223.5.5.5", "detour": "direct" },
       { "type": "https", "tag": "dns-remote", "server": "1.1.1.1", "detour": "${anchor}" }
+    ],
+    "rules": [
+      { "rule_set": ["private"], "action": "route", "server": "dns-local" },
+      { "rule_set": ["cn"], "action": "route", "server": "dns-cn" }
     ],
     "final": "dns-remote",
     "strategy": "prefer_ipv4"
@@ -18,13 +23,16 @@ export function singBoxDefaultBase(namingLocale: ConfigNamingLocale): string {
       "tag": "tun-in",
       "address": ["172.19.0.1/30", "fdfe:dcba:9876::1/126"],
       "auto_route": true,
+      "strict_route": true,
       "route_exclude_address": [
         "10.0.0.0/8",
         "172.16.0.0/12",
         "192.168.0.0/16",
         "169.254.0.0/16",
         "fe80::/10",
-        "fc00::/7"
+        "fc00::/7",
+        "224.0.0.251/32",
+        "ff02::fb/128"
       ]
     },
     {
@@ -37,7 +45,7 @@ export function singBoxDefaultBase(namingLocale: ConfigNamingLocale): string {
   "outbounds": [],
   "route": {
     "auto_detect_interface": true,
-    "default_domain_resolver": "dns-local",
+    "default_domain_resolver": "dns-cn",
     "final": "${anchor}",
     "rule_set": [],
     "rules": []

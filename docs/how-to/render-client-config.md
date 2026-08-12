@@ -16,6 +16,9 @@
 
 `kind` 区分大小写且不能省略。不要把 renderer 名称（例如 `mihomo-proxies`）写成 file kind。
 
+Web 模板的跨客户端规则顺序、DNS 隐私边界和中国 IP 兜底见
+[客户端路由、DNS 与 IP 兜底](../reference/client-routing-dns.md)。
+
 以下命令假设：
 
 ```sh
