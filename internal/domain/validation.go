@@ -36,12 +36,38 @@ type ValidationCounts struct {
 	Warnings int `json:"warning" yaml:"warning"`
 }
 
-type InspectRequest struct {
-	Target string            `json:"target,omitempty" yaml:"target,omitempty"`
-	Meta   map[string]string `json:"meta,omitempty" yaml:"meta,omitempty"`
+type InspectResult struct {
+	Formats    InspectFormats    `json:"formats" yaml:"formats"`
+	Processors InspectProcessors `json:"processors" yaml:"processors"`
+	FileKinds  []FileKind        `json:"file_kinds" yaml:"file_kinds"`
+	Probe      InspectProbe      `json:"probe" yaml:"probe"`
+	Store      InspectStore      `json:"store" yaml:"store"`
 }
 
-type InspectResult struct {
-	Capabilities map[string]any `json:"capabilities,omitempty" yaml:"capabilities,omitempty"`
-	Report       Report         `json:"report,omitempty" yaml:"report,omitempty"`
+type InspectFormats struct {
+	Parse  []string `json:"parse" yaml:"parse"`
+	Render []string `json:"render" yaml:"render"`
+}
+
+type InspectProcessors struct {
+	Nodes []string `json:"nodes" yaml:"nodes"`
+	File  []string `json:"file" yaml:"file"`
+}
+
+type InspectProbe struct {
+	Methods  []ProbeMethod         `json:"methods" yaml:"methods"`
+	Backends []ProbeBackendSummary `json:"backends" yaml:"backends"`
+}
+
+type ProbeBackendSummary struct {
+	Method  ProbeMethod `json:"method" yaml:"method"`
+	Name    string      `json:"name" yaml:"name"`
+	Version string      `json:"version,omitempty" yaml:"version,omitempty"`
+	Core    string      `json:"core,omitempty" yaml:"core,omitempty"`
+}
+
+type InspectStore struct {
+	Configured    bool `json:"configured" yaml:"configured"`
+	Subscriptions *int `json:"subscriptions,omitempty" yaml:"subscriptions,omitempty"`
+	Files         *int `json:"files,omitempty" yaml:"files,omitempty"`
 }

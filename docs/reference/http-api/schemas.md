@@ -25,8 +25,10 @@ canonical stage、processor、file kind、Subscription、FileSpec 和脚本 API�
 
 | 路由 | 成功响应的用途 |
 | --- | --- |
+| `GET /v1/schemas` | 列出 schema catalog；每项带说明与对应 `href`。 |
 | `GET /v1/schemas/processors` | 列出公开 processor 的 canonical `stage`、`type`、effects、说明和详情 URI。 |
 | `GET /v1/schemas/processors/{stage}/{type}` | 返回一个公开 processor 的 `params_schema`、effects、示例和 error codes。 |
+| `GET /v1/schemas/file-kinds` | 列出 canonical file kind、media type、syntax、settings 支持状态与详情 `href`。 |
 | `GET /v1/schemas/file-kinds/{kind}` | 返回一个 canonical file kind 的 `settings_schema`、source rules、defaults 和示例。 |
 | `GET /v1/schemas/script-api/v1` | 返回版本 1 的 script config、envelope、注入方法、来源与 sandbox schema。 |
 | `GET /v1/schemas/subscription` | 返回完整、封闭的具名 Subscription 写入 schema。 |
@@ -34,7 +36,7 @@ canonical stage、processor、file kind、Subscription、FileSpec 和脚本 API�
 
 所有路由都没有请求体和查询参数。processor stage 只有 `nodes`、`file`；
 `{type}` 必须来自 processor catalog。file kind 只有 `static`、`mihomo`、
-`sing-box`、`shadowrocket`；运行时应先读 catalog，不要从版本号猜测可用项。
+`sing-box`、`shadowrocket`；运行时先读根目录或对应索引，不要从版本号猜测可用项。
 
 ## Subscription 写入 schema
 
@@ -129,10 +131,16 @@ export SANDRONE_URL="http://127.0.0.1:1137"
 export SANDRONE_TOKEN="example-token"
 ```
 
-列出 processor schema：
+列出 schema 根目录与 processor/file-kind 索引：
 
 ```sh
+curl -sS "$SANDRONE_URL/v1/schemas" \
+  -H "Authorization: Bearer $SANDRONE_TOKEN"
+
 curl -sS "$SANDRONE_URL/v1/schemas/processors" \
+  -H "Authorization: Bearer $SANDRONE_TOKEN"
+
+curl -sS "$SANDRONE_URL/v1/schemas/file-kinds" \
   -H "Authorization: Bearer $SANDRONE_TOKEN"
 ```
 

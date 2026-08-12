@@ -66,7 +66,15 @@ type validateResponse struct {
 }
 
 type inspectResponse struct {
-	Capabilities map[string]any `json:"capabilities,omitempty"`
+	domain.InspectResult
+	Catalogs inspectCatalogs `json:"catalogs"`
+}
+
+type inspectCatalogs struct {
+	Formats    string `json:"formats"`
+	Schemas    string `json:"schemas"`
+	Processors string `json:"processors"`
+	FileKinds  string `json:"file_kinds"`
 }
 
 type shareListResponse struct {

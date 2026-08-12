@@ -7,16 +7,29 @@
 
 ## 运行时能力发现
 
-`sandrone inspect` 的 `capabilities` 是当前二进制的机器可读能力：
+`sandrone inspect` 返回当前二进制的轻量运行时摘要：
 
-- `parse_formats`：已注册输入格式；
-- `render_formats`：已注册输出格式；
-- `capabilities`：按 `direction` 与 `format` 唯一标识的字段级声明；
-- `node_processors`、`file_processors`、`probe_methods` 和
-  `probe_backends`：同一运行时的其它能力。
+- `formats.parse`、`formats.render`：已注册输入、输出格式；
+- `processors.nodes`、`processors.file`：公开 processor 名称；
+- `file_kinds`、`probe.methods`、`probe.backends`：typed-file 与实际 probe
+  backend 摘要；
+- `store`：是否配置 store；配置时包含 subscription、file 数量。
+
+字段级 format capability 不再内嵌到 inspect。调用方先读取格式索引，再按
+`direction` 与 `format` 读取单条详情：
+
+| 入口 | 格式索引 | 单条详情 |
+| --- | --- | --- |
+| CLI | `sandrone capability formats` | `sandrone capability format <parse|render> <format>` |
+| HTTP | `GET /v1/capabilities/formats` | `GET /v1/capabilities/formats/{direction}/{format}` |
+| MCP | `sandrone://capabilities/formats` | `sandrone://capabilities/formats/{direction}/{format}` |
+
+索引中的每项包含 `direction`、`format`、`node_types`、`reversible`、
+`field_counts`、`revisions` 和协议入口链接；字段级详情才包含 `types`、
+`fields`、`lossy` 与 `raw_only`。
 
 `probe_methods` 的封闭集合是 `tcp_connect`、`udp_ntp` 和 `url_test`；
-具体可用 core/backend 仍以当前进程返回的 `probe_backends` 为准。
+具体可用 core/backend 仍以当前进程返回的 `probe.backends` 为准。
 
 每条 adapter capability 包含：
 
@@ -33,7 +46,7 @@
 字段项还带 `protocol`、`ir_field`、`status`、`source_ref`，必要时有
 `notes`。Mihomo 字段依据固定到 v1.19.25，sing-box 字段依据固定到
 v1.13.14；Shadowrocket 字段引用固定的上游 revision。调用方需要精确、可审计
-的字段清单时，应读取这里的运行时对象，而不是根据目标名称猜测。
+的字段清单时，应读取对应的单条详情，而不是根据目标名称猜测。
 
 ## 输入格式
 

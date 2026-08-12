@@ -3,38 +3,24 @@ package shared
 
 import "github.com/kuuvahki-labs/sandrone/internal/domain"
 
-type Direction string
+type Direction = domain.CapabilityDirection
 
 const (
-	DirectionParse  Direction = "parse"
-	DirectionRender Direction = "render"
+	DirectionParse  = domain.CapabilityDirectionParse
+	DirectionRender = domain.CapabilityDirectionRender
 )
 
-type FieldStatus string
+type FieldStatus = domain.CapabilityFieldStatus
 
 const (
-	FieldStatusSupported FieldStatus = "supported"
-	FieldStatusLossy     FieldStatus = "lossy"
-	FieldStatusRawOnly   FieldStatus = "raw_only"
+	FieldStatusSupported = domain.CapabilityFieldStatusSupported
+	FieldStatusLossy     = domain.CapabilityFieldStatusLossy
+	FieldStatusRawOnly   = domain.CapabilityFieldStatusRawOnly
 )
 
-type FieldRef struct {
-	IRField   string           `json:"ir_field" yaml:"ir_field"`
-	Protocol  string           `json:"protocol" yaml:"protocol"`
-	Status    FieldStatus      `json:"status,omitempty" yaml:"status,omitempty"`
-	SourceRef domain.SourceRef `json:"source_ref" yaml:"source_ref"`
-	Notes     string           `json:"notes,omitempty" yaml:"notes,omitempty"`
-}
+type FieldRef = domain.CapabilityFieldRef
 
-type Capability struct {
-	Format     string            `json:"format" yaml:"format"`
-	Direction  Direction         `json:"direction" yaml:"direction"`
-	Types      []domain.NodeType `json:"types" yaml:"types"`
-	Fields     []FieldRef        `json:"fields,omitempty" yaml:"fields,omitempty"`
-	Lossy      []FieldRef        `json:"lossy,omitempty" yaml:"lossy,omitempty"`
-	RawOnly    []FieldRef        `json:"raw_only,omitempty" yaml:"raw_only,omitempty"`
-	Reversible bool              `json:"reversible" yaml:"reversible"`
-}
+type Capability = domain.FormatCapability
 
 func AllNodeTypes() []domain.NodeType {
 	return []domain.NodeType{

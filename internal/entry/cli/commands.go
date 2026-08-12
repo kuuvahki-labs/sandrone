@@ -343,15 +343,16 @@ func newInspectCommand(cfg *config) *cobra.Command {
 	var output string
 	cmd := &cobra.Command{
 		Use:   "inspect",
-		Short: "Inspect service capabilities and store summary",
-		Long: `Inspect prints the current service capabilities and resource summary as JSON.
+		Short: "Inspect the lightweight runtime summary",
+		Long: `Inspect prints the current runtime summary as JSON.
 
-Use it to see supported parsing/rendering capabilities and the current store
-summary for the selected data directory.`,
+Use it to see available format and processor names, file kinds, probe backends,
+and the current store summary for the selected data directory. Use capability
+commands for detailed format contracts.`,
 		Example: `  sandrone inspect`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			engine := cfg.engineFactory(cfg.dataDir)
-			result, err := engine.Inspect(cmd.Context(), sandrone.InspectRequest{})
+			result, err := engine.Inspect(cmd.Context())
 			if err != nil {
 				return err
 			}
@@ -361,6 +362,59 @@ summary for the selected data directory.`,
 			}
 			out = append(out, '\n')
 			return writeOutput(output, cfg.stdout, out)
+		},
+	}
+	cmd.Flags().StringVar(&output, "output", "", "output file path, or stdout when empty or -")
+	return cmd
+}
+
+func newCapabilityCommand(cfg *config) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "capability",
+		Short: "Inspect detailed format capability contracts",
+	}
+	cmd.AddCommand(
+		newCapabilityFormatsCommand(cfg),
+		newCapabilityFormatCommand(cfg),
+	)
+	return cmd
+}
+
+func newCapabilityFormatsCommand(cfg *config) *cobra.Command {
+	var output string
+	cmd := &cobra.Command{
+		Use:   "formats",
+		Short: "List parse and render format capability summaries",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			engine := cfg.engineFactory(cfg.dataDir)
+			result, err := engine.ListFormatCapabilities(cmd.Context())
+			if err != nil {
+				return err
+			}
+			return writeJSONOutput(output, cfg.stdout, result)
+		},
+	}
+	cmd.Flags().StringVar(&output, "output", "", "output file path, or stdout when empty or -")
+	return cmd
+}
+
+func newCapabilityFormatCommand(cfg *config) *cobra.Command {
+	var output string
+	cmd := &cobra.Command{
+		Use:   "format <parse|render> <format>",
+		Short: "Show one exact format capability contract",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			engine := cfg.engineFactory(cfg.dataDir)
+			result, err := engine.GetFormatCapability(cmd.Context(), sandrone.FormatCapabilityRequest{
+				Direction: sandrone.CapabilityDirection(args[0]),
+				Format:    args[1],
+			})
+			if err != nil {
+				return err
+			}
+			return writeJSONOutput(output, cfg.stdout, result)
 		},
 	}
 	cmd.Flags().StringVar(&output, "output", "", "output file path, or stdout when empty or -")

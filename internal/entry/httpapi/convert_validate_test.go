@@ -35,7 +35,10 @@ func TestValidateInspectAndFilesEndpoints(t *testing.T) {
 	w = httptest.NewRecorder()
 	server.Handler().ServeHTTP(w, inspectReq)
 	require.Equal(t, http.StatusOK, w.Code)
-	require.Contains(t, w.Body.String(), "capabilities")
+	require.Contains(t, w.Body.String(), `"formats"`)
+	require.Contains(t, w.Body.String(), `"catalogs"`)
+	require.NotContains(t, w.Body.String(), `"capabilities"`)
+	require.Less(t, w.Body.Len(), 8<<10)
 
 	fileReq := httptest.NewRequest(http.MethodPost, "/v1/files", bytes.NewBufferString(`{
 		"name": "out.yaml",

@@ -116,7 +116,7 @@ schema 为准；未知字段会被拒绝。与 Go/持久化表示不同，MCP wi
 | tool | 输入用途 | 输出用途 |
 | --- | --- | --- |
 | `sandrone_list_resources` | 可选 `kind`（`subscription` 或 `file`）、`cursor`、`limit`。 | 当前定义摘要 `items` 与可选 `next_cursor`。 |
-| `sandrone_inspect_capabilities` | 无参数返回总览；或同时给出 `kind`（`format`、`processor`、`file_kind`）和 `name`。 | 当前 capability catalog 与 `report`。 |
+| `sandrone_inspect` | 无参数。 | 轻量运行时摘要与 capability/schema catalog URI；不内嵌字段详情。 |
 | `sandrone_convert` | `to_format`，以及 inline `content` + `from_format` 或受控 `remote`；可带 parse/render processors、render options 和 metadata。 | `content_type`、可选 `body` 与 `report`。 |
 | `sandrone_probe_nodes` | 一个 `NodeInput`，以及 method、core、目标、timeout、attempts、concurrency 和 cache TTL 等探测参数。method 为 `tcp_connect`、`udp_ntp` 或 `url_test`。 | 节点级 `results` 与汇总 `report`。 |
 | `sandrone_preview_subscription` | 已保存的 subscription `name` 与可选字符串 `args`。 | processor 前后的节点、数量与 `report`。 |
@@ -152,7 +152,7 @@ typed config 与 processors 见 [FileSpec](file-spec.md)。文件删除的精确
 ### Tool annotations
 
 九个常驻 tool 的 `readOnlyHint` 都为 `true`。其中
-`sandrone_list_resources` 和 `sandrone_inspect_capabilities` 的
+`sandrone_list_resources` 和 `sandrone_inspect` 的
 `openWorldHint` 为 `false`；其余七个常驻 tool 可能经受控 fetch、probe、
 subscription 或 file flow 访问外部世界，`openWorldHint` 为 `true`。
 
@@ -167,8 +167,12 @@ subscription 或 file flow 访问外部世界，`openWorldHint` 为 `true`。
 
 | URI | 内容 |
 | --- | --- |
-| `sandrone://capabilities` | 当前 parser、renderer、公开 processor、typed-file driver 与 probe capability summary。 |
+| `sandrone://capabilities/formats` | parse/render format 摘要索引；每项带 exact detail `resource_uri`。 |
+| `sandrone://schemas` | schema 根目录及各固定 schema resource URI。 |
+| `sandrone://schemas/file-kinds` | canonical file-kind 摘要及各详情 URI。 |
 | `sandrone://schemas/processors` | 公开 processor 的 stage、effects、说明和各详情 URI。 |
+| `sandrone://schemas/subscription` | 完整、封闭的具名 Subscription 写入 schema。 |
+| `sandrone://schemas/file-spec` | 完整、封闭的具名 FileSpec 写入 schema。 |
 | `sandrone://schemas/script-api/v1` | versioned script config、envelope、注入方法、来源和 sandbox schema。 |
 
 Resource templates 为：
@@ -177,13 +181,14 @@ Resource templates 为：
 | --- | --- |
 | `sandrone://subscriptions/{name}` | 已保存的 `Subscription` 定义。 |
 | `sandrone://files/{name}` | 已保存的 `FileSpec` 定义，不是编译后的文件正文。 |
+| `sandrone://capabilities/formats/{direction}/{format}` | 一条 exact parse/render format capability，包含字段级 `fields`、`lossy`、`raw_only`。 |
 | `sandrone://schemas/processors/{stage}/{type}` | 指定 canonical stage/type 的 `params_schema`、effects、examples 和 error codes。 |
 | `sandrone://schemas/file-kinds/{kind}` | 指定 canonical kind 的 `settings_schema`、source rules、defaults 和 examples。 |
 
 模板中的资源名称必须是非空单段名称。`.`、`..`、正斜杠和反斜杠都会被拒绝；
 对 `/` 做 percent-encoding 也不能绕过检查。resource URI 不映射任意宿主文件
-路径或原始 Store key。Processor stage 只有 `nodes` 和 `file`；file kind 必须
-使用 capability catalog 中的 canonical 值。
+路径或原始 Store key。Processor stage 只有 `nodes` 和 `file`；format direction
+只有 `parse`、`render`；format 与 file kind 必须使用对应索引中的 canonical 值。
 
 读取不存在、无效或无法解码的资源时，失败由 MCP resource error 返回。Tool
 不会因为写入或正文省略而自动创建额外的 share、文件或隐藏 resource。
@@ -240,16 +245,18 @@ inline `body`：
 
 该限制不全局覆盖 reports、probe results、preview/traffic 输出、resource JSON、
 `sandrone_get_file` 的 source/spec 输出或 capability/schema catalogs；这些结果
-仍可能很大，调用方应限制自己保存、展示和转发的 MCP 结果。
+仍可能很大，调用方应只读取当前任务所需的 exact resource，并限制自己保存、
+展示和转发的 MCP 结果。`sandrone_inspect` 本身保持轻量，不用于传输字段 catalog。
 
 ## 推荐 Agent 流程
 
 ```text
-inspect → list → read definition/schema → optional prompt
-→ preview/validate → put/delete/render/probe
+inspect → read capability/schema index → list → read exact definition/schema
+→ optional prompt → preview/validate → put/delete/render/probe
 ```
 
-先用 `sandrone_inspect_capabilities` 确认当前能力，再用
+先用 `sandrone_inspect` 确认当前运行时摘要和目录入口，按需读取
+`sandrone://capabilities/formats`、`sandrone://schemas` 及 exact detail，再用
 `sandrone_list_resources` 发现已存定义；通过标准 MCP resource 读取定义及其
 processor、file-kind 或 script schema。只有需要起草或解释时才调用 prompt。
 随后用 convert/preview/validate 做无持久化检查。管理开关已启用且用户明确要求

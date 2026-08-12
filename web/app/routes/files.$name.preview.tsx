@@ -5,7 +5,7 @@ import { LoadingScreen } from "~/core/components/loading-screen";
 import { useSandrone } from "~/core/provider/context";
 import { useFileDetailsResource, useFileResources } from "~/features/files/data/use-file-resources";
 import { fileDriver } from "~/features/files/drivers/registry";
-import { rendererRevisionFromInspect } from "~/features/files/model/renderer-revision";
+import { rendererRevisionFromCapabilityIndex } from "~/features/files/model/renderer-revision";
 import type { FilePreview } from "~/features/files/model/types";
 import { FilePreviewPage } from "~/features/files/pages/file-preview-page";
 import { useShareDialog } from "~/features/shares/components/share-dialog-context";
@@ -48,13 +48,13 @@ export default function FilePreviewRoute() {
       return;
     }
     let active = true;
-    void app.client.inspect().then(
+    void app.client.listFormatCapabilities().then(
       (value) => {
         if (!active) return;
         setRevisionState({
           itemName,
           rendererFormat: targetRendererFormat,
-          revision: rendererRevisionFromInspect(value, targetRendererFormat),
+          revision: rendererRevisionFromCapabilityIndex(value, targetRendererFormat),
         });
       },
       () => {

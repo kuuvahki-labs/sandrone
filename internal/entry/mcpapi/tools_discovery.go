@@ -13,8 +13,6 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/kuuvahki-labs/sandrone/internal/adapter/shared"
-	"github.com/kuuvahki-labs/sandrone/internal/agentcatalog"
 	"github.com/kuuvahki-labs/sandrone/internal/app"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
@@ -41,10 +39,7 @@ type listResourcesOutput struct {
 	NextCursor string           `json:"next_cursor,omitempty"`
 }
 
-type inspectCapabilitiesInput struct {
-	Kind string `json:"kind,omitempty"`
-	Name string `json:"name,omitempty"`
-}
+type inspectInput struct{}
 
 type resourceCursor struct {
 	Version int    `json:"version"`
@@ -69,30 +64,25 @@ func registerDiscoveryTools(server *mcp.Server, rt *app.Runtime) {
 	})
 
 	addTool(server, &mcp.Tool{
-		Name:        "sandrone_inspect_capabilities",
-		Description: "Inspect the capability summary or one format, public processor, or file kind.",
-		InputSchema: inspectCapabilitiesInputSchema(),
+		Name:        "sandrone_inspect",
+		Description: "Inspect the lightweight runtime summary and discover capability and schema catalogs.",
+		InputSchema: inspectInputSchema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:  true,
 			OpenWorldHint: &openWorld,
 		},
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in inspectCapabilitiesInput) (*mcp.CallToolResult, inspectOutput, error) {
-		result, err := rt.Service.Inspect(ctx, domain.InspectRequest{})
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ inspectInput) (*mcp.CallToolResult, inspectOutput, error) {
+		result, err := rt.Service.Inspect(ctx)
 		if err != nil {
 			return nil, inspectOutput{}, err
 		}
-		if in.Kind == "" && in.Name == "" {
-			keepOnlyPublicProcessorNames(rt, result.Capabilities)
-			return nil, inspectOutput{Capabilities: result.Capabilities, Report: result.Report}, nil
-		}
-		if in.Kind == "" || in.Name == "" {
-			return nil, inspectOutput{}, domain.NewError(domain.CodeInvalidArgument, "capability kind and name must be provided together")
-		}
-		filtered, err := filteredCapabilities(rt, in.Kind, in.Name)
-		if err != nil {
-			return nil, inspectOutput{}, err
-		}
-		return nil, inspectOutput{Capabilities: filtered, Report: result.Report}, nil
+		return nil, inspectOutput{
+			InspectResult: *result,
+			Catalogs: inspectCatalogs{
+				Formats: "sandrone://capabilities/formats", Schemas: "sandrone://schemas",
+				Processors: "sandrone://schemas/processors", FileKinds: "sandrone://schemas/file-kinds",
+			},
+		}, nil
 	})
 }
 
@@ -228,71 +218,4 @@ func resourceCursorCheck(version int, kind, offset string) string {
 	sum := sha256.Sum256([]byte("sandrone:mcp:list-resources:cursor:v1\x00" +
 		strconv.Itoa(version) + "\x00" + kind + "\x00" + offset))
 	return hex.EncodeToString(sum[:])
-}
-
-func keepOnlyPublicProcessorNames(rt *app.Runtime, capabilities map[string]any) {
-	nodeTypes := []string{}
-	fileTypes := []string{}
-	for _, descriptor := range rt.Service.Registry().PublicDescriptors() {
-		switch descriptor.Stage {
-		case domain.StageNodes:
-			nodeTypes = append(nodeTypes, descriptor.Type)
-		case domain.StageFile:
-			fileTypes = append(fileTypes, descriptor.Type)
-		}
-	}
-	capabilities["node_processors"] = nodeTypes
-	capabilities["file_processors"] = fileTypes
-}
-
-func filteredCapabilities(rt *app.Runtime, kind, name string) (map[string]any, error) {
-	switch kind {
-	case "format":
-		summary := rt.Service.CapabilitySummary()
-		capabilities, _ := summary["capabilities"].([]shared.Capability)
-		matches := make([]shared.Capability, 0, 2)
-		for _, capability := range capabilities {
-			if capability.Format == name {
-				matches = append(matches, capability)
-			}
-		}
-		if len(matches) == 0 {
-			return nil, domain.NewError(domain.CodeInvalidArgument, "format capability not found")
-		}
-		return map[string]any{"formats": matches}, nil
-	case "processor":
-		matches := make([]agentcatalog.ProcessorCatalogDocument, 0, 2)
-		for _, descriptor := range rt.Service.Registry().PublicDescriptors() {
-			if descriptor.Type != name {
-				continue
-			}
-			document, err := agentcatalog.ProcessorDetail(descriptor)
-			if err != nil {
-				return nil, err
-			}
-			matches = append(matches, document)
-		}
-		if len(matches) == 0 {
-			return nil, domain.NewError(domain.CodeInvalidArgument, "public processor capability not found")
-		}
-		return map[string]any{"processors": matches}, nil
-	case "file_kind":
-		matches := make([]agentcatalog.FileKindCatalogDocument, 0, 1)
-		for _, capability := range rt.Service.FileKindCapabilities() {
-			if string(capability.Kind) != name {
-				continue
-			}
-			document, err := agentcatalog.FileKindDetail(capability)
-			if err != nil {
-				return nil, err
-			}
-			matches = append(matches, document)
-		}
-		if len(matches) == 0 {
-			return nil, domain.NewError(domain.CodeInvalidArgument, "file kind capability not found")
-		}
-		return map[string]any{"file_kinds": matches}, nil
-	default:
-		return nil, domain.NewError(domain.CodeInvalidArgument, "capability kind must be format, processor, or file_kind")
-	}
 }

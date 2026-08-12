@@ -104,7 +104,7 @@ func TestParameterizedPromptsGuideSupportedWorkflows(t *testing.T) {
 			},
 			contains: []string{
 				"mihomo", "sing-box-outbounds", `field \\\"udp\\\" dropped`,
-				"sandrone://capabilities", "sandrone_convert",
+				"sandrone://capabilities/formats", "sandrone_convert",
 			},
 		},
 		{
@@ -115,7 +115,7 @@ func TestParameterizedPromptsGuideSupportedWorkflows(t *testing.T) {
 			},
 			contains: []string{
 				"source missing", "warnings and dependencies",
-				"sandrone://capabilities", "sandrone_inspect_capabilities",
+				"sandrone://capabilities/formats", "sandrone_inspect",
 			},
 		},
 	}

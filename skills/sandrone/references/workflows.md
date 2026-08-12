@@ -9,7 +9,9 @@ client may add a namespace prefix.
 
 | Operation | HTTP | MCP |
 | --- | --- | --- |
-| Inspect | `GET /v1/inspect` | `sandrone_inspect_capabilities` |
+| Inspect | `GET /v1/inspect` | `sandrone_inspect` |
+| List format capabilities | `GET /v1/capabilities/formats` | `sandrone://capabilities/formats` |
+| Exact format capability | `GET /v1/capabilities/formats/{direction}/{format}` | `sandrone://capabilities/formats/{direction}/{format}` |
 | Full conversion | `POST /v1/convert` | `sandrone_convert` |
 | Probe nodes | `POST /v1/probe` | `sandrone_probe_nodes` |
 | List subscriptions | `GET /v1/subscriptions` | `sandrone_list_resources` |
@@ -31,27 +33,29 @@ Read schemas at task time; do not copy their fields into this reference.
 
 | Schema | HTTP | MCP resource |
 | --- | --- | --- |
+| Schema catalog | `GET /v1/schemas` | `sandrone://schemas` |
 | Processor catalog | `GET /v1/schemas/processors` | `sandrone://schemas/processors` |
 | Exact processor | `GET /v1/schemas/processors/{stage}/{type}` | `sandrone://schemas/processors/{stage}/{type}` |
+| File-kind catalog | `GET /v1/schemas/file-kinds` | `sandrone://schemas/file-kinds` |
 | File kind | `GET /v1/schemas/file-kinds/{kind}` | `sandrone://schemas/file-kinds/{kind}` |
 | Script API | `GET /v1/schemas/script-api/v1` | `sandrone://schemas/script-api/v1` |
-| Subscription | `GET /v1/schemas/subscription` | live `sandrone_put_subscription` input schema from `tools/list` |
-| FileSpec | `GET /v1/schemas/file-spec` | live `sandrone_put_file` or `sandrone_validate_file` input schema from `tools/list` |
+| Subscription | `GET /v1/schemas/subscription` | `sandrone://schemas/subscription` |
+| FileSpec | `GET /v1/schemas/file-spec` | `sandrone://schemas/file-spec` |
 
 ## Discover
 
-For HTTP, call `/healthz`, `/version`, `GET /v1/inspect`, then only the schema
-and resource endpoints needed by the request. For MCP, call
-`sandrone_inspect_capabilities`, list with the narrowest useful `kind`, then
-read the relevant definitions and schema resources.
+For HTTP, call `/healthz`, `/version`, `GET /v1/inspect`, then only the format
+capability, schema, and resource endpoints needed by the request. For MCP, call
+`sandrone_inspect`, read the narrowest capability/schema resources, list with
+the narrowest useful `kind`, then read the relevant definitions.
 
 Follow an opaque `next_cursor` without interpreting or modifying it. Keep the
 same list filter across pages.
 
 ## Convert Inline or Remote Input
 
-1. Read conversion capabilities and every requested parse/render processor
-   schema.
+1. Read the exact source parse and target render capabilities plus every
+   requested parse/render processor schema.
 2. Use authenticated `POST /v1/convert` for HTTP or `sandrone_convert` for MCP
    with exactly one supported input source.
 3. Inspect report warnings and loss information.
@@ -64,8 +68,8 @@ Subscription nor a FileSpec.
 
 ## Create or Update a Subscription
 
-1. Read `/v1/schemas/subscription` plus the target format and each requested
-   nodes-stage processor schema, or the equivalent live MCP tool schema and
+1. Read `/v1/schemas/subscription` plus the exact target format capability and
+   each requested nodes-stage processor schema, or the equivalent live MCP
    resources.
 2. If updating, read the exact existing subscription first.
 3. Build a complete Subscription definition from the live schemas.
@@ -86,7 +90,7 @@ unsaved subscription was previewed.
 
 1. Read `/v1/schemas/file-spec`,
    `/v1/schemas/file-kinds/{kind}`, and every requested file-stage processor
-   schema, or the equivalent live MCP tool schema and resources.
+   schema, or the equivalent live MCP resources.
 2. If updating, read the exact existing FileSpec first.
 3. Build a complete FileSpec using only live schema fields. Preserve declared
    file-stage processor order.

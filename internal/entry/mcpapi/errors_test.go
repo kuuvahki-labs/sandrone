@@ -55,7 +55,7 @@ func TestStructuredToolErrorsInputValidationForEveryAlwaysRegisteredTool(t *test
 		},
 		{tool: "sandrone_probe_nodes", arguments: map[string]any{}, field: "input"},
 		{tool: "sandrone_list_resources", arguments: map[string]any{"limit": 201}, field: "limit"},
-		{tool: "sandrone_inspect_capabilities", arguments: map[string]any{"kind": "future"}, field: "kind"},
+		{tool: "sandrone_inspect", arguments: map[string]any{"unexpected": true}, field: "unexpected"},
 		{tool: "sandrone_preview_subscription", arguments: map[string]any{}, field: "name"},
 		{tool: "sandrone_render_subscription", arguments: map[string]any{"name": "demo"}, field: "format"},
 		{tool: "sandrone_get_subscription_traffic", arguments: map[string]any{}, field: "name"},
@@ -99,11 +99,6 @@ func TestStructuredToolErrorsServiceFailuresForEveryAlwaysRegisteredTool(t *test
 		{
 			name: "list cursor", tool: "sandrone_list_resources",
 			arguments: map[string]any{"cursor": "invalid"},
-			code:      domain.CodeInvalidArgument,
-		},
-		{
-			name: "inspect unknown", tool: "sandrone_inspect_capabilities",
-			arguments: map[string]any{"kind": "processor", "name": "missing"},
 			code:      domain.CodeInvalidArgument,
 		},
 		{

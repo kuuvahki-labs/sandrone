@@ -18,18 +18,6 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/service"
 )
 
-type ProcessorSummaryDocument struct {
-	Processors []ProcessorSummaryEntry `json:"processors"`
-}
-
-type ProcessorSummaryEntry struct {
-	Type        string            `json:"type"`
-	Stage       domain.Stage      `json:"stage"`
-	Description string            `json:"description"`
-	Effects     processor.Effects `json:"effects"`
-	URI         string            `json:"uri"`
-}
-
 type ProcessorCatalogDocument struct {
 	Type         string             `json:"type"`
 	Stage        domain.Stage       `json:"stage"`
@@ -119,18 +107,6 @@ type scriptProbeOptions struct {
 	Concurrency     int               `json:"concurrency,omitempty" minimum:"0"`
 	CacheTTLSeconds int               `json:"cache_ttl_seconds,omitempty" minimum:"0"`
 	Meta            map[string]string `json:"meta,omitempty"`
-}
-
-func ProcessorSummary(descriptors []processor.Descriptor) ProcessorSummaryDocument {
-	items := make([]ProcessorSummaryEntry, len(descriptors))
-	for index, descriptor := range descriptors {
-		items[index] = ProcessorSummaryEntry{
-			Type: descriptor.Type, Stage: descriptor.Stage,
-			Description: descriptor.Description, Effects: descriptor.Effects,
-			URI: ProcessorSchemaURI(descriptor.Stage, descriptor.Type),
-		}
-	}
-	return ProcessorSummaryDocument{Processors: items}
 }
 
 func ProcessorDetail(descriptor processor.Descriptor) (ProcessorCatalogDocument, error) {

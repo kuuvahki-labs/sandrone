@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -354,21 +355,66 @@ func encryptShareResult(result *domain.ShareRenderResult, recipientText string) 
 	return nil
 }
 
-func (s *Service) Inspect(ctx context.Context, req domain.InspectRequest) (*domain.InspectResult, error) {
-	capabilities := s.CapabilitySummary()
-	if s.metaStore != nil {
-		if subscriptions, err := s.metaStore.ListSubscriptions(ctx); err == nil {
-			capabilities["subscriptions"] = len(subscriptions)
-		}
-		if files, err := s.metaStore.ListFiles(ctx); err == nil {
-			capabilities["files"] = len(files)
-		}
-		capabilities["store_configured"] = true
-	} else {
-		capabilities["store_configured"] = false
+func (s *Service) Inspect(ctx context.Context) (*domain.InspectResult, error) {
+	capabilityList, err := s.ListFormatCapabilities(ctx)
+	if err != nil {
+		return nil, err
 	}
-	report := s.prepareReport("inspect", domain.Report{})
-	return &domain.InspectResult{Capabilities: capabilities, Report: report}, nil
+
+	result := &domain.InspectResult{
+		Formats:    domain.InspectFormats{Parse: []string{}, Render: []string{}},
+		Processors: domain.InspectProcessors{Nodes: []string{}, File: []string{}},
+		FileKinds:  []domain.FileKind{},
+		Probe:      domain.InspectProbe{Methods: []domain.ProbeMethod{}, Backends: []domain.ProbeBackendSummary{}},
+		Store:      domain.InspectStore{Configured: s.metaStore != nil},
+	}
+	for _, capability := range capabilityList.Items {
+		switch capability.Direction {
+		case domain.CapabilityDirectionParse:
+			result.Formats.Parse = append(result.Formats.Parse, capability.Format)
+		case domain.CapabilityDirectionRender:
+			result.Formats.Render = append(result.Formats.Render, capability.Format)
+		}
+	}
+	for _, descriptor := range s.registry.PublicDescriptors() {
+		switch descriptor.Stage {
+		case domain.StageNodes:
+			result.Processors.Nodes = append(result.Processors.Nodes, descriptor.Type)
+		case domain.StageFile:
+			result.Processors.File = append(result.Processors.File, descriptor.Type)
+		}
+	}
+	for _, capability := range s.FileKindCapabilities() {
+		result.FileKinds = append(result.FileKinds, capability.Kind)
+	}
+	if inspector, ok := s.prober.(interface {
+		BackendSummary() []domain.ProbeBackendSummary
+	}); ok {
+		result.Probe.Backends = inspector.BackendSummary()
+		seenMethods := map[domain.ProbeMethod]bool{}
+		for _, backend := range result.Probe.Backends {
+			if !seenMethods[backend.Method] {
+				seenMethods[backend.Method] = true
+				result.Probe.Methods = append(result.Probe.Methods, backend.Method)
+			}
+		}
+		sort.Slice(result.Probe.Methods, func(i, j int) bool { return result.Probe.Methods[i] < result.Probe.Methods[j] })
+	}
+	if s.metaStore == nil {
+		return result, nil
+	}
+	subscriptions, err := s.metaStore.ListSubscriptions(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("inspect subscriptions: %w", err)
+	}
+	files, err := s.metaStore.ListFiles(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("inspect files: %w", err)
+	}
+	subscriptionCount, fileCount := len(subscriptions), len(files)
+	result.Store.Subscriptions = &subscriptionCount
+	result.Store.Files = &fileCount
+	return result, nil
 }
 func (s *Service) prepareReport(kind string, report domain.Report) domain.Report {
 	if report.Kind == "" {

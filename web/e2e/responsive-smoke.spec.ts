@@ -52,6 +52,17 @@ const filePreview = {
   ].join("\n"),
   warnings: [],
 };
+const formatCapabilities = {
+  items: [{
+    direction: "render",
+    format: "mihomo-proxies",
+    node_types: ["ss"],
+    reversible: false,
+    field_counts: { supported: 1, lossy: 0, raw_only: 0 },
+    revisions: ["v1.19.25"],
+    href: "/v1/capabilities/formats/render/mihomo-proxies",
+  }],
+};
 
 function settingsEnvelope() {
   const settings = {
@@ -101,6 +112,9 @@ test.beforeEach(async ({ page }) => {
   });
   await page.route("**/v1/files", async (route) => {
     await route.fulfill({ json: { items: manifest.files } });
+  });
+  await page.route("**/v1/capabilities/formats", async (route) => {
+    await route.fulfill({ json: formatCapabilities });
   });
   await page.route("**/v1/rule-set-catalog?target=*", async (route) => {
     await route.fulfill({ json: { items: [] } });

@@ -37,6 +37,8 @@ func TestSandroneSkillSupportsHTTPWithoutMandatoryMCP(t *testing.T) {
 	require.Less(t, httpIndex, mcpIndex)
 
 	for _, endpoint := range []string{
+		"/v1/capabilities/formats",
+		"/v1/capabilities/formats/{direction}/{format}",
 		"/v1/convert",
 		"/v1/probe",
 		"/v1/subscriptions/{name}/render",
@@ -59,7 +61,9 @@ func TestSandroneHTTPShapeDocumentationIsLinked(t *testing.T) {
 	mcpReference := readRepoFile(t, "../../../docs/reference/mcp.md")
 
 	for _, route := range []string{
+		"GET /v1/schemas",
 		"GET /v1/schemas/processors",
+		"GET /v1/schemas/file-kinds",
 		"GET /v1/schemas/processors/{stage}/{type}",
 		"GET /v1/schemas/file-kinds/{kind}",
 		"GET /v1/schemas/script-api/v1",

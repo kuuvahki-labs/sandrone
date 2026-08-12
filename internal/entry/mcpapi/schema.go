@@ -119,11 +119,8 @@ func listResourcesInputSchema() *jsonschema.Schema {
 	}, nil)
 }
 
-func inspectCapabilitiesInputSchema() *jsonschema.Schema {
-	return closedObject(map[string]*jsonschema.Schema{
-		"kind": enumSchema("format", "processor", "file_kind"),
-		"name": stringSchema(),
-	}, nil)
+func inspectInputSchema() *jsonschema.Schema {
+	return closedObject(map[string]*jsonschema.Schema{}, nil)
 }
 
 func processorSpecSchema() *jsonschema.Schema {

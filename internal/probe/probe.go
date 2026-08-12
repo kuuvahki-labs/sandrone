@@ -105,8 +105,8 @@ func (e *Engine) RegisterBackend(backend Backend) {
 	e.backends[method] = append(e.backends[method], backend)
 }
 
-func (e *Engine) BackendSummary() []map[string]string {
-	out := []map[string]string{}
+func (e *Engine) BackendSummary() []domain.ProbeBackendSummary {
+	out := []domain.ProbeBackendSummary{}
 	methods := make([]string, 0, len(e.backends))
 	for method := range e.backends {
 		methods = append(methods, string(method))
@@ -114,15 +114,13 @@ func (e *Engine) BackendSummary() []map[string]string {
 	sort.Strings(methods)
 	for _, method := range methods {
 		for _, backend := range e.backends[domain.ProbeMethod(method)] {
-			item := map[string]string{
-				"method": string(backend.Method()),
-				"name":   backend.Name(),
+			item := domain.ProbeBackendSummary{
+				Method: backend.Method(),
+				Name:   backend.Name(),
 			}
-			if backend.Version() != "" {
-				item["version"] = backend.Version()
-			}
+			item.Version = backend.Version()
 			if coreBackend, ok := backend.(CoreBackend); ok {
-				item["core"] = coreBackend.Core()
+				item.Core = coreBackend.Core()
 			}
 			out = append(out, item)
 		}

@@ -37,8 +37,15 @@ type probeOutput struct {
 }
 
 type inspectOutput struct {
-	Capabilities map[string]any `json:"capabilities"`
-	Report       domain.Report  `json:"report,omitempty"`
+	domain.InspectResult
+	Catalogs inspectCatalogs `json:"catalogs"`
+}
+
+type inspectCatalogs struct {
+	Formats    string `json:"formats"`
+	Schemas    string `json:"schemas"`
+	Processors string `json:"processors"`
+	FileKinds  string `json:"file_kinds"`
 }
 
 func New(rt *app.Runtime) *Server {

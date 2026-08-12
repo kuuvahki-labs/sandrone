@@ -36,7 +36,7 @@ func TestReadonlyToolsAndResourceRead(t *testing.T) {
 	}
 	require.True(t, names["sandrone_convert"])
 	require.True(t, names["sandrone_get_file"])
-	require.True(t, names["sandrone_inspect_capabilities"])
+	require.True(t, names["sandrone_inspect"])
 	require.False(t, names["sandrone_put_subscription"])
 	require.NotNil(t, convertTool)
 	require.NotNil(t, convertTool.Annotations)

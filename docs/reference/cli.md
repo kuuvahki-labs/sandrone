@@ -12,6 +12,9 @@ sandrone
 ├── probe
 ├── validate
 ├── inspect
+├── capability
+│   ├── formats
+│   └── format <parse|render> <format>
 ├── doctor
 ├── file
 │   └── render
@@ -154,11 +157,15 @@ sandrone validate --file <name-or-spec-path>
 `ValidateResult.ok` 表示契约校验是否通过；命令仅在调用本身返回 error 时退出
 `1`，不会根据 JSON 中的任意 warning 自行改变退出码。
 
-## `inspect` 与 `doctor`
+## `inspect`、`capability` 与 `doctor`
 
-`inspect` 输出当前服务的能力与存储摘要。结果包含 parser、renderer、
-processor、probe 方法与运行时可用的 probe backend；`--output` 可将缩进
-JSON 写入文件。能力字段的解释以[格式与能力参考](capabilities.md)为准。
+`inspect` 输出轻量运行时与存储摘要。结果包含格式和 processor 名称、file kind、
+probe 方法与运行时可用的 probe backend；不内嵌字段级 capability。`--output`
+可将缩进 JSON 写入文件。
+
+`capability formats` 输出所有 parse/render format 的摘要索引；
+`capability format <parse|render> <format>` 输出一条字段级详情。两者同样支持
+`--output`，精确字段解释见[格式与能力参考](capabilities.md)。
 
 `doctor` 执行两类启动前检查：
 
@@ -228,7 +235,7 @@ MCP 的 tool/resource/prompt catalog、单一管理开关的行为和正文省�
 ## 输出文件与退出约定
 
 - `--output` 为空或 `-` 时写标准输出；文件输出会创建父目录并覆盖已有文件。
-- `probe`、`validate`、`inspect`、`doctor` 产生缩进 JSON，并以换行结尾。
+- `probe`、`validate`、`inspect`、`capability`、`doctor` 产生缩进 JSON，并以换行结尾。
 - `convert` 与 `file render` 的主输出是目标格式原文，不额外包装 JSON。
 - `--report-output` 的 report 总是缩进 JSON 文件。主输出先写，report
   写入随后发生；若 report 写入失败，已经写出的主输出不会回滚。

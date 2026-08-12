@@ -2,6 +2,7 @@ package service_test
 
 import (
 	"context"
+	"errors"
 	"os"
 	"testing"
 
@@ -10,6 +11,7 @@ import (
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/service"
+	"github.com/kuuvahki-labs/sandrone/internal/store"
 )
 
 func TestServicePutFileAndGetFileByName(t *testing.T) {
@@ -90,6 +92,32 @@ func TestServiceListResources(t *testing.T) {
 	require.Len(t, files.Items, 1)
 	require.Equal(t, "inline", files.Items[0].Type)
 	require.Equal(t, "static", files.Items[0].Target)
+}
+
+func TestInspectReturnsConfiguredStoreCounts(t *testing.T) {
+	ctx := context.Background()
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{Name: "sub", Type: domain.SubscriptionTypeLocal, Format: "uri-list"}))
+	require.NoError(t, svc.PutFile(ctx, domain.FileSpec{Name: "file.txt", Kind: domain.FileKindStatic, Source: domain.FileSource{Type: "inline", Content: "body"}}))
+
+	result, err := svc.Inspect(ctx)
+
+	require.NoError(t, err)
+	require.True(t, result.Store.Configured)
+	require.Equal(t, 1, *result.Store.Subscriptions)
+	require.Equal(t, 1, *result.Store.Files)
+}
+
+func TestInspectPropagatesStoreListFailure(t *testing.T) {
+	want := errors.New("injected list failure")
+	baseStore := store.NewFSStore(afero.NewMemMapFs())
+	svc := service.New(service.WithStore(&inspectListFailStore{Store: baseStore, err: want}))
+
+	result, err := svc.Inspect(context.Background())
+
+	require.Nil(t, result)
+	require.ErrorIs(t, err, want)
+	require.Contains(t, err.Error(), "inspect subscriptions")
 }
 
 func TestServiceListFilesExposesTypedConfigKind(t *testing.T) {
@@ -182,4 +210,13 @@ func TestServiceRejectsNegativeResourceRenderCacheTTL(t *testing.T) {
 	})
 	require.Error(t, err)
 	require.True(t, domain.IsCode(err, domain.CodeInvalidArgument), "got %v", err)
+}
+
+type inspectListFailStore struct {
+	store.Store
+	err error
+}
+
+func (s *inspectListFailStore) List(context.Context, string) ([]store.Entry, error) {
+	return nil, s.err
 }

@@ -136,7 +136,7 @@ func TestBodyLimitDoesNotClaimGlobalLimitsForNonBodyOutputs(t *testing.T) {
 
 	for _, call := range []*mcp.CallToolParams{
 		{Name: "sandrone_list_resources"},
-		{Name: "sandrone_inspect_capabilities"},
+		{Name: "sandrone_inspect"},
 	} {
 		result, err := session.CallTool(ctx, call)
 		require.NoError(t, err)

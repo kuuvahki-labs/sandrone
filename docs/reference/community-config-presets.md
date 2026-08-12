@@ -8,7 +8,7 @@
 
 - Mihomo 产物固定面向 v1.19.25，sing-box 固定面向 v1.13.14，Shadowrocket
   配置基线固定到源码 revision `5f1916b5897fc59fb7172aca59ae52050a3532fe`。
-  这些 revision 来自已鉴权的 `GET /v1/inspect` capability payload，并显示在 Web
+  这些 revision 来自已鉴权的 `GET /v1/capabilities/formats` 索引，并显示在 Web
   文件预览中；不写入 `FileSpec`，也不在 Web 预设目录另存一份版本号。
 - 基础默认和默认开启的 processor 只影响之后创建的新文件；分组默认只影响之后
   创建的新分组。编辑已有文件或分组不会自动回填或迁移。

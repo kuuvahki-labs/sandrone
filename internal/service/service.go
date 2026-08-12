@@ -19,7 +19,6 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/jsonnodes"
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/mihomo"
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/shadowrocket"
-	"github.com/kuuvahki-labs/sandrone/internal/adapter/shared"
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/singbox"
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/uri"
 	cachepkg "github.com/kuuvahki-labs/sandrone/internal/cache"
@@ -53,11 +52,11 @@ type reportingRenderer interface {
 }
 
 type parseCapabilityProvider interface {
-	ParseCapabilities() []shared.Capability
+	ParseCapabilities() []domain.FormatCapability
 }
 
 type renderCapabilityProvider interface {
-	RenderCapabilities() []shared.Capability
+	RenderCapabilities() []domain.FormatCapability
 }
 
 type ProbeEngine interface {
@@ -252,27 +251,8 @@ func New(opts ...Option) *Service {
 // requests; for the typical user this is unnecessary.
 func (s *Service) Registry() *processor.Registry { return s.registry }
 
-func (s *Service) CapabilitySummary() map[string]any {
-	summary := map[string]any{
-		"parse_formats": []string{
-			"uri", "uri-list", "base64", "mihomo", "sing-box", "json-nodes",
-		},
-		"render_formats": []string{
-			"base64", "mihomo-proxies", "shadowrocket-proxies", "sing-box-outbounds", "json-nodes", "uri-list",
-		},
-		"node_processors": s.registry.NodeTypes(),
-		"file_processors": s.registry.FileTypes(),
-		"probe_methods":   []string{string(domain.ProbeTCPConnect), string(domain.ProbeUDPNTP), string(domain.ProbeURLTest)},
-		"capabilities":    s.adapterCapabilities(),
-	}
-	if inspector, ok := s.prober.(interface{ BackendSummary() []map[string]string }); ok {
-		summary["probe_backends"] = inspector.BackendSummary()
-	}
-	return summary
-}
-
-func (s *Service) adapterCapabilities() []shared.Capability {
-	capabilities := []shared.Capability{}
+func (s *Service) adapterCapabilities() []domain.FormatCapability {
+	capabilities := []domain.FormatCapability{}
 	seen := map[string]bool{}
 	for _, parser := range s.parsers {
 		if provider, ok := parser.(parseCapabilityProvider); ok {
@@ -293,7 +273,7 @@ func (s *Service) adapterCapabilities() []shared.Capability {
 	return capabilities
 }
 
-func appendUniqueCapabilities(dst []shared.Capability, seen map[string]bool, capabilities []shared.Capability) []shared.Capability {
+func appendUniqueCapabilities(dst []domain.FormatCapability, seen map[string]bool, capabilities []domain.FormatCapability) []domain.FormatCapability {
 	for _, capability := range capabilities {
 		key := capability.Format + "\x00" + string(capability.Direction)
 		if capability.Format == "" || seen[key] {

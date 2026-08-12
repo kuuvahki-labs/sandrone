@@ -26,10 +26,10 @@ Sandrone does not support the legacy initialize/initialized session lifecycle
 or older protocol negotiation. If the client cannot establish that connection,
 report the incompatibility and the HTTP setup alternative.
 
-For HTTP, call `/healthz`, `/version`, `/v1/inspect`, then the narrowest
-applicable `/v1/schemas/*` endpoint. For MCP, inspect the live capability
-catalog, list relevant resources, and read named definitions and schema
-resources.
+For HTTP, call `/healthz`, `/version`, `/v1/inspect`, then the exact
+`/v1/capabilities/formats/*` and `/v1/schemas/*` endpoints needed by the task.
+For MCP, call `sandrone_inspect`, read the exact capability/schema resources,
+list relevant stored resources, and read named definitions.
 
 Keep the selected plane fixed throughout a mutation. After any ambiguous
 failure, reread the exact resource through that plane before deciding whether

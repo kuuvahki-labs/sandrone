@@ -206,6 +206,10 @@ export class ApiClient {
     return this.dedupedRequest("GET", "/v1/inspect");
   }
 
+  listFormatCapabilities(): Promise<unknown> {
+    return this.dedupedRequest("GET", "/v1/capabilities/formats");
+  }
+
   listSubscriptions(): Promise<unknown> {
     return this.dedupedRequest("GET", "/v1/subscriptions");
   }

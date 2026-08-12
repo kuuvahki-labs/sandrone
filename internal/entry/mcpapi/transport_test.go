@@ -38,14 +38,15 @@ func TestStreamableHTTPSmoke(t *testing.T) {
 	require.NotEmpty(t, prompts.Prompts)
 
 	inspect, err := session.CallTool(ctx, &mcp.CallToolParams{
-		Name:      "sandrone_inspect_capabilities",
+		Name:      "sandrone_inspect",
 		Arguments: map[string]any{},
 	})
 	require.NoError(t, err)
 	require.False(t, inspect.IsError)
 	inspectJSON, err := json.Marshal(inspect.StructuredContent)
 	require.NoError(t, err)
-	require.Contains(t, string(inspectJSON), `"capabilities"`)
+	require.Contains(t, string(inspectJSON), `"formats"`)
+	require.Contains(t, string(inspectJSON), `"catalogs"`)
 
 	schema, err := session.ReadResource(ctx, &mcp.ReadResourceParams{URI: "sandrone://schemas/script-api/v1"})
 	require.NoError(t, err)

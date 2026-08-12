@@ -201,61 +201,36 @@ func TestListResourcesRejectsInvalidKindCursorAndLimits(t *testing.T) {
 	}
 }
 
-func TestInspectCapabilitiesReturnsSummaryAndFilteredOwnerMetadata(t *testing.T) {
+func TestInspectReturnsLightweightRuntimeSummary(t *testing.T) {
 	ctx := context.Background()
 	session := connect(t, ctx, mcpapi.SDKServer(testRuntime(t, app.Config{})))
 	defer session.Close()
 
-	summary := callInspectCapabilities(t, ctx, session, nil)
-	require.Contains(t, summary, "parse_formats")
-	require.Contains(t, summary, "render_formats")
-	require.Contains(t, summary, "capabilities")
-	summaryJSON, err := json.Marshal(summary)
+	result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "sandrone_inspect"})
+	require.NoError(t, err)
+	require.False(t, result.IsError)
+	var output struct {
+		Formats  domain.InspectFormats `json:"formats"`
+		Catalogs struct {
+			Formats    string `json:"formats"`
+			Schemas    string `json:"schemas"`
+			Processors string `json:"processors"`
+			FileKinds  string `json:"file_kinds"`
+		} `json:"catalogs"`
+	}
+	decodeStructuredContent(t, result, &output)
+	require.NotEmpty(t, output.Formats.Parse)
+	require.NotEmpty(t, output.Formats.Render)
+	require.Equal(t, "sandrone://capabilities/formats", output.Catalogs.Formats)
+	require.Equal(t, "sandrone://schemas", output.Catalogs.Schemas)
+	require.Equal(t, "sandrone://schemas/processors", output.Catalogs.Processors)
+	require.Equal(t, "sandrone://schemas/file-kinds", output.Catalogs.FileKinds)
+
+	summaryJSON, err := json.Marshal(result)
 	require.NoError(t, err)
 	require.NotContains(t, string(summaryJSON), "inject_nodes")
-
-	format := callInspectCapabilities(t, ctx, session, map[string]any{
-		"kind": "format", "name": "uri-list",
-	})
-	formatItems, ok := format["formats"].([]any)
-	require.True(t, ok)
-	require.Len(t, formatItems, 2)
-
-	processor := callInspectCapabilities(t, ctx, session, map[string]any{
-		"kind": "processor", "name": "rename",
-	})
-	processorItems, ok := processor["processors"].([]any)
-	require.True(t, ok)
-	require.Len(t, processorItems, 1)
-	require.Equal(t, "rename", processorItems[0].(map[string]any)["type"])
-	require.Contains(t, processorItems[0].(map[string]any), "params_schema")
-
-	fileKind := callInspectCapabilities(t, ctx, session, map[string]any{
-		"kind": "file_kind", "name": "mihomo",
-	})
-	fileKindItems, ok := fileKind["file_kinds"].([]any)
-	require.True(t, ok)
-	require.Len(t, fileKindItems, 1)
-	require.Equal(t, "mihomo", fileKindItems[0].(map[string]any)["kind"])
-	require.Contains(t, fileKindItems[0].(map[string]any), "settings_schema")
-}
-
-func TestInspectCapabilitiesRejectsUnknownOrInternalCapabilities(t *testing.T) {
-	ctx := context.Background()
-	session := connect(t, ctx, mcpapi.SDKServer(testRuntime(t, app.Config{})))
-	defer session.Close()
-
-	for _, arguments := range []map[string]any{
-		{"kind": "format", "name": "future"},
-		{"kind": "processor", "name": "future"},
-		{"kind": "file_kind", "name": "future"},
-		{"kind": "processor", "name": "inject_nodes"},
-		{"kind": "processor"},
-		{"name": "rename"},
-	} {
-		body := callToolError(t, ctx, session, "sandrone_inspect_capabilities", arguments)
-		require.NotEmpty(t, body)
-	}
+	require.NotContains(t, string(summaryJSON), `"fields"`)
+	require.Less(t, len(summaryJSON), 16<<10)
 }
 
 func callListResources(t *testing.T, ctx context.Context, session *mcp.ClientSession, arguments map[string]any) listedResources {
@@ -266,18 +241,6 @@ func callListResources(t *testing.T, ctx context.Context, session *mcp.ClientSes
 	var output listedResources
 	decodeStructuredContent(t, result, &output)
 	return output
-}
-
-func callInspectCapabilities(t *testing.T, ctx context.Context, session *mcp.ClientSession, arguments map[string]any) map[string]any {
-	t.Helper()
-	result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "sandrone_inspect_capabilities", Arguments: arguments})
-	require.NoError(t, err)
-	require.False(t, result.IsError)
-	var output struct {
-		Capabilities map[string]any `json:"capabilities"`
-	}
-	decodeStructuredContent(t, result, &output)
-	return output.Capabilities
 }
 
 func decodeStructuredContent(t *testing.T, result *mcp.CallToolResult, output any) {

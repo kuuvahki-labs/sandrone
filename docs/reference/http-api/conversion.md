@@ -296,13 +296,13 @@ curl -sS "$SANDRONE_URL/v1/validate" \
 
 ### 用途
 
-读取当前进程实际注册的 parser、renderer、processor、probe backend 和 store
-摘要。它适合做运行时能力发现，不应由客户端根据版本号猜测能力。
+读取当前进程实际注册的 parser、renderer、processor、file kind、probe backend
+和 store 摘要。它只承担轻量运行时发现；字段级格式能力和 schema 使用响应中的
+catalog 路径按需读取。
 
 ### 请求
 
-没有请求体。可选 query `target` 会传入 service；当前内建 service 返回全局能力
-摘要，不按该值筛选，因此通常应省略。
+没有请求体或查询参数。
 
 ### 响应
 
@@ -310,43 +310,40 @@ curl -sS "$SANDRONE_URL/v1/validate" \
 
 ```json
 {
-  "capabilities": {
-    "parse_formats": [
-      "uri",
-      "uri-list",
-      "base64",
-      "mihomo",
-      "sing-box",
-      "json-nodes"
-    ],
-    "render_formats": [
-      "mihomo-proxies",
-      "shadowrocket-proxies",
-      "sing-box-outbounds",
-      "json-nodes",
-      "uri-list"
-    ],
-    "store_configured": true
+  "formats": {
+    "parse": ["base64", "json-nodes", "mihomo", "sing-box", "uri", "uri-list"],
+    "render": ["base64", "json-nodes", "mihomo-proxies", "shadowrocket-proxies", "sing-box-outbounds", "uri-list"]
+  },
+  "processors": {
+    "nodes": ["dedup", "filter", "probe", "quick_settings", "rename", "script", "sort"],
+    "file": ["json_patch", "merge", "script", "template", "yaml_patch"]
+  },
+  "file_kinds": ["static", "mihomo", "sing-box", "shadowrocket"],
+  "probe": {
+    "methods": ["tcp_connect", "udp_ntp", "url_test"],
+    "backends": [{"method": "tcp_connect", "name": "tcp_connect"}]
+  },
+  "store": {"configured": true, "subscriptions": 0, "files": 0},
+  "catalogs": {
+    "formats": "/v1/capabilities/formats",
+    "schemas": "/v1/schemas",
+    "processors": "/v1/schemas/processors",
+    "file_kinds": "/v1/schemas/file-kinds"
   }
 }
 ```
 
-上例只展示稳定的顶层形状；实际 `capabilities` 还包含：
-
-- `capabilities`：带 direction、format 与字段状态的 adapter 声明；
-- `node_processors`、`file_processors`；
-- `probe_methods`（`tcp_connect`、`udp_ntp`、`url_test`），以及 backend
-  可报告时的 `probe_backends`；
-- 配置 metadata store 时的 `subscriptions`、`files` 数量与
-  `store_configured: true`。
-
-精确字段能力和 `supported`、`lossy`、`raw_only` 语义见
-[格式与能力参考](../capabilities.md)。响应不包含内部 report。
+`probe.methods` 只列当前实际注册 backend 支持的方法；`probe.backends` 的具体
+数量随构建和配置变化。未配置 store 时只返回 `configured: false`，不返回数量。
+精确字段能力通过 `catalogs.formats` 的索引和详情读取；`supported`、`lossy`、
+`raw_only` 语义见[格式与能力参考](../capabilities.md)。响应不包含字段 catalog
+或内部 report。
 
 ### 失败与安全边界
 
-该接口只返回已注册能力和资源数量，不返回订阅、文件正文、token 或远程输入
-内容。它仍是受保护的 `/v1/*` 管理接口。
+该接口只返回已注册名称、backend 摘要和资源数量，不返回订阅、文件正文、token
+或远程输入内容。读取 store 数量失败时请求整体失败，不伪装为零。它仍是受保护
+的 `/v1/*` 管理接口。
 
 ### 最小示例
 

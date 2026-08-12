@@ -67,8 +67,20 @@ type (
 	ValidateResult              = domain.ValidateResult
 	ValidationCounts            = domain.ValidationCounts
 	ValidationIssue             = domain.ValidationIssue
-	InspectRequest              = domain.InspectRequest
 	InspectResult               = domain.InspectResult
+	InspectFormats              = domain.InspectFormats
+	InspectProcessors           = domain.InspectProcessors
+	InspectProbe                = domain.InspectProbe
+	InspectStore                = domain.InspectStore
+	ProbeBackendSummary         = domain.ProbeBackendSummary
+	CapabilityDirection         = domain.CapabilityDirection
+	CapabilityFieldStatus       = domain.CapabilityFieldStatus
+	CapabilityFieldRef          = domain.CapabilityFieldRef
+	FormatCapability            = domain.FormatCapability
+	FormatCapabilityRequest     = domain.FormatCapabilityRequest
+	FormatCapabilityFieldCounts = domain.FormatCapabilityFieldCounts
+	FormatCapabilitySummary     = domain.FormatCapabilitySummary
+	FormatCapabilityListResult  = domain.FormatCapabilityListResult
 	MieruOptions                = domain.MieruOptions
 	TLSOptions                  = domain.TLSOptions
 	ECHOptions                  = domain.ECHOptions
@@ -125,6 +137,13 @@ const (
 	ProbeTCPConnect = domain.ProbeTCPConnect
 	ProbeUDPNTP     = domain.ProbeUDPNTP
 	ProbeURLTest    = domain.ProbeURLTest
+
+	CapabilityDirectionParse  = domain.CapabilityDirectionParse
+	CapabilityDirectionRender = domain.CapabilityDirectionRender
+
+	CapabilityFieldStatusSupported = domain.CapabilityFieldStatusSupported
+	CapabilityFieldStatusLossy     = domain.CapabilityFieldStatusLossy
+	CapabilityFieldStatusRawOnly   = domain.CapabilityFieldStatusRawOnly
 
 	SubscriptionTypeRemote     = domain.SubscriptionTypeRemote
 	SubscriptionTypeLocal      = domain.SubscriptionTypeLocal
@@ -194,8 +213,16 @@ func (e *Engine) ValidateNodes(ctx context.Context, req ParseRequest) (*Validate
 	return e.service.ValidateNodes(ctx, req)
 }
 
-func (e *Engine) Inspect(ctx context.Context, req InspectRequest) (*InspectResult, error) {
-	return e.service.Inspect(ctx, req)
+func (e *Engine) Inspect(ctx context.Context) (*InspectResult, error) {
+	return e.service.Inspect(ctx)
+}
+
+func (e *Engine) ListFormatCapabilities(ctx context.Context) (*FormatCapabilityListResult, error) {
+	return e.service.ListFormatCapabilities(ctx)
+}
+
+func (e *Engine) GetFormatCapability(ctx context.Context, req FormatCapabilityRequest) (*FormatCapability, error) {
+	return e.service.GetFormatCapability(ctx, req)
 }
 
 // GetFile runs the full file flow described in docs/architecture/file-pipeline.md.
@@ -207,10 +234,6 @@ func (e *Engine) GetFile(ctx context.Context, req FileRequest) (*FileResult, err
 // file-stage processors are applied.
 func (e *Engine) GetFileSource(ctx context.Context, name string) (*FileDocument, error) {
 	return e.service.GetFileSource(ctx, name)
-}
-
-func (e *Engine) CapabilitySummary() map[string]any {
-	return e.service.CapabilitySummary()
 }
 
 func (e *Engine) PutSubscription(ctx context.Context, sub Subscription) error {

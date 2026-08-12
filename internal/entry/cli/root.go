@@ -25,7 +25,9 @@ type engine interface {
 	GetFile(context.Context, sandrone.FileRequest) (*sandrone.FileResult, error)
 	ValidateFile(context.Context, sandrone.FileRequest) (*sandrone.ValidateResult, error)
 	ValidateNodes(context.Context, sandrone.ParseRequest) (*sandrone.ValidateResult, error)
-	Inspect(context.Context, sandrone.InspectRequest) (*sandrone.InspectResult, error)
+	Inspect(context.Context) (*sandrone.InspectResult, error)
+	ListFormatCapabilities(context.Context) (*sandrone.FormatCapabilityListResult, error)
+	GetFormatCapability(context.Context, sandrone.FormatCapabilityRequest) (*sandrone.FormatCapability, error)
 }
 
 type engineFactory func(dataDir string) engine
@@ -126,6 +128,7 @@ func newRootCommand(cfg *config) *cobra.Command {
 		newProbeCommand(cfg),
 		newValidateCommand(cfg),
 		newInspectCommand(cfg),
+		newCapabilityCommand(cfg),
 		newFileCommand(cfg),
 		newDoctorCommand(cfg),
 		newServeCommand(cfg),

@@ -450,7 +450,7 @@ describe("ApiClient", () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
-  it("loads inspect with bearer auth and coalesces concurrent requests", async () => {
+  it("loads format capabilities with bearer auth and coalesces concurrent requests", async () => {
     saveAdminToken("secret");
     let resolveResponse: (() => void) | undefined;
     const responseReady = new Promise<void>((resolve) => {
@@ -460,19 +460,19 @@ describe("ApiClient", () => {
     const fetcher = vi.fn(async (input: FetchInput, init?: FetchOptions) => {
       calls.push({ input, init });
       await responseReady;
-      return new Response(JSON.stringify({ capabilities: {} }), {
+      return new Response(JSON.stringify({ items: [] }), {
         headers: { "content-type": "application/json" },
       });
     });
     const client = new ApiClient({ fetcher });
 
-    const first = client.inspect();
-    const second = client.inspect();
+    const first = client.listFormatCapabilities();
+    const second = client.listFormatCapabilities();
     resolveResponse?.();
     await Promise.all([first, second]);
 
     expect(fetcher).toHaveBeenCalledTimes(1);
-    expect(String(calls[0]?.input)).toBe("/v1/inspect");
+    expect(String(calls[0]?.input)).toBe("/v1/capabilities/formats");
     expect(calls[0]?.init?.headers).toEqual({ Authorization: "Bearer secret" });
   });
 

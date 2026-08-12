@@ -21,9 +21,15 @@ func TestSchemaRoutesPublishServerCatalogs(t *testing.T) {
 		path   string
 		assert func(*testing.T, string)
 	}{
+		{"/v1/schemas", func(t *testing.T, body string) {
+			require.Contains(t, body, `"schemas"`)
+			require.Contains(t, body, `"/v1/schemas/processors"`)
+		}},
 		{"/v1/schemas/processors", func(t *testing.T, body string) {
 			require.Contains(t, body, `"processors"`)
 			require.Contains(t, body, `"rename"`)
+			require.Contains(t, body, `"href"`)
+			require.NotContains(t, body, `sandrone://`)
 		}},
 		{"/v1/schemas/processors/nodes/rename", func(t *testing.T, body string) {
 			require.Contains(t, body, `"params_schema"`)
@@ -32,6 +38,10 @@ func TestSchemaRoutesPublishServerCatalogs(t *testing.T) {
 		{"/v1/schemas/file-kinds/mihomo", func(t *testing.T, body string) {
 			require.Contains(t, body, `"kind": "mihomo"`)
 			require.Contains(t, body, `"settings_schema"`)
+		}},
+		{"/v1/schemas/file-kinds", func(t *testing.T, body string) {
+			require.Contains(t, body, `"file_kinds"`)
+			require.Contains(t, body, `"/v1/schemas/file-kinds/mihomo"`)
 		}},
 		{"/v1/schemas/script-api/v1", func(t *testing.T, body string) {
 			require.Contains(t, body, `"version": 1`)
@@ -121,8 +131,6 @@ func TestSchemaRoutesMatchSharedCatalogDocuments(t *testing.T) {
 	rt := testRuntime(t, app.Config{})
 	handler := httpapi.New(rt).Handler()
 
-	assertJSONRoute(t, handler, "/v1/schemas/processors",
-		agentcatalog.ProcessorSummary(rt.Service.Registry().PublicDescriptors()))
 	for _, descriptor := range rt.Service.Registry().PublicDescriptors() {
 		document, err := agentcatalog.ProcessorDetail(descriptor)
 		require.NoError(t, err)

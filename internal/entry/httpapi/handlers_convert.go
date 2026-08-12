@@ -118,12 +118,16 @@ func (s *Server) validate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) inspect(w http.ResponseWriter, r *http.Request) {
-	result, err := s.rt.Service.Inspect(r.Context(), domain.InspectRequest{
-		Target: r.URL.Query().Get("target"),
-	})
+	result, err := s.rt.Service.Inspect(r.Context())
 	if err != nil {
 		writeServiceError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, inspectResponse{Capabilities: result.Capabilities})
+	writeJSON(w, http.StatusOK, inspectResponse{
+		InspectResult: *result,
+		Catalogs: inspectCatalogs{
+			Formats: "/v1/capabilities/formats", Processors: "/v1/schemas/processors",
+			Schemas: "/v1/schemas", FileKinds: "/v1/schemas/file-kinds",
+		},
+	})
 }

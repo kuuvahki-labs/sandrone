@@ -343,7 +343,7 @@ func TestFiniteJSONCommandsWriteOutputFile(t *testing.T) {
 			args: func(_ string, output string) []string {
 				return []string{"inspect", "--output", output}
 			},
-			rec: &recordingEngine{inspectResult: &sandrone.InspectResult{Capabilities: map[string]any{"ready": true}}},
+			rec: &recordingEngine{inspectResult: &sandrone.InspectResult{Formats: sandrone.InspectFormats{Parse: []string{"uri-list"}}}},
 		},
 	}
 
@@ -613,13 +613,43 @@ func TestValidateMapsInputURLToRemoteParseRequest(t *testing.T) {
 	require.Equal(t, 7000, req.Remote.TimeoutMS)
 }
 
-func TestInspectCommandOutputsCapabilities(t *testing.T) {
+func TestInspectCommandOutputsRuntimeSummary(t *testing.T) {
 	code, stdout, stderr := runCLI(t,
 		[]string{"inspect"},
 		"",
 	)
 	require.Equal(t, 0, code, stderr)
-	require.Contains(t, stdout, "capabilities")
+	require.Contains(t, stdout, `"formats"`)
+	require.NotContains(t, stdout, `"fields"`)
+}
+
+func TestCapabilityCommandsOutputFormatIndexAndDetail(t *testing.T) {
+	rec := &recordingEngine{
+		formatCapabilityList: &sandrone.FormatCapabilityListResult{Items: []sandrone.FormatCapabilitySummary{{
+			Direction: sandrone.CapabilityDirectionRender,
+			Format:    "uri-list",
+		}}},
+		formatCapability: &sandrone.FormatCapability{
+			Direction: sandrone.CapabilityDirectionRender,
+			Format:    "uri-list",
+		},
+	}
+
+	code, stdout, stderr := runCLI(t, []string{"capability", "formats"}, "",
+		WithEngineFactory(func(string) engine { return rec }),
+	)
+	require.Equal(t, 0, code, stderr)
+	require.Contains(t, stdout, `"format": "uri-list"`)
+
+	code, stdout, stderr = runCLI(t, []string{"capability", "format", "render", "uri-list"}, "",
+		WithEngineFactory(func(string) engine { return rec }),
+	)
+	require.Equal(t, 0, code, stderr)
+	require.Contains(t, stdout, `"direction": "render"`)
+	require.Equal(t, []sandrone.FormatCapabilityRequest{{
+		Direction: sandrone.CapabilityDirectionRender,
+		Format:    "uri-list",
+	}}, rec.formatCapabilityRequests)
 }
 
 func TestErrorOutputAndExitCode(t *testing.T) {
@@ -895,16 +925,19 @@ func runCLI(t *testing.T, args []string, stdin string, opts ...Option) (int, str
 }
 
 type recordingEngine struct {
-	parseRequests   []sandrone.ParseRequest
-	renderRequests  []sandrone.RenderRequest
-	convertRequests []sandrone.ConvertRequest
-	probeRequests   []sandrone.ProbeRequest
-	parseResult     *sandrone.ParseResult
-	renderResult    *sandrone.RenderResult
-	convertResult   *sandrone.RenderResult
-	probeResult     *sandrone.ProbeResult
-	validateResult  *sandrone.ValidateResult
-	inspectResult   *sandrone.InspectResult
+	parseRequests            []sandrone.ParseRequest
+	renderRequests           []sandrone.RenderRequest
+	convertRequests          []sandrone.ConvertRequest
+	probeRequests            []sandrone.ProbeRequest
+	parseResult              *sandrone.ParseResult
+	renderResult             *sandrone.RenderResult
+	convertResult            *sandrone.RenderResult
+	probeResult              *sandrone.ProbeResult
+	validateResult           *sandrone.ValidateResult
+	inspectResult            *sandrone.InspectResult
+	formatCapabilityList     *sandrone.FormatCapabilityListResult
+	formatCapability         *sandrone.FormatCapability
+	formatCapabilityRequests []sandrone.FormatCapabilityRequest
 }
 
 func (e *recordingEngine) Parse(_ context.Context, req sandrone.ParseRequest) (*sandrone.ParseResult, error) {
@@ -943,9 +976,24 @@ func (e *recordingEngine) ValidateNodes(_ context.Context, req sandrone.ParseReq
 	return &sandrone.ValidateResult{OK: true}, nil
 }
 
-func (e *recordingEngine) Inspect(context.Context, sandrone.InspectRequest) (*sandrone.InspectResult, error) {
+func (e *recordingEngine) Inspect(context.Context) (*sandrone.InspectResult, error) {
 	if e.inspectResult != nil {
 		return e.inspectResult, nil
 	}
-	return &sandrone.InspectResult{Capabilities: map[string]any{}}, nil
+	return &sandrone.InspectResult{}, nil
+}
+
+func (e *recordingEngine) ListFormatCapabilities(context.Context) (*sandrone.FormatCapabilityListResult, error) {
+	if e.formatCapabilityList != nil {
+		return e.formatCapabilityList, nil
+	}
+	return &sandrone.FormatCapabilityListResult{}, nil
+}
+
+func (e *recordingEngine) GetFormatCapability(_ context.Context, req sandrone.FormatCapabilityRequest) (*sandrone.FormatCapability, error) {
+	e.formatCapabilityRequests = append(e.formatCapabilityRequests, req)
+	if e.formatCapability != nil {
+		return e.formatCapability, nil
+	}
+	return &sandrone.FormatCapability{}, nil
 }

@@ -7,39 +7,82 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/kuuvahki-labs/sandrone/internal/adapter/shared"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/processor"
 	"github.com/kuuvahki-labs/sandrone/internal/service"
 )
 
-func TestCapabilitySummaryIncludesAdapterCapabilities(t *testing.T) {
+func TestFormatCapabilitiesExposeStableSummaryAndDetail(t *testing.T) {
 	svc := service.New()
-	summary := svc.CapabilitySummary()
-	capabilities, ok := summary["capabilities"].([]shared.Capability)
-	require.True(t, ok)
-	require.NotEmpty(t, capabilities)
+	result, err := svc.ListFormatCapabilities(context.Background())
+	require.NoError(t, err)
+	require.Len(t, result.Items, 12)
 
-	seen := map[string]shared.Capability{}
-	for _, capability := range capabilities {
-		require.NotEmpty(t, capability.Types, capability.Format)
-		require.NotEmpty(t, capability.Fields, capability.Format)
-		seen[capability.Format+"\x00"+string(capability.Direction)] = capability
+	seen := map[string]domain.FormatCapabilitySummary{}
+	for _, item := range result.Items {
+		require.NotEmpty(t, item.NodeTypes, item.Format)
+		require.Positive(t, item.FieldCounts.Supported, item.Format)
+		seen[item.Format+"\x00"+string(item.Direction)] = item
 	}
-	parseFormats := summary["parse_formats"].([]string)
+	parseFormats := formatsForDirection(result.Items, domain.CapabilityDirectionParse)
 	require.ElementsMatch(t, []string{"uri", "uri-list", "base64", "mihomo", "sing-box", "json-nodes"}, parseFormats)
 	for _, format := range parseFormats {
-		require.Contains(t, seen, format+"\x00"+string(shared.DirectionParse))
+		require.Contains(t, seen, format+"\x00"+string(domain.CapabilityDirectionParse))
 	}
-	renderFormats := summary["render_formats"].([]string)
+	renderFormats := formatsForDirection(result.Items, domain.CapabilityDirectionRender)
 	require.ElementsMatch(t, []string{"base64", "mihomo-proxies", "shadowrocket-proxies", "sing-box-outbounds", "json-nodes", "uri-list"}, renderFormats)
 	for _, format := range renderFormats {
-		require.Contains(t, seen, format+"\x00"+string(shared.DirectionRender))
+		require.Contains(t, seen, format+"\x00"+string(domain.CapabilityDirectionRender))
 	}
 
-	uriList := seen["uri-list\x00"+string(shared.DirectionParse)]
-	require.NotContains(t, uriList.Types, domain.NodeTypeWireGuard)
-	require.NotEmpty(t, seen["uri-list\x00"+string(shared.DirectionRender)].Lossy)
+	uriList := seen["uri-list\x00"+string(domain.CapabilityDirectionParse)]
+	require.NotContains(t, uriList.NodeTypes, domain.NodeTypeWireGuard)
+	require.Positive(t, seen["uri-list\x00"+string(domain.CapabilityDirectionRender)].FieldCounts.Lossy)
+
+	detail, err := svc.GetFormatCapability(context.Background(), domain.FormatCapabilityRequest{
+		Direction: domain.CapabilityDirectionRender,
+		Format:    "mihomo-proxies",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "mihomo-proxies", detail.Format)
+	require.NotEmpty(t, detail.Fields)
+	require.Equal(t, []string{"v1.19.25"}, seen["mihomo-proxies\x00render"].Revisions)
+}
+
+func TestGetFormatCapabilityRejectsUnknownKeys(t *testing.T) {
+	svc := service.New()
+	for _, req := range []domain.FormatCapabilityRequest{
+		{Direction: "future", Format: "uri-list"},
+		{Direction: domain.CapabilityDirectionRender},
+		{Direction: domain.CapabilityDirectionRender, Format: "future"},
+	} {
+		_, err := svc.GetFormatCapability(context.Background(), req)
+		require.Error(t, err)
+		require.True(t, domain.IsCode(err, domain.CodeInvalidArgument), "got %v", err)
+	}
+}
+
+func TestInspectReturnsLightweightRegisteredCapabilities(t *testing.T) {
+	result, err := service.New().Inspect(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, []string{"base64", "json-nodes", "mihomo", "sing-box", "uri", "uri-list"}, result.Formats.Parse)
+	require.Equal(t, []string{"base64", "json-nodes", "mihomo-proxies", "shadowrocket-proxies", "sing-box-outbounds", "uri-list"}, result.Formats.Render)
+	require.NotContains(t, result.Processors.File, "inject_nodes")
+	require.Equal(t, []domain.FileKind{domain.FileKindStatic, domain.FileKindMihomo, domain.FileKindSingBox, domain.FileKindShadowrocket}, result.FileKinds)
+	require.Equal(t, []domain.ProbeMethod{domain.ProbeTCPConnect, domain.ProbeUDPNTP, domain.ProbeURLTest}, result.Probe.Methods)
+	require.False(t, result.Store.Configured)
+	require.Nil(t, result.Store.Subscriptions)
+	require.Nil(t, result.Store.Files)
+}
+
+func formatsForDirection(items []domain.FormatCapabilitySummary, direction domain.CapabilityDirection) []string {
+	formats := []string{}
+	for _, item := range items {
+		if item.Direction == direction {
+			formats = append(formats, item.Format)
+		}
+	}
+	return formats
 }
 
 func TestServiceRendersBase64Subscription(t *testing.T) {
