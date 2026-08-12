@@ -1,7 +1,6 @@
 ---
 name: sandrone
 description: Use when an Agent must operate Sandrone to convert proxy or subscription data, inspect or manage subscriptions and FileSpecs, render client configurations, probe nodes, author processors or sandbox scripts, or explain Sandrone reports.
-compatibility: Requires either shell access with curl, SANDRONE_URL, and the bundled HTTP script, or a connected Sandrone MCP server.
 ---
 
 # Sandrone
@@ -21,6 +20,11 @@ resource definitions from the selected live plane.
 3. Otherwise, report both supported setup choices: configure `SANDRONE_URL`
    (and `SANDRONE_TOKEN` when required) for the bundled script, or connect a
    Sandrone MCP server.
+
+Use the MCP plane only through a client that supports MCP `2026-07-28`.
+Sandrone does not support the legacy initialize/initialized session lifecycle
+or older protocol negotiation. If the client cannot establish that connection,
+report the incompatibility and the HTTP setup alternative.
 
 For HTTP, call `/healthz`, `/version`, `/v1/inspect`, then the narrowest
 applicable `/v1/schemas/*` endpoint. For MCP, inspect the live capability

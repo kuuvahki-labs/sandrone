@@ -24,6 +24,9 @@ func TestSandroneSkillSupportsHTTPWithoutMandatoryMCP(t *testing.T) {
 	require.Contains(t, skill, "scripts/sandrone-api.sh")
 	require.Contains(t, skill, "HTTP")
 	require.Contains(t, skill, "MCP")
+	require.Contains(t, skill, "2026-07-28")
+	require.Contains(t, skill, "legacy initialize/initialized session lifecycle")
+	require.NotContains(t, skill, "compatibility:")
 	require.NotContains(t, skill, "Use Sandrone MCP as the only execution plane")
 
 	require.NotContains(t, metadata, `type: "mcp"`)
