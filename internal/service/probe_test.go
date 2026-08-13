@@ -93,6 +93,28 @@ func TestServiceProbeNormalizesInlineHysteriaBandwidthWithoutMutatingInput(t *te
 	}
 }
 
+func TestServiceProbeSilentlyCanonicalizesInlineVMessAndVLESSUserIDs(t *testing.T) {
+	callerNodes := []domain.NodeIR{
+		{Name: "vmess", Type: domain.NodeTypeVMess, Server: "vmess.example", Port: 443, UUID: "123456", Cipher: "auto"},
+		{Name: "vless", Type: domain.NodeTypeVLESS, Server: "vless.example", Port: 443, UUID: "a9dk23bz0", Encryption: "none"},
+	}
+	svc := service.New(service.WithProbeEngine(fakeProbeEngine{probe: func(_ context.Context, _ domain.ProbeRequest, nodes []domain.NodeIR, _ ...probe.Payload) (*domain.ProbeResult, error) {
+		require.Equal(t, "f8598425-92f2-5508-a071-4fc67f9040ac", nodes[0].UUID)
+		require.Equal(t, "c91481b6-fc0f-5d9e-b166-5ddf07b9c3c5", nodes[1].UUID)
+		return &domain.ProbeResult{Results: []domain.NodeProbeResult{{NodeName: "vmess"}, {NodeName: "vless"}}}, nil
+	}}))
+
+	result, err := svc.Probe(context.Background(), domain.ProbeRequest{
+		Input:  domain.NodeInput{Type: "inline_nodes", Nodes: callerNodes},
+		Method: domain.ProbeTCPConnect,
+	})
+
+	require.NoError(t, err)
+	require.Empty(t, result.Report.Warnings)
+	require.Equal(t, "123456", callerNodes[0].UUID)
+	require.Equal(t, "a9dk23bz0", callerNodes[1].UUID)
+}
+
 func TestServiceProbeNormalizesInlineHysteriaOverBoundMbps(t *testing.T) {
 	max := shared.MaxHysteriaMbps()
 	if max == int(^uint(0)>>1) {

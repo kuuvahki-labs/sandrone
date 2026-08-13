@@ -20,7 +20,7 @@ func (s *Service) ValidateNodes(ctx context.Context, req domain.ParseRequest) (*
 	for _, node := range parsed.Nodes {
 		report.Warnings = append(report.Warnings, node.Warnings...)
 	}
-	validated := nodevalidation.Validate(parsed.Nodes, nodevalidation.StageNormalized, req.Target)
+	validated := nodevalidation.Validate(normalizeNodeUUIDs(parsed.Nodes), nodevalidation.StageNormalized, req.Target)
 	issues := append([]domain.ValidationIssue{}, validated.Issues...)
 	counts := validated.Counts
 	nodes := validated.Nodes
@@ -37,7 +37,7 @@ func (s *Service) ValidateNodes(ctx context.Context, req domain.ParseRequest) (*
 			return nil, processErr
 		}
 		report.Warnings = append(report.Warnings, processed.Warnings...)
-		post := nodevalidation.Validate(processed.Nodes, nodevalidation.StageProcessed, req.Target)
+		post := nodevalidation.Validate(normalizeNodeUUIDs(processed.Nodes), nodevalidation.StageProcessed, req.Target)
 		issues = append(issues, post.Issues...)
 		counts.Valid = post.Counts.Valid
 		counts.Invalid += post.Counts.Invalid

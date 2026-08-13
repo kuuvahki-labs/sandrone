@@ -4,10 +4,38 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/gofrs/uuid/v5"
+
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
 
 const vlessVisionFlow = "xtls-rprx-vision"
+
+func normalizeNodeUUIDs(nodes []domain.NodeIR) []domain.NodeIR {
+	out := append([]domain.NodeIR{}, nodes...)
+	for index := range out {
+		normalizeNodeUUID(&out[index])
+	}
+	return out
+}
+
+func normalizeNodeUUID(node *domain.NodeIR) {
+	if node == nil || strings.TrimSpace(node.UUID) == "" {
+		return
+	}
+	parsed, err := uuid.FromString(node.UUID)
+	switch node.Type {
+	case domain.NodeTypeVMess, domain.NodeTypeVLESS:
+		if err != nil {
+			parsed = uuid.NewV5(uuid.Nil, node.UUID)
+		}
+		node.UUID = parsed.String()
+	case domain.NodeTypeTUIC:
+		if err == nil {
+			node.UUID = parsed.String()
+		}
+	}
+}
 
 func normalizeParsedNodes(parsed *parseInputResult) {
 	if parsed == nil {

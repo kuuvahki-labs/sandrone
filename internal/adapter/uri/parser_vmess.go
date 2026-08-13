@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"regexp"
 	"strings"
 
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/shared"
@@ -13,7 +12,6 @@ import (
 )
 
 var errVMessZeroPort = errors.New("zero vmess port")
-var vmessAEADUUIDPattern = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
 func parseVMess(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 	payload := strings.TrimPrefix(raw, "vmess://")
@@ -38,9 +36,6 @@ func parseVMessAEAD(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 	}
 	if _, hasPassword := u.User.Password(); hasPassword {
 		return node, source, domain.NewError(domain.CodeParseFailed, "vmess AEAD userinfo must contain only a uuid")
-	}
-	if !vmessAEADUUIDPattern.MatchString(u.User.Username()) {
-		return node, source, domain.NewError(domain.CodeParseFailed, "invalid vmess uuid")
 	}
 	host, port, err := shared.ParseURLHostPort(u, "")
 	if err != nil {

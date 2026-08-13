@@ -251,11 +251,6 @@ func TestParseVMessAEADRejectsMalformedAuthority(t *testing.T) {
 			want: "userinfo must contain only a uuid",
 		},
 		{
-			name: "invalid uuid",
-			raw:  "vmess://not-a-uuid@example.com:443",
-			want: "invalid vmess uuid",
-		},
-		{
 			name: "non-empty path",
 			raw:  "vmess://11111111-1111-1111-1111-111111111111@example.com:443/not-in-profile",
 			want: "vmess AEAD URL path is not allowed",
@@ -269,6 +264,16 @@ func TestParseVMessAEADRejectsMalformedAuthority(t *testing.T) {
 			require.Contains(t, err.Error(), tc.want)
 		})
 	}
+}
+
+func TestParseVMessAEADAcceptsNonUUIDUserID(t *testing.T) {
+	p := uri.NewParser()
+
+	nodes, _, err := p.Parse(context.Background(), []byte("vmess://not-a-uuid@example.com:443#mapped"))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	require.Equal(t, "not-a-uuid", nodes[0].UUID)
 }
 
 func TestParseVMessAEADRejectsDuplicateQueryKey(t *testing.T) {

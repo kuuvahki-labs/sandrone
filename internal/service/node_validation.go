@@ -8,6 +8,7 @@ import (
 )
 
 func validateNodeBatch(nodes []domain.NodeIR, stage nodevalidation.Stage, target string) (nodevalidation.Result, []domain.Warning, error) {
+	nodes = normalizeNodeUUIDs(nodes)
 	result := nodevalidation.Validate(nodes, stage, target)
 	if result.Counts.Invalid == 0 {
 		return result, nil, nil

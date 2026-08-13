@@ -120,6 +120,30 @@ func TestValidateTUICRequiresEnabledTLS(t *testing.T) {
 	}
 }
 
+func TestValidateUUIDsWithStandardParserAndKeepsTUICStrict(t *testing.T) {
+	t.Parallel()
+
+	compactVMess := domain.NodeIR{
+		Name: "vmess", Type: domain.NodeTypeVMess, Server: "vmess.example", Port: 443,
+		UUID: "11111111111111111111111111111111", Cipher: "auto",
+	}
+	require.Equal(t, 1, nodevalidation.Validate([]domain.NodeIR{compactVMess}, nodevalidation.StageNormalized, "").Counts.Valid)
+
+	invalidVLESS := domain.NodeIR{
+		Name: "vless", Type: domain.NodeTypeVLESS, Server: "vless.example", Port: 443,
+		UUID: "not-normalized", Encryption: "none",
+	}
+	require.Equal(t, 1, nodevalidation.Validate([]domain.NodeIR{invalidVLESS}, nodevalidation.StageNormalized, "").Counts.Invalid)
+
+	invalidTUIC := domain.NodeIR{
+		Name: "tuic", Type: domain.NodeTypeTUIC, Server: "tuic.example", Port: 443,
+		UUID: "not-a-uuid", Password: "secret", TLS: &domain.TLSOptions{Enabled: true},
+	}
+	result := nodevalidation.Validate([]domain.NodeIR{invalidTUIC}, nodevalidation.StageNormalized, "")
+	require.Equal(t, 1, result.Counts.Invalid)
+	require.Contains(t, issueFields(result.Issues), "uuid")
+}
+
 func TestValidateRejectsNonCanonicalNetwork(t *testing.T) {
 	t.Parallel()
 

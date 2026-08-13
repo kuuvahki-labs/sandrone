@@ -4,6 +4,7 @@ go 1.25.11
 
 require (
 	github.com/dop251/goja v0.0.0-20260701091749-b07b74453ea9
+	github.com/gofrs/uuid/v5 v5.4.0
 	github.com/google/jsonschema-go v0.4.3
 	github.com/metacubex/age v0.0.0-20260603010618-28d156b4ea78
 	github.com/metacubex/mihomo v1.19.28
@@ -63,7 +64,6 @@ require (
 	github.com/gobwas/pool v0.2.1 // indirect
 	github.com/gobwas/ws v1.4.0 // indirect
 	github.com/godbus/dbus/v5 v5.2.2 // indirect
-	github.com/gofrs/uuid/v5 v5.4.0 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/google/btree v1.1.3 // indirect

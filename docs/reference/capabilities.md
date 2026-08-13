@@ -87,6 +87,12 @@ VMess URI 输入同时接受 legacy `vmess://Base64(JSON)` 与 Discussion #716
 的字段，未支持参数保留为 Raw 并产生 warning。VMess URI 输出仍为 legacy
 Base64 JSON，不承诺对 #716 的完整或无损往返。
 
+VMess 与 VLESS 的非空用户 ID 遵循上游核心兼容语义：能解析为 UUID 时规范化为
+canonical UUID 字符串，否则静默映射为以 nil UUID 为 namespace、原字符串为 name
+的 UUIDv5。映射后的 UUID 写入 `NodeIR.UUID`，使所有目标 renderer 使用同一线级
+身份；这项语义保持规范化不产生 warning。空用户 ID 仍无效。TUIC 不使用该映射，
+其 UUID/password 凭据中的 UUID 必须能被标准 UUID parser 接受。
+
 ## 输出格式
 
 | format | 产物 |

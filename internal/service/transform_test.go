@@ -66,6 +66,50 @@ func TestServiceParseAndRenderRegistry(t *testing.T) {
 		})
 	}
 }
+
+func TestServiceCanonicalizesVMessAndVLESSUserIDsAcrossEntryPointsAndTargets(t *testing.T) {
+	svc := service.New()
+	rawNodes := []domain.NodeIR{
+		{Name: "mapped-vmess", Type: domain.NodeTypeVMess, Server: "vmess.example", Port: 443, UUID: "123456", Cipher: "auto"},
+		{Name: "mapped-vless", Type: domain.NodeTypeVLESS, Server: "vless.example", Port: 443, UUID: "a9dk23bz0", Encryption: "none"},
+	}
+	input, err := json.Marshal(rawNodes)
+	require.NoError(t, err)
+
+	parsed, err := svc.Parse(context.Background(), domain.ParseRequest{Format: "json-nodes", Content: input})
+	require.NoError(t, err)
+	require.Empty(t, parsed.Report.Warnings)
+	require.Equal(t, "f8598425-92f2-5508-a071-4fc67f9040ac", parsed.Nodes[0].UUID)
+	require.Equal(t, "c91481b6-fc0f-5d9e-b166-5ddf07b9c3c5", parsed.Nodes[1].UUID)
+
+	validated, err := svc.ValidateNodes(context.Background(), domain.ParseRequest{Format: "json-nodes", Content: input})
+	require.NoError(t, err)
+	require.True(t, validated.OK)
+	require.Equal(t, 2, validated.Counts.Valid)
+	require.Empty(t, validated.Issues)
+	require.Empty(t, validated.Report.Warnings)
+
+	for _, format := range []string{"json-nodes", "mihomo-proxies", "sing-box-outbounds", "shadowrocket-proxies"} {
+		t.Run(format, func(t *testing.T) {
+			rendered, err := svc.Render(context.Background(), domain.RenderRequest{Format: format, Nodes: rawNodes})
+			require.NoError(t, err)
+			require.Empty(t, rendered.Report.Warnings)
+			require.Contains(t, string(rendered.Body), "f8598425-92f2-5508-a071-4fc67f9040ac")
+			require.Contains(t, string(rendered.Body), "c91481b6-fc0f-5d9e-b166-5ddf07b9c3c5")
+		})
+	}
+
+	uriList, err := svc.Render(context.Background(), domain.RenderRequest{Format: "uri-list", Nodes: rawNodes})
+	require.NoError(t, err)
+	require.Empty(t, uriList.Report.Warnings)
+	roundTrip, err := svc.Parse(context.Background(), domain.ParseRequest{Format: "uri-list", Content: uriList.Body})
+	require.NoError(t, err)
+	require.Equal(t, "f8598425-92f2-5508-a071-4fc67f9040ac", roundTrip.Nodes[0].UUID)
+	require.Equal(t, "c91481b6-fc0f-5d9e-b166-5ddf07b9c3c5", roundTrip.Nodes[1].UUID)
+	require.Equal(t, "123456", rawNodes[0].UUID)
+	require.Equal(t, "a9dk23bz0", rawNodes[1].UUID)
+}
+
 func TestServiceConvertRunsParseAndRender(t *testing.T) {
 	targets := []string{}
 	svc := service.New(service.WithProcessor(func(r *processor.Registry) {

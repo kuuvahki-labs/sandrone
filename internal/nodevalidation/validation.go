@@ -3,11 +3,12 @@ package nodevalidation
 
 import (
 	"net"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/gofrs/uuid/v5"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
@@ -26,8 +27,6 @@ type Result struct {
 	Issues []domain.ValidationIssue
 	Counts domain.ValidationCounts
 }
-
-var uuidPattern = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
 func Validate(nodes []domain.NodeIR, stage Stage, target string) Result {
 	result := Result{
@@ -105,7 +104,7 @@ func validateNode(node domain.NodeIR, index int, stage Stage, target string) []d
 			add("node_validation_required", "shadowsocksr", "shadowsocksr options are required")
 		}
 	case domain.NodeTypeVMess, domain.NodeTypeVLESS:
-		if !uuidPattern.MatchString(strings.TrimSpace(node.UUID)) {
+		if !validUUID(node.UUID) {
 			add("node_validation_invalid", "uuid", "uuid must be a valid UUID")
 		}
 	case domain.NodeTypeTrojan:
@@ -327,9 +326,14 @@ func validateTUIC(node domain.NodeIR, add func(string, string, string)) {
 	if hasUUID != hasPassword {
 		add("node_validation_conflict", "tuic.credentials", "TUIC UUID and password must be provided together")
 	}
-	if hasUUID && !uuidPattern.MatchString(node.UUID) {
+	if hasUUID && !validUUID(node.UUID) {
 		add("node_validation_invalid", "uuid", "uuid must be a valid UUID")
 	}
+}
+
+func validUUID(value string) bool {
+	_, err := uuid.FromString(value)
+	return err == nil
 }
 
 func validateWireGuard(options *domain.WireGuardOptions, add func(string, string, string)) {
