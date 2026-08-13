@@ -83,4 +83,6 @@ export const processorZhCN = {
   "processors.quick.reuse": "连接复用（仅 Snell）",
   "processors.filter.infoPresetOption": "过滤信息节点",
   "processors.filter.infoPresetName": "过滤信息节点",
+  "processors.rename.normalizationPresetOption": "节点名称规范化",
+  "processors.rename.normalizationPresetName": "节点名称规范化",
 } as const;

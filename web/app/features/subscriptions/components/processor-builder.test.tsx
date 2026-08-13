@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
@@ -212,6 +214,38 @@ describe("ProcessorBuilder", () => {
         },
       },
     ]);
+  });
+
+  it("appends the inline node-name normalization preset without a file dependency", async () => {
+    const user = userEvent.setup();
+    const { serializedProcessors } = renderProcessorBuilder({
+      defaultValue: [{ type: "sort", stage: "nodes", params: { by: "+name" } }],
+    });
+
+    await selectMuiOption(
+      user,
+      screen.getByRole("combobox", { name: "类型" }),
+      "节点名称规范化",
+    );
+    await user.click(screen.getByRole("button", { name: "添加处理器" }));
+
+    const processors = serializedProcessors();
+    expect(processors[0]).toEqual({
+      type: "sort",
+      stage: "nodes",
+      params: { by: "+name" },
+    });
+    expect(processors[1]).toMatchObject({
+      name: "节点名称规范化",
+      type: "script",
+      stage: "nodes",
+      params: { source: { type: "inline" } },
+    });
+    expect(processors[1].params).not.toHaveProperty("args");
+    const source = processors[1].params?.source as { content?: unknown };
+    expect(typeof source.content).toBe("string");
+    expect(createHash("sha256").update(String(source.content)).digest("hex"))
+      .toBe("4fd7f47924ae126815dcfe1baab076748070b254a65e53579410f070ec08f91f");
   });
 
   it("starts without quick settings and appends visual processors in order", async () => {
