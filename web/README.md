@@ -49,8 +49,10 @@ SANDRONE_DEV_API_TARGET=http://127.0.0.1:18080 pnpm dev
 pnpm build
 ```
 
-Web 构建只生成 `web/build/client` 中的 client-side 静态资源。如需让仓库内
-的 Sandrone HTTP server 按默认路径发现这些资源，在仓库根目录执行：
+Web 构建只生成 `web/build/client` 中的 client-side 静态资源，并为不小于
+8 KiB 的 JavaScript 和 CSS 生成构建期 Brotli 副本。普通资源保留为兼容兜底，
+生产 Sandrone HTTP server 会按请求的 `Accept-Encoding` 自动选择 `.br` 表示。
+如需让仓库内的 Sandrone HTTP server 按默认路径发现这些资源，在仓库根目录执行：
 
 ```sh
 make build-webui

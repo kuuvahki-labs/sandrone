@@ -7,14 +7,14 @@
     "node": ">=24.0.0 <25"
   },
   "scripts": {
-    "build": "react-router build && node -e \"require('node:fs').rmSync('build/server', { recursive: true, force: true })\"",
+    "build": "react-router build && node -e \"require('node:fs').rmSync('build/server', { recursive: true, force: true })\" && node scripts/precompress-assets.mjs build/client",
     "dev": "react-router dev --host 0.0.0.0",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "preview": "vite preview --host 127.0.0.1 --outDir build/client",
     "start": "vite preview --host 127.0.0.1 --outDir build/client",
     "test": "vitest",
-    "test:run": "vitest --run",
+    "test:run": "vitest --run && node --test scripts/*.test.mjs",
     "pretest:e2e": "playwright install chromium-headless-shell",
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install chromium-headless-shell",

@@ -86,6 +86,16 @@ sha256sum -c checksums.txt
 本地执行 `make release-artifacts` 会先构建 Web UI，再生成两个自包含二进制归档和
 校验文件。
 
+工作树存在未提交改动、只需要生成本地部署快照时，使用：
+
+```sh
+make snapshot-artifacts
+```
+
+该目标同样构建 `linux/amd64`、`linux/arm64` 和 `checksums.txt`，输出到
+`dist/snapshot/`。快照身份固定为 `version=dev` 且不报告 revision，不会覆盖
+`dist/` 下的正式发布附件，也不用于 GitHub Release。
+
 纯 `vMAJOR.MINOR.PATCH` tag 创建正式 Release；其他与版本文件匹配的 tag（例如
 `v0.1.0-rc.1`）创建 prerelease。重新运行同一个 tag 的发布任务会替换同名附件，
 不会创建第二个 Release。

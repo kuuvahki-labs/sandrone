@@ -7,6 +7,25 @@ const muiOptimizerInclude = Object.freeze(["@mui/material/**"]);
 
 export default defineConfig({
   plugins: [tailwindcss(), !process.env.VITEST && reactRouter()],
+  build: {
+    minify: "oxc",
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          minSize: 20 * 1024,
+          groups: [
+            {
+              name: "vendor",
+              test: /node_modules[\\/]/,
+              entriesAware: true,
+              entriesAwareMergeThreshold: 32 * 1024,
+              priority: 10,
+            },
+          ],
+        },
+      },
+    },
+  },
   resolve: {
     tsconfigPaths: true,
   },

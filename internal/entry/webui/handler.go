@@ -3,10 +3,13 @@ package webui
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"io/fs"
 	"mime"
 	"net/http"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -86,15 +89,67 @@ func (h *handler) serveStatic(w http.ResponseWriter, r *http.Request, name strin
 	if h.static == nil {
 		return false
 	}
-	body, err := fs.ReadFile(h.static, name)
+	if _, err := fs.Stat(h.static, name); err != nil {
+		return false
+	}
+	representationName := name
+	if _, err := fs.Stat(h.static, name+".br"); err == nil {
+		w.Header().Set("Vary", "Accept-Encoding")
+		if acceptsBrotli(r.Header.Get("Accept-Encoding")) {
+			representationName = name + ".br"
+			w.Header().Set("Content-Encoding", "br")
+		}
+	}
+	body, err := fs.ReadFile(h.static, representationName)
 	if err != nil {
 		return false
 	}
+	w.Header().Set("Cache-Control", cacheControlFor(name))
+	w.Header().Set("ETag", contentETag(body))
 	if contentType := mime.TypeByExtension(path.Ext(name)); contentType != "" {
 		w.Header().Set("Content-Type", contentType)
 	}
 	http.ServeContent(w, r, name, time.Time{}, bytes.NewReader(body))
 	return true
+}
+
+func acceptsBrotli(header string) bool {
+	for _, coding := range strings.Split(header, ",") {
+		parts := strings.Split(coding, ";")
+		if !strings.EqualFold(strings.TrimSpace(parts[0]), "br") {
+			continue
+		}
+		quality := 1.0
+		for _, parameter := range parts[1:] {
+			key, value, ok := strings.Cut(parameter, "=")
+			if !ok || !strings.EqualFold(strings.TrimSpace(key), "q") {
+				continue
+			}
+			parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+			if err != nil || parsed < 0 || parsed > 1 {
+				return false
+			}
+			quality = parsed
+		}
+		return quality > 0
+	}
+	return false
+}
+
+func cacheControlFor(name string) string {
+	switch {
+	case strings.HasPrefix(name, "assets/"):
+		return "public, max-age=31536000, immutable"
+	case strings.HasPrefix(name, "brand/"):
+		return "public, max-age=86400"
+	default:
+		return "no-cache"
+	}
+}
+
+func contentETag(body []byte) string {
+	sum := sha256.Sum256(body)
+	return `"` + hex.EncodeToString(sum[:]) + `"`
 }
 
 func defaultReservedPrefixes() []string {

@@ -2,7 +2,31 @@
 set -eu
 
 : "${VERSION:?VERSION is required}"
-: "${REVISION:?REVISION is required}"
+
+artifact_kind=${ARTIFACT_KIND-release}
+REVISION=${REVISION-}
+case "$artifact_kind" in
+	release)
+		if [ -z "$REVISION" ]; then
+			printf '%s\n' 'release artifacts require REVISION' >&2
+			exit 2
+		fi
+		;;
+	snapshot)
+		if [ "$VERSION" != dev ]; then
+			printf '%s\n' 'snapshot artifacts require VERSION=dev' >&2
+			exit 2
+		fi
+		if [ -n "$REVISION" ]; then
+			printf '%s\n' 'snapshot artifacts require an empty REVISION' >&2
+			exit 2
+		fi
+		;;
+	*)
+		printf 'unsupported artifact kind %s\n' "$artifact_kind" >&2
+		exit 2
+		;;
+esac
 
 release_targets=${RELEASE_TARGETS-"linux/amd64 linux/arm64"}
 output_dir=${OUTPUT_DIR-dist}

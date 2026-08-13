@@ -60,7 +60,7 @@ BUILD_LDFLAGS_ARG := -ldflags "$(BUILD_LDFLAGS)"
 endif
 BUILD_VCS_ARG := $(if $(BUILD_REVISION),,-buildvcs=false)
 
-VALIDATED_TARGETS := help check ci fmt fmt-check vet test test-webui test-webui-e2e build build-bin build-check build-webui image lint ruleset-catalog release-artifacts
+VALIDATED_TARGETS := help check ci fmt fmt-check vet test test-webui test-webui-e2e build build-bin build-check build-webui image lint ruleset-catalog release-artifacts snapshot-artifacts
 
 .PHONY: validate-build-identity $(VALIDATED_TARGETS)
 
@@ -91,6 +91,7 @@ help: ## Show available targets.
 	@printf '  %-28s %s\n' 'build' 'Generate the rule-set catalog and build the CLI to BUILD_BIN.'
 	@printf '  %-28s %s\n' 'build-bin' 'Generate the catalog and build the CLI in the repo; override BIN as needed.'
 	@printf '  %-28s %s\n' 'release-artifacts' 'Build Linux release archives and checksums.'
+	@printf '  %-28s %s\n' 'snapshot-artifacts' 'Build local dev Linux archives under dist/snapshot.'
 	@printf '  %-28s %s\n' 'ruleset-catalog' 'Generate the ignored build-time rule-set URL snapshot.'
 	@printf '  %-28s %s\n' 'build-webui' 'Build web UI assets and copy them into Go embed static files.'
 	@printf '  %-28s %s\n' 'image' 'Build a locally tagged container image.'
@@ -131,7 +132,10 @@ build-check:
 	$(GO) build $(GOFLAGS) $(BUILD_VCS_ARG) $(BUILD_LDFLAGS_ARG) -o $(BUILD_BIN) $(CMD_PKG)
 
 release-artifacts: build-webui
-	VERSION="$(BUILD_VERSION)" REVISION="$(BUILD_REVISION)" ./scripts/build-release-artifacts.sh
+	ARTIFACT_KIND=release VERSION="$(BUILD_VERSION)" REVISION="$(BUILD_REVISION)" ./scripts/build-release-artifacts.sh
+
+snapshot-artifacts: build-webui
+	ARTIFACT_KIND=snapshot VERSION=dev REVISION="" OUTPUT_DIR="$(CURDIR)/dist/snapshot" ./scripts/build-release-artifacts.sh
 
 build-webui:
 	./scripts/build-webui.sh

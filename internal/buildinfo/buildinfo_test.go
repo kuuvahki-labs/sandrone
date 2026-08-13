@@ -359,19 +359,23 @@ func TestMakeBuildWithoutRevisionForcesDevVersion(t *testing.T) {
 	}
 }
 
-func TestReleaseArtifactsTargetUsesCanonicalScript(t *testing.T) {
+func TestArtifactTargetsUseCanonicalScript(t *testing.T) {
 	makefile, err := os.ReadFile(filepath.Join("..", "..", "Makefile"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	content := string(makefile)
-	validatedLine := "VALIDATED_TARGETS := help check ci fmt fmt-check vet test test-webui test-webui-e2e build build-bin build-check build-webui image lint ruleset-catalog release-artifacts"
+	validatedLine := "VALIDATED_TARGETS := help check ci fmt fmt-check vet test test-webui test-webui-e2e build build-bin build-check build-webui image lint ruleset-catalog release-artifacts snapshot-artifacts"
 	if !strings.Contains(content, validatedLine) {
-		t.Errorf("Makefile does not validate release-artifacts")
+		t.Errorf("Makefile does not validate artifact targets")
 	}
-	wantTarget := "release-artifacts: build-webui\n\tVERSION=\"$(BUILD_VERSION)\" REVISION=\"$(BUILD_REVISION)\" ./scripts/build-release-artifacts.sh\n"
-	if count := strings.Count(content, wantTarget); count != 1 {
-		t.Fatalf("Makefile contains %d canonical release-artifacts recipes, want 1", count)
+	for target, wantRecipe := range map[string]string{
+		"release-artifacts":  "release-artifacts: build-webui\n\tARTIFACT_KIND=release VERSION=\"$(BUILD_VERSION)\" REVISION=\"$(BUILD_REVISION)\" ./scripts/build-release-artifacts.sh\n",
+		"snapshot-artifacts": "snapshot-artifacts: build-webui\n\tARTIFACT_KIND=snapshot VERSION=dev REVISION=\"\" OUTPUT_DIR=\"$(CURDIR)/dist/snapshot\" ./scripts/build-release-artifacts.sh\n",
+	} {
+		if count := strings.Count(content, wantRecipe); count != 1 {
+			t.Errorf("Makefile contains %d canonical %s recipes, want 1", count, target)
+		}
 	}
 }
 
@@ -433,6 +437,61 @@ func TestBuildReleaseArtifactsProducesCanonicalArchive(t *testing.T) {
 		if !strings.Contains(lines[1], want) {
 			t.Errorf("build call does not contain %q:\n%s", want, lines[1])
 		}
+	}
+}
+
+func TestBuildSnapshotArtifactsAllowsUnknownRevision(t *testing.T) {
+	repo, script, makeLog := newReleaseArtifactFixture(t)
+	outputDir := filepath.Join(repo, "snapshot")
+	output, err := runCommandEnv(repo, []string{
+		"PATH=" + os.Getenv("PATH"),
+		"ARTIFACT_KIND=snapshot",
+		"VERSION=dev",
+		"REVISION=",
+		"RELEASE_TARGETS=linux/arm64",
+		"OUTPUT_DIR=" + outputDir,
+		"MAKE=" + script,
+		"MAKE_LOG=" + makeLog,
+	}, "sh", filepath.Join(repo, "scripts", "build-release-artifacts.sh"))
+	if err != nil {
+		t.Fatalf("build snapshot artifacts: %v\n%s", err, output)
+	}
+
+	if _, err := os.Stat(filepath.Join(outputDir, "sandrone_linux_arm64.tar.gz")); err != nil {
+		t.Fatalf("snapshot archive: %v", err)
+	}
+	makeCalls, err := os.ReadFile(makeLog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(makeCalls)), "\n")
+	if got, want := len(lines), 2; got != want {
+		t.Fatalf("make call count = %d, want %d:\n%s", got, want, makeCalls)
+	}
+	for _, want := range []string{" VERSION=dev", " REVISION="} {
+		if !strings.Contains(lines[1], want) {
+			t.Errorf("snapshot build call does not contain %q:\n%s", want, lines[1])
+		}
+	}
+}
+
+func TestBuildReleaseArtifactsRejectsUnknownRevision(t *testing.T) {
+	repo, script, makeLog := newReleaseArtifactFixture(t)
+	output, err := runCommandEnv(repo, []string{
+		"PATH=" + os.Getenv("PATH"),
+		"ARTIFACT_KIND=release",
+		"VERSION=dev",
+		"REVISION=",
+		"RELEASE_TARGETS=linux/arm64",
+		"OUTPUT_DIR=" + filepath.Join(repo, "output"),
+		"MAKE=" + script,
+		"MAKE_LOG=" + makeLog,
+	}, "sh", filepath.Join(repo, "scripts", "build-release-artifacts.sh"))
+	if err == nil {
+		t.Fatalf("release artifacts accepted an empty revision:\n%s", output)
+	}
+	if want := "release artifacts require REVISION"; !strings.Contains(string(output), want) {
+		t.Fatalf("missing error %q:\n%s", want, output)
 	}
 }
 
