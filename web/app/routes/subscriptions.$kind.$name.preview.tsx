@@ -28,7 +28,7 @@ export default function SubscriptionPreviewRoute() {
   const backToList = resourcePreviewOrigin(searchParams.get("from")) === "list";
   const loadPreview = useCallback((): Promise<SubscriptionPreview | null> => item ? loadSubscriptionPreview(item.name) : Promise.resolve(null), [item, loadSubscriptionPreview]);
   const refreshPreviewLoader = useCallback((): Promise<SubscriptionPreview | null> => item ? loadSubscriptionPreview(item.name, { refresh: true }) : Promise.resolve(null), [item, loadSubscriptionPreview]);
-  const { failed, pending, preview, refreshPreview } = useResourcePreview<SubscriptionPreview>(item ? `${item.kind}:${item.name}` : undefined, loadPreview, refreshPreviewLoader);
+  const { elapsedSeconds, failed, pending, preview, refreshPreview } = useResourcePreview<SubscriptionPreview>(item ? `${item.kind}:${item.name}` : undefined, loadPreview, refreshPreviewLoader);
 
   if (subscriptions.loading) return <LoadingScreen />;
 
@@ -39,6 +39,7 @@ export default function SubscriptionPreviewRoute() {
   return (
     <SubscriptionPreviewPage
       backLabel={t("actions.back")}
+      elapsedSeconds={elapsedSeconds}
       failed={failed}
       item={item}
       key={`${item.kind}:${item.name}`}

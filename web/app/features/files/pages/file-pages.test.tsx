@@ -126,7 +126,7 @@ describe("FilePreviewPage", () => {
       <FilePreviewPage backLabel="返回编辑" fileName="default.txt" pending onBack={vi.fn()} onRefresh={onRefresh} onShare={onShare} />,
     );
 
-    expect(screen.getByRole("heading", { name: "正在生成" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "正在处理" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "刷新文件预览" })).toBeDisabled();
 
     rerender(<FilePreviewPage backLabel="返回文件列表" failed fileName="default.txt" onBack={vi.fn()} onRefresh={onRefresh} onShare={onShare} />);

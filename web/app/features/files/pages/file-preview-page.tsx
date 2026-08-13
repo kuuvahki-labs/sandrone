@@ -6,12 +6,14 @@ import Typography from "@mui/material/Typography";
 
 import type { FilePreview } from "~/features/files/model/types";
 import { useI18n } from "~/shared/i18n/context";
+import { PreviewPendingStatus } from "~/shared/preview/preview-pending-status";
 import { CollapsibleWarningPanel } from "~/shared/resources/warning-panel";
 import { CodeBlock } from "~/shared/ui/code-editor";
 import { PageHeader } from "~/shared/ui/page";
 
 export interface FilePreviewPageProps {
   backLabel: string;
+  elapsedSeconds?: number;
   failed?: boolean;
   fileName: string;
   pending?: boolean;
@@ -23,6 +25,7 @@ export interface FilePreviewPageProps {
 
 export function FilePreviewPage({
   backLabel,
+  elapsedSeconds = 0,
   failed = false,
   fileName,
   pending = false,
@@ -50,18 +53,7 @@ export function FilePreviewPage({
         title={t("files.preview.title")}
       />
 
-      {pending && !preview ? (
-        <Card component="article" variant="outlined">
-          <CardContent>
-            <div className="grid gap-2">
-              <Typography component="h3" variant="h6">
-                {t("files.preview.loadingTitle")}
-              </Typography>
-              <Typography color="text.secondary">{t("files.preview.loadingDescription")}</Typography>
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
+      {pending ? <PreviewPendingStatus elapsedSeconds={elapsedSeconds} /> : null}
 
       {failed && !preview ? (
         <Card component="article" variant="outlined">

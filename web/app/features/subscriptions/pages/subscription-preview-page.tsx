@@ -17,6 +17,7 @@ import Typography from "@mui/material/Typography";
 
 import type { SubscriptionItem, SubscriptionPreview, SubscriptionPreviewNode, SubscriptionPreviewNodeDiff, SubscriptionPreviewProbe, SubscriptionPreviewStatus } from "~/features/subscriptions/model/types";
 import { type Translator, useI18n } from "~/shared/i18n/context";
+import { PreviewPendingStatus } from "~/shared/preview/preview-pending-status";
 import { CollapsibleWarningPanel } from "~/shared/resources/warning-panel";
 import { CodeBlock } from "~/shared/ui/code-editor";
 import { Metric, PageHeader } from "~/shared/ui/page";
@@ -30,6 +31,7 @@ const previewDateTimeFormatters = new Map<string, Intl.DateTimeFormat>();
 
 export interface SubscriptionPreviewPageProps {
   backLabel: string;
+  elapsedSeconds?: number;
   failed?: boolean;
   item: SubscriptionItem;
   pending?: boolean;
@@ -39,7 +41,7 @@ export interface SubscriptionPreviewPageProps {
   onShare: () => void;
 }
 
-export function SubscriptionPreviewPage({ backLabel, failed = false, pending = false, preview, onBack, onRefresh, onShare }: SubscriptionPreviewPageProps) {
+export function SubscriptionPreviewPage({ backLabel, elapsedSeconds = 0, failed = false, pending = false, preview, onBack, onRefresh, onShare }: SubscriptionPreviewPageProps) {
   const { t } = useI18n();
   const [filter, setFilter] = useState<PreviewFilter>("all");
   const nodes = preview?.nodes ?? [];
@@ -63,18 +65,7 @@ export function SubscriptionPreviewPage({ backLabel, failed = false, pending = f
         <Metric label={t("subscriptions.preview.metricWarnings")} value={preview?.warnings.length} />
       </div>
 
-      {pending && !preview ? (
-        <Card component="article" variant="outlined">
-          <CardContent>
-            <div className="grid gap-2">
-              <Typography component="h3" variant="h6">
-                {t("subscriptions.preview.loadingTitle")}
-              </Typography>
-              <Typography color="text.secondary">{t("subscriptions.preview.loadingDescription")}</Typography>
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
+      {pending ? <PreviewPendingStatus elapsedSeconds={elapsedSeconds} /> : null}
 
       {failed && !preview ? (
         <Card component="article" variant="outlined">

@@ -27,7 +27,7 @@ export default function FilePreviewRoute() {
   const backToList = resourcePreviewOrigin(searchParams.get("from")) === "list";
   const loadPreview = useCallback((): Promise<FilePreview | null> => item ? loadFilePreview(item.name) : Promise.resolve(null), [item, loadFilePreview]);
   const refreshPreviewLoader = useCallback((): Promise<FilePreview | null> => item ? loadFilePreview(item.name, { refresh: true }) : Promise.resolve(null), [item, loadFilePreview]);
-  const { failed, pending, preview, refreshPreview } = useResourcePreview<FilePreview>(item?.name, loadPreview, refreshPreviewLoader);
+  const { elapsedSeconds, failed, pending, preview, refreshPreview } = useResourcePreview<FilePreview>(item?.name, loadPreview, refreshPreviewLoader);
 
   if (files.loading) return <LoadingScreen />;
 
@@ -38,6 +38,7 @@ export default function FilePreviewRoute() {
   return (
     <FilePreviewPage
       backLabel={t("actions.back")}
+      elapsedSeconds={elapsedSeconds}
       failed={failed}
       fileName={item.name}
       key={item.name}
