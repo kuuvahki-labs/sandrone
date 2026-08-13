@@ -2,7 +2,7 @@ import Checkbox from "@mui/material/Checkbox";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import TextField from "@mui/material/TextField";
 
-import nodeNameNormalizationScript from "~/features/subscriptions/processors/scripts/node-name-normalization.js.txt?raw";
+import nodeNameNormalizationScript from "~/features/subscriptions/processors/scripts/node-name-normalization.js?raw";
 import { useUICapabilities } from "~/shared/capabilities/context";
 import { type Translator, useI18n } from "~/shared/i18n/context";
 import { DEFAULT_PROBE_URL } from "~/shared/probe/defaults";

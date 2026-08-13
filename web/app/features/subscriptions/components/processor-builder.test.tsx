@@ -245,7 +245,7 @@ describe("ProcessorBuilder", () => {
     const source = processors[1].params?.source as { content?: unknown };
     expect(typeof source.content).toBe("string");
     expect(createHash("sha256").update(String(source.content)).digest("hex"))
-      .toBe("4fd7f47924ae126815dcfe1baab076748070b254a65e53579410f070ec08f91f");
+      .toBe("218f3bbeb8b6e176e501f7d4b236e7a573196c7126d4b13dc286c763491a0ab9");
   });
 
   it("starts without quick settings and appends visual processors in order", async () => {

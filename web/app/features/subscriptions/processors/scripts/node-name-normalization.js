@@ -1,3 +1,5 @@
+/* eslint-disable */
+
 /**
  * Sandrone 用法：作为 nodes 阶段的 script 处理器使用，参数通过 ProcessorSpec.params.args 或请求 input.args 传入。
  * rename.js 以下是此脚本支持的参数，请按对象字段传入 args。
