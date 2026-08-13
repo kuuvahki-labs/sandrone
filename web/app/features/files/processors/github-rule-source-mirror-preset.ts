@@ -46,7 +46,7 @@ export function githubRuleSourceMirrorProcessorPreset(name: string): ProcessorDe
       },
       args: {
         preset_id: GITHUB_RULE_SOURCE_MIRROR_PRESET_ID,
-        replacements_json: JSON.stringify(GITHUB_RULE_SOURCE_MIRROR_REPLACEMENTS),
+        replacements: GITHUB_RULE_SOURCE_MIRROR_REPLACEMENTS.map((pair) => [...pair]),
       },
     },
   };
@@ -62,7 +62,7 @@ export function recognizeGitHubRuleSourceMirrorProcessorPreset(
   if (source.content !== withoutTrailingNewline(replaceStringsScript)) return false;
   const args = objectValue(processor.params?.args);
   return args.preset_id === GITHUB_RULE_SOURCE_MIRROR_PRESET_ID
-    && typeof args.replacements_json === "string";
+    && Array.isArray(args.replacements);
 }
 
 function withoutTrailingNewline(content: string): string {

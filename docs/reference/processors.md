@@ -256,10 +256,10 @@ Web 文件处理器编辑器为 Mihomo、sing-box 和 Shadowrocket 提供
 | `params.args` | 契约 |
 | --- | --- |
 | `preset_id` | 固定为 `github-rule-source-mirror`，用于识别内置预设。 |
-| `replacements_json` | JSON 字符串，内容是有序的 `[source, destination]` 字符串二元组数组。 |
+| `replacements` | 有序的 `[source, destination]` 字符串二元组数组。 |
 
 脚本按数组顺序执行，每一组都替换正文中的全部字面匹配，不使用正则表达式。
-参数缺失、JSON 非法或数组元素不是两个字符串时，当前 processor 失败。
+参数缺失、不是数组或数组元素不是两个字符串时，当前 processor 失败。
 
 预填脚本把下列已知规则库前缀改写为 jsDelivr：
 
@@ -270,7 +270,7 @@ Web 文件处理器编辑器为 Mihomo、sing-box 和 Shadowrocket 提供
 | `https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/` | `https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/` |
 
 这些只是可编辑的默认替换值。用户可以在普通脚本参数编辑器中修改
-`replacements_json`，换成其他镜像或追加映射；通用脚本源码不绑定 GitHub 或
+`replacements`，换成其他镜像或追加映射；通用脚本源码不绑定 GitHub 或
 jsDelivr。没有匹配项时正文保持不变，不产生 warning。删除该 script 即停止
 输出时改写，结构化规则集字段本身不会被迁移。
 

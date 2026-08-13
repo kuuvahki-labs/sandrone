@@ -72,7 +72,7 @@ describe("FileProcessorBuilder", () => {
         source: { type: "inline" },
         args: {
           preset_id: "github-rule-source-mirror",
-          replacements_json: expect.any(String),
+          replacements: expect.any(Array),
         },
       },
     });

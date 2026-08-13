@@ -3,6 +3,7 @@ import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 
 import { createTranslator } from "~/shared/i18n/context";
+import { keyValueTextToObject, objectToKeyValueText } from "~/shared/processors/model";
 import type { ProcessorDetail } from "~/shared/resources/types";
 
 import {
@@ -33,15 +34,20 @@ describe("GitHub rule source mirror preset", () => {
         source: { type: "inline" },
         args: {
           preset_id: GITHUB_RULE_SOURCE_MIRROR_PRESET_ID,
-          replacements_json: JSON.stringify(GITHUB_RULE_SOURCE_MIRROR_REPLACEMENTS),
+          replacements: GITHUB_RULE_SOURCE_MIRROR_REPLACEMENTS,
         },
       },
     });
     expect(content).toContain("// Parameters:");
     expect(content).toContain("// - preset_id:");
-    expect(content).toContain("// - replacements_json:");
+    expect(content).toContain("// - replacements:");
     expect(content).not.toContain("raw.githubusercontent.com");
     expect(content).not.toContain("cdn.jsdelivr.net");
+  });
+
+  it("round-trips its structured replacements through the editable args field", () => {
+    const args = processorArgs();
+    expect(keyValueTextToObject(objectToKeyValueText(args))).toEqual(args);
   });
 
   it("rewrites every built-in Raw prefix in order and preserves unrelated content", () => {
@@ -62,7 +68,7 @@ describe("GitHub rule source mirror preset", () => {
       unrelated,
     ].join("\n"));
 
-    expect(runPreset("a", { replacements_json: JSON.stringify([["a", "ab"], ["ab", "done"]]) })).toBe("done");
+    expect(runPreset("a", { replacements: [["a", "ab"], ["ab", "done"]] })).toBe("done");
   });
 
   it("is idempotent and preserves the rest of the file envelope", () => {
@@ -88,12 +94,12 @@ describe("GitHub rule source mirror preset", () => {
   });
 
   it("rejects missing, malformed, and request-overridden managed parameters", () => {
-    expect(() => runEnvelope({ file: { content: "a" } }, { replacements_json: "{}" })).toThrow("requires ordered");
-    expect(() => runEnvelope({ file: { content: "a" } }, { replacements_json: JSON.stringify([["a", 1]]) })).toThrow("requires ordered");
-    expect(() => runEnvelopeWithArgs({ file: { content: "a" } }, { preset_id: GITHUB_RULE_SOURCE_MIRROR_PRESET_ID })).toThrow("replacements_json");
+    expect(() => runEnvelope({ file: { content: "a" } }, { replacements: {} })).toThrow("requires ordered");
+    expect(() => runEnvelope({ file: { content: "a" } }, { replacements: [["a", 1]] })).toThrow("requires ordered");
+    expect(() => runEnvelopeWithArgs({ file: { content: "a" } }, { preset_id: GITHUB_RULE_SOURCE_MIRROR_PRESET_ID })).toThrow("replacements");
     expect(() => runEnvelope({
       file: { content: "a" },
-      request: { args: { replacements_json: "[]" } },
+      request: { args: { replacements: "[]" } },
     })).toThrow("cannot be overridden");
   });
 
@@ -105,7 +111,7 @@ describe("GitHub rule source mirror preset", () => {
     expect(recognizeGitHubRuleSourceMirrorProcessorPreset(processor)).toBe(true);
     expect(recognizeGitHubRuleSourceMirrorProcessorPreset({
       ...processor,
-      params: { source, args: { ...args, replacements_json: "[]" } },
+      params: { source, args: { ...args, replacements: [] } },
     })).toBe(true);
     expect(recognizeGitHubRuleSourceMirrorProcessorPreset({
       type: "script",

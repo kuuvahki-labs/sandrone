@@ -53,11 +53,11 @@
 - Produces: `githubRuleSourceMirrorProcessorPreset(name: string): ProcessorDetail`.
 - Produces: `recognizeGitHubRuleSourceMirrorProcessorPreset(processor): boolean` accepting new args and the legacy marker.
 - Produces: `GITHUB_RULE_SOURCE_MIRROR_PRESET_ID = "github-rule-source-mirror"`.
-- Produces: generic script args `preset_id: string` and `replacements_json: string`.
+- Produces: generic script args `preset_id: string` and `replacements: [string, string][]`.
 
 - [ ] **Step 1: Replace the old test with failing parameterization and compatibility tests**
 
-Assert the new processor contains no GitHub/jsDelivr URLs in its source, stores all three ordered mappings in `replacements_json`, rewrites literal strings in order, rejects malformed mappings, survives user edits to `replacements_json`, and recognizes this legacy processor shape:
+Assert the new processor contains no GitHub/jsDelivr URLs in its source, stores all three ordered mappings in `replacements`, rewrites literal strings in order, rejects malformed mappings, survives user edits to `replacements`, and recognizes this legacy processor shape:
 
 ```ts
 expect(recognizeGitHubRuleSourceMirrorProcessorPreset({
@@ -86,11 +86,11 @@ The script header and core must follow this shape:
 
 // Parameters:
 // - preset_id: stable preset identifier; request args must not override it.
-// - replacements_json: ordered JSON array of [source, destination] string pairs.
-function main(input, api) {
+// - replacements: ordered array of [source, destination] string pairs.
+function main(input) {
   rejectManagedRequestArgOverrides(input);
   const presetID = stringArgument(input, "preset_id");
-  const replacements = api.json.parse(stringArgument(input, "replacements_json"));
+  const replacements = input.args.replacements;
   if (!Array.isArray(replacements) || replacements.some((pair) => (
     !Array.isArray(pair)
     || pair.length !== 2
@@ -114,12 +114,12 @@ params: {
   source: { type: "inline", content: replaceStringsScript },
   args: {
     preset_id: GITHUB_RULE_SOURCE_MIRROR_PRESET_ID,
-    replacements_json: JSON.stringify(GITHUB_RULE_SOURCE_MIRROR_REPLACEMENTS),
+    replacements: GITHUB_RULE_SOURCE_MIRROR_REPLACEMENTS.map((pair) => [...pair]),
   },
 }
 ```
 
-Recognition requires exact new `source` plus `args.preset_id`, but deliberately does not compare `replacements_json`; the legacy branch only accepts inline script content containing the old stable marker.
+Recognition requires exact new `source` plus `args.preset_id`, but deliberately does not compare `replacements`; the legacy branch only accepts inline script content containing the old stable marker.
 
 - [ ] **Step 4: Run the focused test and verify it passes**
 
@@ -353,7 +353,7 @@ git commit -m "refactor(web): use shared rule mirror preset"
 
 - [ ] **Step 1: Add failing source-header assertions**
 
-For ordered-rule scripts, assert the first comment block names `preset_id`, `rules_json`, and `insert_mode` only for Shadowrocket. For the sing-box structure script, assert it names `operation`. The GitHub test from Task 1 already covers `preset_id` and `replacements_json`.
+For ordered-rule scripts, assert the first comment block names `preset_id`, `rules_json`, and `insert_mode` only for Shadowrocket. For the sing-box structure script, assert it names `operation`. The GitHub test from Task 1 already covers `preset_id` and `replacements`.
 
 - [ ] **Step 2: Run script tests and verify missing headers fail**
 
@@ -375,7 +375,7 @@ Add `insert_mode` only to Shadowrocket and `operation` only to the sing-box stru
 
 - [ ] **Step 4: Update canonical docs**
 
-Rename the shortcut to “GitHub 规则源镜像替换”, document `replacements_json` as an ordered array of string pairs, state that replacements are global literal operations executed in order, and link the community preset page back to this section. Remove wording that says users edit destination literals in source code.
+Rename the shortcut to “GitHub 规则源镜像替换”, document `replacements` as an ordered array of string pairs, state that replacements are global literal operations executed in order, and link the community preset page back to this section. Remove wording that says users edit destination literals in source code.
 
 - [ ] **Step 5: Run script tests and docs hygiene checks**
 

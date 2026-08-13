@@ -2,18 +2,18 @@
 
 // Parameters:
 // - preset_id: stable preset identifier; request args must not override it.
-// - replacements_json: ordered JSON array of [source, destination] string pairs.
-function main(input, api) {
+// - replacements: ordered array of [source, destination] string pairs.
+function main(input) {
   rejectManagedRequestArgOverrides(input);
   const presetID = stringArgument(input, "preset_id");
-  const replacements = api.json.parse(stringArgument(input, "replacements_json"));
+  const replacements = input.args && input.args.replacements;
   if (!Array.isArray(replacements) || replacements.some((pair) => (
     !Array.isArray(pair)
     || pair.length !== 2
     || typeof pair[0] !== "string"
     || typeof pair[1] !== "string"
   ))) {
-    throw new Error("Sandrone preset " + presetID + " requires ordered [source, destination] string pairs");
+    throw new Error("Sandrone preset " + presetID + " replacements requires ordered [source, destination] string pairs");
   }
   if (!input.file || typeof input.file.content !== "string") return input;
   let content = input.file.content;
@@ -30,7 +30,7 @@ function rejectManagedRequestArgOverrides(input) {
   if (!isObject(requestArgs)) return;
   if (
     Object.prototype.hasOwnProperty.call(requestArgs, "preset_id")
-    || Object.prototype.hasOwnProperty.call(requestArgs, "replacements_json")
+    || Object.prototype.hasOwnProperty.call(requestArgs, "replacements")
   ) {
     throw new Error("Sandrone preset arguments cannot be overridden by request args");
   }
