@@ -157,8 +157,13 @@ raw 字段会产生 `render_lossy_field`。`json-nodes` 会原样承载 `raw`，
 无操作兼容项消费而不产生 `parse_unknown_field`：
 
 - URI TLS 查询参数 `disable_sni` 映射到 `TLS.DisableSNI`，包括显式
-  `0`/`false`；TUIC 同时接受 `allowInsecure`、
-  `allow_insecure`、`allow-insecure`、`skip-cert-verify` 和 `insecure`；
+  `0`/`false`；`allowInsecure`、`allowinsecure`、`allow_insecure`、
+  `allow-insecure`、`skip-cert-verify` 和 `insecure` 均映射到
+  `TLS.InsecureSkipVerify`；
+- VMess AEAD、VLESS 和 Trojan WebSocket URI 接受正整数 `ed` 与可选非空
+  `eh`，分别映射到 `transport.max_early_data` 和
+  `transport.early_data_header_name`；缺少 `eh` 时使用
+  `Sec-WebSocket-Protocol`，非法或冲突值仍保留到 `raw` 并告警；
 - VLESS/TCP 仅接受 `quicSecurity=none`；其它值以及 TCP 上的 `mode`、`spx`
   仍保留到 `raw` 并告警；
 - Mihomo Hysteria2 仅接受布尔值 `udp: true`，gRPC 仅接受

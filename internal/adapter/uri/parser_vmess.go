@@ -64,6 +64,7 @@ func parseVMessAEAD(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 	xhttpExtraComplete := applyTransportQuery(&node, values)
 	node.Raw = map[string]json.RawMessage{}
 	known := vmessAEADKnownQueryFields(node, values, xhttpExtraComplete)
+	applyWebSocketEarlyDataQuery(node.Transport, values, known)
 	preserveURIQuery(&node, values, known)
 	return node, source, nil
 }
@@ -83,7 +84,7 @@ func vmessAEADKnownQueryFields(node domain.NodeIR, values url.Values, xhttpExtra
 		if key, value := vmessAEADFirstQueryField(values, "sni", "servername", "serverName"); value != "" && tls.ServerName == value {
 			known[key] = true
 		}
-		if key, value := vmessAEADFirstQueryField(values, "allowInsecure", "allow_insecure", "allow-insecure", "skip-cert-verify", "insecure"); vmessAEADBoolQueryIsValid(value) {
+		if key, value := vmessAEADFirstQueryField(values, "allowInsecure", "allowinsecure", "allow_insecure", "allow-insecure", "skip-cert-verify", "insecure"); vmessAEADBoolQueryIsValid(value) {
 			known[key] = true
 		}
 		if value := values.Get("disable_sni"); vmessAEADBoolQueryIsValid(value) {

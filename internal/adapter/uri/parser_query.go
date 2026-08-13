@@ -28,7 +28,7 @@ func applyTLSQuery(node *domain.NodeIR, values url.Values) {
 		}
 		node.TLS.ServerName = sni
 	}
-	if insecure := shared.QueryFirst(values, "allowInsecure", "allow_insecure", "allow-insecure", "skip-cert-verify", "insecure"); insecure != "" {
+	if insecure := shared.QueryFirst(values, "allowInsecure", "allowinsecure", "allow_insecure", "allow-insecure", "skip-cert-verify", "insecure"); insecure != "" {
 		if node.TLS == nil {
 			node.TLS = &domain.TLSOptions{}
 		}
@@ -164,21 +164,64 @@ func normalizeWebSocketEarlyData(transport *domain.TransportOptions) {
 		return
 	}
 	rawMaxEarlyData, ok := strings.CutPrefix(rawQuery, "ed=")
-	if !ok || rawMaxEarlyData == "" {
+	if !ok {
 		return
 	}
-	for _, char := range rawMaxEarlyData {
-		if char < '0' || char > '9' {
-			return
-		}
-	}
-	maxEarlyData, err := strconv.Atoi(rawMaxEarlyData)
-	if err != nil || maxEarlyData <= 0 {
+	maxEarlyData, ok := positiveDecimal(rawMaxEarlyData)
+	if !ok {
 		return
 	}
 	transport.Path = path
 	transport.MaxEarlyData = maxEarlyData
 	transport.EarlyDataHeaderName = "Sec-WebSocket-Protocol"
+}
+
+func applyWebSocketEarlyDataQuery(transport *domain.TransportOptions, values url.Values, known map[string]bool) {
+	if transport == nil || transport.Type != "websocket" {
+		return
+	}
+	rawEarlyData, ok := singleQueryValue(values, "ed")
+	if !ok {
+		return
+	}
+	maxEarlyData, ok := positiveDecimal(rawEarlyData)
+	if !ok || transport.MaxEarlyData != 0 && transport.MaxEarlyData != maxEarlyData {
+		return
+	}
+	headerName := "Sec-WebSocket-Protocol"
+	if rawHeader, exists := values["eh"]; exists {
+		if len(rawHeader) != 1 || strings.TrimSpace(rawHeader[0]) == "" {
+			return
+		}
+		headerName = rawHeader[0]
+	}
+	transport.MaxEarlyData = maxEarlyData
+	transport.EarlyDataHeaderName = headerName
+	known["ed"] = true
+	if _, exists := values["eh"]; exists {
+		known["eh"] = true
+	}
+}
+
+func singleQueryValue(values url.Values, key string) (string, bool) {
+	raw, ok := values[key]
+	if !ok || len(raw) != 1 {
+		return "", false
+	}
+	return raw[0], true
+}
+
+func positiveDecimal(value string) (int, bool) {
+	if value == "" {
+		return 0, false
+	}
+	for _, char := range value {
+		if char < '0' || char > '9' {
+			return 0, false
+		}
+	}
+	parsed, err := strconv.Atoi(value)
+	return parsed, err == nil && parsed > 0
 }
 
 func preserveURIQuery(node *domain.NodeIR, values url.Values, known map[string]bool) {

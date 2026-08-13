@@ -39,11 +39,12 @@ func parseVLESS(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 	known := map[string]bool{
 		"flow": true, "encryption": true, "packetEncoding": true, "packet-encoding": true,
 		"security": true, "tls": true, "sni": true, "servername": true, "serverName": true, "fp": true, "fingerprint": true, "pinSHA256": true, "pcs": true, "alpn": true,
-		"allowInsecure": true, "allow_insecure": true, "allow-insecure": true, "skip-cert-verify": true, "insecure": true, "disable_sni": true,
+		"allowInsecure": true, "allowinsecure": true, "allow_insecure": true, "allow-insecure": true, "skip-cert-verify": true, "insecure": true, "disable_sni": true,
 		"pbk": true, "public-key": true, "sid": true, "short-id": true,
 		"ech": true, "echForceQuery": true,
 		"type": true, "net": true, "transport": true, "host": true, "authority": true, "path": true, "wspath": true, "wsPath": true, "ws-path": true, "obfs-uri": true, "serviceName": true, "service_name": true,
 	}
+	applyWebSocketEarlyDataQuery(node.Transport, values, known)
 	if node.Transport != nil && node.Transport.Type == "xhttp" {
 		known["mode"] = true
 		known["extra"] = true
@@ -98,7 +99,7 @@ func parseAnyTLS(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 		"idle-session-check-interval": true, "idle-session-timeout": true, "min-idle-session": true,
 		"security": true, "tls": true, "sni": true, "servername": true, "serverName": true,
 		"fp": true, "fingerprint": true, "pinSHA256": true, "pcs": true, "alpn": true,
-		"allowInsecure": true, "allow_insecure": true, "allow-insecure": true, "skip-cert-verify": true, "insecure": true, "disable_sni": true,
+		"allowInsecure": true, "allowinsecure": true, "allow_insecure": true, "allow-insecure": true, "skip-cert-verify": true, "insecure": true, "disable_sni": true,
 		"pbk": true, "public-key": true, "sid": true, "short-id": true,
 	})
 	return node, source, nil
@@ -138,15 +139,17 @@ func parseTrojan(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 	}
 	applyTransportQuery(&node, values)
 	node.Raw = map[string]json.RawMessage{}
-	preserveURIQuery(&node, values, map[string]bool{
+	known := map[string]bool{
 		"security": true, "tls": true, "sni": true, "servername": true, "serverName": true, "peer": true,
 		"fp": true, "fingerprint": true, "pinSHA256": true, "pcs": true, "alpn": true,
-		"allowInsecure": true, "allow_insecure": true, "allow-insecure": true, "skip-cert-verify": true, "insecure": true, "disable_sni": true,
+		"allowInsecure": true, "allowinsecure": true, "allow_insecure": true, "allow-insecure": true, "skip-cert-verify": true, "insecure": true, "disable_sni": true,
 		"pbk": true, "public-key": true, "sid": true, "short-id": true,
 		"type": true, "net": true, "transport": true, "host": true, "authority": true,
 		"path": true, "wspath": true, "obfs-uri": true, "serviceName": true, "service_name": true,
 		"wsHost": true, "ws-host": true, "wsPath": true, "ws-path": true,
-	})
+	}
+	applyWebSocketEarlyDataQuery(node.Transport, values, known)
+	preserveURIQuery(&node, values, known)
 	return node, source, nil
 }
 
@@ -188,7 +191,7 @@ func parseHysteria(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 		"obfs": true, "obfsParam": true, "obfs-param": true, "obfs-password": true, "obfs_password": true,
 		"hop_interval": true, "hop-interval": true,
 		"security": true, "tls": true, "sni": true, "servername": true, "serverName": true, "alpn": true,
-		"peer": true, "insecure": true, "allowInsecure": true, "allow_insecure": true, "allow-insecure": true, "skip-cert-verify": true, "disable_sni": true,
+		"peer": true, "insecure": true, "allowInsecure": true, "allowinsecure": true, "allow_insecure": true, "allow-insecure": true, "skip-cert-verify": true, "disable_sni": true,
 		"fp": true, "fingerprint": true, "pinSHA256": true, "pcs": true,
 	}
 	for key, value := range knownRates {
@@ -237,7 +240,7 @@ func parseHysteria2(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 		"obfs": true, "obfs-type": true, "obfs-password": true, "obfs_password": true, "obfsParam": true, "obfs-param": true,
 		"hop_interval": true, "hop-interval": true,
 		"security": true, "tls": true, "sni": true, "servername": true, "serverName": true, "alpn": true,
-		"allowInsecure": true, "allow_insecure": true, "allow-insecure": true, "skip-cert-verify": true, "insecure": true, "disable_sni": true,
+		"allowInsecure": true, "allowinsecure": true, "allow_insecure": true, "allow-insecure": true, "skip-cert-verify": true, "insecure": true, "disable_sni": true,
 		"fp": true, "fingerprint": true, "pinSHA256": true, "pcs": true,
 	}
 	if peer := values.Get("peer"); peer != "" && node.TLS != nil && node.TLS.ServerName == peer {
@@ -367,7 +370,7 @@ func parseTUIC(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 		"token": true, "congestion_control": true, "congestion-controller": true,
 		"udp_relay_mode": true, "udp-relay-mode": true, "zero_rtt_handshake": true,
 		"reduce_rtt": true, "heartbeat": true, "security": true, "sni": true,
-		"alpn": true, "allowInsecure": true, "allow_insecure": true, "allow-insecure": true,
+		"alpn": true, "allowInsecure": true, "allowinsecure": true, "allow_insecure": true, "allow-insecure": true,
 		"skip-cert-verify": true, "insecure": true, "disable_sni": true,
 		"fp": true, "fingerprint": true, "pinSHA256": true, "pcs": true,
 	})
@@ -582,7 +585,7 @@ func parseHTTP(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 	node.Raw = map[string]json.RawMessage{}
 	preserveURIQuery(&node, values, map[string]bool{
 		"security": true, "tls": true, "sni": true, "servername": true, "serverName": true,
-		"allowInsecure": true, "allow_insecure": true, "allow-insecure": true, "skip-cert-verify": true, "insecure": true, "disable_sni": true,
+		"allowInsecure": true, "allowinsecure": true, "allow_insecure": true, "allow-insecure": true, "skip-cert-verify": true, "insecure": true, "disable_sni": true,
 		"fp": true, "fingerprint": true, "pinSHA256": true, "pcs": true,
 	})
 	return node, source, nil

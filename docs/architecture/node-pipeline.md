@@ -52,8 +52,11 @@ normalize 是 adapter 把外部别名、默认语义和目标结构统一成 `No
 
 URI adapter 会把 WebSocket path 中独占的 `?ed=<正整数>` 约定转换为
 `transport.max_early_data`，同时将
-`transport.early_data_header_name` 设为 `Sec-WebSocket-Protocol`；包含其他
-query 参数或无效 `ed` 的 path 保持原样。各 parser 返回后，service 会统一移除
+`transport.early_data_header_name` 设为 `Sec-WebSocket-Protocol`。VMess AEAD、
+VLESS 和 Trojan WebSocket URI 的顶层查询参数 `ed=<正整数>` 与可选非空 `eh`
+也映射到这两个字段；缺少 `eh` 时使用相同默认值。非法、非 WebSocket 或与 path
+语义冲突的查询参数继续保留到 `raw` 并告警，包含其他 query 参数或无效 `ed` 的
+path 保持原样。各 parser 返回后，service 会统一移除
 非 TCP/raw transport 上的 VLESS `xtls-rprx-vision` flow，并产生
 `node_normalized_incompatible_flow` warning。这个兼容修正与目标 renderer
 无关，不允许在 sing-box 或 Mihomo 输出层静默形成不同语义。

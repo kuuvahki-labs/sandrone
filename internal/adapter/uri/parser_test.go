@@ -2096,6 +2096,7 @@ func TestParseTUICTLSCompatibilityAliases(t *testing.T) {
 	p := uri.NewParser()
 	for _, alias := range []string{
 		"allowInsecure",
+		"allowinsecure",
 		"allow_insecure",
 		"allow-insecure",
 		"skip-cert-verify",
@@ -2194,6 +2195,20 @@ func TestParseVLESSExplicitNoneIgnoresTLSModifiers(t *testing.T) {
 	require.Nil(t, nodes[0].TLS)
 }
 
+func TestParseVLESSLowercaseAllowInsecureAlias(t *testing.T) {
+	p := uri.NewParser()
+	raw := "vless://11111111-1111-1111-1111-111111111111@example.com:443?encryption=none&security=tls&allowinsecure=1"
+
+	nodes, source, err := p.Parse(context.Background(), []byte(raw))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	require.NotNil(t, nodes[0].TLS)
+	require.True(t, nodes[0].TLS.InsecureSkipVerify)
+	require.NotContains(t, nodes[0].Raw, "uri.query.allowinsecure")
+	require.Empty(t, source.Warnings)
+}
+
 func TestParseVLESSWebSocketEarlyDataPath(t *testing.T) {
 	p := uri.NewParser()
 	raw := "vless://11111111-1111-1111-1111-111111111111@example.com:443?encryption=none&type=ws&path=%2Fdo%3Fed%3D2048#vless"
@@ -2210,6 +2225,119 @@ func TestParseVLESSWebSocketEarlyDataPath(t *testing.T) {
 	require.Equal(t, "Sec-WebSocket-Protocol", got.Transport.EarlyDataHeaderName)
 }
 
+func TestParseVLESSWebSocketEarlyDataQuery(t *testing.T) {
+	p := uri.NewParser()
+	tests := []struct {
+		name       string
+		query      string
+		wantMax    int
+		wantHeader string
+	}{
+		{
+			name:       "default header",
+			query:      "type=ws&path=%2Fdo&ed=2560",
+			wantMax:    2560,
+			wantHeader: "Sec-WebSocket-Protocol",
+		},
+		{
+			name:       "explicit header",
+			query:      "type=ws&path=%2Fdo&ed=2560&eh=X-Early-Data",
+			wantMax:    2560,
+			wantHeader: "X-Early-Data",
+		},
+		{
+			name:       "consistent path and query",
+			query:      "type=ws&path=%2Fdo%3Fed%3D2560&ed=2560&eh=X-Early-Data",
+			wantMax:    2560,
+			wantHeader: "X-Early-Data",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := "vless://11111111-1111-1111-1111-111111111111@example.com:443?encryption=none&" + tc.query
+
+			nodes, source, err := p.Parse(context.Background(), []byte(raw))
+
+			require.NoError(t, err)
+			require.Len(t, nodes, 1)
+			got := nodes[0]
+			require.NotNil(t, got.Transport)
+			require.Equal(t, "websocket", got.Transport.Type)
+			require.Equal(t, tc.wantMax, got.Transport.MaxEarlyData)
+			require.Equal(t, tc.wantHeader, got.Transport.EarlyDataHeaderName)
+			require.NotContains(t, got.Raw, "uri.query.ed")
+			require.NotContains(t, got.Raw, "uri.query.eh")
+			require.Empty(t, source.Warnings)
+		})
+	}
+}
+
+func TestParseVLESSWebSocketEarlyDataQueryPreservesUnsupportedValues(t *testing.T) {
+	p := uri.NewParser()
+	tests := []struct {
+		name       string
+		query      string
+		wantMax    int
+		wantHeader string
+	}{
+		{name: "invalid early data", query: "type=ws&path=%2Fdo&ed=0&eh=X-Early-Data"},
+		{name: "non websocket", query: "type=tcp&ed=2560&eh=X-Early-Data"},
+		{
+			name:       "conflicting path and query",
+			query:      "type=ws&path=%2Fdo%3Fed%3D2048&ed=2560&eh=X-Early-Data",
+			wantMax:    2048,
+			wantHeader: "Sec-WebSocket-Protocol",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := "vless://11111111-1111-1111-1111-111111111111@example.com:443?encryption=none&" + tc.query
+
+			nodes, source, err := p.Parse(context.Background(), []byte(raw))
+
+			require.NoError(t, err)
+			require.Len(t, nodes, 1)
+			got := nodes[0]
+			require.NotNil(t, got.Transport)
+			require.Equal(t, tc.wantMax, got.Transport.MaxEarlyData)
+			require.Equal(t, tc.wantHeader, got.Transport.EarlyDataHeaderName)
+			require.Contains(t, got.Raw, "uri.query.ed")
+			require.Contains(t, got.Raw, "uri.query.eh")
+			require.Len(t, source.Warnings, 2)
+		})
+	}
+}
+
+func TestParseVMessAEADWebSocketEarlyDataQuery(t *testing.T) {
+	p := uri.NewParser()
+	raw := "vmess://11111111-1111-1111-1111-111111111111@example.com:443?type=ws&path=%2Fdo&ed=2560&eh=X-Early-Data"
+
+	nodes, source, err := p.Parse(context.Background(), []byte(raw))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	require.Equal(t, 2560, nodes[0].Transport.MaxEarlyData)
+	require.Equal(t, "X-Early-Data", nodes[0].Transport.EarlyDataHeaderName)
+	require.NotContains(t, nodes[0].Raw, "uri.query.ed")
+	require.NotContains(t, nodes[0].Raw, "uri.query.eh")
+	require.Empty(t, source.Warnings)
+}
+
+func TestParseTrojanWebSocketEarlyDataQuery(t *testing.T) {
+	p := uri.NewParser()
+	raw := "trojan://secret@example.com:443?type=ws&path=%2Fdo&ed=2560&eh=X-Early-Data"
+
+	nodes, source, err := p.Parse(context.Background(), []byte(raw))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	require.Equal(t, 2560, nodes[0].Transport.MaxEarlyData)
+	require.Equal(t, "X-Early-Data", nodes[0].Transport.EarlyDataHeaderName)
+	require.NotContains(t, nodes[0].Raw, "uri.query.ed")
+	require.NotContains(t, nodes[0].Raw, "uri.query.eh")
+	require.Empty(t, source.Warnings)
+}
+
 func TestParseVLESSWebSocketNonCanonicalEarlyDataPathStaysLiteral(t *testing.T) {
 	p := uri.NewParser()
 	tests := []string{
@@ -2220,6 +2348,7 @@ func TestParseVLESSWebSocketNonCanonicalEarlyDataPathStaysLiteral(t *testing.T) 
 		"/do?ed=2048&",
 		"/do?ed=2048&other=value",
 		"/do?ed=2048&ed=1024",
+		"/do?2048",
 		"/do?%65d=2048",
 		"/do?ed=%2B1",
 	}

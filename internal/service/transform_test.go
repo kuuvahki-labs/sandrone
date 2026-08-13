@@ -110,6 +110,50 @@ func TestServiceCanonicalizesVMessAndVLESSUserIDsAcrossEntryPointsAndTargets(t *
 	require.Equal(t, "a9dk23bz0", rawNodes[1].UUID)
 }
 
+func TestServicePreservesURIWebSocketEarlyDataAcrossTargets(t *testing.T) {
+	svc := service.New()
+	content := []byte("vless://11111111-1111-1111-1111-111111111111@example.com:443?encryption=none&type=ws&path=%2Fws&ed=2560&eh=Sec-WebSocket-Protocol#early-data")
+
+	parsed, err := svc.Parse(context.Background(), domain.ParseRequest{Format: "uri-list", Content: content})
+
+	require.NoError(t, err)
+	require.Len(t, parsed.Nodes, 1)
+	require.Empty(t, parsed.Report.Warnings)
+	require.Equal(t, 2560, parsed.Nodes[0].Transport.MaxEarlyData)
+	require.Equal(t, "Sec-WebSocket-Protocol", parsed.Nodes[0].Transport.EarlyDataHeaderName)
+
+	tests := []struct {
+		format   string
+		contains []string
+	}{
+		{
+			format: "mihomo-proxies",
+			contains: []string{
+				"max-early-data: 2560",
+				"early-data-header-name: Sec-WebSocket-Protocol",
+			},
+		},
+		{
+			format: "sing-box-outbounds",
+			contains: []string{
+				`"max_early_data": 2560`,
+				`"early_data_header_name": "Sec-WebSocket-Protocol"`,
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.format, func(t *testing.T) {
+			rendered, err := svc.Render(context.Background(), domain.RenderRequest{Format: tc.format, Nodes: parsed.Nodes})
+
+			require.NoError(t, err)
+			require.Empty(t, rendered.Report.Warnings)
+			for _, want := range tc.contains {
+				require.Contains(t, string(rendered.Body), want)
+			}
+		})
+	}
+}
+
 func TestServiceConvertRunsParseAndRender(t *testing.T) {
 	targets := []string{}
 	svc := service.New(service.WithProcessor(func(r *processor.Registry) {
