@@ -38,6 +38,16 @@ args:
 
 `replacements_json` 是有序的 JSON 二元组数组。脚本按数组顺序对 `input.file.content` 做全量字面量替换；不使用正则表达式。参数缺失、JSON 非法或元素不是两个字符串时显式失败，避免静默生成错误配置。
 
+所有读取 `input.args` 的 Web 内置预设脚本都必须在文件头用简短注释列出参数名、格式和用途。无参数脚本不添加空的参数说明。字符串替换脚本的头部至少说明：
+
+```javascript
+// Parameters:
+// - preset_id: stable preset identifier; request args must not override it.
+// - replacements_json: ordered JSON array of [source, destination] string pairs.
+```
+
+参数注释只描述用户编辑脚本时必须知道的契约，不复制完整 processor 或 scripting API 文档。
+
 GitHub 快捷项只负责提供默认参数，包含当前三组 GitHub Raw → jsDelivr 映射。用户可在现有脚本参数编辑器中修改映射，脚本源码不再承载目标地址。
 
 新快捷项的中英文名称分别为：
@@ -69,6 +79,7 @@ GitHub 快捷项改为普通 `FileProcessorPreset`，供 Mihomo、sing-box 和 S
 
 - 通用脚本按顺序完成多组字面量替换，并拒绝非法参数；
 - GitHub 预设把三组映射写入 `replacements_json`，源码不含这些地址；
+- 所有读取 `input.args` 的内置预设脚本都有与实际参数一致的文件头说明；
 - 新格式和旧 marker 格式都能识别，修改替换表后仍能抑制重复；
 - 中文和英文界面新增的所有文件预设使用对应本地化名称；
 - 新建三种 typed file 的默认 processor 名称按界面语言生成；
