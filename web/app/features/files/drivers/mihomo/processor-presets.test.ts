@@ -324,21 +324,7 @@ tun:
     expect(stringifyFailure.stringifyCalls()).toBe(1);
   });
 
-  it("builds exact STUN and QUIC ordered-rule processors", () => {
-    expect(mihomoProcessorPreset("stun-block")).toMatchObject({
-      type: "script",
-      stage: "file",
-      params: {
-        source: { type: "inline", content: expect.any(String) },
-        args: {
-          preset_id: "stun-block",
-          rules_json: JSON.stringify([
-            "AND,((NETWORK,UDP),(DST-PORT,3478)),REJECT",
-            "AND,((NETWORK,UDP),(DST-PORT,5349)),REJECT",
-          ]),
-        },
-      },
-    });
+  it("builds the exact QUIC ordered-rule processor", () => {
     expect(mihomoProcessorPreset("quic-fallback")).toMatchObject({
       type: "script",
       stage: "file",
@@ -360,7 +346,6 @@ tun:
       "tun",
       "ntp-direct",
       "fake-ip-compat",
-      "stun-block",
       "quic-fallback",
       "udp-p2p-eim",
       "linux-tun-acceleration",
@@ -372,17 +357,16 @@ tun:
     expect(presetDescriptor("tailscale-native")).toMatchObject({
       defaultOn: false,
       dependencies: ["tun"],
-      conflicts: ["tailscale-external", "stun-block"],
+      conflicts: ["tailscale-external"],
     });
     expect(presetDescriptor("tailscale-external")).toMatchObject({
       defaultOn: false,
       dependencies: ["tun"],
-      conflicts: ["tailscale-native", "stun-block"],
+      conflicts: ["tailscale-native"],
     });
     expect(presetDescriptor("tailscale-external").dependencies).toEqual(["tun"]);
     expect(presetDescriptor("tailnet-share").dependencies).toEqual(["tun", "tailscale-external"]);
     const scenarioIDs = [
-      "stun-block",
       "quic-fallback",
       "udp-p2p-eim",
       "linux-tun-acceleration",
@@ -397,25 +381,11 @@ tun:
         conflicts: preset.conflicts,
       };
     })).toEqual([
-      { id: "stun-block", defaultOn: false, dependencies: [], conflicts: ["udp-p2p-eim", "tailscale-native", "tailscale-external"] },
       { id: "quic-fallback", defaultOn: false, dependencies: [], conflicts: [] },
-      { id: "udp-p2p-eim", defaultOn: false, dependencies: [], conflicts: ["stun-block"] },
+      { id: "udp-p2p-eim", defaultOn: false, dependencies: [], conflicts: [] },
       { id: "linux-tun-acceleration", defaultOn: false, dependencies: ["tun"], conflicts: [] },
       { id: "windows-relaxed-route", defaultOn: false, dependencies: [], conflicts: [] },
     ]);
-
-    const stunPlan = planFileProcessorPresetAddition(
-      mihomoProcessorPresets,
-      "stun-block",
-      [mihomoProcessorPreset("udp-p2p-eim")],
-    );
-    expect(stunPlan.removedPresetIDs).toEqual(["udp-p2p-eim"]);
-    const eimPlan = planFileProcessorPresetAddition(
-      mihomoProcessorPresets,
-      "udp-p2p-eim",
-      [mihomoProcessorPreset("stun-block")],
-    );
-    expect(eimPlan.removedPresetIDs).toEqual(["stun-block"]);
 
     const editedTailnetShare = mihomoProcessorPreset("tailnet-share");
     editedTailnetShare.params = {
@@ -423,7 +393,6 @@ tun:
       content: `${String(editedTailnetShare.params?.content)}\n# user edit`,
     };
     const nativeCurrent = [
-      mihomoProcessorPreset("stun-block"),
       mihomoProcessorPreset("tailscale-external"),
       mihomoProcessorPreset("tailnet-share"),
       editedTailnetShare,
@@ -433,25 +402,12 @@ tun:
       "tailscale-native",
       nativeCurrent,
     );
-    expect(nativePlan.removeIndices).toEqual([0, 1, 2]);
-    expect(nativePlan.removedPresetIDs).toEqual([
-      "stun-block",
-      "tailscale-external",
-      "tailnet-share",
-    ]);
+    expect(nativePlan.removeIndices).toEqual([0, 1]);
+    expect(nativePlan.removedPresetIDs).toEqual(["tailscale-external", "tailnet-share"]);
     const nativeRemovals = new Set(nativePlan.removeIndices);
     const nativeSurvivors = nativeCurrent.filter((_, index) => !nativeRemovals.has(index));
     expect(nativeSurvivors).toEqual([editedTailnetShare]);
     expect(nativeSurvivors[0]).toBe(editedTailnetShare);
-    const stunPlanWithTailscale = planFileProcessorPresetAddition(
-      mihomoProcessorPresets,
-      "stun-block",
-      [
-        mihomoProcessorPreset("tailscale-native"),
-        mihomoProcessorPreset("tailscale-external"),
-      ],
-    );
-    expect(stunPlanWithTailscale.removedPresetIDs).toEqual(["tailscale-native", "tailscale-external"]);
   });
 
   it("explains external ownership and native login/startup risks in both locales", () => {
@@ -490,7 +446,7 @@ tun:
     expect(recognizedFileProcessorPresetID(mihomoProcessorPresets, { ...preset, params: { ...preset.params, mode: "yaml_overlay" } })).toBeNull();
   });
 
-  it.each(["stun-block", "quic-fallback"] as const)(
+  it.each(["quic-fallback"] as const)(
     "recognizes only the exact ordered-rule processor for %s",
     (id) => {
       const preset = mihomoProcessorPreset(id);

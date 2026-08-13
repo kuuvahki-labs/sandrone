@@ -79,7 +79,7 @@ describe("FileProcessorBuilder", () => {
     expect(currentProcessors()).toEqual([added[1]]);
   });
 
-  it("inserts a missing dependency before native Tailscale while removing STUN atomically", async () => {
+  it("inserts a missing dependency before native Tailscale", async () => {
     localStorage.setItem("sandrone.locale", "en-US");
     const user = userEvent.setup();
     const before: ProcessorDetail = {
@@ -100,7 +100,6 @@ describe("FileProcessorBuilder", () => {
         defaultValue={[
           before,
           singBoxProcessorPreset("tailscale-native"),
-          singBoxProcessorPreset("stun-block"),
           after,
         ]}
       />,
@@ -123,7 +122,6 @@ describe("FileProcessorBuilder", () => {
     ]);
     expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue("Before");
     expect(screen.getByRole("alert")).toHaveTextContent("Added dependencies: Ensure TUN inbound");
-    expect(screen.getByRole("alert")).toHaveTextContent("Removed conflicts: STUN blocking");
   });
 
   it("preserves unsupported processors byte-for-byte in their original order", () => {

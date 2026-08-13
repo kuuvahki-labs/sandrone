@@ -231,10 +231,6 @@ func TestServiceCommunityPresetMihomoOrderedScenariosUseExactRawAsset(t *testing
 			},
 		})},
 		Processors: []domain.ProcessorSpec{
-			orderedRuleProcessor(t, script, "stun-block", "STUN Block", `[
-				"AND,((NETWORK,UDP),(DST-PORT,3478)),REJECT",
-				"AND,((NETWORK,UDP),(DST-PORT,5349)),REJECT"
-			]`),
 			orderedRuleProcessor(t, script, "quic-fallback", "QUIC Fallback", `[
 				"AND,((NETWORK,UDP),(DST-PORT,443)),REJECT"
 			]`),
@@ -247,8 +243,6 @@ func TestServiceCommunityPresetMihomoOrderedScenariosUseExactRawAsset(t *testing
 	require.NotNil(t, result)
 	doc := decodeMihomoCommunityPresetResult(t, result.Content)
 	require.Equal(t, []any{
-		"AND,((NETWORK,UDP),(DST-PORT,3478)),REJECT",
-		"AND,((NETWORK,UDP),(DST-PORT,5349)),REJECT",
 		"AND,((NETWORK,UDP),(DST-PORT,443)),REJECT",
 		"RULE-SET,private,DIRECT",
 		"MATCH,Proxy",
@@ -699,7 +693,6 @@ func TestServiceCommunityPresetSingBoxOrderedScenariosUseExactRawAsset(t *testin
 			},
 		})},
 		Processors: []domain.ProcessorSpec{
-			orderedRuleProcessor(t, script, "stun-block", "STUN Block", `[{"protocol":"stun","action":"reject"}]`),
 			orderedRuleProcessor(t, script, "quic-fallback", "QUIC Fallback", `[{"protocol":"quic","action":"reject"}]`),
 		},
 	}
@@ -713,7 +706,6 @@ func TestServiceCommunityPresetSingBoxOrderedScenariosUseExactRawAsset(t *testin
 	require.Equal(t, "LockedRouteFinal", route["final"])
 	require.Equal(t, []any{
 		map[string]any{"domain_suffix": []any{"user.example"}, "outbound": "direct"},
-		map[string]any{"protocol": "stun", "action": "reject"},
 		map[string]any{"protocol": "quic", "action": "reject"},
 		map[string]any{"rule_set": []any{"private"}, "outbound": "direct"},
 		map[string]any{"outbound": "LockedFinal"},

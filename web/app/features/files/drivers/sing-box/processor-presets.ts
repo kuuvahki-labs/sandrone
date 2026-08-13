@@ -20,7 +20,6 @@ export type SingBoxProcessorPresetID =
   | "sniff"
   | "ntp-direct"
   | "ensure-tun"
-  | "stun-block"
   | "quic-fallback"
   | "ipv4-only"
   | "udp-p2p-eim"
@@ -29,7 +28,7 @@ export type SingBoxProcessorPresetID =
   | "windows-relaxed-route"
   | "tailscale-native"
   | "tailscale-external";
-type SingBoxOrderedRuleProcessorPresetID = "ntp-direct" | "stun-block" | "quic-fallback";
+type SingBoxOrderedRuleProcessorPresetID = "ntp-direct" | "quic-fallback";
 type SingBoxTailscaleProcessorPresetID = "tailscale-native" | "tailscale-external";
 type SingBoxStructureProcessorPresetID = Exclude<
   SingBoxProcessorPresetID,
@@ -61,7 +60,6 @@ const PRESET_NAMES: Record<SingBoxProcessorPresetID, string> = {
   sniff: "Sniff & DNS Hijack",
   "ntp-direct": "Traditional NTP Direct",
   "ensure-tun": "Ensure TUN",
-  "stun-block": "STUN Block",
   "quic-fallback": "QUIC Fallback",
   "ipv4-only": "IPv4 Only",
   "udp-p2p-eim": "UDP/P2P EIM",
@@ -82,12 +80,6 @@ const ORDERED_RULE_PRESETS: Record<
   OrderedRuleProcessorPresetOptions
 > = {
   "ntp-direct": NTP_DIRECT_PRESET,
-  "stun-block": {
-    id: "stun-block",
-    kind: "sing-box",
-    name: PRESET_NAMES["stun-block"],
-    rules: [{ protocol: "stun", action: "reject" }],
-  },
   "quic-fallback": {
     id: "quic-fallback",
     kind: "sing-box",
@@ -158,15 +150,6 @@ export const singBoxProcessorPresets: readonly FileProcessorPreset[] = [
     "processors.filePreset.singBox.ensureTun.risk",
   ),
   orderedRuleDescriptor(
-    ORDERED_RULE_PRESETS["stun-block"],
-    "privacy",
-    "processors.filePreset.singBox.stunBlock.label",
-    "processors.filePreset.singBox.stunBlock.description",
-    "processors.filePreset.singBox.stunBlock.risk",
-    ["sniff"],
-    ["udp-p2p-eim", "tailscale-native", "tailscale-external"],
-  ),
-  orderedRuleDescriptor(
     ORDERED_RULE_PRESETS["quic-fallback"],
     "network",
     "processors.filePreset.singBox.quicFallback.label",
@@ -188,7 +171,6 @@ export const singBoxProcessorPresets: readonly FileProcessorPreset[] = [
     "processors.filePreset.singBox.udpP2pEim.description",
     "processors.filePreset.singBox.udpP2pEim.risk",
     [],
-    ["stun-block"],
   ),
   structureDescriptor(
     "linux-tun-acceleration",
@@ -218,14 +200,14 @@ export const singBoxProcessorPresets: readonly FileProcessorPreset[] = [
     "processors.filePreset.singBox.tailscaleNative.label",
     "processors.filePreset.singBox.tailscaleNative.description",
     "processors.filePreset.singBox.tailscaleNative.risk",
-    ["tailscale-external", "stun-block"],
+    ["tailscale-external"],
   ),
   tailscaleDescriptor(
     "tailscale-external",
     "processors.filePreset.singBox.tailscaleExternal.label",
     "processors.filePreset.singBox.tailscaleExternal.description",
     "processors.filePreset.singBox.tailscaleExternal.risk",
-    ["tailscale-native", "stun-block"],
+    ["tailscale-native"],
   ),
 ];
 
@@ -349,7 +331,7 @@ function isExactRecord(
 function isOrderedRulePresetID(
   id: SingBoxProcessorPresetID,
 ): id is SingBoxOrderedRuleProcessorPresetID {
-  return id === "ntp-direct" || id === "stun-block" || id === "quic-fallback";
+  return id === "ntp-direct" || id === "quic-fallback";
 }
 
 function isTailscalePresetID(

@@ -71,19 +71,7 @@ describe("sing-box file processor defaults", () => {
     })).toBeNull();
   });
 
-  it("builds exact STUN and QUIC ordered-rule processors", () => {
-    expect(singBoxProcessorPreset("stun-block")).toMatchObject({
-      name: "STUN Block",
-      type: "script",
-      stage: "file",
-      params: {
-        source: { type: "inline", content: expect.any(String) },
-        args: {
-          preset_id: "stun-block",
-          rules_json: JSON.stringify([{ protocol: "stun", action: "reject" }]),
-        },
-      },
-    });
+  it("builds the exact QUIC ordered-rule processor", () => {
     expect(singBoxProcessorPreset("quic-fallback")).toMatchObject({
       name: "QUIC Fallback",
       type: "script",
@@ -122,7 +110,6 @@ describe("sing-box file processor defaults", () => {
       "sniff",
       "ntp-direct",
       "ensure-tun",
-      "stun-block",
       "quic-fallback",
       "ipv4-only",
       "udp-p2p-eim",
@@ -134,7 +121,6 @@ describe("sing-box file processor defaults", () => {
     ]);
     const scenarioIDs = [
       "ensure-tun",
-      "stun-block",
       "quic-fallback",
       "ipv4-only",
       "udp-p2p-eim",
@@ -152,10 +138,9 @@ describe("sing-box file processor defaults", () => {
       };
     })).toEqual([
       { id: "ensure-tun", defaultOn: false, dependencies: [], conflicts: [] },
-      { id: "stun-block", defaultOn: false, dependencies: ["sniff"], conflicts: ["udp-p2p-eim", "tailscale-native", "tailscale-external"] },
       { id: "quic-fallback", defaultOn: false, dependencies: ["sniff"], conflicts: [] },
       { id: "ipv4-only", defaultOn: false, dependencies: [], conflicts: [] },
-      { id: "udp-p2p-eim", defaultOn: false, dependencies: [], conflicts: ["stun-block"] },
+      { id: "udp-p2p-eim", defaultOn: false, dependencies: [], conflicts: [] },
       { id: "linux-tun-acceleration", defaultOn: false, dependencies: ["ensure-tun"], conflicts: [] },
       { id: "mptcp-direct", defaultOn: false, dependencies: ["linux-tun-acceleration"], conflicts: [] },
       { id: "windows-relaxed-route", defaultOn: false, dependencies: [], conflicts: [] },
@@ -163,20 +148,8 @@ describe("sing-box file processor defaults", () => {
 
     expect(planFileProcessorPresetAddition(singBoxProcessorPresets, "mptcp-direct", []).addedPresetIDs)
       .toEqual(["ensure-tun", "linux-tun-acceleration", "mptcp-direct"]);
-    expect(planFileProcessorPresetAddition(singBoxProcessorPresets, "stun-block", []).addedPresetIDs)
-      .toEqual(["sniff", "stun-block"]);
     expect(planFileProcessorPresetAddition(singBoxProcessorPresets, "quic-fallback", []).addedPresetIDs)
       .toEqual(["sniff", "quic-fallback"]);
-    expect(planFileProcessorPresetAddition(
-      singBoxProcessorPresets,
-      "stun-block",
-      [singBoxProcessorPreset("udp-p2p-eim")],
-    ).removedPresetIDs).toEqual(["udp-p2p-eim"]);
-    expect(planFileProcessorPresetAddition(
-      singBoxProcessorPresets,
-      "udp-p2p-eim",
-      [singBoxProcessorPreset("stun-block")],
-    ).removedPresetIDs).toEqual(["stun-block"]);
   });
 
   it("builds exact no-argument native and external Tailscale scripts in native-first order", () => {
@@ -196,13 +169,13 @@ describe("sing-box file processor defaults", () => {
       category: "tailscale",
       defaultOn: false,
       dependencies: ["ensure-tun"],
-      conflicts: ["tailscale-external", "stun-block"],
+      conflicts: ["tailscale-external"],
     });
     expect(presetDescriptor("tailscale-external" as SingBoxProcessorPresetID)).toMatchObject({
       category: "tailscale",
       defaultOn: false,
       dependencies: ["ensure-tun"],
-      conflicts: ["tailscale-native", "stun-block"],
+      conflicts: ["tailscale-native"],
     });
   });
 
@@ -537,16 +510,12 @@ describe("sing-box file processor defaults", () => {
     }
   });
 
-  it("replaces Tailscale modes and STUN atomically while preserving edited and ordered processors", () => {
+  it("replaces Tailscale modes atomically while preserving edited and ordered processors", () => {
     const customBefore = customProcessor("before");
-    const editedSTUN = singBoxProcessorPreset("stun-block");
-    editedSTUN.params = { ...editedSTUN.params, args: { preset_id: "stun-block", rules_json: "[]" } };
     const customAfter = customProcessor("after");
     const current = [
       customBefore,
       singBoxProcessorPreset("tailscale-external" as SingBoxProcessorPresetID),
-      editedSTUN,
-      singBoxProcessorPreset("stun-block"),
       customAfter,
     ];
 
@@ -555,10 +524,9 @@ describe("sing-box file processor defaults", () => {
       "tailscale-native",
       current,
     );
-    expect(native.removedPresetIDs).toEqual(["tailscale-external", "stun-block"]);
+    expect(native.removedPresetIDs).toEqual(["tailscale-external"]);
     expect(applyPlan(current, native)).toEqual([
       customBefore,
-      editedSTUN,
       customAfter,
       singBoxProcessorPreset("ensure-tun"),
       singBoxProcessorPreset("tailscale-native" as SingBoxProcessorPresetID),
@@ -582,29 +550,9 @@ describe("sing-box file processor defaults", () => {
     expect(external.removedPresetIDs).toEqual(["tailscale-native"]);
     expect(external.addedPresetIDs).toEqual(["ensure-tun", "tailscale-external"]);
 
-    const stun = planFileProcessorPresetAddition(
-      singBoxProcessorPresets,
-      "stun-block",
-      [
-        customBefore,
-        singBoxProcessorPreset("tailscale-native" as SingBoxProcessorPresetID),
-        singBoxProcessorPreset("tailscale-external" as SingBoxProcessorPresetID),
-        customAfter,
-      ],
-    );
-    expect(stun.removedPresetIDs).toEqual(["tailscale-native", "tailscale-external"]);
-    expect(applyPlan([
-      customBefore,
-      singBoxProcessorPreset("tailscale-native" as SingBoxProcessorPresetID),
-      singBoxProcessorPreset("tailscale-external" as SingBoxProcessorPresetID),
-      customAfter,
-    ], stun).slice(0, 2)).toEqual([customBefore, customAfter]);
   });
 
-  it("uses the exact Chinese STUN warning and explicit scenario risks", () => {
-    expect(zhCN["processors.filePreset.singBox.stunBlock.risk"]).toBe(
-      "阻止应用通过 STUN 获取公网出口地址；可能导致 WebRTC、语音通话、视频会议或 P2P 连接降级或失效。默认关闭。",
-    );
+  it("uses the explicit scenario risks", () => {
     expect(enUS["processors.filePreset.singBox.udpP2pEim.risk"]).toContain("gVisor");
     expect(enUS["processors.filePreset.singBox.mptcpDirect.risk"]).toContain("cannot transparently proxy MPTCP");
     expect(enUS["processors.filePreset.singBox.mptcpDirect.risk"]).toContain("direct egress");
@@ -614,7 +562,6 @@ describe("sing-box file processor defaults", () => {
   });
 
   it.each([
-    "stun-block",
     "quic-fallback",
     "ensure-tun",
     "ipv4-only",

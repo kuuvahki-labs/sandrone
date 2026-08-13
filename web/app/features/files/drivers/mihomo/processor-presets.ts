@@ -21,7 +21,6 @@ export type MihomoProcessorPresetID =
   | "tun"
   | "ntp-direct"
   | "fake-ip-compat"
-  | "stun-block"
   | "quic-fallback"
   | "udp-p2p-eim"
   | "linux-tun-acceleration"
@@ -29,7 +28,7 @@ export type MihomoProcessorPresetID =
   | "tailscale-native"
   | "tailscale-external"
   | "tailnet-share";
-type MihomoOrderedRuleProcessorPresetID = "ntp-direct" | "stun-block" | "quic-fallback";
+type MihomoOrderedRuleProcessorPresetID = "ntp-direct" | "quic-fallback";
 type MihomoNativeProcessorPresetID = "tailscale-native";
 type MihomoMergeProcessorPresetID = Exclude<
   MihomoProcessorPresetID,
@@ -56,7 +55,6 @@ const PRESET_NAMES: Record<MihomoProcessorPresetID, string> = {
   tun: "TUN",
   "ntp-direct": "Traditional NTP Direct",
   "fake-ip-compat": "Fake-IP 兼容扩展",
-  "stun-block": "STUN Block",
   "quic-fallback": "QUIC Fallback",
   "udp-p2p-eim": "UDP/P2P EIM",
   "linux-tun-acceleration": "Linux/OpenWrt TUN Acceleration",
@@ -72,15 +70,6 @@ const ORDERED_RULE_PRESETS: Record<MihomoOrderedRuleProcessorPresetID, OrderedRu
     kind: "mihomo",
     name: PRESET_NAMES["ntp-direct"],
     rules: ["AND,((NETWORK,UDP),(DST-PORT,123)),DIRECT"],
-  },
-  "stun-block": {
-    id: "stun-block",
-    kind: "mihomo",
-    name: PRESET_NAMES["stun-block"],
-    rules: [
-      "AND,((NETWORK,UDP),(DST-PORT,3478)),REJECT",
-      "AND,((NETWORK,UDP),(DST-PORT,5349)),REJECT",
-    ],
   },
   "quic-fallback": {
     id: "quic-fallback",
@@ -134,16 +123,6 @@ export const mihomoProcessorPresets: readonly FileProcessorPreset[] = [
     "processors.filePreset.mihomo.fakeIpCompat.risk",
   ),
   orderedRuleDescriptor(
-    ORDERED_RULE_PRESETS["stun-block"],
-    "privacy",
-    "processors.filePreset.mihomo.stunBlock.label",
-    "processors.filePreset.mihomo.stunBlock.description",
-    "processors.filePreset.mihomo.stunBlock.risk",
-    false,
-    [],
-    ["udp-p2p-eim", "tailscale-native", "tailscale-external"],
-  ),
-  orderedRuleDescriptor(
     ORDERED_RULE_PRESETS["quic-fallback"],
     "network",
     "processors.filePreset.mihomo.quicFallback.label",
@@ -158,7 +137,6 @@ export const mihomoProcessorPresets: readonly FileProcessorPreset[] = [
     "processors.filePreset.mihomo.udpP2pEim.risk",
     false,
     [],
-    ["stun-block"],
   ),
   descriptor(
     "linux-tun-acceleration",
@@ -185,7 +163,7 @@ export const mihomoProcessorPresets: readonly FileProcessorPreset[] = [
     "processors.filePreset.mihomo.tailscaleExternal.risk",
     false,
     ["tun"],
-    ["tailscale-native", "stun-block"],
+    ["tailscale-native"],
   ),
   descriptor(
     "tailnet-share",
@@ -280,7 +258,7 @@ function mihomoTailscaleNativeDescriptor(): FileProcessorPreset {
     riskKey: "processors.filePreset.mihomo.tailscaleNative.risk",
     defaultOn: false,
     dependencies: ["tun"],
-    conflicts: ["tailscale-external", "stun-block"],
+    conflicts: ["tailscale-external"],
     build: mihomoTailscaleNativeProcessor,
     recognize: (processor) => {
       if (processor.type !== "script") return false;
@@ -304,5 +282,5 @@ function isExactRecord(
 }
 
 function isOrderedRulePresetID(id: MihomoProcessorPresetID): id is MihomoOrderedRuleProcessorPresetID {
-  return id === "ntp-direct" || id === "stun-block" || id === "quic-fallback";
+  return id === "ntp-direct" || id === "quic-fallback";
 }
