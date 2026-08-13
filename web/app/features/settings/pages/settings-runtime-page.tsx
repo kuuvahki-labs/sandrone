@@ -9,6 +9,7 @@ import { ScheduledRefreshSettingsSection } from "~/features/settings/sections/sc
 import { StartupSettingsSection } from "~/features/settings/sections/startup-settings-section";
 import { SubscriptionTrafficSettingsSection } from "~/features/settings/sections/subscription-traffic-settings-section";
 import type { ScheduledRefreshStatus, SettingsUpdate, SettingsView } from "~/shared/api/client";
+import { useUICapabilities } from "~/shared/capabilities/context";
 import { useI18n } from "~/shared/i18n/context";
 import { PageHeader } from "~/shared/ui/page";
 
@@ -32,6 +33,7 @@ export function SettingsRuntimePage({
   onSave,
 }: SettingsRuntimePageProps) {
   const { t } = useI18n();
+  const { hasFeature } = useUICapabilities();
   const [draft, setDraft] = useState(settings);
 
   useEffect(() => {
@@ -68,12 +70,14 @@ export function SettingsRuntimePage({
           subscriptions: { auto_load_traffic: enabled },
         }))}
       />
-      <ScheduledRefreshSettingsSection
-        resources={scheduledRefreshResources}
-        status={scheduledRefreshStatus}
-        value={draft.scheduled_refresh}
-        onChange={(scheduledRefresh) => setDraft((current) => ({ ...current, scheduled_refresh: scheduledRefresh }))}
-      />
+      {hasFeature("scheduler.enabled") ? (
+        <ScheduledRefreshSettingsSection
+          resources={scheduledRefreshResources}
+          status={scheduledRefreshStatus}
+          value={draft.scheduled_refresh}
+          onChange={(scheduledRefresh) => setDraft((current) => ({ ...current, scheduled_refresh: scheduledRefresh }))}
+        />
+      ) : null}
       <RuntimeSettingsSection
         value={draft}
         onChange={(runtime) => setDraft((current) => ({ ...current, ...runtime }))}

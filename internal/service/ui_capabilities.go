@@ -1,0 +1,57 @@
+package service
+
+import (
+	"context"
+	"sort"
+
+	"github.com/kuuvahki-labs/sandrone/internal/domain"
+)
+
+type probeCapabilityProvider interface {
+	BackendSummary() []domain.ProbeBackendSummary
+}
+
+func (s *Service) ListUICapabilities(_ context.Context) (*domain.UICapabilityListResult, error) {
+	features := map[string]domain.UICapability{}
+	setFeature := func(key string, enabled bool, reason string, dependencies ...string) {
+		features[key] = domain.UICapability{
+			Key:          key,
+			Enabled:      enabled,
+			Reason:       reason,
+			Dependencies: append([]string(nil), dependencies...),
+		}
+	}
+
+	backendSummary := []domain.ProbeBackendSummary{}
+	if provider, ok := s.prober.(probeCapabilityProvider); ok {
+		backendSummary = provider.BackendSummary()
+	}
+	probeEnabled := len(backendSummary) > 0
+	setFeature("probe.enabled", probeEnabled, capabilityReason(probeEnabled, "probe backend is not available"))
+
+	cores := map[string]bool{}
+	for _, backend := range backendSummary {
+		if backend.Core != "" {
+			cores[backend.Core] = true
+		}
+	}
+	setFeature("core.mihomo", cores["mihomo"], capabilityReason(cores["mihomo"], "mihomo probe backend is not available"), "probe.enabled")
+	setFeature("core.sing_box", cores["sing-box"], capabilityReason(cores["sing-box"], "sing-box probe backend is not available"), "probe.enabled")
+
+	setFeature("scheduler.enabled", s.schedulerEnabled, capabilityReason(s.schedulerEnabled, "scheduler is not available"))
+
+	items := make([]domain.UICapability, 0, len(features))
+	for _, feature := range features {
+		feature.Dependencies = append([]string(nil), feature.Dependencies...)
+		items = append(items, feature)
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].Key < items[j].Key })
+	return &domain.UICapabilityListResult{Features: items}, nil
+}
+
+func capabilityReason(enabled bool, reason string) string {
+	if enabled {
+		return ""
+	}
+	return reason
+}

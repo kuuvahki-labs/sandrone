@@ -2,6 +2,7 @@ import type {
   ApiClient,
   SettingsUpdate,
   SettingsView,
+  UICapability,
 } from "~/shared/api/client";
 
 interface DeleteTargetBase {
@@ -46,5 +47,10 @@ export interface SandroneContextValue {
   showNotice: ShowNotice;
   signOut: () => void;
   tokenInput: string;
+  uiCapabilities: readonly UICapability[];
+  uiCapabilitiesLoaded: boolean;
+  hasFeature: (key: string) => boolean;
+  getFeature: (key: string) => UICapability | undefined;
+  reloadUiCapabilities: () => Promise<void>;
   updateSettings: (settings: SettingsUpdate) => Promise<unknown>;
 }

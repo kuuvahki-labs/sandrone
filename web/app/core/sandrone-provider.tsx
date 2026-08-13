@@ -1,6 +1,7 @@
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 
-import { ApiClient } from "~/shared/api/client";
+import { ApiClient, type UICapability } from "~/shared/api/client";
+import { UICapabilityProvider } from "~/shared/capabilities/context";
 import { useI18n } from "~/shared/i18n/context";
 
 import { SandroneContext } from "./provider/context";
@@ -25,9 +26,31 @@ export function SandroneProvider({ children }: { children: ReactNode }) {
     showNotice,
     t,
   });
+  const [uiCapabilities, setUiCapabilities] = useState<readonly UICapability[]>([]);
+  const [uiCapabilitiesLoaded, setUiCapabilitiesLoaded] = useState(false);
+  const reloadUiCapabilities = useCallback(async () => {
+    try {
+      const result = await client.getUICapabilities();
+      setUiCapabilities(result.features ?? []);
+      setUiCapabilitiesLoaded(true);
+    } catch {
+      setUiCapabilities([]);
+      setUiCapabilitiesLoaded(false);
+    }
+  }, [client]);
+
+  useEffect(() => {
+    void reloadUiCapabilities();
+  }, [reloadUiCapabilities]);
+
+  const featureMap = useMemo(() => new Map(uiCapabilities.map((feature) => [feature.key, feature])), [uiCapabilities]);
+  const hasFeature = useCallback((key: string) => featureMap.get(key)?.enabled === true, [featureMap]);
+  const getFeature = useCallback((key: string) => featureMap.get(key), [featureMap]);
 
   function signOut() {
     preferences.signOut();
+    setUiCapabilities([]);
+    setUiCapabilitiesLoaded(false);
     setNeedsToken(true);
   }
 
@@ -35,6 +58,7 @@ export function SandroneProvider({ children }: { children: ReactNode }) {
     preferences.enterWithToken();
     setNeedsToken(false);
     await project.reloadSettings(true);
+    await reloadUiCapabilities();
   }
 
   const value: SandroneContextValue = {
@@ -53,10 +77,21 @@ export function SandroneProvider({ children }: { children: ReactNode }) {
     showNotice,
     signOut,
     tokenInput: preferences.tokenInput,
+    uiCapabilities,
+    uiCapabilitiesLoaded,
+    hasFeature,
+    getFeature,
+    reloadUiCapabilities,
     updateSettings: project.updateSettings,
     saveBaseUrl: preferences.saveBaseUrl,
     ...deleteActions,
   };
 
-  return <SandroneContext.Provider value={value}>{children}</SandroneContext.Provider>;
+  return (
+    <SandroneContext.Provider value={value}>
+      <UICapabilityProvider value={{ capabilities: uiCapabilities, loaded: uiCapabilitiesLoaded, hasFeature, getFeature }}>
+        {children}
+      </UICapabilityProvider>
+    </SandroneContext.Provider>
+  );
 }

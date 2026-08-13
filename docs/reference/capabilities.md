@@ -28,6 +28,22 @@
 `field_counts`、`revisions` 和协议入口链接；字段级详情才包含 `types`、
 `fields`、`lossy` 与 `raw_only`。
 
+面向 Web UI 的功能显示能力通过 `GET /v1/capabilities/ui` 获取。它只返回
+后端计算后的稳定 feature 状态，不包含固定的产品导航入口。当前 feature 包括：
+
+- `probe.enabled`：是否有可执行的测活 backend；
+- `scheduler.enabled`：服务是否提供调度器能力，与
+  `settings.scheduled_refresh.enabled`（用户是否开启定时刷新）不同；
+- `core.mihomo`、`core.sing_box`：对应测活 core backend 是否可用。
+
+格式集合当前由前后端同版本发布，继续使用现有格式 capability 和前端固定资源
+配置，不纳入 UI feature catalog。未来出现独立发布或动态变化的格式能力时，
+再增加对应的 UI feature。
+
+Web 在能力未加载或请求失败时，只隐藏依赖后端能力的控件；固定导航和基础资源
+页面仍然可用。feature 的 `enabled` 和 `reason` 由后端计算，前端不根据底层
+`probe.backends` 或编译标签自行推导。
+
 `probe_methods` 的封闭集合是 `tcp_connect`、`udp_ntp` 和 `url_test`；
 具体可用 core/backend 仍以当前进程返回的 `probe.backends` 为准。
 

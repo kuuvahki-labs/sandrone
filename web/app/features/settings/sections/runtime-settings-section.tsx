@@ -13,6 +13,7 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 
 import type { SettingsView } from "~/shared/api/client";
+import { useUICapabilities } from "~/shared/capabilities/context";
 import { useI18n } from "~/shared/i18n/context";
 import { ProbeURLField } from "~/shared/ui/probe-url-field";
 
@@ -26,6 +27,7 @@ export function RuntimeSettingsSection({
   onChange,
 }: RuntimeSettingsSectionProps) {
   const { t } = useI18n();
+  const { hasFeature } = useUICapabilities();
   const probeMethodLabelId = useId();
 
   function updateRemoteDefaults(patch: Partial<SettingsView["remote_defaults"]>) {
@@ -109,7 +111,7 @@ export function RuntimeSettingsSection({
                 onChange={(event) => updateCacheDefaults({ file_render_ttl_seconds: numberOrZero(event.target.value) })}
               />
             </RuntimeSettingsGroup>
-            <RuntimeSettingsGroup id="runtime-probe-defaults" title={t("settings.runtime.group.probe")}>
+            {hasFeature("probe.enabled") ? <RuntimeSettingsGroup id="runtime-probe-defaults" title={t("settings.runtime.group.probe")}>
               <FormControl fullWidth>
                 <InputLabel id={probeMethodLabelId}>{t("settings.runtime.probeMethod")}</InputLabel>
                 <Select
@@ -163,7 +165,7 @@ export function RuntimeSettingsSection({
                 value={numberInputValue(value.probe_defaults.cache_ttl_seconds)}
                 onChange={(event) => updateProbeDefaults({ cache_ttl_seconds: numberOrZero(event.target.value) })}
               />
-            </RuntimeSettingsGroup>
+            </RuntimeSettingsGroup> : null}
           </div>
         </div>
       </CardContent>

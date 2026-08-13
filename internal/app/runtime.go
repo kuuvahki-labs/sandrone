@@ -89,6 +89,7 @@ func NewRuntime(cfg Config, logger *slog.Logger) (*Runtime, error) {
 		service.WithStore(coordinator),
 		service.WithProjectSettings(settingsStore, cfg.StoredSettings, cfg.EffectiveSettings, cfg.OverrideSources),
 		service.WithLogger(logger),
+		service.WithSchedulerEnabled(true),
 	)
 	return &Runtime{
 		Service: svc,

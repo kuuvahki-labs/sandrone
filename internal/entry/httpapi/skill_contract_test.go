@@ -39,6 +39,7 @@ func TestSandroneSkillSupportsHTTPWithoutMandatoryMCP(t *testing.T) {
 	for _, endpoint := range []string{
 		"/v1/capabilities/formats",
 		"/v1/capabilities/formats/{direction}/{format}",
+		"/v1/capabilities/ui",
 		"/v1/convert",
 		"/v1/probe",
 		"/v1/subscriptions/{name}/render",

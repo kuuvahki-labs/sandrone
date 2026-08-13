@@ -12,6 +12,7 @@ client may add a namespace prefix.
 | Inspect | `GET /v1/inspect` | `sandrone_inspect` |
 | List format capabilities | `GET /v1/capabilities/formats` | `sandrone://capabilities/formats` |
 | Exact format capability | `GET /v1/capabilities/formats/{direction}/{format}` | `sandrone://capabilities/formats/{direction}/{format}` |
+| List UI capabilities | `GET /v1/capabilities/ui` | — |
 | Full conversion | `POST /v1/convert` | `sandrone_convert` |
 | Probe nodes | `POST /v1/probe` | `sandrone_probe_nodes` |
 | List subscriptions | `GET /v1/subscriptions` | `sandrone_list_resources` |

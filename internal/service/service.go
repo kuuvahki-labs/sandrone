@@ -93,6 +93,7 @@ type Service struct {
 	scheduledRefreshStatus  domain.ScheduledRefreshStatus
 	scheduledRefreshUpdates chan struct{}
 	scheduledRefreshTarget  func(context.Context, domain.ScheduledRefreshTarget) error
+	schedulerEnabled        bool
 }
 
 // Option lets callers customise Service construction.
@@ -146,6 +147,14 @@ func WithProbeEngine(prober ProbeEngine) Option {
 		if prober != nil {
 			s.prober = prober
 		}
+	}
+}
+
+// WithSchedulerEnabled controls whether the runtime exposes scheduler-backed
+// UI features. Serve entrypoints keep the default enabled behavior.
+func WithSchedulerEnabled(enabled bool) Option {
+	return func(s *Service) {
+		s.schedulerEnabled = enabled
 	}
 }
 

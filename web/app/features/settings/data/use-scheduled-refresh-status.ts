@@ -1,13 +1,20 @@
 import { useEffect, useState } from "react";
 
 import type { ApiClient, ScheduledRefreshStatus } from "~/shared/api/client";
+import { useUICapabilities } from "~/shared/capabilities/context";
 
 const statusPollIntervalMS = 30_000;
 
 export function useScheduledRefreshStatus(client: ApiClient): ScheduledRefreshStatus | undefined {
+  const { hasFeature } = useUICapabilities();
+  const schedulerEnabled = hasFeature("scheduler.enabled");
   const [status, setStatus] = useState<ScheduledRefreshStatus>();
 
   useEffect(() => {
+    if (!schedulerEnabled) {
+      setStatus(undefined);
+      return;
+    }
     let active = true;
     const poll = async () => {
       if (!active) return;
@@ -24,7 +31,7 @@ export function useScheduledRefreshStatus(client: ApiClient): ScheduledRefreshSt
       active = false;
       window.clearInterval(timer);
     };
-  }, [client]);
+  }, [client, schedulerEnabled]);
 
   return status;
 }

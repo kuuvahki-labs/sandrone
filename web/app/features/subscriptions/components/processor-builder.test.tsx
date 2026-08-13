@@ -8,6 +8,7 @@ import {
   scriptFiles,
   selectMuiOption,
 } from "~/features/subscriptions/test-data";
+import { UICapabilityProvider } from "~/shared/capabilities/context";
 import type { ProcessorDetail, ResourceOption } from "~/shared/resources/types";
 
 function renderProcessorBuilder({
@@ -20,11 +21,18 @@ function renderProcessorBuilder({
   scriptFiles?: ResourceOption[];
 } = {}) {
   const { container } = render(
-    <ProcessorBuilder
-      defaultValue={defaultValue}
-      onDirty={onDirty}
-      scriptFiles={availableScriptFiles}
-    />,
+    <UICapabilityProvider value={{
+      capabilities: [{ key: "probe.enabled", enabled: true }],
+      loaded: true,
+      hasFeature: (key) => key === "probe.enabled",
+      getFeature: (key) => key === "probe.enabled" ? { key, enabled: true } : undefined,
+    }}>
+      <ProcessorBuilder
+        defaultValue={defaultValue}
+        onDirty={onDirty}
+        scriptFiles={availableScriptFiles}
+      />
+    </UICapabilityProvider>,
   );
   const processorsInput = container.querySelector<HTMLInputElement>(
     'input[name="processors"][type="hidden"]',

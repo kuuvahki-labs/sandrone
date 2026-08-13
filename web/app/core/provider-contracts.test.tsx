@@ -127,10 +127,13 @@ const expectedContextKeys = [
   "deleteTarget",
   "effectiveSettings",
   "enterWithToken",
+  "getFeature",
+  "hasFeature",
   "needsToken",
   "notices",
   "publicBaseUrl",
   "reloadSettings",
+  "reloadUiCapabilities",
   "requestDelete",
   "restartRequired",
   "saveBaseUrl",
@@ -141,6 +144,8 @@ const expectedContextKeys = [
   "showNotice",
   "signOut",
   "tokenInput",
+  "uiCapabilities",
+  "uiCapabilitiesLoaded",
   "updateSettings",
 ];
 
@@ -152,6 +157,7 @@ describe("SandroneProvider", () => {
       effective: defaultProjectSettings,
       overrides: {},
       restart_required: [],
+      features: [],
     }), { headers: { "content-type": "application/json" } })));
   });
 

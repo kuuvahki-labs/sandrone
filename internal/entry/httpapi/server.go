@@ -172,6 +172,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/inspect", s.inspect)
 	s.mux.HandleFunc("GET /v1/capabilities/formats", s.listFormatCapabilities)
 	s.mux.HandleFunc("GET /v1/capabilities/formats/{direction}/{format}", s.getFormatCapability)
+	s.mux.HandleFunc("GET /v1/capabilities/ui", s.listUICapabilities)
 	s.mux.HandleFunc("GET /v1/schemas", s.listSchemas)
 	s.mux.HandleFunc("GET /v1/schemas/processors", s.listProcessorSchemas)
 	s.mux.HandleFunc("GET /v1/schemas/processors/{stage}/{type}", s.getProcessorSchema)

@@ -9,6 +9,7 @@ import {
   renderApp,
   resourceListResponse,
   resources,
+  uiCapabilities,
 } from "./app-routing.test-data";
 
 describe("React Router app share and delete workflows", () => {
@@ -85,6 +86,9 @@ describe("React Router app share and delete workflows", () => {
       }
       if (url.includes("/v1/subscriptions/provider")) {
         return jsonResponse(remoteSubscriptionDefinition);
+      }
+      if (url === "/v1/capabilities/ui") {
+        return jsonResponse(uiCapabilities);
       }
       return jsonResponse({ ok: true }, { status: init?.method === "POST" ? 201 : 200 });
     }));

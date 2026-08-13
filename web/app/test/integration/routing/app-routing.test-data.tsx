@@ -123,6 +123,15 @@ export const filePreview = {
   warnings: [{ code: "file_script_warning", message: "left unchanged", source: "default.yaml" }],
 };
 
+export const uiCapabilities = {
+  features: [
+    { key: "probe.enabled", enabled: true },
+    { key: "scheduler.enabled", enabled: true },
+    { key: "core.mihomo", enabled: true },
+    { key: "core.sing_box", enabled: true },
+  ],
+};
+
 export function installDefaultFetchMock() {
   localStorage.clear();
   vi.restoreAllMocks();
@@ -132,6 +141,9 @@ export function installDefaultFetchMock() {
     if (resourceResponse) return resourceResponse;
     if (url === "/v1/settings") {
       return jsonResponse(defaultSettingsEnvelope(defaultProjectSettings));
+    }
+    if (url === "/v1/capabilities/ui") {
+      return jsonResponse(uiCapabilities);
     }
     if (url.includes("/v1/subscriptions/provider")) {
       if (url.includes("/preview")) {

@@ -153,6 +153,17 @@ export interface SettingsEnvelope {
   restart_required: string[];
 }
 
+export interface UICapability {
+  key: string;
+  enabled: boolean;
+  reason?: string;
+  dependencies?: string[];
+}
+
+export interface UICapabilityList {
+  features: UICapability[];
+}
+
 export interface ScheduledRefreshStatus {
   enabled: boolean;
   running: boolean;
@@ -208,6 +219,10 @@ export class ApiClient {
 
   listFormatCapabilities(): Promise<unknown> {
     return this.dedupedRequest("GET", "/v1/capabilities/formats");
+  }
+
+  getUICapabilities(): Promise<UICapabilityList> {
+    return this.dedupedRequest("GET", "/v1/capabilities/ui");
   }
 
   listSubscriptions(): Promise<unknown> {

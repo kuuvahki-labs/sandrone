@@ -2,6 +2,7 @@ import Checkbox from "@mui/material/Checkbox";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import TextField from "@mui/material/TextField";
 
+import { useUICapabilities } from "~/shared/capabilities/context";
 import { type Translator, useI18n } from "~/shared/i18n/context";
 import { DEFAULT_PROBE_URL } from "~/shared/probe/defaults";
 import {
@@ -50,7 +51,8 @@ const probeRuntimeDefaults = {
 
 export function ProcessorBuilder({ defaultValue = [], onDirty, scriptFiles = [] }: { defaultValue?: ProcessorDetail[]; onDirty?: () => void; scriptFiles?: ResourceOption[] }) {
   const { t } = useI18n();
-  const options = processorOptions(t);
+  const { hasFeature } = useUICapabilities();
+  const options = processorOptions(t, hasFeature("probe.enabled"));
 
   function ParamsEditor(props: ProcessorParamsEditorProps) {
     return <ProcessorParamsEditor {...props} scriptFiles={scriptFiles} />;
@@ -251,7 +253,7 @@ function probeMethodPatch(method: string): Record<string, unknown> {
   }
 }
 
-function processorOptions(t: Translator) {
+function processorOptions(t: Translator, probeEnabled = true) {
   return [
     { value: "filter", label: t("processors.filter") },
     { value: "information_filter_preset", label: t("processors.filter.infoPresetOption") },
@@ -259,7 +261,7 @@ function processorOptions(t: Translator) {
     { value: "rename", label: t("processors.nameOperation") },
     { value: "sort", label: t("processors.sort") },
     { value: "quick_settings", label: t("processors.quickSettings") },
-    { value: "probe", label: t("processors.probe") },
+    ...(probeEnabled ? [{ value: "probe", label: t("processors.probe") }] : []),
     { value: "script", label: t("model.processor.script") },
   ];
 }

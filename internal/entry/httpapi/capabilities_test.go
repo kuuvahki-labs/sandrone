@@ -48,6 +48,27 @@ func TestFormatCapabilityRoutesPublishIndexAndExactDetail(t *testing.T) {
 	require.Equal(t, serviceDetail, &detail)
 }
 
+func TestUICapabilityRoutePublishesRuntimeFeatures(t *testing.T) {
+	rt := testRuntime(t, app.Config{})
+	handler := httpapi.New(rt).Handler()
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/v1/capabilities/ui", nil))
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	var response struct {
+		Features []domain.UICapability `json:"features"`
+	}
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
+	require.NotEmpty(t, response.Features)
+	keys := make([]string, len(response.Features))
+	for index, feature := range response.Features {
+		keys[index] = feature.Key
+	}
+	require.Contains(t, keys, "probe.enabled")
+	require.Contains(t, keys, "scheduler.enabled")
+	require.NotContains(t, keys, "format.render.shadowrocket-proxies")
+}
+
 func TestFormatCapabilityRoutesRejectUnknownCanonicalKeys(t *testing.T) {
 	handler := httpapi.New(testRuntime(t, app.Config{})).Handler()
 	for _, path := range []string{
