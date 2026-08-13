@@ -74,13 +74,13 @@ describe("FileNewPage", () => {
     expect(processors).toHaveLength(2);
     expect(processors).toMatchObject([
       {
-        name: "Sniff & DNS Hijack",
+        name: "流量嗅探与 DNS 劫持",
         type: "merge",
         stage: "file",
         params: { mode: "json_override" },
       },
       {
-        name: "Traditional NTP Direct",
+        name: "传统 NTP 直连",
         type: "script",
         stage: "file",
         params: {

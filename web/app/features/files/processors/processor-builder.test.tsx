@@ -28,12 +28,12 @@ describe("FileProcessorBuilder", () => {
     ]);
   });
 
-  it.each(typedRuleSourceKinds)("offers the rule source rewrite preset for %s", async (kind) => {
+  it.each(typedRuleSourceKinds)("offers the rule source mirror preset for %s", async (kind) => {
     const user = userEvent.setup();
     render(<FileProcessorBuilder kind={kind} />);
 
     await user.click(screen.getByRole("combobox", { name: "类型" }));
-    expect(screen.getByRole("option", { name: "GitHub 规则源地址替换" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "GitHub 规则源镜像替换" })).toBeInTheDocument();
   });
 
   it("does not offer the rule source rewrite shortcut for static files", async () => {
@@ -41,10 +41,10 @@ describe("FileProcessorBuilder", () => {
     render(<FileProcessorBuilder kind="static" />);
 
     await user.click(screen.getByRole("combobox", { name: "类型" }));
-    expect(screen.queryByRole("option", { name: "GitHub 规则源地址替换" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "GitHub 规则源镜像替换" })).not.toBeInTheDocument();
   });
 
-  it("appends one editable standard script and preserves it across kinds", async () => {
+  it("appends one editable parameterized script and suppresses a duplicate", async () => {
     const user = userEvent.setup();
     const existing: ProcessorDetail = {
       name: "Existing",
@@ -52,12 +52,12 @@ describe("FileProcessorBuilder", () => {
       stage: "file",
       params: { source: { type: "inline", content: "function main(input) { return input; }" } },
     };
-    const { rerender } = render(<FileProcessorBuilder kind="mihomo" defaultValue={[existing]} />);
+    render(<FileProcessorBuilder kind="mihomo" defaultValue={[existing]} />);
 
     await selectMuiOption(
       user,
       screen.getByRole("combobox", { name: "类型" }),
-      "GitHub 规则源地址替换",
+      "GitHub 规则源镜像替换",
     );
     await user.click(screen.getByRole("button", { name: "添加处理器" }));
 
@@ -65,18 +65,43 @@ describe("FileProcessorBuilder", () => {
     expect(added).toHaveLength(2);
     expect(added[0]).toEqual(existing);
     expect(added[1]).toMatchObject({
-      name: "GitHub Rule Source Rewrite",
+      name: "GitHub 规则源镜像替换",
       type: "script",
       stage: "file",
-      params: { source: { type: "inline" } },
+      params: {
+        source: { type: "inline" },
+        args: {
+          preset_id: "github-rule-source-mirror",
+          replacements_json: expect.any(String),
+        },
+      },
     });
     expect(screen.getAllByRole("textbox", { name: "内联脚本" })).toHaveLength(2);
 
     await user.click(screen.getByRole("button", { name: "添加处理器" }));
     expect(currentProcessors()).toHaveLength(2);
 
-    rerender(<FileProcessorBuilder key="static" kind="static" defaultValue={[added[1]]} />);
-    expect(currentProcessors()).toEqual([added[1]]);
+  });
+
+  it("preserves a legacy saved name while using its marker to suppress duplicates", async () => {
+    const user = userEvent.setup();
+    const legacy: ProcessorDetail = {
+      name: "GitHub Rule Source Rewrite",
+      type: "script",
+      stage: "file",
+      params: {
+        source: {
+          type: "inline",
+          content: "// sandrone:file-preset=github-rule-source-rewrite\nfunction main(input) { return input; }",
+        },
+      },
+    };
+    render(<FileProcessorBuilder kind="mihomo" defaultValue={[legacy]} />);
+
+    expect(currentProcessors()).toEqual([legacy]);
+    await selectMuiOption(user, screen.getByRole("combobox", { name: "类型" }), "GitHub 规则源镜像替换");
+    await user.click(screen.getByRole("button", { name: "添加处理器" }));
+    expect(currentProcessors()).toEqual([legacy]);
   });
 
   it("inserts a missing dependency before native Tailscale", async () => {
@@ -99,7 +124,7 @@ describe("FileProcessorBuilder", () => {
         kind="sing-box"
         defaultValue={[
           before,
-          singBoxProcessorPreset("tailscale-native"),
+          singBoxProcessorPreset("tailscale-native", "Native Tailscale"),
           after,
         ]}
       />,
@@ -116,8 +141,8 @@ describe("FileProcessorBuilder", () => {
 
     expect(currentProcessors().map((processor) => processor.name)).toEqual([
       "Before",
-      "Ensure TUN",
-      "Tailscale 原生接管",
+      "Ensure TUN inbound",
+      "Native Tailscale",
       "After",
     ]);
     expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue("Before");

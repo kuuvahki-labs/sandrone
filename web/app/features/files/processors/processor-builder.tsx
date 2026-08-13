@@ -36,13 +36,7 @@ import type { ProcessorDetail, ResourceOption } from "~/shared/resources/types";
 import type { SelectOption } from "~/shared/ui/form-fields";
 
 import { FileMergeParamsEditor } from "./merge-params-editor";
-import {
-  recognizeRuleSourceRewriteProcessorPreset,
-  RULE_SOURCE_REWRITE_PRESET_OPTION,
-  ruleSourceRewriteProcessorPreset,
-} from "./rule-source-rewrite-preset";
 
-const RULE_SOURCE_REWRITE_KINDS = new Set(["mihomo", "sing-box", "shadowrocket"]);
 const FILE_PRESET_OPTION_PREFIX = "file-preset:";
 const FILE_PRESET_CATEGORIES: readonly FileProcessorPresetCategory[] = [
   "privacy",
@@ -77,11 +71,6 @@ export function FileProcessorBuilder({ defaultValue = [], kind, onDirty, onValid
     ...FILE_PRESET_CATEGORIES.flatMap((category) => {
       const group = t(FILE_PRESET_CATEGORY_LABEL_KEYS[category]);
       return [
-        ...(category === "network" && RULE_SOURCE_REWRITE_KINDS.has(kind) ? [{
-          value: RULE_SOURCE_REWRITE_PRESET_OPTION,
-          label: t("files.processor.ruleSourceRewritePreset"),
-          group,
-        }] : []),
         ...driver.processors.presets
           .filter((preset) => preset.category === category)
           .map((preset) => ({
@@ -108,10 +97,6 @@ export function FileProcessorBuilder({ defaultValue = [], kind, onDirty, onValid
   }, [driver, onValidityChange]);
   const addProcessorDrafts = useCallback((type: string, current: ProcessorDraft[]): ProcessorDraft[] => {
     setPresetNotice(null);
-    if (type === RULE_SOURCE_REWRITE_PRESET_OPTION) {
-      if (current.some(recognizeRuleSourceRewriteProcessorPreset)) return current;
-      return [...current, draftFromProcessor(ruleSourceRewriteProcessorPreset())];
-    }
     if (type.startsWith(FILE_PRESET_OPTION_PREFIX)) {
       const presetID = type.slice(FILE_PRESET_OPTION_PREFIX.length);
       const requested = driver.processors.presets.find((preset) => preset.id === presetID);
@@ -120,6 +105,7 @@ export function FileProcessorBuilder({ defaultValue = [], kind, onDirty, onValid
         driver.processors.presets,
         presetID,
         current.map(serializeProcessorDraft),
+        t,
       );
       const addedIDs = new Set(plan.addedPresetIDs);
       setPresetNotice({
