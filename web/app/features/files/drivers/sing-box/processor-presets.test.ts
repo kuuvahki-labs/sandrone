@@ -7,7 +7,6 @@ import {
   recognizedFileProcessorPresetID,
 } from "~/features/files/drivers/core/processor-presets";
 import { enUS } from "~/shared/i18n/translations/en-US";
-import { zhCN } from "~/shared/i18n/translations/zh-CN";
 
 import {
   defaultSingBoxProcessors,

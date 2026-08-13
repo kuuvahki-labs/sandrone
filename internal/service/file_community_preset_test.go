@@ -928,10 +928,10 @@ func TestServiceCommunityPresetShadowrocketTailscaleNativeGeneratesFullFile(t *t
 	require.NoError(t, err)
 	require.Contains(t, modelSectionLines(t, model, "Proxy"), "Shadow-Node = ss, example.com, 8388, password=example-password, method=aes-128-gcm")
 	require.Equal(t, []string{
-		"DOMAIN,user.example,DIRECT",
 		"DOMAIN-SUFFIX,ts.net,TAILSCALE",
 		"IP-CIDR,100.64.0.0/10,TAILSCALE,no-resolve",
 		"IP-CIDR,fd7a:115c:a1e0::/48,TAILSCALE,no-resolve",
+		"DOMAIN,user.example,DIRECT",
 		"IP-CIDR,10.0.0.0/8,DIRECT,no-resolve",
 		"FINAL,Proxy",
 	}, modelSectionLines(t, model, "Rule"))

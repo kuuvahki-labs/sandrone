@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ApiClient } from "~/shared/api/client";
+import { UICapabilityProvider } from "~/shared/capabilities/context";
 import { createTranslator } from "~/shared/i18n/context";
 
 import { useBackupOperations } from "./use-backup-operations";
@@ -48,7 +49,18 @@ describe("useScheduledRefreshStatus", () => {
       .mockResolvedValueOnce({ enabled: true, running: false, last_success_count: 1, last_failure_count: 0, skipped_count: 0 })
       .mockResolvedValueOnce({ enabled: true, running: true, last_success_count: 1, last_failure_count: 0, skipped_count: 0 });
     const client = { getScheduledRefreshStatus } as unknown as ApiClient;
-    const { result, unmount } = renderHook(() => useScheduledRefreshStatus(client));
+    const { result, unmount } = renderHook(() => useScheduledRefreshStatus(client), {
+      wrapper: ({ children }) => (
+        <UICapabilityProvider value={{
+          capabilities: [{ key: "scheduler.enabled", enabled: true }],
+          loaded: true,
+          hasFeature: (key) => key === "scheduler.enabled",
+          getFeature: (key) => key === "scheduler.enabled" ? { key, enabled: true } : undefined,
+        }}>
+          {children}
+        </UICapabilityProvider>
+      ),
+    });
 
     await act(async () => Promise.resolve());
     expect(getScheduledRefreshStatus).toHaveBeenCalledTimes(1);

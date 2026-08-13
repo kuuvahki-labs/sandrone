@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { defaultProjectSettings } from "~/features/settings/model/project-settings";
+import { UICapabilityProvider } from "~/shared/capabilities/context";
 
 import { SettingsDataPage } from "./settings-data-page";
 import { SettingsRuntimePage } from "./settings-runtime-page";
@@ -13,7 +14,7 @@ describe("settings runtime page", () => {
     const onSave = vi.fn();
     const onBack = vi.fn();
 
-    render(
+    renderRuntimePage(
       <SettingsRuntimePage
         overrides={{ "http.listen": "environment" }}
         restartRequired={[]}
@@ -113,7 +114,7 @@ describe("settings runtime page", () => {
       onBack: vi.fn(),
       onSave,
     };
-    const { rerender } = render(
+    const { rerender } = renderRuntimePage(
       <SettingsRuntimePage
         {...baseProps}
         scheduledRefreshStatus={{ enabled: false, running: false, last_success_count: 0, last_failure_count: 0, skipped_count: 0 }}
@@ -124,10 +125,12 @@ describe("settings runtime page", () => {
     await user.type(schedule, "@daily");
 
     rerender(
-      <SettingsRuntimePage
-        {...baseProps}
-        scheduledRefreshStatus={{ enabled: true, running: true, last_success_count: 2, last_failure_count: 1, skipped_count: 3 }}
-      />,
+      <UICapabilityProvider value={runtimeCapabilityValue}>
+        <SettingsRuntimePage
+          {...baseProps}
+          scheduledRefreshStatus={{ enabled: true, running: true, last_success_count: 2, last_failure_count: 1, skipped_count: 3 }}
+        />
+      </UICapabilityProvider>,
     );
     await user.click(screen.getByRole("button", { name: "保存设置" }));
 
@@ -146,7 +149,7 @@ describe("settings runtime page", () => {
         targets: [{ kind: "subscription" as const, name: "missing-provider" }],
       },
     };
-    render(
+    renderRuntimePage(
       <SettingsRuntimePage
         overrides={{}}
         restartRequired={[]}
@@ -306,6 +309,26 @@ function renderDataPage({
       onDownloadBackup={onDownloadBackup}
       onRestoreBackup={onRestoreBackup}
     />,
+  );
+}
+
+const runtimeCapabilityValue = {
+  capabilities: [
+    { key: "probe.enabled", enabled: true },
+    { key: "scheduler.enabled", enabled: true },
+  ],
+  loaded: true,
+  hasFeature: (key: string) => key === "probe.enabled" || key === "scheduler.enabled",
+  getFeature: (key: string) => key === "probe.enabled" || key === "scheduler.enabled"
+    ? { key, enabled: true }
+    : undefined,
+};
+
+function renderRuntimePage(page: React.ReactElement) {
+  return render(
+    <UICapabilityProvider value={runtimeCapabilityValue}>
+      {page}
+    </UICapabilityProvider>,
   );
 }
 
