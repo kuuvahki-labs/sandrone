@@ -55,6 +55,7 @@ const TAILSCALE_NATIVE_PRESET: OrderedRuleProcessorPresetOptions = {
   id: "tailscale-native",
   kind: "shadowrocket",
   name: "Tailscale 原生接管",
+  insertMode: "top",
   rules: [
     "DOMAIN-SUFFIX,ts.net,TAILSCALE",
     "IP-CIDR,100.64.0.0/10,TAILSCALE,no-resolve",

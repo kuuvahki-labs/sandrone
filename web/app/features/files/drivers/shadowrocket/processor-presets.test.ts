@@ -97,6 +97,7 @@ describe("Shadowrocket processor presets", () => {
       params: {
         source: { type: "inline", content: expect.any(String) },
         args: {
+          insert_mode: "top",
           preset_id: "tailscale-native",
           rules_json: JSON.stringify([
             "DOMAIN-SUFFIX,ts.net,TAILSCALE",

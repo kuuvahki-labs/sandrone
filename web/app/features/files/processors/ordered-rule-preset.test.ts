@@ -144,6 +144,58 @@ describe("ordered rule processor presets", () => {
       },
     ]);
   });
+
+  it("supports top insertion for Shadowrocket rules that must beat remote LAN rule sets", () => {
+    const options: OrderedRuleProcessorPresetOptions = {
+      ...CASES[2],
+      insertMode: "top",
+      rules: ["IP-CIDR,100.64.0.0/10,TAILSCALE,no-resolve"],
+    };
+    const document = {
+      bom: false,
+      newline: "\n",
+      trailing_newline: true,
+      preamble: [],
+      sections: [
+        {
+          name: "Rule",
+          lines: [
+            "RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket/Lan/Lan.list,DIRECT",
+            "FINAL,Proxy",
+          ],
+        },
+      ],
+    };
+
+    const output = JSON.parse(runPreset(options, JSON.stringify(document), iniModelAPI())) as typeof document;
+
+    expect(output.sections[0].lines).toEqual([
+      "IP-CIDR,100.64.0.0/10,TAILSCALE,no-resolve",
+      ...document.sections[0].lines,
+    ]);
+    expect(recognizeOrderedRuleProcessorPreset(orderedRuleProcessorPreset(options), options)).toBe(true);
+  });
+
+  it("recognizes the legacy top-mode Tailscale processor", () => {
+    const options: OrderedRuleProcessorPresetOptions = {
+      ...CASES[2],
+      insertMode: "top",
+    };
+    const processor = orderedRuleProcessorPreset(options);
+    const params = processor.params as { args: Record<string, string>; source: Record<string, string> };
+    const legacyProcessor = {
+      ...processor,
+      params: {
+        ...params,
+        args: {
+          preset_id: params.args.preset_id,
+          rules_json: params.args.rules_json,
+        },
+      },
+    };
+
+    expect(recognizeOrderedRuleProcessorPreset(legacyProcessor, options)).toBe(true);
+  });
 });
 
 function inlineSource(processor: ProcessorDetail): string {
