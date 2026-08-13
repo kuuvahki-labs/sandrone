@@ -486,6 +486,47 @@ func TestServicePreviewSubscriptionProbeAnnotationKeepsNodesUnchanged(t *testing
 	require.Equal(t, "node-a", preview.Nodes[0].TargetNames["shadowrocket"])
 }
 
+func TestServicePreviewSubscriptionSkipsProbeForDuplicateNodeNames(t *testing.T) {
+	ctx := context.Background()
+	probeCalls := 0
+	svc := service.New(
+		service.WithFS(afero.NewMemMapFs()),
+		service.WithProbeEngine(fakeProbeEngine{probe: func(context.Context, domain.ProbeRequest, []domain.NodeIR, ...probe.Payload) (*domain.ProbeResult, error) {
+			probeCalls++
+			return nil, nil
+		}}),
+	)
+	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+		Name:   "local/duplicate-names",
+		Type:   domain.SubscriptionTypeLocal,
+		Format: "uri-list",
+		Content: "ss://aes-128-gcm:secret@one.example:8388#same\n" +
+			"ss://aes-128-gcm:secret@two.example:8388#same",
+		Processors: []domain.ProcessorSpec{{
+			Type:  "probe",
+			Stage: domain.StageNodes,
+			Params: params(t, map[string]any{
+				"method":   "url_test",
+				"annotate": true,
+			}),
+		}},
+	}))
+
+	preview, err := svc.PreviewSubscription(ctx, "local/duplicate-names")
+
+	require.NoError(t, err)
+	require.Zero(t, probeCalls)
+	require.Equal(t, 2, preview.BeforeCount)
+	require.Equal(t, 2, preview.AfterCount)
+	require.Equal(t, map[string]int{"added": 0, "modified": 0, "removed": 0, "unchanged": 2}, preview.StatusCounts)
+	require.Len(t, preview.Report.Warnings, 1)
+	require.Equal(t, domain.Warning{
+		Code:    "probe_skipped_duplicate_node_names",
+		Message: "probe skipped because duplicate node names were detected: groups=1 affected_nodes=2",
+		Source:  "probe",
+	}, preview.Report.Warnings[0])
+}
+
 type insertFirstProcessor struct{}
 
 func (insertFirstProcessor) Name() string { return "insert_first" }

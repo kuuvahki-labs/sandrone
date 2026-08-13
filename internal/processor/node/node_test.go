@@ -274,6 +274,35 @@ func TestProbeProcessorAnnotatesAndSorts(t *testing.T) {
 	require.Equal(t, "probe_tcp_failed", out.Warnings[0].Code)
 }
 
+func TestProbeProcessorSkipsDuplicateNodeNamesWithOneWarning(t *testing.T) {
+	runner := &stubProbeRunner{}
+	proc := buildNode(t, makeProbeRegistry(runner), "probe", map[string]any{
+		"annotate":  true,
+		"fail_mode": "error",
+		"sort":      "duration",
+	})
+	nodes := []domain.NodeIR{
+		{Name: "same", Server: "one.example", Port: 443, Meta: map[string]string{"probe.alive": "stale"}},
+		{Name: "same", Server: "two.example", Port: 443},
+		{Name: "same", Server: "three.example", Port: 443},
+		{Name: "other", Server: "four.example", Port: 443},
+		{Name: "other", Server: "five.example", Port: 443},
+		{Name: "unique", Server: "six.example", Port: 443},
+	}
+
+	out, err := proc.ApplyNodes(context.Background(), domain.NodeProcessInput{Nodes: nodes})
+
+	require.NoError(t, err)
+	require.Empty(t, runner.requests)
+	require.Equal(t, nodes, out.Nodes)
+	require.Len(t, out.Warnings, 1)
+	require.Equal(t, domain.Warning{
+		Code:    "probe_skipped_duplicate_node_names",
+		Message: "probe skipped because duplicate node names were detected: groups=2 affected_nodes=5",
+		Source:  "probe",
+	}, out.Warnings[0])
+}
+
 func TestProbeProcessorRejectsUnsupportedMethod(t *testing.T) {
 	r := makeProbeRegistry(&stubProbeRunner{})
 	_, err := r.BuildNode(domain.ProcessorSpec{

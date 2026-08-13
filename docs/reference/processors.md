@@ -143,6 +143,13 @@ sing-box 和 Mihomo，省略 core 时默认 sing-box。
   alive、duration、checked_at、error_code 等已有结果；
 - `sort: duration`：存活节点在前并按延迟升序；失败节点在后，平局保持输入顺序。
 
+执行 runner 前，processor 会检查当前批次的 `NodeIR.Name`。只要存在重名，整次
+processor 就跳过探测，按原顺序原样返回全部节点，并只产生一条
+`probe_skipped_duplicate_node_names` warning；warning 汇总重名组数和涉及的节点数，
+不展开具体名称。此时不会改写 `probe.*` meta，`fail_mode`、`annotate` 和 `sort`
+均不生效。preview 与其它执行这条 nodes processor 链的入口共享该行为；直接调用
+probe service 不经过这项 processor 前置检查。
+
 runner 返回的结果数必须与输入节点数相同。probe report warning 会并入 processor
 warning；runner 错误直接终止链。使用 sing-box core 时，核心目标不能表达的节点
 由 runner 在原位置返回 `probe_invalid_target`，而不是让可探测的同批节点失败；

@@ -85,6 +85,17 @@ func buildProbe(prober ProbeRunner) processor.NodeBuilder {
 func (p *probeProc) Name() string { return "probe" }
 
 func (p *probeProc) ApplyNodes(ctx context.Context, in domain.NodeProcessInput) (domain.NodeProcessOutput, error) {
+	duplicateGroups, affectedNodes := duplicateNodeNameCounts(in.Nodes)
+	if duplicateGroups > 0 {
+		return domain.NodeProcessOutput{
+			Nodes: append([]domain.NodeIR{}, in.Nodes...),
+			Warnings: []domain.Warning{{
+				Code:    "probe_skipped_duplicate_node_names",
+				Message: fmt.Sprintf("probe skipped because duplicate node names were detected: groups=%d affected_nodes=%d", duplicateGroups, affectedNodes),
+				Source:  "probe",
+			}},
+		}, nil
+	}
 	method := domain.ProbeMethod(p.params.Method)
 	core := strings.TrimSpace(p.params.Core)
 	url := strings.TrimSpace(p.params.URL)
@@ -174,6 +185,21 @@ func (p *probeProc) ApplyNodes(ctx context.Context, in domain.NodeProcessInput) 
 		Nodes:    out,
 		Warnings: append([]domain.Warning{}, result.Report.Warnings...),
 	}, nil
+}
+
+func duplicateNodeNameCounts(nodes []domain.NodeIR) (groups int, affected int) {
+	counts := make(map[string]int, len(nodes))
+	for _, node := range nodes {
+		counts[node.Name]++
+	}
+	for _, count := range counts {
+		if count < 2 {
+			continue
+		}
+		groups++
+		affected += count
+	}
+	return groups, affected
 }
 
 type probeItem struct {
