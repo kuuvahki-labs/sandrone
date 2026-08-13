@@ -75,7 +75,7 @@ describe("config rule editors", () => {
     expect(await screen.findByRole("option", { name: "ads" })).toBeInTheDocument();
     await user.keyboard("{Escape}");
     await user.click(within(rule).getByRole("combobox", { name: "策略" }));
-    expect(await screen.findByRole("option", { name: "Proxy" })).toBeInTheDocument();
+    expect(await screen.findByRole("option", { name: /Proxy.*代理组|Proxy.*Proxy group/ })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: /HK Node.*ss/ })).toBeInTheDocument();
     await user.keyboard("{Escape}");
   });

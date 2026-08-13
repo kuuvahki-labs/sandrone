@@ -49,6 +49,14 @@ describe("config reference options", () => {
       "builtin:COMPATIBLE",
       "builtin:GLOBAL",
     ]);
+    expect(memberReferenceOptions("mihomo", nodes, [
+      ...groups,
+      { name: "Hong Kong", type: "url-test", proxies: ["HK Node"] },
+    ], "Proxy")).toContainEqual(expect.objectContaining({
+      kind: "group",
+      value: "Hong Kong",
+    }));
+    expect(nodes).not.toContainEqual(expect.objectContaining({ name: "Hong Kong" }));
   });
 
   it("uses sing-box names and deduplicates colliding suggestions by value", () => {

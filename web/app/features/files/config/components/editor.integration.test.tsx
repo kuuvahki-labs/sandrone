@@ -94,6 +94,40 @@ describe("config file workbench integration", { timeout: 20_000 }, () => {
       .toBeInTheDocument();
   });
 
+  it("offers generated adaptive groups to proxy members and rule policies", async () => {
+    localStorage.setItem("sandrone.locale", "en-US");
+    const user = userEvent.setup();
+    renderEditor({
+      defaultValue: {
+        ...minimalConfig,
+        groups: [
+          ...(minimalConfig.groups ?? []),
+          { name: "Custom", type: "select", proxies: ["DIRECT"] },
+        ],
+      },
+      loadSubscriptionPreview: vi.fn().mockResolvedValue(
+        subscriptionPreview("provider", ["HK-01"]),
+      ),
+    });
+
+    expect(await screen.findByText("Loaded 1 nodes")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Generate adaptive groups" }));
+    expect(screen.getByRole("button", { name: "Expand proxy group Hong Kong" }))
+      .toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Expand proxy group Custom" }));
+    await user.click(screen.getByRole("combobox", { name: "Members 1" }));
+    const memberOption = await screen.findByRole("option", { name: /Hong Kong.*Proxy group/ });
+    expect(memberOption).not.toHaveTextContent(/ss|node-1\.example:8388/);
+    await user.keyboard("{Escape}");
+
+    await user.click(screen.getByRole("button", { name: "Expand rule 1" }));
+    const rule = screen.getByRole("group", { name: "Rule 1" });
+    await user.click(within(rule).getByRole("combobox", { name: "Policy" }));
+    const policyOption = await screen.findByRole("option", { name: /Hong Kong.*Proxy group/ });
+    expect(policyOption).not.toHaveTextContent(/ss|node-1\.example:8388/);
+  });
+
   it("restores catalog state after a template round trip and reports adaptive changes", async () => {
     localStorage.setItem("sandrone.locale", "en-US");
     const user = userEvent.setup();

@@ -110,6 +110,7 @@ export function CreatableReferenceField({ label, onChange, options, value }: {
   options: ConfigReferenceOption[];
   value: string;
 }) {
+  const { t } = useI18n();
   const selected = options.find((option) => option.value === value) ?? value;
   return (
     <Autocomplete<ConfigReferenceOption, false, false, true>
@@ -125,11 +126,21 @@ export function CreatableReferenceField({ label, onChange, options, value }: {
         <li {...props} key={`${option.kind}:${option.value}`}>
           <span className="grid min-w-0 gap-0.5">
             <Typography className="break-words" component="span" variant="body2">{option.value}</Typography>
-            {option.detail ? <Typography className="break-words" color="text.secondary" component="span" variant="caption">{option.detail}</Typography> : null}
+            <Typography className="break-words" color="text.secondary" component="span" variant="caption">
+              {[t(referenceKindKey(option.kind)), option.detail].filter(Boolean).join(" · ")}
+            </Typography>
           </span>
         </li>
       )}
       onChange={(_event, next) => onChange(typeof next === "string" ? next : next?.value ?? "")}
     />
   );
+}
+
+function referenceKindKey(kind: ConfigReferenceOption["kind"]):
+  | "files.config.referenceKind.builtin"
+  | "files.config.referenceKind.group"
+  | "files.config.referenceKind.macro"
+  | "files.config.referenceKind.node" {
+  return `files.config.referenceKind.${kind}`;
 }
