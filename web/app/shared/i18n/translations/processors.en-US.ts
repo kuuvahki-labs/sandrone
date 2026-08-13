@@ -83,6 +83,4 @@ export const processorEnUS = {
   "processors.quick.reuse": "Connection reuse (Snell only)",
   "processors.filter.infoPresetOption": "Filter information nodes",
   "processors.filter.infoPresetName": "Filter information nodes",
-  "processors.rename.normalizationPresetOption": "Normalize Node Names",
-  "processors.rename.normalizationPresetName": "Normalize Node Names",
 } as const;

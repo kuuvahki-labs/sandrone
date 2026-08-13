@@ -2,7 +2,6 @@ import Checkbox from "@mui/material/Checkbox";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import TextField from "@mui/material/TextField";
 
-import nodeNameNormalizationScript from "~/features/subscriptions/processors/scripts/node-name-normalization.js?raw";
 import { useUICapabilities } from "~/shared/capabilities/context";
 import { type Translator, useI18n } from "~/shared/i18n/context";
 import { DEFAULT_PROBE_URL } from "~/shared/probe/defaults";
@@ -260,7 +259,6 @@ function processorOptions(t: Translator, probeEnabled = true) {
     { value: "information_filter_preset", label: t("processors.filter.infoPresetOption") },
     { value: "dedup", label: t("processors.dedup") },
     { value: "rename", label: t("processors.nameOperation") },
-    { value: "node_name_normalization_preset", label: t("processors.rename.normalizationPresetOption") },
     { value: "sort", label: t("processors.sort") },
     { value: "quick_settings", label: t("processors.quickSettings") },
     ...(probeEnabled ? [{ value: "probe", label: t("processors.probe") }] : []),
@@ -269,19 +267,6 @@ function processorOptions(t: Translator, probeEnabled = true) {
 }
 
 function addSubscriptionProcessorDrafts(type: string, current: ProcessorDraft[], t: Translator): ProcessorDraft[] {
-  if (type === "node_name_normalization_preset") {
-    return [...current, {
-      id: createProcessorID(),
-      name: t("processors.rename.normalizationPresetName"),
-      type: "script",
-      params: {
-        source: {
-          type: "inline",
-          content: nodeNameNormalizationScript,
-        },
-      },
-    }];
-  }
   if (type !== "information_filter_preset") {
     return [...current, {
       id: createProcessorID(),
