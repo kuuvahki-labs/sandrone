@@ -1,5 +1,7 @@
 /* eslint-disable unused-imports/no-unused-vars */
 
+// Parameters:
+// - operation: sing-box TUN operation identifier; request args must not override it.
 function main(input, api) {
   rejectManagedRequestArgOverride(input);
   const operation = stringArgument(input, "operation");

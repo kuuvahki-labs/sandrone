@@ -1,5 +1,9 @@
 /* eslint-disable unused-imports/no-unused-vars */
 
+// Parameters:
+// - preset_id: stable preset identifier; request args must not override it.
+// - rules_json: JSON array of Shadowrocket rule strings inserted by this preset.
+// - insert_mode: optional "top" or "anchor" insertion mode; request args must not override it.
 function main(input, api) {
   rejectManagedRequestArgOverrides(input);
   const presetID = stringArgument(input, "preset_id");

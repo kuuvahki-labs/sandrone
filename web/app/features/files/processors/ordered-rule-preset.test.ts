@@ -31,6 +31,19 @@ const CASES: readonly OrderedRuleProcessorPresetOptions[] = [
 const LOCALIZED_NAME = "传统 NTP 直连";
 
 describe("ordered rule processor presets", () => {
+  it.each(CASES)("documents the managed $kind parameters in the script header", (options) => {
+    const header = inlineSource(orderedRuleProcessorPreset(options)).split("function main")[0];
+
+    expect(header).toContain("// Parameters:");
+    expect(header).toContain("// - preset_id:");
+    expect(header).toContain("// - rules_json:");
+    if (options.kind === "shadowrocket") {
+      expect(header).toContain("// - insert_mode:");
+    } else {
+      expect(header).not.toContain("insert_mode");
+    }
+  });
+
   it.each(CASES)("builds the exact editable $kind inline script params", (options) => {
     const processor = orderedRuleProcessorPreset(options);
 

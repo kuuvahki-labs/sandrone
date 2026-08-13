@@ -42,6 +42,14 @@ const EXPECTED_TUN = {
 };
 
 describe("sing-box structure processor presets", () => {
+  it("documents the managed operation parameter in the script header", () => {
+    const header = inlineSource(singBoxStructureProcessorPreset(OPTIONS["ensure-tun"]))
+      .split("function main")[0];
+
+    expect(header).toContain("// Parameters:");
+    expect(header).toContain("// - operation:");
+  });
+
   it.each(Object.values(OPTIONS))("builds exact editable inline params for $operation", (options) => {
     const processor = singBoxStructureProcessorPreset(options);
 

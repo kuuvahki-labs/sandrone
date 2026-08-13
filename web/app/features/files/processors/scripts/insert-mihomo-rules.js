@@ -1,5 +1,8 @@
 /* eslint-disable unused-imports/no-unused-vars */
 
+// Parameters:
+// - preset_id: stable preset identifier; request args must not override it.
+// - rules_json: JSON array of Mihomo rule strings inserted by this preset.
 function main(input, api) {
   rejectManagedRequestArgOverrides(input);
   const presetID = stringArgument(input, "preset_id");

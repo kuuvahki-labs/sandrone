@@ -242,15 +242,24 @@ runtime registry 仍会列出 `inject_nodes`，但它要求直接调用内部 re
 file-stage `script` 可修改完整文件 envelope，并可使用受控资源 API。参数、
 返回转换和安全边界只在 [Scripting API](scripting-api.md) 详述。
 
-### Web 内置规则源地址替换
+### Web 内置字符串替换预设
 
 Web 中所有受管社区配置预设的默认状态、精确输出、风险、依赖、冲突与版本边界
 统一见[社区配置预设](community-config-presets.md)。它们只复制普通 `merge` 或
 `script` processor，不改变本页定义的 processor type 和执行顺序。
 
 Web 文件处理器编辑器为 Mihomo、sing-box 和 Shadowrocket 提供
-“GitHub 规则源地址替换”快捷项。它不是新的 processor type；选择后会在链末尾
-追加一个普通的 file-stage `script`，脚本来源是可编辑的 `inline` 内容。
+“GitHub 规则源镜像替换”快捷项。它不是新的 processor type；选择后会在链末尾
+追加一个普通的 file-stage `script`。脚本源码是通用的有序字面量字符串替换器，
+具体映射由 processor 参数提供：
+
+| `params.args` | 契约 |
+| --- | --- |
+| `preset_id` | 固定为 `github-rule-source-mirror`，用于识别内置预设。 |
+| `replacements_json` | JSON 字符串，内容是有序的 `[source, destination]` 字符串二元组数组。 |
+
+脚本按数组顺序执行，每一组都替换正文中的全部字面匹配，不使用正则表达式。
+参数缺失、JSON 非法或数组元素不是两个字符串时，当前 processor 失败。
 
 预填脚本把下列已知规则库前缀改写为 jsDelivr：
 
@@ -260,9 +269,13 @@ Web 文件处理器编辑器为 Mihomo、sing-box 和 Shadowrocket 提供
 | `https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/` | `https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@sing/` |
 | `https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/` | `https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/` |
 
-这些只是可编辑的默认替换值。用户可以在普通内联脚本编辑器中换成其他镜像；
-名称和 marker 不绑定 jsDelivr。没有匹配项时正文保持不变，不产生 warning。
-删除该 script 即停止输出时改写，结构化规则集字段本身不会被迁移。
+这些只是可编辑的默认替换值。用户可以在普通脚本参数编辑器中修改
+`replacements_json`，换成其他镜像或追加映射；通用脚本源码不绑定 GitHub 或
+jsDelivr。没有匹配项时正文保持不变，不产生 warning。删除该 script 即停止
+输出时改写，结构化规则集字段本身不会被迁移。
+
+旧版带 `sandrone:file-preset=github-rule-source-rewrite` marker 的内联脚本仍会被
+识别为同一快捷项，以抑制重复添加；Web 不会改写其脚本正文或已保存名称。
 
 ## 失败与原子性
 

@@ -101,11 +101,15 @@ sing-box 的固定目标 v1.13.14 在 route rule 使用 `preferred_by` 匹配 en
 `accept_default_resolvers`，因此普通查询不会把 Tailscale resolver 当作全局
 fallback。
 
-## 可编辑规则源地址替换快捷项
+## 可编辑规则源镜像替换快捷项
 
-Mihomo、sing-box 和 Shadowrocket 还共享“GitHub 规则源地址替换”快捷项。它默认
+Mihomo、sing-box 和 Shadowrocket 还共享“GitHub 规则源镜像替换”快捷项。它默认
 把项目已知的 MetaCubeX `meta`/`sing` 与 blackmatrix7 GitHub Raw 前缀改写为
-jsDelivr，未匹配内容保持原样且不产生 warning。它生成普通可编辑 inline script，
-不是新的 processor type；删除或编辑副本即可改变行为。精确前缀表见
-[Processors](processors.md#web-内置规则源地址替换)，来源为
+jsDelivr，未匹配内容保持原样且不产生 warning。它生成普通 inline script，并把
+有序替换表放在可编辑参数中，不是新的 processor type；删除或编辑副本即可改变
+行为。精确参数与前缀表见
+[Processors](processors.md#web-内置字符串替换预设)，来源为
 [jsDelivr GitHub 文档](https://www.jsdelivr.com/documentation#id-github)。
+
+新建文件与新添加预设的 processor 名称使用当时的 Web 界面语言；已保存名称视为
+用户数据并保持原样。产品名、协议名和技术缩写保留原文。
