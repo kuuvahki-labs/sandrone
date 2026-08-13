@@ -1,4 +1,4 @@
-# 订阅节点名称重命名预设设计
+# 订阅节点名称规范化预设设计
 
 ## 背景
 
@@ -11,10 +11,11 @@ nodes-stage `script` processor 的 `source.file` 引用它。Web 订阅处理器
 
 ## 用户行为
 
-订阅处理器类型列表新增“节点名称重命名”。选择并添加后，Web 在当前处理链末尾
+订阅处理器类型列表新增“节点名称规范化”（英文为 “Normalize Node Names”）。
+选择并添加后，Web 在当前处理链末尾
 追加一个普通的 nodes-stage `script` processor：
 
-- 名称为“节点名称重命名”；
+- 名称为“节点名称规范化”；
 - `params.source.type` 为 `inline`；
 - `params.source.content` 为现有 `rename.js` 的脚本正文；
 - 不生成 `params.args`，所有脚本参数继续使用脚本自身默认行为。
@@ -44,7 +45,7 @@ nodes-stage `script` processor 的 `source.file` 引用它。Web 订阅处理器
 
 前端测试覆盖：
 
-- 类型列表显示“节点名称重命名”；
+- 类型列表显示“节点名称规范化”；
 - 添加预设会在原有处理器之后追加 nodes-stage `script`；
 - 序列化结果使用内联 source，正文与受版本控制的脚本资源一致；
 - 序列化结果不包含 `args`，也不依赖可选的脚本文件资源列表；
