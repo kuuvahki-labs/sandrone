@@ -202,7 +202,7 @@ function draftProcessors(processors: ProcessorDetail[]): ProcessorDraft[] {
 
 function draftFromProcessor(processor: ProcessorDetail, index: number): ProcessorDraft {
   const type = processor.type || "filter";
-  const params = type === "probe" ? { ...defaultParams(type), ...(processor.params ?? {}) } : processor.params ?? {};
+  const params = type === "probe" ? { ...defaultPersistedProbeParams(), ...(processor.params ?? {}) } : processor.params ?? {};
   return {
     id: createProcessorID(index),
     name: stringValue(processor.name),
@@ -354,20 +354,28 @@ function defaultParams(type: string): Record<string, unknown> {
       return {};
     case "probe":
       return {
-        method: probeRuntimeDefaults.method,
-        core: probeRuntimeDefaults.core,
-        url: probeRuntimeDefaults.url,
-        timeout_ms: probeRuntimeDefaults.timeoutMS,
-        attempts: probeRuntimeDefaults.attempts,
-        concurrency: probeRuntimeDefaults.concurrency,
-        cache_ttl_seconds: probeRuntimeDefaults.cacheTTLSeconds,
-        fail_mode: probeRuntimeDefaults.failMode,
+        ...defaultPersistedProbeParams(),
+        annotate: true,
+        fail_mode: "drop",
       };
     case "script":
       return defaultScriptParams();
     default:
       return {};
   }
+}
+
+function defaultPersistedProbeParams(): Record<string, unknown> {
+  return {
+    method: probeRuntimeDefaults.method,
+    core: probeRuntimeDefaults.core,
+    url: probeRuntimeDefaults.url,
+    timeout_ms: probeRuntimeDefaults.timeoutMS,
+    attempts: probeRuntimeDefaults.attempts,
+    concurrency: probeRuntimeDefaults.concurrency,
+    cache_ttl_seconds: probeRuntimeDefaults.cacheTTLSeconds,
+    fail_mode: probeRuntimeDefaults.failMode,
+  };
 }
 
 function createProcessorID(index = Date.now()): string {

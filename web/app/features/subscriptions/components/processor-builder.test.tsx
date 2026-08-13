@@ -127,6 +127,18 @@ describe("ProcessorBuilder", () => {
     ]);
   });
 
+  it("keeps legacy probe behavior defaults when persisted fields are missing", () => {
+    const { serializedProcessors } = renderProcessorBuilder({
+      defaultValue: [{ type: "probe", stage: "nodes", params: {} }],
+    });
+
+    const probeGroup = screen.getByRole("group", { name: "处理器 测活" });
+    expect(within(probeGroup).getByRole("checkbox", { name: "写入测活元数据" })).not.toBeChecked();
+    expect(within(probeGroup).getByRole("combobox", { name: "失败处理" })).toHaveTextContent("保留");
+    expect(serializedProcessors()[0]?.params).toMatchObject({ fail_mode: "keep" });
+    expect(serializedProcessors()[0]?.params).not.toHaveProperty("annotate");
+  });
+
   it("preserves the persisted position of quick settings", () => {
     const { serializedProcessors } = renderProcessorBuilder({
       defaultValue: [
@@ -155,7 +167,8 @@ describe("ProcessorBuilder", () => {
     expect(within(probeGroup).getByRole("combobox", { name: "方式" })).toHaveTextContent("url_test");
     expect(within(probeGroup).getAllByRole("combobox")).toHaveLength(4);
     expect(probeGroup).not.toHaveTextContent(/sing-box|mihomo/);
-    expect(within(probeGroup).getByRole("combobox", { name: "失败处理" })).toHaveTextContent("保留");
+    expect(within(probeGroup).getByRole("checkbox", { name: "写入测活元数据" })).toBeChecked();
+    expect(within(probeGroup).getByRole("combobox", { name: "失败处理" })).toHaveTextContent("丢弃");
     expect(within(probeGroup).queryByRole("textbox", { name: "NTP 服务器" })).not.toBeInTheDocument();
     const probeURL = within(probeGroup).getByRole("combobox", { name: "URL" });
     expect(probeURL).toHaveValue("https://cp.cloudflare.com");
@@ -177,7 +190,8 @@ describe("ProcessorBuilder", () => {
           attempts: 1,
           concurrency: 10,
           cache_ttl_seconds: 0,
-          fail_mode: "keep",
+          fail_mode: "drop",
+          annotate: true,
         },
       },
     ]);
@@ -197,7 +211,8 @@ describe("ProcessorBuilder", () => {
           attempts: 1,
           concurrency: 10,
           cache_ttl_seconds: 0,
-          fail_mode: "keep",
+          fail_mode: "drop",
+          annotate: true,
         },
       },
       {
