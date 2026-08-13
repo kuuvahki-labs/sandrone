@@ -9,6 +9,10 @@ import {
 } from "~/features/files/processors/ordered-rule-preset";
 import type { ProcessorDetail } from "~/shared/resources/types";
 
+import disableIPv6Content from "./preset-content/disable-ipv6.ini?raw";
+import restrictedNetworkDNSFallbackContent from "./preset-content/restricted-network-dns-fallback.ini?raw";
+import udpUnsupportedDirectContent from "./preset-content/udp-unsupported-direct.ini?raw";
+
 type ShadowrocketINIOverridePresetID =
   | "disable-ipv6"
   | "udp-unsupported-direct"
@@ -20,17 +24,14 @@ export type ShadowrocketProcessorPresetID =
   | "tailscale-native";
 
 const PRESET_CONTENT: Record<ShadowrocketINIOverridePresetID, string> = {
-  "disable-ipv6": `# sandrone:shadowrocket-preset=disable-ipv6
-[General]
-ipv6 = false
-prefer-ipv6 = false`,
-  "udp-unsupported-direct": `# sandrone:shadowrocket-preset=udp-unsupported-direct
-[General]
-udp-policy-not-supported-behaviour = DIRECT`,
-  "restricted-network-dns-fallback": `# sandrone:shadowrocket-preset=restricted-network-dns-fallback
-[General]
-dns-direct-fallback-proxy = true`,
+  "disable-ipv6": withoutTrailingNewline(disableIPv6Content),
+  "udp-unsupported-direct": withoutTrailingNewline(udpUnsupportedDirectContent),
+  "restricted-network-dns-fallback": withoutTrailingNewline(restrictedNetworkDNSFallbackContent),
 };
+
+function withoutTrailingNewline(content: string): string {
+  return content.endsWith("\n") ? content.slice(0, -1) : content;
+}
 
 const PRESET_NAMES: Record<ShadowrocketINIOverridePresetID, string> = {
   "disable-ipv6": "Disable IPv6",

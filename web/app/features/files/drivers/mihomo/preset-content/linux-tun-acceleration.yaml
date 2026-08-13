@@ -1,0 +1,5 @@
+# sandrone:mihomo-preset=linux-tun-acceleration
+find-process-mode: strict
+tun:
+  auto-route: true
+  auto-redirect: true

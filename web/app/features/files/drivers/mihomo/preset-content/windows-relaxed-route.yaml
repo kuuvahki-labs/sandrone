@@ -1,0 +1,3 @@
+# sandrone:mihomo-preset=windows-relaxed-route
+tun:
+  strict-route: false

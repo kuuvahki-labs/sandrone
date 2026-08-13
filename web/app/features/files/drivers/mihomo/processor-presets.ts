@@ -7,6 +7,15 @@ import {
 import mihomoTailscaleNativeScript from "~/features/files/processors/scripts/mihomo-tailscale-native.js?raw";
 import type { ProcessorDetail } from "~/shared/resources/types";
 
+import fakeIPCompatContent from "./preset-content/fake-ip-compat.yaml?raw";
+import linuxTunAccelerationContent from "./preset-content/linux-tun-acceleration.yaml?raw";
+import snifferContent from "./preset-content/sniffer.yaml?raw";
+import tailnetShareContent from "./preset-content/tailnet-share.yaml?raw";
+import tailscaleExternalContent from "./preset-content/tailscale-external.yaml?raw";
+import tunContent from "./preset-content/tun.yaml?raw";
+import udpP2PEIMContent from "./preset-content/udp-p2p-eim.yaml?raw";
+import windowsRelaxedRouteContent from "./preset-content/windows-relaxed-route.yaml?raw";
+
 export type MihomoProcessorPresetID =
   | "sniffer"
   | "tun"
@@ -28,127 +37,19 @@ type MihomoMergeProcessorPresetID = Exclude<
 >;
 
 const PRESET_CONTENT: Record<MihomoMergeProcessorPresetID, string> = {
-  sniffer: `# sandrone:mihomo-preset=sniffer
-sniffer!:
-  enable: true
-  force-dns-mapping: true
-  parse-pure-ip: true
-  override-destination: true
-  skip-domain:
-    - "Mijia Cloud"
-    - "dlg.io.mi.com"
-    - "+.push.apple.com"
-  sniff:
-    HTTP:
-      ports:
-        - 80
-        - "8080-8880"
-    TLS:
-      ports:
-        - 443
-        - 8443
-    QUIC:
-      ports:
-        - 443
-        - 8443`,
-  tun: `# sandrone:mihomo-preset=tun
-tun!:
-  enable: true
-  stack: mixed
-  auto-route: true
-  strict-route: true
-  auto-detect-interface: true
-  dns-hijack:
-    - any:53
-    - tcp://any:53
-  route-exclude-address:
-    - 10.0.0.0/8
-    - 172.16.0.0/12
-    - 192.168.0.0/16
-    - 169.254.0.0/16
-    - fe80::/10
-    - fc00::/7
-    - 224.0.0.251/32
-    - ff02::fb/128`,
-  "fake-ip-compat": `# sandrone:mihomo-preset=fake-ip-compat
-dns:
-  fake-ip-filter+:
-    # Extended NTP endpoints used by common systems and Chinese cloud services.
-    - "time-ios.apple.com"
-    - "ntp1.aliyun.com"
-    - "ntp2.aliyun.com"
-    - "ntp3.aliyun.com"
-    - "ntp4.aliyun.com"
-    - "ntp5.aliyun.com"
-    - "ntp6.aliyun.com"
-    - "ntp7.aliyun.com"
-    - "time1.cloud.tencent.com"
-    - "time2.cloud.tencent.com"
-    - "time3.cloud.tencent.com"
-    - "time4.cloud.tencent.com"
-    - "time5.cloud.tencent.com"
-    - "*.ntp.org.cn"
-    - "ntp.ntsc.ac.cn"
-    # Apple software update endpoints.
-    - "mesu.apple.com"
-    - "swscan.apple.com"
-    - "swquery.apple.com"
-    - "swdownload.apple.com"
-    - "swcdn.apple.com"
-    - "swdist.apple.com"
-    # Selected media and local-login compatibility endpoints.
-    - "music.163.com"
-    - "*.music.163.com"
-    - "y.qq.com"
-    - "*.y.qq.com"
-    - "streamoc.music.tc.qq.com"
-    - "mobileoc.music.tc.qq.com"
-    - "isure.stream.qqmusic.qq.com"
-    - "dl.stream.qqmusic.qq.com"
-    - "aqqmusic.tc.qq.com"
-    - "amobile.music.tc.qq.com"
-    - "songsearch.kugou.com"
-    - "trackercdn.kugou.com"
-    - "*.kuwo.cn"
-    - "music.migu.cn"
-    - "*.music.migu.cn"
-    - "localhost.*.weixin.qq.com"
-    - "*.mcdn.bilivideo.cn"
-    # Banking, P2P, accelerator, and remote-access compatibility endpoints.
-    - "+.cmbchina.com"
-    - "+.cmbimg.com"
-    - "+.sandai.net"
-    - "+.n0808.com"
-    - "+.uu.163.com"
-    - "ps.res.netease.com"
-    - "+.oray.com"
-    - "+.orayimg.com"`,
-  "udp-p2p-eim": `# sandrone:mihomo-preset=udp-p2p-eim
-tun:
-  endpoint-independent-nat: true`,
-  "linux-tun-acceleration": `# sandrone:mihomo-preset=linux-tun-acceleration
-find-process-mode: strict
-tun:
-  auto-route: true
-  auto-redirect: true`,
-  "windows-relaxed-route": `# sandrone:mihomo-preset=windows-relaxed-route
-tun:
-  strict-route: false`,
-  "tailscale-external": `# sandrone:mihomo-preset=tailscale
-dns:
-  fake-ip-filter+:
-    - "+.ts.net"
-  nameserver-policy:
-    "<+.ts.net>": 100.100.100.100
-tun:
-  route-exclude-address+:
-    - 100.64.0.0/10
-    - fd7a:115c:a1e0::/48`,
-  "tailnet-share": `# sandrone:mihomo-preset=tailnet-share
-lan-allowed-ips+:
-  - 100.64.0.0/10
-  - fd7a:115c:a1e0::/48`,
+  sniffer: withoutTrailingNewline(snifferContent),
+  tun: withoutTrailingNewline(tunContent),
+  "fake-ip-compat": withoutTrailingNewline(fakeIPCompatContent),
+  "udp-p2p-eim": withoutTrailingNewline(udpP2PEIMContent),
+  "linux-tun-acceleration": withoutTrailingNewline(linuxTunAccelerationContent),
+  "windows-relaxed-route": withoutTrailingNewline(windowsRelaxedRouteContent),
+  "tailscale-external": withoutTrailingNewline(tailscaleExternalContent),
+  "tailnet-share": withoutTrailingNewline(tailnetShareContent),
 };
+
+function withoutTrailingNewline(content: string): string {
+  return content.endsWith("\n") ? content.slice(0, -1) : content;
+}
 
 const PRESET_NAMES: Record<MihomoProcessorPresetID, string> = {
   sniffer: "Sniffer",
