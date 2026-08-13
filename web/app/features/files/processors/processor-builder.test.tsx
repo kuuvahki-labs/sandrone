@@ -36,7 +36,7 @@ describe("FileProcessorBuilder", () => {
     expect(screen.getByRole("option", { name: "GitHub 规则源镜像替换" })).toBeInTheDocument();
   });
 
-  it("does not offer the rule source rewrite shortcut for static files", async () => {
+  it("does not offer the rule source mirror shortcut for static files", async () => {
     const user = userEvent.setup();
     render(<FileProcessorBuilder kind="static" />);
 
