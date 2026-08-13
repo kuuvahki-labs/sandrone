@@ -1,11 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 
 import { LoadingScreen } from "~/core/components/loading-screen";
 import { useSandrone } from "~/core/provider/context";
 import { useFileDetailsResource, useFileResources } from "~/features/files/data/use-file-resources";
-import { fileDriver } from "~/features/files/drivers/registry";
-import { rendererRevisionFromCapabilityIndex } from "~/features/files/model/renderer-revision";
 import type { FilePreview } from "~/features/files/model/types";
 import { FilePreviewPage } from "~/features/files/pages/file-preview-page";
 import { useShareDialog } from "~/features/shares/components/share-dialog-context";
@@ -26,46 +24,10 @@ export default function FilePreviewRoute() {
   const { loadFilePreview } = useFileDetailsResource(resourcePorts);
   const name = decodeResourceRouteParam(params.name);
   const item = name ? files.items.find((candidate) => candidate.name === name) : undefined;
-  const itemName = item?.name;
-  const targetRendererFormat = fileDriver(item?.kind)?.targetRendererFormat;
-  const [revisionState, setRevisionState] = useState<{
-    itemName: string;
-    rendererFormat: string;
-    revision?: string;
-  }>();
-  const targetRendererRevision = revisionState !== undefined
-    && revisionState.itemName === itemName
-    && revisionState.rendererFormat === targetRendererFormat
-    ? revisionState.revision
-    : undefined;
   const backToList = resourcePreviewOrigin(searchParams.get("from")) === "list";
   const loadPreview = useCallback((): Promise<FilePreview | null> => item ? loadFilePreview(item.name) : Promise.resolve(null), [item, loadFilePreview]);
   const refreshPreviewLoader = useCallback((): Promise<FilePreview | null> => item ? loadFilePreview(item.name, { refresh: true }) : Promise.resolve(null), [item, loadFilePreview]);
   const { failed, pending, preview, refreshPreview } = useResourcePreview<FilePreview>(item?.name, loadPreview, refreshPreviewLoader);
-
-  useEffect(() => {
-    if (!itemName || !targetRendererFormat) {
-      return;
-    }
-    let active = true;
-    void app.client.listFormatCapabilities().then(
-      (value) => {
-        if (!active) return;
-        setRevisionState({
-          itemName,
-          rendererFormat: targetRendererFormat,
-          revision: rendererRevisionFromCapabilityIndex(value, targetRendererFormat),
-        });
-      },
-      () => {
-        if (!active) return;
-        setRevisionState({ itemName, rendererFormat: targetRendererFormat });
-      },
-    );
-    return () => {
-      active = false;
-    };
-  }, [app.client, itemName, targetRendererFormat]);
 
   if (files.loading) return <LoadingScreen />;
 
@@ -84,7 +46,6 @@ export default function FilePreviewRoute() {
       onShare={() => shareDialog.open({ kind: "file", name: item.name })}
       pending={pending}
       preview={preview}
-      targetRendererRevision={targetRendererRevision}
     />
   );
 }

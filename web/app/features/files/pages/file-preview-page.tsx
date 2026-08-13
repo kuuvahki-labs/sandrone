@@ -16,7 +16,6 @@ export interface FilePreviewPageProps {
   fileName: string;
   pending?: boolean;
   preview?: FilePreview;
-  targetRendererRevision?: string;
   onBack: () => void;
   onRefresh: () => void;
   onShare: () => void;
@@ -28,7 +27,6 @@ export function FilePreviewPage({
   fileName,
   pending = false,
   preview,
-  targetRendererRevision,
   onBack,
   onRefresh,
   onShare,
@@ -80,12 +78,6 @@ export function FilePreviewPage({
 
       {preview ? (
         <>
-          {targetRendererRevision ? (
-            <Typography color="text.secondary" variant="body2">
-              {t("files.preview.targetCore", { revision: targetRendererRevision })}
-            </Typography>
-          ) : null}
-
           {preview.warnings.length ? (
             <CollapsibleWarningPanel label={t("files.preview.warnings")} warnings={preview.warnings} />
           ) : null}

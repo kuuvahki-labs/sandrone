@@ -118,34 +118,6 @@ describe("FilePreviewPage", () => {
     expect(screen.getByText(/processor kept output/)).toBeInTheDocument();
   });
 
-  it("shows the target core revision above warnings and final content only when available", () => {
-    const view = render(
-      <FilePreviewPage
-        {...pageActions}
-        targetRendererRevision="v1.19.25"
-        preview={{
-          body: "processor output",
-          contentType: "text/plain",
-          warnings: [{ code: "processor_warning", message: "processor kept output" }],
-        }}
-      />,
-    );
-
-    const targetCore = screen.getByText("目标核心：v1.19.25");
-    const warnings = screen.getByText("1 组警告 · 1 条记录");
-    const finalContent = screen.getByRole("region", { name: "最终文件内容" });
-    expect(targetCore.compareDocumentPosition(warnings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(targetCore.compareDocumentPosition(finalContent) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-
-    view.rerender(
-      <FilePreviewPage
-        {...pageActions}
-        preview={{ body: "processor output", contentType: "text/plain", warnings: [] }}
-      />,
-    );
-    expect(screen.queryByText(/目标核心/)).not.toBeInTheDocument();
-  });
-
   it("keeps loading, failure, and refresh behavior", async () => {
     const user = userEvent.setup();
     const onRefresh = vi.fn();
