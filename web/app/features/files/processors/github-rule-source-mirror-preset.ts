@@ -1,3 +1,4 @@
+import type { FileProcessorPreset } from "~/features/files/drivers/core/processor-presets";
 import type { ProcessorDetail } from "~/shared/resources/types";
 
 import replaceStringsScript from "./scripts/replace-strings.js?raw";
@@ -20,6 +21,18 @@ export const GITHUB_RULE_SOURCE_MIRROR_REPLACEMENTS: readonly (readonly [string,
 ];
 
 const LEGACY_PRESET_MARKER = "// sandrone:file-preset=github-rule-source-rewrite";
+
+export const githubRuleSourceMirrorPreset: FileProcessorPreset = {
+  id: GITHUB_RULE_SOURCE_MIRROR_PRESET_ID,
+  category: "network",
+  labelKey: "files.processor.githubRuleSourceMirrorPreset",
+  descriptionKey: "files.processor.githubRuleSourceMirrorPresetDescription",
+  defaultOn: false,
+  dependencies: [],
+  conflicts: [],
+  build: (t) => githubRuleSourceMirrorProcessorPreset(t("files.processor.githubRuleSourceMirrorPreset")),
+  recognize: recognizeGitHubRuleSourceMirrorProcessorPreset,
+};
 
 export function githubRuleSourceMirrorProcessorPreset(name: string): ProcessorDetail {
   return {

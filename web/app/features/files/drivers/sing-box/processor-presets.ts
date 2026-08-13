@@ -2,6 +2,7 @@ import type {
   FileProcessorPreset,
   FileProcessorPresetCategory,
 } from "~/features/files/drivers/core/processor-presets";
+import { githubRuleSourceMirrorPreset } from "~/features/files/processors/github-rule-source-mirror-preset";
 import {
   orderedRuleProcessorPreset,
   type OrderedRuleProcessorPresetOptions,
@@ -14,6 +15,7 @@ import {
   singBoxStructureProcessorPreset,
   type SingBoxStructureProcessorPresetOptions,
 } from "~/features/files/processors/sing-box-structure-preset";
+import type { Translator } from "~/shared/i18n/context";
 import type { ProcessorDetail } from "~/shared/resources/types";
 
 export type SingBoxProcessorPresetID =
@@ -52,22 +54,7 @@ const SNIFF_AND_DNS_HIJACK_CONTENT = JSON.stringify({
 const NTP_DIRECT_PRESET: OrderedRuleProcessorPresetOptions = {
   id: "ntp-direct",
   kind: "sing-box",
-  name: "Traditional NTP Direct",
   rules: [{ network: "udp", port: 123, outbound: "direct" }],
-};
-
-const PRESET_NAMES: Record<SingBoxProcessorPresetID, string> = {
-  sniff: "Sniff & DNS Hijack",
-  "ntp-direct": "Traditional NTP Direct",
-  "ensure-tun": "Ensure TUN",
-  "quic-fallback": "QUIC Fallback",
-  "ipv4-only": "IPv4 Only",
-  "udp-p2p-eim": "UDP/P2P EIM",
-  "linux-tun-acceleration": "Linux/OpenWrt TUN Acceleration",
-  "mptcp-direct": "MPTCP Direct",
-  "windows-relaxed-route": "Windows Relaxed Route",
-  "tailscale-native": "Tailscale 原生接管",
-  "tailscale-external": "Tailscale 共存",
 };
 
 const TAILSCALE_SCRIPTS: Readonly<Record<SingBoxTailscaleProcessorPresetID, string>> = {
@@ -83,7 +70,6 @@ const ORDERED_RULE_PRESETS: Record<
   "quic-fallback": {
     id: "quic-fallback",
     kind: "sing-box",
-    name: PRESET_NAMES["quic-fallback"],
     rules: [{ protocol: "quic", action: "reject" }],
   },
 };
@@ -92,25 +78,23 @@ const STRUCTURE_PRESETS: Record<
   SingBoxStructureProcessorPresetID,
   SingBoxStructureProcessorPresetOptions
 > = {
-  "ensure-tun": { operation: "ensure-tun", name: PRESET_NAMES["ensure-tun"] },
-  "ipv4-only": { operation: "ipv4-only", name: PRESET_NAMES["ipv4-only"] },
-  "udp-p2p-eim": { operation: "udp-p2p-eim", name: PRESET_NAMES["udp-p2p-eim"] },
+  "ensure-tun": { operation: "ensure-tun" },
+  "ipv4-only": { operation: "ipv4-only" },
+  "udp-p2p-eim": { operation: "udp-p2p-eim" },
   "linux-tun-acceleration": {
     operation: "linux-tun-acceleration",
-    name: PRESET_NAMES["linux-tun-acceleration"],
   },
-  "mptcp-direct": { operation: "mptcp-direct", name: PRESET_NAMES["mptcp-direct"] },
+  "mptcp-direct": { operation: "mptcp-direct" },
   "windows-relaxed-route": {
     operation: "windows-relaxed-route",
-    name: PRESET_NAMES["windows-relaxed-route"],
   },
 };
 
-export function singBoxProcessorPreset(id: SingBoxProcessorPresetID): ProcessorDetail {
-  if (id === "sniff") return sniffAndDNSHijackProcessor();
-  if (isOrderedRulePresetID(id)) return orderedRuleProcessorPreset(ORDERED_RULE_PRESETS[id]);
-  if (isTailscalePresetID(id)) return tailscaleProcessor(id);
-  return singBoxStructureProcessorPreset(STRUCTURE_PRESETS[id]);
+export function singBoxProcessorPreset(id: SingBoxProcessorPresetID, name: string): ProcessorDetail {
+  if (id === "sniff") return sniffAndDNSHijackProcessor(name);
+  if (isOrderedRulePresetID(id)) return orderedRuleProcessorPreset(ORDERED_RULE_PRESETS[id], name);
+  if (isTailscalePresetID(id)) return tailscaleProcessor(id, name);
+  return singBoxStructureProcessorPreset(STRUCTURE_PRESETS[id], name);
 }
 
 export const singBoxProcessorPresets: readonly FileProcessorPreset[] = [
@@ -123,7 +107,7 @@ export const singBoxProcessorPresets: readonly FileProcessorPreset[] = [
     defaultOn: true,
     dependencies: [],
     conflicts: [],
-    build: () => singBoxProcessorPreset("sniff"),
+    build: (t) => singBoxProcessorPreset("sniff", t("processors.filePreset.singBox.sniff.label")),
     recognize: (processor) => (
       processor.type === "merge"
       && processor.params?.mode === "json_override"
@@ -139,9 +123,10 @@ export const singBoxProcessorPresets: readonly FileProcessorPreset[] = [
     defaultOn: true,
     dependencies: [],
     conflicts: [],
-    build: () => orderedRuleProcessorPreset(NTP_DIRECT_PRESET),
+    build: (t) => orderedRuleProcessorPreset(NTP_DIRECT_PRESET, t("processors.filePreset.ntpDirect.label")),
     recognize: (processor) => recognizeOrderedRuleProcessorPreset(processor, NTP_DIRECT_PRESET),
   },
+  githubRuleSourceMirrorPreset,
   structureDescriptor(
     "ensure-tun",
     "network",
@@ -211,15 +196,15 @@ export const singBoxProcessorPresets: readonly FileProcessorPreset[] = [
   ),
 ];
 
-export function defaultSingBoxProcessors(): ProcessorDetail[] {
+export function defaultSingBoxProcessors(t: Translator): ProcessorDetail[] {
   return singBoxProcessorPresets
     .filter((preset) => preset.defaultOn)
-    .map((preset) => preset.build());
+    .map((preset) => preset.build(t));
 }
 
-function sniffAndDNSHijackProcessor(): ProcessorDetail {
+function sniffAndDNSHijackProcessor(name: string): ProcessorDetail {
   return {
-    name: "Sniff & DNS Hijack",
+    name,
     type: "merge",
     stage: "file",
     params: {
@@ -247,7 +232,7 @@ function orderedRuleDescriptor(
     defaultOn: false,
     dependencies,
     conflicts,
-    build: () => orderedRuleProcessorPreset(options),
+    build: (t) => orderedRuleProcessorPreset(options, t(labelKey)),
     recognize: (processor) => recognizeOrderedRuleProcessorPreset(processor, options),
   };
 }
@@ -271,14 +256,14 @@ function structureDescriptor(
     defaultOn: false,
     dependencies,
     conflicts,
-    build: () => singBoxStructureProcessorPreset(options),
+    build: (t) => singBoxStructureProcessorPreset(options, t(labelKey)),
     recognize: (processor) => recognizeSingBoxStructureProcessorPreset(processor, options),
   };
 }
 
-function tailscaleProcessor(id: SingBoxTailscaleProcessorPresetID): ProcessorDetail {
+function tailscaleProcessor(id: SingBoxTailscaleProcessorPresetID, name: string): ProcessorDetail {
   return {
-    name: PRESET_NAMES[id],
+    name,
     type: "script",
     stage: "file",
     params: {
@@ -306,7 +291,7 @@ function tailscaleDescriptor(
     defaultOn: false,
     dependencies: ["ensure-tun"],
     conflicts,
-    build: () => tailscaleProcessor(id),
+    build: (t) => tailscaleProcessor(id, t(labelKey)),
     recognize: (processor) => {
       if (processor.type !== "script") return false;
       if (!isExactRecord(processor.params, ["source"])) return false;

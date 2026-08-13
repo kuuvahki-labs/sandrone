@@ -4,6 +4,7 @@ import {
   planFileProcessorPresetAddition,
   recognizedFileProcessorPresetID,
 } from "~/features/files/drivers/core/processor-presets";
+import { createTranslator } from "~/shared/i18n/context";
 import { enUS } from "~/shared/i18n/translations/en-US";
 import { zhCN } from "~/shared/i18n/translations/zh-CN";
 
@@ -12,9 +13,12 @@ import {
   shadowrocketProcessorPresets,
 } from "./processor-presets";
 
+const en = createTranslator("en-US");
+const zh = createTranslator("zh-CN");
+
 describe("Shadowrocket processor presets", () => {
   it("uses traditional NTP direct as the only new-file default", () => {
-    const processors = defaultShadowrocketProcessors();
+    const processors = defaultShadowrocketProcessors(en);
 
     expect(processors.map((processor) => processor.name)).toEqual(["Traditional NTP Direct"]);
     expect(processors[0]).toMatchObject({
@@ -30,8 +34,14 @@ describe("Shadowrocket processor presets", () => {
     });
   });
 
+  it.each([["en-US", en], ["zh-CN", zh]] as const)("uses every preset label as its %s processor name", (_locale, t) => {
+    for (const preset of shadowrocketProcessorPresets) {
+      expect(preset.build(t).name).toBe(t(preset.labelKey));
+    }
+  });
+
   it("recognizes only the exact managed NTP script", () => {
-    const preset = defaultShadowrocketProcessors()[0]!;
+    const preset = defaultShadowrocketProcessors(en)[0]!;
 
     expect(recognizedFileProcessorPresetID(shadowrocketProcessorPresets, preset)).toBe("ntp-direct");
     expect(recognizedFileProcessorPresetID(shadowrocketProcessorPresets, {
@@ -45,7 +55,7 @@ describe("Shadowrocket processor presets", () => {
 
   it("builds the exact optional INI override scenarios", () => {
     expect(Object.fromEntries(SCENARIOS.map(({ id }) => {
-      const processor = presetDescriptor(id).build();
+      const processor = presetDescriptor(id).build(en);
       return [id, {
         type: processor.type,
         stage: processor.stage,
@@ -61,6 +71,7 @@ describe("Shadowrocket processor presets", () => {
   it("declares every optional scenario default off without dependencies or conflicts", () => {
     expect(shadowrocketProcessorPresets.map((descriptor) => descriptor.id)).toEqual([
       "ntp-direct",
+      "github-rule-source-mirror",
       "disable-ipv6",
       "udp-unsupported-direct",
       "restricted-network-dns-fallback",
@@ -80,17 +91,17 @@ describe("Shadowrocket processor presets", () => {
       dependencies: [],
       conflicts: [],
     })));
-    expect(defaultShadowrocketProcessors().map((processor) => processor.name)).toEqual([
+    expect(defaultShadowrocketProcessors(en).map((processor) => processor.name)).toEqual([
       "Traditional NTP Direct",
     ]);
   });
 
   it("builds the exact native Tailscale ordered rules without a module warning", () => {
     const descriptor = presetDescriptor("tailscale-native");
-    const processor = descriptor.build();
+    const processor = descriptor.build(en);
 
     expect(processor).toEqual({
-      name: "Tailscale 原生接管",
+      name: "Native Tailscale",
       type: "script",
       stage: "file",
       params: {
@@ -121,17 +132,18 @@ describe("Shadowrocket processor presets", () => {
   });
 
   it("does not declare conflicts for native Tailscale", () => {
-    const tailscale = presetDescriptor("tailscale-native").build();
+    const tailscale = presetDescriptor("tailscale-native").build(en);
     expect(presetDescriptor("tailscale-native").conflicts).toEqual([]);
     expect(planFileProcessorPresetAddition(
       shadowrocketProcessorPresets,
       "tailscale-native",
       [tailscale],
+      en,
     ).additions).toEqual([]);
   });
 
   it.each(SCENARIOS)("recognizes only the exact INI override for $id", ({ id }) => {
-    const preset = presetDescriptor(id).build();
+    const preset = presetDescriptor(id).build(en);
 
     expect(recognizedFileProcessorPresetID(shadowrocketProcessorPresets, preset)).toBe(id);
     expect(recognizedFileProcessorPresetID(shadowrocketProcessorPresets, {
@@ -164,7 +176,7 @@ describe("Shadowrocket processor presets", () => {
       labelKey: preset.labelKey,
       labelEN: enUS[preset.labelKey],
       labelZH: zhCN[preset.labelKey],
-      processor: preset.build(),
+      processor: preset.build(en),
     }));
     expect(JSON.stringify(surface).toLowerCase()).not.toContain("quic");
   });

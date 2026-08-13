@@ -46,7 +46,7 @@ export const processorZhCN = {
   "processors.filePreset.mihomo.tailscaleExternal.risk": "该模式要求独立的系统 Tailscale 已运行并正确配置。",
   "processors.filePreset.mihomo.tailnetShare.description": "允许 Tailnet 设备访问 Mihomo 的 LAN 监听地址。",
   "processors.filePreset.mihomo.tailnetShare.risk": "这会将 LAN 访问范围扩大到标准 Tailnet 地址段，请确认入站端口和访问控制。",
-  "processors.filePreset.singBox.sniff.label": "Sniff & DNS Hijack",
+  "processors.filePreset.singBox.sniff.label": "流量嗅探与 DNS 劫持",
   "processors.filePreset.singBox.sniff.description": "在路由前嗅探流量，并劫持 DNS 协议或 53 端口连接。",
   "processors.filePreset.singBox.sniff.risk": "嗅探会检查连接元数据，DNS 劫持会改变原有的解析路径。",
   "processors.filePreset.singBox.ensureTun.label": "确保 TUN 入站",

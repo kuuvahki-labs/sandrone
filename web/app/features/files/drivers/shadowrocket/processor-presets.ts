@@ -2,11 +2,13 @@ import type {
   FileProcessorPreset,
   FileProcessorPresetCategory,
 } from "~/features/files/drivers/core/processor-presets";
+import { githubRuleSourceMirrorPreset } from "~/features/files/processors/github-rule-source-mirror-preset";
 import {
   orderedRuleProcessorPreset,
   type OrderedRuleProcessorPresetOptions,
   recognizeOrderedRuleProcessorPreset,
 } from "~/features/files/processors/ordered-rule-preset";
+import type { Translator } from "~/shared/i18n/context";
 import type { ProcessorDetail } from "~/shared/resources/types";
 
 import disableIPv6Content from "./preset-content/disable-ipv6.ini?raw";
@@ -33,23 +35,15 @@ function withoutTrailingNewline(content: string): string {
   return content.endsWith("\n") ? content.slice(0, -1) : content;
 }
 
-const PRESET_NAMES: Record<ShadowrocketINIOverridePresetID, string> = {
-  "disable-ipv6": "Disable IPv6",
-  "udp-unsupported-direct": "UDP Unsupported Direct",
-  "restricted-network-dns-fallback": "Restricted Network DNS Fallback",
-};
-
 const NTP_DIRECT_PRESET: OrderedRuleProcessorPresetOptions = {
   id: "ntp-direct",
   kind: "shadowrocket",
-  name: "Traditional NTP Direct",
   rules: ["AND,((PROTOCOL,UDP),(DST-PORT,123)),DIRECT"],
 };
 
 const TAILSCALE_NATIVE_PRESET: OrderedRuleProcessorPresetOptions = {
   id: "tailscale-native",
   kind: "shadowrocket",
-  name: "Tailscale 原生接管",
   insertMode: "top",
   rules: [
     "DOMAIN-SUFFIX,ts.net,TAILSCALE",
@@ -68,9 +62,10 @@ export const shadowrocketProcessorPresets: readonly FileProcessorPreset[] = [
     defaultOn: true,
     dependencies: [],
     conflicts: [],
-    build: () => orderedRuleProcessorPreset(NTP_DIRECT_PRESET),
+    build: (t) => orderedRuleProcessorPreset(NTP_DIRECT_PRESET, t("processors.filePreset.ntpDirect.label")),
     recognize: (processor) => recognizeOrderedRuleProcessorPreset(processor, NTP_DIRECT_PRESET),
   },
+  githubRuleSourceMirrorPreset,
   iniOverrideDescriptor(
     "disable-ipv6",
     "network",
@@ -101,17 +96,17 @@ export const shadowrocketProcessorPresets: readonly FileProcessorPreset[] = [
     defaultOn: false,
     dependencies: [],
     conflicts: [],
-    build: () => orderedRuleProcessorPreset(TAILSCALE_NATIVE_PRESET),
+    build: (t) => orderedRuleProcessorPreset(TAILSCALE_NATIVE_PRESET, t("processors.filePreset.shadowrocket.tailscaleNative.label")),
     recognize: (processor) => (
       recognizeOrderedRuleProcessorPreset(processor, TAILSCALE_NATIVE_PRESET)
     ),
   },
 ];
 
-export function defaultShadowrocketProcessors(): ProcessorDetail[] {
+export function defaultShadowrocketProcessors(t: Translator): ProcessorDetail[] {
   return shadowrocketProcessorPresets
     .filter((preset) => preset.defaultOn)
-    .map((preset) => preset.build());
+    .map((preset) => preset.build(t));
 }
 
 function iniOverrideDescriptor(
@@ -132,8 +127,8 @@ function iniOverrideDescriptor(
     defaultOn: false,
     dependencies: [],
     conflicts,
-    build: () => ({
-      name: PRESET_NAMES[id],
+    build: (t) => ({
+      name: t(labelKey),
       type: "merge",
       stage: "file",
       params: { mode: "ini_override", content },

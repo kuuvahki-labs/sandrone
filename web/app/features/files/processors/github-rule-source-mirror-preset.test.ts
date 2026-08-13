@@ -2,16 +2,25 @@ import { runInNewContext } from "node:vm";
 
 import { describe, expect, it } from "vitest";
 
+import { createTranslator } from "~/shared/i18n/context";
 import type { ProcessorDetail } from "~/shared/resources/types";
 
 import {
   GITHUB_RULE_SOURCE_MIRROR_PRESET_ID,
   GITHUB_RULE_SOURCE_MIRROR_REPLACEMENTS,
+  githubRuleSourceMirrorPreset,
   githubRuleSourceMirrorProcessorPreset,
   recognizeGitHubRuleSourceMirrorProcessorPreset,
 } from "./github-rule-source-mirror-preset";
 
 describe("GitHub rule source mirror preset", () => {
+  it("uses the localized shortcut label as the generated processor name", () => {
+    expect(githubRuleSourceMirrorPreset.build(createTranslator("zh-CN")).name)
+      .toBe("GitHub 规则源镜像替换");
+    expect(githubRuleSourceMirrorPreset.build(createTranslator("en-US")).name)
+      .toBe("GitHub rule source mirror replacement");
+  });
+
   it("serializes an editable parameterized inline file script", () => {
     const processor = githubRuleSourceMirrorProcessorPreset("GitHub 规则源镜像替换");
     const content = inlineScriptContent(processor);

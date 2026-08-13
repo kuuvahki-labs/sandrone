@@ -6,18 +6,22 @@ import {
   planFileProcessorPresetAddition,
   recognizedFileProcessorPresetID,
 } from "~/features/files/drivers/core/processor-presets";
+import { createTranslator } from "~/shared/i18n/context";
 import { enUS } from "~/shared/i18n/translations/en-US";
 
 import {
   defaultSingBoxProcessors,
-  singBoxProcessorPreset,
+  singBoxProcessorPreset as buildSingBoxProcessorPreset,
   type SingBoxProcessorPresetID,
   singBoxProcessorPresets,
 } from "./processor-presets";
 
+const en = createTranslator("en-US");
+const zh = createTranslator("zh-CN");
+
 describe("sing-box file processor defaults", () => {
   it("uses sniff and DNS hijack, then traditional NTP direct as the new-file defaults", () => {
-    const processors = defaultSingBoxProcessors();
+    const processors = defaultSingBoxProcessors(en);
 
     expect(processors.map((processor) => processor.name)).toEqual([
       "Sniff & DNS Hijack",
@@ -54,11 +58,17 @@ describe("sing-box file processor defaults", () => {
         ],
       },
     });
-    expect(defaultSingBoxProcessors()[0]).not.toBe(processors[0]);
+    expect(defaultSingBoxProcessors(en)[0]).not.toBe(processors[0]);
+  });
+
+  it.each([["en-US", en], ["zh-CN", zh]] as const)("uses every preset label as its %s processor name", (_locale, t) => {
+    for (const preset of singBoxProcessorPresets) {
+      expect(preset.build(t).name).toBe(t(preset.labelKey));
+    }
   });
 
   it("recognizes only the exact managed JSON override", () => {
-    const preset = defaultSingBoxProcessors()[0]!;
+    const preset = defaultSingBoxProcessors(en)[0]!;
     expect(recognizedFileProcessorPresetID(singBoxProcessorPresets, preset)).toBe("sniff");
     expect(recognizedFileProcessorPresetID(singBoxProcessorPresets, {
       ...preset,
@@ -72,7 +82,7 @@ describe("sing-box file processor defaults", () => {
 
   it("builds the exact QUIC ordered-rule processor", () => {
     expect(singBoxProcessorPreset("quic-fallback")).toMatchObject({
-      name: "QUIC Fallback",
+      name: "Force QUIC fallback",
       type: "script",
       stage: "file",
       params: {
@@ -86,12 +96,12 @@ describe("sing-box file processor defaults", () => {
   });
 
   it.each([
-    ["ensure-tun", "Ensure TUN", "ensure-tun"],
-    ["ipv4-only", "IPv4 Only", "ipv4-only"],
-    ["udp-p2p-eim", "UDP/P2P EIM", "udp-p2p-eim"],
-    ["linux-tun-acceleration", "Linux/OpenWrt TUN Acceleration", "linux-tun-acceleration"],
-    ["mptcp-direct", "MPTCP Direct", "mptcp-direct"],
-    ["windows-relaxed-route", "Windows Relaxed Route", "windows-relaxed-route"],
+    ["ensure-tun", "Ensure TUN inbound", "ensure-tun"],
+    ["ipv4-only", "IPv4 only", "ipv4-only"],
+    ["udp-p2p-eim", "UDP/P2P compatibility", "udp-p2p-eim"],
+    ["linux-tun-acceleration", "Linux/OpenWrt TUN acceleration", "linux-tun-acceleration"],
+    ["mptcp-direct", "MPTCP direct", "mptcp-direct"],
+    ["windows-relaxed-route", "Windows relaxed routing", "windows-relaxed-route"],
   ] as const)("builds the exact %s structural processor", (id, name, operation) => {
     expect(singBoxProcessorPreset(id)).toEqual({
       name,
@@ -108,6 +118,7 @@ describe("sing-box file processor defaults", () => {
     expect(singBoxProcessorPresets.map((preset) => preset.id)).toEqual([
       "sniff",
       "ntp-direct",
+      "github-rule-source-mirror",
       "ensure-tun",
       "quic-fallback",
       "ipv4-only",
@@ -145,9 +156,9 @@ describe("sing-box file processor defaults", () => {
       { id: "windows-relaxed-route", defaultOn: false, dependencies: [], conflicts: [] },
     ]);
 
-    expect(planFileProcessorPresetAddition(singBoxProcessorPresets, "mptcp-direct", []).addedPresetIDs)
+    expect(planFileProcessorPresetAddition(singBoxProcessorPresets, "mptcp-direct", [], en).addedPresetIDs)
       .toEqual(["ensure-tun", "linux-tun-acceleration", "mptcp-direct"]);
-    expect(planFileProcessorPresetAddition(singBoxProcessorPresets, "quic-fallback", []).addedPresetIDs)
+    expect(planFileProcessorPresetAddition(singBoxProcessorPresets, "quic-fallback", [], en).addedPresetIDs)
       .toEqual(["sniff", "quic-fallback"]);
   });
 
@@ -155,7 +166,7 @@ describe("sing-box file processor defaults", () => {
     for (const id of ["tailscale-native", "tailscale-external"] as const) {
       const preset = singBoxProcessorPreset(id as SingBoxProcessorPresetID);
       expect(preset).toEqual({
-        name: id === "tailscale-native" ? "Tailscale 原生接管" : "Tailscale 共存",
+        name: id === "tailscale-native" ? "Native Tailscale" : "Tailscale coexistence",
         type: "script",
         stage: "file",
         params: { source: { type: "inline", content: expect.any(String) } },
@@ -188,6 +199,7 @@ describe("sing-box file processor defaults", () => {
       singBoxProcessorPresets,
       "tailscale-native",
       current,
+      en,
     );
 
     expect(plan.additions).toEqual([{
@@ -522,6 +534,7 @@ describe("sing-box file processor defaults", () => {
       singBoxProcessorPresets,
       "tailscale-native",
       current,
+      en,
     );
     expect(native.removedPresetIDs).toEqual(["tailscale-external"]);
     expect(applyPlan(current, native)).toEqual([
@@ -537,6 +550,7 @@ describe("sing-box file processor defaults", () => {
         singBoxProcessorPresets,
         "tailscale-native",
         applyPlan(current, native),
+        en,
       ),
     );
     expect(repeated).toEqual(applyPlan(current, native));
@@ -545,6 +559,7 @@ describe("sing-box file processor defaults", () => {
       singBoxProcessorPresets,
       "tailscale-external",
       [singBoxProcessorPreset("tailscale-native")],
+      en,
     );
     expect(external.removedPresetIDs).toEqual(["tailscale-native"]);
     expect(external.addedPresetIDs).toEqual(["ensure-tun", "tailscale-external"]);
@@ -584,6 +599,11 @@ function presetDescriptor(id: SingBoxProcessorPresetID) {
   const descriptor = singBoxProcessorPresets.find((preset) => preset.id === id);
   if (!descriptor) throw new Error(`missing sing-box processor preset: ${id}`);
   return descriptor;
+}
+
+function singBoxProcessorPreset(id: SingBoxProcessorPresetID) {
+  const preset = presetDescriptor(id);
+  return buildSingBoxProcessorPreset(id, en(preset.labelKey));
 }
 
 type TailscalePresetID = "tailscale-native" | "tailscale-external";

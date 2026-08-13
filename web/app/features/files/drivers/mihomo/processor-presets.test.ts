@@ -7,19 +7,23 @@ import {
   planFileProcessorPresetAddition,
   recognizedFileProcessorPresetID,
 } from "~/features/files/drivers/core/processor-presets";
+import { createTranslator } from "~/shared/i18n/context";
 import { enUS } from "~/shared/i18n/translations/en-US";
 import { zhCN } from "~/shared/i18n/translations/zh-CN";
 
 import {
   defaultMihomoProcessors,
-  mihomoProcessorPreset,
+  mihomoProcessorPreset as buildMihomoProcessorPreset,
   type MihomoProcessorPresetID,
   mihomoProcessorPresets,
 } from "./processor-presets";
 
+const en = createTranslator("en-US");
+const zh = createTranslator("zh-CN");
+
 describe("Mihomo processor presets", () => {
   it("uses Sniffer, TUN, then traditional NTP direct as the new-file default chain", () => {
-    expect(defaultMihomoProcessors().map((processor) => processor.name)).toEqual([
+    expect(defaultMihomoProcessors(en).map((processor) => processor.name)).toEqual([
       "Sniffer",
       "TUN",
       "Traditional NTP Direct",
@@ -36,6 +40,12 @@ describe("Mihomo processor presets", () => {
         },
       },
     });
+  });
+
+  it.each([["en-US", en], ["zh-CN", zh]] as const)("uses every preset label as its %s processor name", (_locale, t) => {
+    for (const preset of mihomoProcessorPresets) {
+      expect(preset.build(t).name).toBe(t(preset.labelKey));
+    }
   });
 
   it("defines the complete editable YAML override contents", () => {
@@ -151,7 +161,7 @@ tun:
     const preset = mihomoProcessorPreset(id);
 
     expect(preset).toEqual({
-      name: "Tailscale 原生接管",
+      name: "Native Tailscale",
       type: "script",
       stage: "file",
       params: {
@@ -345,6 +355,7 @@ tun:
       "sniffer",
       "tun",
       "ntp-direct",
+      "github-rule-source-mirror",
       "fake-ip-compat",
       "quic-fallback",
       "udp-p2p-eim",
@@ -401,6 +412,7 @@ tun:
       mihomoProcessorPresets,
       "tailscale-native",
       nativeCurrent,
+      en,
     );
     expect(nativePlan.removeIndices).toEqual([0, 1]);
     expect(nativePlan.removedPresetIDs).toEqual(["tailscale-external", "tailnet-share"]);
@@ -422,7 +434,7 @@ tun:
       id: preset.id,
       labelKey: preset.labelKey,
       labels: [enUS[preset.labelKey], zhCN[preset.labelKey]],
-      processor: preset.build(),
+      processor: preset.build(en),
     }));
     const serialized = JSON.stringify(managedSurface).toLowerCase();
 
@@ -465,6 +477,11 @@ function presetDescriptor(id: MihomoProcessorPresetID) {
   const descriptor = mihomoProcessorPresets.find((preset) => preset.id === id);
   if (!descriptor) throw new Error(`missing Mihomo processor preset: ${id}`);
   return descriptor;
+}
+
+function mihomoProcessorPreset(id: MihomoProcessorPresetID) {
+  const preset = presetDescriptor(id);
+  return buildMihomoProcessorPreset(id, en(preset.labelKey));
 }
 
 function presetYAML(id: MihomoProcessorPresetID): Record<string, unknown> {

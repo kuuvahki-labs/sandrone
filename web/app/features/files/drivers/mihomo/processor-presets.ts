@@ -1,10 +1,12 @@
 import type { FileProcessorPreset, FileProcessorPresetCategory } from "~/features/files/drivers/core/processor-presets";
+import { githubRuleSourceMirrorPreset } from "~/features/files/processors/github-rule-source-mirror-preset";
 import {
   orderedRuleProcessorPreset,
   type OrderedRuleProcessorPresetOptions,
   recognizeOrderedRuleProcessorPreset,
 } from "~/features/files/processors/ordered-rule-preset";
 import mihomoTailscaleNativeScript from "~/features/files/processors/scripts/mihomo-tailscale-native.js?raw";
+import type { Translator } from "~/shared/i18n/context";
 import type { ProcessorDetail } from "~/shared/resources/types";
 
 import fakeIPCompatContent from "./preset-content/fake-ip-compat.yaml?raw";
@@ -50,40 +52,24 @@ function withoutTrailingNewline(content: string): string {
   return content.endsWith("\n") ? content.slice(0, -1) : content;
 }
 
-const PRESET_NAMES: Record<MihomoProcessorPresetID, string> = {
-  sniffer: "Sniffer",
-  tun: "TUN",
-  "ntp-direct": "Traditional NTP Direct",
-  "fake-ip-compat": "Fake-IP 兼容扩展",
-  "quic-fallback": "QUIC Fallback",
-  "udp-p2p-eim": "UDP/P2P EIM",
-  "linux-tun-acceleration": "Linux/OpenWrt TUN Acceleration",
-  "windows-relaxed-route": "Windows Relaxed Route",
-  "tailscale-native": "Tailscale 原生接管",
-  "tailscale-external": "Tailscale 共存",
-  "tailnet-share": "Tailnet 代理共享",
-};
-
 const ORDERED_RULE_PRESETS: Record<MihomoOrderedRuleProcessorPresetID, OrderedRuleProcessorPresetOptions> = {
   "ntp-direct": {
     id: "ntp-direct",
     kind: "mihomo",
-    name: PRESET_NAMES["ntp-direct"],
     rules: ["AND,((NETWORK,UDP),(DST-PORT,123)),DIRECT"],
   },
   "quic-fallback": {
     id: "quic-fallback",
     kind: "mihomo",
-    name: PRESET_NAMES["quic-fallback"],
     rules: ["AND,((NETWORK,UDP),(DST-PORT,443)),REJECT"],
   },
 };
 
-export function mihomoProcessorPreset(id: MihomoProcessorPresetID): ProcessorDetail {
-  if (isOrderedRulePresetID(id)) return orderedRuleProcessorPreset(ORDERED_RULE_PRESETS[id]);
-  if (id === "tailscale-native") return mihomoTailscaleNativeProcessor();
+export function mihomoProcessorPreset(id: MihomoProcessorPresetID, name: string): ProcessorDetail {
+  if (isOrderedRulePresetID(id)) return orderedRuleProcessorPreset(ORDERED_RULE_PRESETS[id], name);
+  if (id === "tailscale-native") return mihomoTailscaleNativeProcessor(name);
   return {
-    name: PRESET_NAMES[id],
+    name,
     type: "merge",
     stage: "file",
     params: { mode: "yaml_override", content: PRESET_CONTENT[id] },
@@ -115,6 +101,7 @@ export const mihomoProcessorPresets: readonly FileProcessorPreset[] = [
     "processors.filePreset.ntpDirect.risk",
     true,
   ),
+  githubRuleSourceMirrorPreset,
   descriptor(
     "fake-ip-compat",
     "network",
@@ -176,10 +163,10 @@ export const mihomoProcessorPresets: readonly FileProcessorPreset[] = [
   ),
 ];
 
-export function defaultMihomoProcessors(): ProcessorDetail[] {
+export function defaultMihomoProcessors(t: Translator): ProcessorDetail[] {
   return mihomoProcessorPresets
     .filter((preset) => preset.defaultOn)
-    .map((preset) => preset.build());
+    .map((preset) => preset.build(t));
 }
 
 function descriptor(
@@ -202,7 +189,7 @@ function descriptor(
     defaultOn,
     dependencies,
     conflicts,
-    build: () => mihomoProcessorPreset(id),
+    build: (t) => mihomoProcessorPreset(id, t(labelKey)),
     recognize: (processor) => (
       processor.type === "merge"
       && processor.params?.mode === "yaml_override"
@@ -230,14 +217,14 @@ function orderedRuleDescriptor(
     defaultOn,
     dependencies,
     conflicts,
-    build: () => orderedRuleProcessorPreset(options),
+    build: (t) => orderedRuleProcessorPreset(options, t(labelKey)),
     recognize: (processor) => recognizeOrderedRuleProcessorPreset(processor, options),
   };
 }
 
-function mihomoTailscaleNativeProcessor(): ProcessorDetail {
+function mihomoTailscaleNativeProcessor(name: string): ProcessorDetail {
   return {
-    name: PRESET_NAMES["tailscale-native"],
+    name,
     type: "script",
     stage: "file",
     params: {
@@ -259,7 +246,7 @@ function mihomoTailscaleNativeDescriptor(): FileProcessorPreset {
     defaultOn: false,
     dependencies: ["tun"],
     conflicts: ["tailscale-external"],
-    build: mihomoTailscaleNativeProcessor,
+    build: (t) => mihomoTailscaleNativeProcessor(t("processors.filePreset.mihomo.tailscaleNative.label")),
     recognize: (processor) => {
       if (processor.type !== "script") return false;
       if (!isExactRecord(processor.params, ["source"])) return false;
