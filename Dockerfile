@@ -62,4 +62,4 @@ LABEL org.opencontainers.image.version=$VERSION \
   org.opencontainers.image.source=https://github.com/kuuvahki-labs/sandrone
 
 ENTRYPOINT ["sandrone"]
-CMD ["serve", "http", "--listen", "0.0.0.0:1137", "--data-dir", "/app/data"]
+CMD ["serve", "--listen", "0.0.0.0:1137", "--data-dir", "/app/data"]

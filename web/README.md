@@ -24,7 +24,7 @@ pnpm install --frozen-lockfile
 生成或嵌入 Web 资源：
 
 ```sh
-go run -mod=readonly -tags probe_singbox ./cmd/sandrone serve http
+go run -mod=readonly -tags probe_singbox ./cmd/sandrone serve
 ```
 
 然后在 `web/` 目录启动 React Router/Vite 开发服务器：
@@ -74,7 +74,7 @@ pnpm start
 静态资源嵌入可执行文件：
 
 ```sh
-go run -mod=readonly -tags probe_singbox ./cmd/sandrone serve http
+go run -mod=readonly -tags probe_singbox ./cmd/sandrone serve
 ```
 
 然后访问 `http://127.0.0.1:1137/`。

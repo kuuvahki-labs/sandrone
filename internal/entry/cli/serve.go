@@ -35,68 +35,30 @@ func newServeCommand(cfg *config) *cobra.Command {
 	}
 	cmd := &cobra.Command{
 		Use:   "serve",
-		Short: "Run HTTP API and MCP entrypoints",
+		Short: "Run HTTP API, Web UI, and MCP on one listener",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			rt, err := newServeRuntime(cmd, cfg, opts)
+			if err != nil {
+				return err
+			}
+			return runEntrypoint(cmd.Context(), newServeServer(rt), rt)
+		},
 	}
-	cmd.PersistentFlags().StringVar(&opts.listen, "listen", opts.listen, "listen address")
-	cmd.PersistentFlags().StringVar(&opts.token, "token", opts.token, "bearer token for HTTP and MCP HTTP")
-	cmd.PersistentFlags().StringVar(&opts.logLevel, "log-level", opts.logLevel, "log level: debug, info, warn, or error")
-	cmd.AddCommand(
-		newServeHTTPCommand(cfg, &opts),
-		newServeMCPCommand(cfg, &opts),
-		newServeAllCommand(cfg, &opts),
+	cmd.Flags().StringVar(&opts.listen, "listen", opts.listen, "listen address")
+	cmd.Flags().StringVar(&opts.token, "token", opts.token, "bearer token for HTTP and MCP HTTP")
+	cmd.Flags().StringVar(&opts.logLevel, "log-level", opts.logLevel, "log level: debug, info, warn, or error")
+	addMCPFlags(cmd, &opts)
+	return cmd
+}
+
+func newServeServer(rt *app.Runtime) *httpapi.Server {
+	mcpServer := mcpapi.New(rt)
+	return httpapi.New(
+		rt,
+		httpapi.WithMCP(rt.Config.MCP.Path, mcpServer.Handler()),
+		httpapi.WithWebUI(newWebUIHandler(rt.Config)),
 	)
-	return cmd
-}
-
-func newServeHTTPCommand(cfg *config, opts *serveOptions) *cobra.Command {
-	return &cobra.Command{
-		Use:   "http",
-		Short: "Run the HTTP API",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			rt, err := newServeRuntime(cmd, cfg, *opts)
-			if err != nil {
-				return err
-			}
-			server := httpapi.New(rt, httpapi.WithWebUI(newWebUIHandler(rt.Config)))
-			return runEntrypoint(cmd.Context(), server, rt)
-		},
-	}
-}
-
-func newServeMCPCommand(cfg *config, opts *serveOptions) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "mcp",
-		Short: "Run the MCP streamable HTTP server",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			rt, err := newServeRuntime(cmd, cfg, *opts)
-			if err != nil {
-				return err
-			}
-			mcpServer := mcpapi.New(rt)
-			httpServer := httpapi.New(rt, httpapi.WithMCP(rt.Config.MCP.Path, mcpServer.Handler()))
-			return runEntrypoint(cmd.Context(), httpServer, rt)
-		},
-	}
-	addMCPFlags(cmd, opts)
-	return cmd
-}
-
-func newServeAllCommand(cfg *config, opts *serveOptions) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "all",
-		Short: "Run HTTP API and MCP streamable HTTP on one listener",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			rt, err := newServeRuntime(cmd, cfg, *opts)
-			if err != nil {
-				return err
-			}
-			mcpServer := mcpapi.New(rt)
-			httpServer := httpapi.New(rt, httpapi.WithMCP(rt.Config.MCP.Path, mcpServer.Handler()), httpapi.WithWebUI(newWebUIHandler(rt.Config)))
-			return runEntrypoint(cmd.Context(), httpServer, rt)
-		},
-	}
-	addMCPFlags(cmd, opts)
-	return cmd
 }
 
 func addMCPFlags(cmd *cobra.Command, opts *serveOptions) {

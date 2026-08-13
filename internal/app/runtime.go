@@ -131,8 +131,8 @@ func Validate(cfg Config) error {
 			return domain.NewError(domain.CodeInvalidArgument, "binding HTTP to a non-local address requires --token")
 		}
 	}
-	if cfg.MCP.Path != "" && !strings.HasPrefix(cfg.MCP.Path, "/") {
-		return domain.NewError(domain.CodeInvalidArgument, "MCP path must start with /")
+	if err := projectsettings.ValidateMCPPath(cfg.MCP.Path); err != nil {
+		return err
 	}
 	if cfg.MCP.MaxOutputBytes < 0 {
 		return domain.NewError(domain.CodeInvalidArgument, "MCP max output bytes must be non-negative")

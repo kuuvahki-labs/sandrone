@@ -352,11 +352,28 @@ func validateHTTP(value domain.HTTPSettings) error {
 }
 
 func validateMCP(value domain.MCPSettings) error {
-	if !strings.HasPrefix(value.Path, "/") {
-		return invalid("MCP path must start with /")
+	if err := ValidateMCPPath(value.Path); err != nil {
+		return err
 	}
 	if value.MaxOutputBytes < 0 {
 		return invalid("MCP max_output_bytes must be non-negative")
+	}
+	return nil
+}
+
+func ValidateMCPPath(value string) error {
+	if value == "" {
+		return nil
+	}
+	if !strings.HasPrefix(value, "/") {
+		return invalid("MCP path must start with /")
+	}
+	switch value {
+	case "/", "/healthz", "/version", "/convert":
+		return invalid("MCP path %q conflicts with public route", value)
+	}
+	if value == "/s" || strings.HasPrefix(value, "/s/") {
+		return invalid("MCP path %q conflicts with public route", value)
 	}
 	return nil
 }

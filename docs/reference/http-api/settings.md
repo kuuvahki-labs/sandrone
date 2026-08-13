@@ -74,6 +74,10 @@ SettingsEnvelope {
 
 `settings` 和 `effective` 都使用上面的完整结构。`settings` 是持久化目标；
 `effective` 是当前进程实际使用的值。启动 token 不属于这两个对象。
+`mcp` 不包含启停开关：统一服务始终挂载 MCP；这三个字段只控制 MCP 路径、
+管理 tools 注册范围和最终内联正文上限。
+`mcp.path` 必须以 `/` 开头，且不能是 `/`、`/healthz`、`/version`、`/convert`、
+`/s` 或 `/s/*`，避免覆盖无需 bearer token 的公开 route。
 
 `overrides` 的 key 是设置路径，值为 `environment` 或 `flag`。被环境变量或
 显式 flag 覆盖的启动字段即使写入文件，也不会进入 `restart_required`，因为
@@ -138,9 +142,9 @@ SettingsEnvelope {
 归一化后必须为正数。主题接受 `system`、`light`、`dark`，语言接受 `auto`、
 `zh-CN`、`en-US`。
 
-远程、probe、cache、appearance、subscriptions 和 scheduled-refresh 组保存后立即生效。HTTP、
-MCP、Web UI 静态目录和日志级别属于启动组，保存后列入 `restart_required`，
-当前 listener、鉴权边界和其它启动组件不会热切换。
+远程、probe、cache、appearance、subscriptions 和 scheduled-refresh 组保存后立即生效。
+HTTP listen、MCP 三个字段和日志级别属于启动组，保存后列入 `restart_required`；
+当前 listener、MCP 路径与 tool catalog、鉴权边界和其它启动组件不会热切换。
 
 设置文件不存在时使用内建默认值；第一次成功保存才创建文件。文件使用原子替换
 并保持 `0600` 权限。`data_dir` 不属于该文件或 API。

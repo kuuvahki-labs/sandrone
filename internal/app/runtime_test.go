@@ -39,3 +39,14 @@ func TestValidateRejectsUnsupportedLogLevel(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unsupported log level")
 }
+
+func TestValidateRejectsPublicMCPPathOverride(t *testing.T) {
+	err := Validate(Config{
+		DataDir: t.TempDir(),
+		HTTP:    HTTPConfig{Listen: "127.0.0.1:1137"},
+		MCP:     MCPConfig{Path: "/convert"},
+	})
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "conflicts with public route")
+}

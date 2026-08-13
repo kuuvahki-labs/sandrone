@@ -141,15 +141,15 @@ curl "$SANDRONE_URL/version"
 
 ## Web、MCP 与分享路径边界
 
-同一 HTTP server 可以同时挂载五类入口：
+`sandrone serve` 在同一 HTTP server 上挂载五类入口：
 
 - `/convert` 是无需 bearer token 的一次性节点转换；
 - `/v1/*` 是受保护的管理 HTTP API；
 - `/mcp` 及其子路径默认是受保护的 MCP streamable HTTP，路径可由
   `serve --path` 调整；
 - `/s/:id` 是无需 bearer token 的公开只读分享输出；
-- `/` 及其它不属于上述保留前缀的路径在启用 Web UI 时交给 SPA 和静态资源
-  handler。
+- `/` 及其它不属于上述保留前缀的路径交给 SPA 和静态资源 handler；普通 Go
+  开发构建未嵌入 Web 产物时，这些路径返回 `404`。
 
 Web UI fallback 不会接管 `/convert`、`/v1`、MCP 配置路径或 `/s` 保留前缀。
 MCP 与 Web 只是同 server 上的独立入口，不是 REST 专题的一部分。

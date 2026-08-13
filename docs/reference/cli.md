@@ -193,35 +193,26 @@ sandrone file render <name-or-spec-path>
 
 ## `serve`
 
-### `serve http`
+`serve` 在一个 HTTP listener 上同时提供 HTTP API、构建时嵌入的 Web UI 与 MCP
+streamable HTTP。HTTP 与 MCP 共用静态 bearer token；MCP 没有独立启停开关。
+发布二进制提供完整 Web 页面；未先生成 Web 资源的普通 Go 开发构建仍可启动 HTTP
+API 和 MCP，但 Web 路径返回 `404`，前端由独立 Vite 开发服务器提供。
 
-启动 HTTP API，并在同一监听器挂载构建时嵌入的 Web UI。发布二进制提供完整页面；
-未先生成 Web 资源的普通 Go 开发构建仍可启动 API，但 Web 路径返回 `404`，前端由
-独立 Vite 开发服务器提供。开发与嵌入构建见 [Web UI 快速说明](../../web/README.md)，
-HTTP endpoint 契约见
-[HTTP API 通用约定](http-api/README.md)。
-
-### `serve mcp`
-
-通过 Streamable HTTP 启动 MCP server，并额外接受：
+除通用的 `--listen`、`--token` 和 `--log-level` 外，`serve` 接受：
 
 | flag | 环境变量 | 内建缺省值 | 含义 |
 | --- | --- | --- | --- |
-| `--path` | `SANDRONE_MCP_PATH` | `/mcp` | streamable HTTP 路径，必须以 `/` 开头 |
+| `--path` | `SANDRONE_MCP_PATH` | `/mcp` | streamable HTTP 路径，必须以 `/` 开头且不能覆盖公开 route |
 | `--allow-management-tools` | `SANDRONE_MCP_ALLOW_MANAGEMENT_TOOLS` | `false` | 注册可覆盖或立即删除定义的管理 tools；只应在可信本机 Agent 场景启用 |
 | `--max-output-bytes` | `SANDRONE_MCP_MAX_OUTPUT_BYTES` | `1048576` | MCP 内联输出上限；不能为负数 |
-
-server 使用 `--listen` 和 `--path` 启动 HTTP listener。
-
-### `serve all`
-
-在一个 HTTP listener 上同时提供 HTTP API、可选 Web UI 与 MCP streamable
-HTTP。它接受 `--path`、`--allow-management-tools` 和
-`--max-output-bytes`。
 
 MCP 的 tool/resource/prompt catalog、单一管理开关的行为和正文省略规则见
 [MCP 参考](mcp.md)。管理 tools 缺省不注册；启用后 `put` 可覆盖同名定义，
 `delete` 立即生效。
+Web 开发与嵌入构建见 [Web UI 快速说明](../../web/README.md)，HTTP endpoint
+契约见 [HTTP API 通用约定](http-api/README.md)。
+MCP path 不能是 `/`、`/healthz`、`/version`、`/convert`、`/s` 或 `/s/*`，
+避免 MCP 绕过共享 bearer token 或与公开分享/Web 路由冲突。
 
 ### 监听与鉴权约束
 

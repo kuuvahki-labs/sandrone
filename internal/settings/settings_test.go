@@ -119,6 +119,21 @@ func TestNormalizeRejectsInvalidProjectFields(t *testing.T) {
 	}
 }
 
+func TestNormalizeRejectsMCPPathsThatBypassSharedAuthentication(t *testing.T) {
+	for _, path := range []string{"/", "/healthz", "/version", "/convert", "/s", "/s/share"} {
+		t.Run(path, func(t *testing.T) {
+			value := settings.Default()
+			value.MCP.Path = path
+
+			_, err := settings.Normalize(value)
+
+			require.Error(t, err)
+			require.True(t, domain.IsCode(err, domain.CodeInvalidArgument), "got %v", err)
+			require.Contains(t, err.Error(), "conflicts with public route")
+		})
+	}
+}
+
 func TestNormalizeScheduledRefresh(t *testing.T) {
 	value := settings.Default()
 	value.ScheduledRefresh = domain.ScheduledRefreshSettings{

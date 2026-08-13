@@ -36,13 +36,16 @@ header 与 body 不一致时返回 JSON-RPC `HeaderMismatch`（`-32020`）和 HT
 `400`。Sandrone 当前 schema 没有 `x-mcp-header` 参数，因此不定义
 `Mcp-Param-*` routing hint。
 
-`sandrone serve mcp` 启动只挂载 MCP 的 HTTP listener；`sandrone serve all` 在
-同一个 listener 上同时提供 HTTP API、可选 Web UI 和 MCP。`--path` 可以修改
-MCP 路径，但必须以 `/` 开头。handler 复用 HTTP server 的静态 bearer token：
+`sandrone serve` 在同一个 listener 上同时提供 HTTP API、构建时嵌入的 Web UI
+和 MCP。MCP 始终挂载；`--path` 可以修改其路径，但必须以 `/` 开头。handler
+复用 HTTP server 的静态 bearer token：
 
 ```http
 Authorization: Bearer <token>
 ```
+
+MCP path 不能覆盖 `/`、`/healthz`、`/version`、`/convert`、`/s` 或 `/s/*`
+公开 route；启动参数和持久化设置都会拒绝这些冲突值。
 
 只要配置了 token，该 header 就必须精确匹配。绑定非 loopback 地址时必须提供
 token；完整启动与鉴权规则见 [CLI 参考的 serve 章节](cli.md#serve)和

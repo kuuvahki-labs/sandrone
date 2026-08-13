@@ -5,6 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -689,46 +693,44 @@ func TestDoctorReportsFormatsAndDataDir(t *testing.T) {
 	require.ElementsMatch(t, []string{"base64", "mihomo-proxies", "shadowrocket-proxies", "sing-box-outbounds", "json-nodes", "uri-list"}, renderFormats)
 }
 
-func TestServeCommandTreeIncludesSubcommands(t *testing.T) {
+func TestServeCommandRunsWithoutSubcommands(t *testing.T) {
 	cmd := NewRootCommand(WithEnv(map[string]string{}))
 	serve, _, err := cmd.Find([]string{"serve"})
 	require.NoError(t, err)
 	require.Equal(t, "serve", serve.Name())
-	for _, name := range []string{"http", "mcp", "all"} {
-		child, _, err := serve.Find([]string{name})
-		require.NoError(t, err)
-		require.Equal(t, name, child.Name())
-	}
+	require.Empty(t, serve.Commands())
 }
 
-func TestServeMCPHelpDocumentsSingleManagementSwitch(t *testing.T) {
-	for _, command := range []string{"mcp", "all"} {
-		t.Run(command, func(t *testing.T) {
-			help := runHelp(t, "serve", command)
+func TestServeHelpDocumentsUnifiedEntrypointFlags(t *testing.T) {
+	help := runHelp(t, "serve")
 
-			require.Contains(t, help, "--allow-management-tools")
-		})
-	}
+	require.Contains(t, help, "--path")
+	require.Contains(t, help, "--allow-management-tools")
+	require.Contains(t, help, "--max-output-bytes")
 }
 
 func TestServeHelpOmitsRemovedAuthenticationAndTransportFlags(t *testing.T) {
-	for _, command := range []string{"http", "mcp", "all"} {
-		t.Run(command, func(t *testing.T) {
-			help := runHelp(t, "serve", command)
+	help := runHelp(t, "serve")
 
-			require.NotContains(t, help, "--token-required")
-			require.NotContains(t, help, "--transport")
-		})
-	}
+	require.NotContains(t, help, "--token-required")
+	require.NotContains(t, help, "--transport")
 }
 
-func TestServeHTTPPassesFlagsToRuntime(t *testing.T) {
+func TestServePassesFlagsToRuntime(t *testing.T) {
 	dataDir := t.TempDir()
 	stopErr := errors.New("stop after runtime")
 	var got app.Config
 
 	code, _, stderr := runCLI(t,
-		[]string{"--data-dir", dataDir, "serve", "--listen", "127.0.0.1:0", "--token", "secret", "http"},
+		[]string{
+			"--data-dir", dataDir,
+			"serve",
+			"--listen", "127.0.0.1:0",
+			"--token", "secret",
+			"--path", "/agent",
+			"--allow-management-tools",
+			"--max-output-bytes", "2048",
+		},
 		"",
 		WithRuntimeFactory(func(cfg app.Config) (*app.Runtime, error) {
 			got = cfg
@@ -741,15 +743,21 @@ func TestServeHTTPPassesFlagsToRuntime(t *testing.T) {
 	require.Equal(t, dataDir, got.DataDir)
 	require.Equal(t, "127.0.0.1:0", got.HTTP.Listen)
 	require.Equal(t, "secret", got.HTTP.Token)
+	require.Equal(t, "/agent", got.MCP.Path)
+	require.True(t, got.MCP.AllowManagementTools)
+	require.Equal(t, 2048, got.MCP.MaxOutputBytes)
+	require.Equal(t, "flag", got.OverrideSources["mcp.path"])
+	require.Equal(t, "flag", got.OverrideSources["mcp.allow_management_tools"])
+	require.Equal(t, "flag", got.OverrideSources["mcp.max_output_bytes"])
 }
 
-func TestServeHTTPUsesTokenEnv(t *testing.T) {
+func TestServeUsesTokenEnv(t *testing.T) {
 	dataDir := t.TempDir()
 	stopErr := errors.New("stop after runtime")
 	var got app.Config
 
 	code, _, stderr := runCLI(t,
-		[]string{"--data-dir", dataDir, "serve", "http"},
+		[]string{"--data-dir", dataDir, "serve"},
 		"",
 		WithEnv(map[string]string{EnvToken: "env-secret"}),
 		WithRuntimeFactory(func(cfg app.Config) (*app.Runtime, error) {
@@ -763,13 +771,13 @@ func TestServeHTTPUsesTokenEnv(t *testing.T) {
 	require.Equal(t, "env-secret", got.HTTP.Token)
 }
 
-func TestServeHTTPIgnoresRemovedWebUIStaticDirEnv(t *testing.T) {
+func TestServeIgnoresRemovedWebUIStaticDirEnv(t *testing.T) {
 	dataDir := t.TempDir()
 	stopErr := errors.New("stop after runtime")
 	var got app.Config
 
 	code, _, stderr := runCLI(t,
-		[]string{"--data-dir", dataDir, "serve", "http"},
+		[]string{"--data-dir", dataDir, "serve"},
 		"",
 		WithEnv(map[string]string{"SANDRONE_WEBUI_STATIC_DIR": t.TempDir()}),
 		WithRuntimeFactory(func(cfg app.Config) (*app.Runtime, error) {
@@ -783,11 +791,11 @@ func TestServeHTTPIgnoresRemovedWebUIStaticDirEnv(t *testing.T) {
 	require.NotContains(t, got.OverrideSources, "webui.static_dir")
 }
 
-func TestServeHTTPRejectsRemovedWebUIStaticDirFlag(t *testing.T) {
+func TestServeRejectsRemovedWebUIStaticDirFlag(t *testing.T) {
 	dataDir := t.TempDir()
 
 	code, _, stderr := runCLI(t,
-		[]string{"--data-dir", dataDir, "serve", "--webui-static-dir", t.TempDir(), "http"},
+		[]string{"--data-dir", dataDir, "serve", "--webui-static-dir", t.TempDir()},
 		"",
 	)
 
@@ -795,13 +803,13 @@ func TestServeHTTPRejectsRemovedWebUIStaticDirFlag(t *testing.T) {
 	require.Contains(t, stderr, "unknown flag: --webui-static-dir")
 }
 
-func TestServeHTTPUsesDefaultListen(t *testing.T) {
+func TestServeUsesDefaultListen(t *testing.T) {
 	dataDir := t.TempDir()
 	stopErr := errors.New("stop after runtime")
 	var got app.Config
 
 	code, _, stderr := runCLI(t,
-		[]string{"--data-dir", dataDir, "serve", "http"},
+		[]string{"--data-dir", dataDir, "serve"},
 		"",
 		WithRuntimeFactory(func(cfg app.Config) (*app.Runtime, error) {
 			got = cfg
@@ -820,7 +828,7 @@ func TestServeMarksEnvironmentAndExplicitFlagOverrideSources(t *testing.T) {
 	var got app.Config
 
 	code, _, stderr := runCLI(t,
-		[]string{"--data-dir", dataDir, "serve", "--listen", "127.0.0.1:3237", "http"},
+		[]string{"--data-dir", dataDir, "serve", "--listen", "127.0.0.1:3237"},
 		"",
 		WithEnv(map[string]string{
 			EnvListen:   "127.0.0.1:2237",
@@ -847,7 +855,7 @@ func TestServeReadsBooleanAndIntegerStartupEnvironmentOverrides(t *testing.T) {
 	var got app.Config
 
 	code, _, stderr := runCLI(t,
-		[]string{"--data-dir", dataDir, "serve", "all"},
+		[]string{"--data-dir", dataDir, "serve"},
 		"",
 		WithEnv(map[string]string{
 			EnvToken:                   "env-secret",
@@ -877,7 +885,7 @@ func TestServePassesLogLevelToRuntime(t *testing.T) {
 	var got app.Config
 
 	code, _, stderr := runCLI(t,
-		[]string{"--data-dir", dataDir, "serve", "--log-level", "debug", "http"},
+		[]string{"--data-dir", dataDir, "serve", "--log-level", "debug"},
 		"",
 		WithRuntimeFactory(func(cfg app.Config) (*app.Runtime, error) {
 			got = cfg
@@ -894,13 +902,65 @@ func TestServeRejectsInvalidLogLevel(t *testing.T) {
 	dataDir := t.TempDir()
 
 	code, stdout, stderr := runCLI(t,
-		[]string{"--data-dir", dataDir, "serve", "--log-level", "trace", "http"},
+		[]string{"--data-dir", dataDir, "serve", "--log-level", "trace"},
 		"",
 	)
 
 	require.Equal(t, 1, code)
 	require.Empty(t, stdout)
 	require.Contains(t, stderr, "unsupported log level")
+}
+
+func TestServeRejectsRemovedSubcommands(t *testing.T) {
+	for _, name := range []string{"http", "mcp", "all"} {
+		t.Run(name, func(t *testing.T) {
+			code, stdout, stderr := runCLI(t, []string{"serve", name}, "")
+
+			require.Equal(t, 1, code)
+			require.Empty(t, stdout)
+			require.Contains(t, stderr, "unknown command")
+		})
+	}
+}
+
+func TestServeServerMountsHTTPWebUIAndMCP(t *testing.T) {
+	rt, err := app.NewRuntime(app.Config{
+		DataDir: t.TempDir(),
+		HTTP:    app.HTTPConfig{Token: "secret"},
+		MCP:     app.MCPConfig{Path: "/agent"},
+	}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	require.NoError(t, err)
+	handler := newServeServer(rt).Handler()
+
+	request := httptest.NewRequest(http.MethodGet, "/v1/inspect", nil)
+	request.Header.Set("Authorization", "Bearer secret")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	require.Equal(t, http.StatusOK, response.Code)
+
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/", nil))
+	require.Equal(t, http.StatusMethodNotAllowed, response.Code)
+
+	discoverBody := `{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientInfo":{"name":"cli-test","version":"1.0.0"},"io.modelcontextprotocol/clientCapabilities":{}}}}`
+	newDiscoverRequest := func() *http.Request {
+		request := httptest.NewRequest(http.MethodPost, "/agent", strings.NewReader(discoverBody))
+		request.Header.Set("Content-Type", "application/json")
+		request.Header.Set("Accept", "application/json, text/event-stream")
+		request.Header.Set("Mcp-Protocol-Version", "2026-07-28")
+		request.Header.Set("Mcp-Method", "server/discover")
+		return request
+	}
+	request = newDiscoverRequest()
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	require.Equal(t, http.StatusUnauthorized, response.Code)
+
+	request = newDiscoverRequest()
+	request.Header.Set("Authorization", "Bearer secret")
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	require.Equal(t, http.StatusOK, response.Code)
 }
 
 func runHelp(t *testing.T, args ...string) string {
