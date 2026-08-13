@@ -150,7 +150,7 @@ interface FileDriverBase {
     validate: (source: FileSourceDetail) => FileInputValidationCode | null;
   };
   processors: {
-    defaults: () => ProcessorDetail[];
+    defaults: (t: Translator) => ProcessorDetail[];
     mergeModes: readonly FileMergeMode[];
     presets: readonly FileProcessorPreset[];
     validate: (processors: ProcessorDetail[]) => FileProcessorValidationIssue[];

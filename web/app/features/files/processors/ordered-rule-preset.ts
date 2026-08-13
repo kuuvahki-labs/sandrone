@@ -10,7 +10,6 @@ export type OrderedRuleProcessorInsertMode = "anchor" | "top";
 export interface OrderedRuleProcessorPresetOptions {
   readonly id: string;
   readonly kind: OrderedRuleProcessorKind;
-  readonly name: string;
   readonly rules: readonly unknown[];
   readonly insertMode?: OrderedRuleProcessorInsertMode;
 }
@@ -23,9 +22,10 @@ const SCRIPT_BY_KIND: Readonly<Record<OrderedRuleProcessorKind, string>> = {
 
 export function orderedRuleProcessorPreset(
   options: OrderedRuleProcessorPresetOptions,
+  name: string,
 ): ProcessorDetail {
   return {
-    name: options.name,
+    name,
     type: "script",
     stage: "file",
     params: expectedParams(options),

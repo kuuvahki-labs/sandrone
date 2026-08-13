@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import type { ProcessorDetail } from "~/shared/resources/types";
 
 import {
-  orderedRuleProcessorPreset,
+  orderedRuleProcessorPreset as buildOrderedRuleProcessorPreset,
   type OrderedRuleProcessorPresetOptions,
   recognizeOrderedRuleProcessorPreset,
 } from "./ordered-rule-preset";
@@ -14,29 +14,28 @@ const CASES: readonly OrderedRuleProcessorPresetOptions[] = [
   {
     id: "ntp-direct",
     kind: "mihomo",
-    name: "Traditional NTP Direct",
     rules: ["AND,((NETWORK,UDP),(DST-PORT,123)),DIRECT"],
   },
   {
     id: "ntp-direct",
     kind: "sing-box",
-    name: "Traditional NTP Direct",
     rules: [{ network: "udp", port: 123, outbound: "direct" }],
   },
   {
     id: "ntp-direct",
     kind: "shadowrocket",
-    name: "Traditional NTP Direct",
     rules: ["AND,((PROTOCOL,UDP),(DST-PORT,123)),DIRECT"],
   },
 ];
+
+const LOCALIZED_NAME = "传统 NTP 直连";
 
 describe("ordered rule processor presets", () => {
   it.each(CASES)("builds the exact editable $kind inline script params", (options) => {
     const processor = orderedRuleProcessorPreset(options);
 
     expect(processor).toEqual({
-      name: options.name,
+      name: LOCALIZED_NAME,
       type: "script",
       stage: "file",
       params: {
@@ -202,6 +201,10 @@ function inlineSource(processor: ProcessorDetail): string {
   const source = processor.params?.source as Record<string, unknown> | undefined;
   if (typeof source?.content !== "string") throw new Error("expected inline script content");
   return source.content;
+}
+
+function orderedRuleProcessorPreset(options: OrderedRuleProcessorPresetOptions): ProcessorDetail {
+  return buildOrderedRuleProcessorPreset(options, LOCALIZED_NAME);
 }
 
 function runPreset(

@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 
+import type { Translator } from "~/shared/i18n/context";
 import type { ProcessorDetail } from "~/shared/resources/types";
 
 import {
   type FileProcessorPreset,
   type FileProcessorPresetPlan,
   filterForeignManagedProcessors,
-  planFileProcessorPresetAddition,
+  planFileProcessorPresetAddition as buildPresetPlan,
   recognizedFileProcessorPresetID,
 } from "./processor-presets";
 
@@ -177,8 +178,8 @@ describe("file processor preset planner", () => {
   it("filters foreign managed processors while preserving target and unknown values by identity", () => {
     const targetCatalog = [preset("target", "Target")];
     const foreignCatalog = [preset("foreign", "Foreign")];
-    const target = targetCatalog[0].build();
-    const foreign = foreignCatalog[0].build();
+    const target = targetCatalog[0].build(t);
+    const foreign = foreignCatalog[0].build(t);
     const unknown = custom("unknown");
 
     const filtered = filterForeignManagedProcessors(
@@ -209,6 +210,16 @@ const catalog: readonly FileProcessorPreset[] = [
   preset("unrelated", "Unrelated"),
 ];
 
+const t: Translator = (_key, params) => String(params?.presetName ?? "");
+
+function planFileProcessorPresetAddition(
+  presetCatalog: readonly FileProcessorPreset[],
+  requestedPresetID: string,
+  current: readonly ProcessorDetail[],
+): FileProcessorPresetPlan {
+  return buildPresetPlan(presetCatalog, requestedPresetID, current, t);
+}
+
 function preset(
   id: string,
   name: string,
@@ -226,7 +237,10 @@ function preset(
     defaultOn: false,
     dependencies: edges.dependencies ?? [],
     conflicts: edges.conflicts ?? [],
-    build: () => builtProcessor(id, name),
+    build: (translator) => builtProcessor(
+      id,
+      translator("files.kind.static", { presetName: name }),
+    ),
     recognize: (processor) => (
       processor.type === expected.type
       && exactParams(processor.params, expected.params)
@@ -237,7 +251,7 @@ function preset(
 function built(id: string): ProcessorDetail {
   const descriptor = catalog.find((candidate) => candidate.id === id);
   if (!descriptor) throw new Error(`missing test preset: ${id}`);
-  return descriptor.build();
+  return descriptor.build(t);
 }
 
 function builtProcessor(id: string, name: string): ProcessorDetail {

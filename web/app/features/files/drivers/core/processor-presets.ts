@@ -12,7 +12,7 @@ export interface FileProcessorPreset {
   readonly defaultOn: boolean;
   readonly dependencies: readonly string[];
   readonly conflicts: readonly string[];
-  build(): ProcessorDetail;
+  build(t: Translator): ProcessorDetail;
   recognize(processor: Pick<ProcessorDetail, "type" | "params">): boolean;
 }
 
@@ -36,6 +36,7 @@ export function planFileProcessorPresetAddition(
   catalog: readonly FileProcessorPreset[],
   requestedPresetID: string,
   current: readonly ProcessorDetail[],
+  t: Translator,
 ): FileProcessorPresetPlan {
   validateFileProcessorPresetCatalog(catalog);
   const byID = new Map(catalog.map((preset) => [preset.id, preset]));
@@ -80,7 +81,7 @@ export function planFileProcessorPresetAddition(
     if (survivingPresetIDs.has(preset.id)) continue;
     additions.push({
       presetID: preset.id,
-      processor: preset.build(),
+      processor: preset.build(t),
       beforeIndex: earliestSurvivingConsumerIndex(
         preset.id,
         byID,

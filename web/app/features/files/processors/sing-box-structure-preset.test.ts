@@ -7,23 +7,30 @@ import type { ProcessorDetail } from "~/shared/resources/types";
 import {
   recognizeSingBoxStructureProcessorPreset,
   type SingBoxStructureOperation,
-  singBoxStructureProcessorPreset,
+  singBoxStructureProcessorPreset as buildSingBoxStructureProcessorPreset,
   type SingBoxStructureProcessorPresetOptions,
 } from "./sing-box-structure-preset";
 
 const OPTIONS: Readonly<Record<SingBoxStructureOperation, SingBoxStructureProcessorPresetOptions>> = {
-  "ensure-tun": { operation: "ensure-tun", name: "Ensure TUN" },
-  "ipv4-only": { operation: "ipv4-only", name: "IPv4 Only" },
-  "udp-p2p-eim": { operation: "udp-p2p-eim", name: "UDP/P2P EIM" },
+  "ensure-tun": { operation: "ensure-tun" },
+  "ipv4-only": { operation: "ipv4-only" },
+  "udp-p2p-eim": { operation: "udp-p2p-eim" },
   "linux-tun-acceleration": {
     operation: "linux-tun-acceleration",
-    name: "Linux/OpenWrt TUN Acceleration",
   },
-  "mptcp-direct": { operation: "mptcp-direct", name: "MPTCP Direct" },
+  "mptcp-direct": { operation: "mptcp-direct" },
   "windows-relaxed-route": {
     operation: "windows-relaxed-route",
-    name: "Windows Relaxed Route",
   },
+};
+
+const NAMES: Readonly<Record<SingBoxStructureOperation, string>> = {
+  "ensure-tun": "确保 TUN 入站",
+  "ipv4-only": "仅 IPv4",
+  "udp-p2p-eim": "UDP/P2P 兼容",
+  "linux-tun-acceleration": "Linux/OpenWrt TUN 加速",
+  "mptcp-direct": "MPTCP 直连",
+  "windows-relaxed-route": "Windows 宽松路由",
 };
 
 const EXPECTED_TUN = {
@@ -39,7 +46,7 @@ describe("sing-box structure processor presets", () => {
     const processor = singBoxStructureProcessorPreset(options);
 
     expect(processor).toEqual({
-      name: options.name,
+      name: NAMES[options.operation],
       type: "script",
       stage: "file",
       params: {
@@ -246,6 +253,10 @@ function inlineSource(processor: ProcessorDetail): string {
   const source = processor.params?.source as Record<string, unknown> | undefined;
   if (typeof source?.content !== "string") throw new Error("expected inline script content");
   return source.content;
+}
+
+function singBoxStructureProcessorPreset(options: SingBoxStructureProcessorPresetOptions): ProcessorDetail {
+  return buildSingBoxStructureProcessorPreset(options, NAMES[options.operation]);
 }
 
 function runOperation(

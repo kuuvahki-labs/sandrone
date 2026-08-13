@@ -61,8 +61,8 @@ export function FileFormFields({ configDefault, defaultName, description = "", d
   const [processorsValid, setProcessorsValid] = useState(true);
 	const isConfig = driver.configuration.mode !== "none";
   const defaultBase = driver.source.defaultBase(stableNamingLocale);
-  const processors = mode === "create"
-		? driver.processors.defaults()
+	const processors = mode === "create"
+		? driver.processors.defaults(t)
 		: processorsDefault;
 
   useEffect(() => {

@@ -12,14 +12,14 @@ export type SingBoxStructureOperation =
 
 export interface SingBoxStructureProcessorPresetOptions {
   readonly operation: SingBoxStructureOperation;
-  readonly name: string;
 }
 
 export function singBoxStructureProcessorPreset(
   options: SingBoxStructureProcessorPresetOptions,
+  name: string,
 ): ProcessorDetail {
   return {
-    name: options.name,
+    name,
     type: "script",
     stage: "file",
     params: expectedParams(options),
