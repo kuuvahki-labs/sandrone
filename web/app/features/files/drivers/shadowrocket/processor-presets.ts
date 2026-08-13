@@ -10,7 +10,6 @@ import {
 import type { ProcessorDetail } from "~/shared/resources/types";
 
 type ShadowrocketINIOverridePresetID =
-  | "webrtc-privacy"
   | "disable-ipv6"
   | "udp-unsupported-direct"
   | "restricted-network-dns-fallback";
@@ -21,10 +20,6 @@ export type ShadowrocketProcessorPresetID =
   | "tailscale-native";
 
 const PRESET_CONTENT: Record<ShadowrocketINIOverridePresetID, string> = {
-  "webrtc-privacy": `# sandrone:shadowrocket-preset=webrtc-privacy
-[General]
-stun-response-ip = 1.1.1.1
-stun-response-ipv6 = ::1`,
   "disable-ipv6": `# sandrone:shadowrocket-preset=disable-ipv6
 [General]
 ipv6 = false
@@ -38,7 +33,6 @@ dns-direct-fallback-proxy = true`,
 };
 
 const PRESET_NAMES: Record<ShadowrocketINIOverridePresetID, string> = {
-  "webrtc-privacy": "WebRTC Privacy",
   "disable-ipv6": "Disable IPv6",
   "udp-unsupported-direct": "UDP Unsupported Direct",
   "restricted-network-dns-fallback": "Restricted Network DNS Fallback",
@@ -77,14 +71,6 @@ export const shadowrocketProcessorPresets: readonly FileProcessorPreset[] = [
     recognize: (processor) => recognizeOrderedRuleProcessorPreset(processor, NTP_DIRECT_PRESET),
   },
   iniOverrideDescriptor(
-    "webrtc-privacy",
-    "privacy",
-    "processors.filePreset.shadowrocket.webrtcPrivacy.label",
-    "processors.filePreset.shadowrocket.webrtcPrivacy.description",
-    "processors.filePreset.shadowrocket.webrtcPrivacy.risk",
-    ["tailscale-native"],
-  ),
-  iniOverrideDescriptor(
     "disable-ipv6",
     "network",
     "processors.filePreset.shadowrocket.disableIPv6.label",
@@ -113,7 +99,7 @@ export const shadowrocketProcessorPresets: readonly FileProcessorPreset[] = [
     riskKey: "processors.filePreset.shadowrocket.tailscaleNative.risk",
     defaultOn: false,
     dependencies: [],
-    conflicts: ["webrtc-privacy"],
+    conflicts: [],
     build: () => orderedRuleProcessorPreset(TAILSCALE_NATIVE_PRESET),
     recognize: (processor) => (
       recognizeOrderedRuleProcessorPreset(processor, TAILSCALE_NATIVE_PRESET)

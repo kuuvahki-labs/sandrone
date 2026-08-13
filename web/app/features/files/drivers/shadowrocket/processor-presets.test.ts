@@ -61,7 +61,6 @@ describe("Shadowrocket processor presets", () => {
   it("declares every optional scenario default off without dependencies or conflicts", () => {
     expect(shadowrocketProcessorPresets.map((descriptor) => descriptor.id)).toEqual([
       "ntp-direct",
-      "webrtc-privacy",
       "disable-ipv6",
       "udp-unsupported-direct",
       "restricted-network-dns-fallback",
@@ -79,7 +78,7 @@ describe("Shadowrocket processor presets", () => {
       id,
       defaultOn: false,
       dependencies: [],
-      conflicts: id === "webrtc-privacy" ? ["tailscale-native"] : [],
+      conflicts: [],
     })));
     expect(defaultShadowrocketProcessors().map((processor) => processor.name)).toEqual([
       "Traditional NTP Direct",
@@ -111,7 +110,7 @@ describe("Shadowrocket processor presets", () => {
       category: "tailscale",
       defaultOn: false,
       dependencies: [],
-      conflicts: ["webrtc-privacy"],
+      conflicts: [],
     });
     expect(recognizedFileProcessorPresetID(shadowrocketProcessorPresets, processor))
       .toBe("tailscale-native");
@@ -121,35 +120,9 @@ describe("Shadowrocket processor presets", () => {
       .not.toContain("模块");
   });
 
-  it("replaces managed WebRTC privacy and Tailscale reciprocally but preserves edits", () => {
+  it("does not declare conflicts for native Tailscale", () => {
     const tailscale = presetDescriptor("tailscale-native").build();
-    const privacy = presetDescriptor("webrtc-privacy").build();
-    const editedPrivacy = {
-      ...privacy,
-      params: { ...privacy.params, content: `${String(privacy.params?.content)}\n# user edit` },
-    };
-    expect(presetDescriptor("webrtc-privacy").conflicts).toEqual(["tailscale-native"]);
-
-    const nativePlan = planFileProcessorPresetAddition(
-      shadowrocketProcessorPresets,
-      "tailscale-native",
-      [editedPrivacy, privacy],
-    );
-    expect(nativePlan.removeIndices).toEqual([1]);
-    expect(nativePlan.removedPresetIDs).toEqual(["webrtc-privacy"]);
-    expect(nativePlan.additions).toEqual([{
-      presetID: "tailscale-native",
-      processor: tailscale,
-      beforeIndex: null,
-    }]);
-
-    const stunPlan = planFileProcessorPresetAddition(
-      shadowrocketProcessorPresets,
-      "webrtc-privacy",
-      [tailscale],
-    );
-    expect(stunPlan.removedPresetIDs).toEqual(["tailscale-native"]);
-
+    expect(presetDescriptor("tailscale-native").conflicts).toEqual([]);
     expect(planFileProcessorPresetAddition(
       shadowrocketProcessorPresets,
       "tailscale-native",
@@ -176,9 +149,6 @@ describe("Shadowrocket processor presets", () => {
   });
 
   it("uses the fixed risk copy and exposes no Shadowrocket QUIC preset surface", () => {
-    expect(zhCN["processors.filePreset.shadowrocket.webrtcPrivacy.risk"]).toBe(
-      "可能导致语音通话、视频会议、WebRTC 或 P2P 连接降级或失效。",
-    );
     expect(enUS["processors.filePreset.shadowrocket.disableIPv6.risk"]).toBe(
       "This controls only the IPv6 behavior expressible in Shadowrocket configuration and does not guarantee that underlying node transport never uses IPv6.",
     );
@@ -201,13 +171,6 @@ describe("Shadowrocket processor presets", () => {
 });
 
 const SCENARIOS = [
-  {
-    id: "webrtc-privacy",
-    content: `# sandrone:shadowrocket-preset=webrtc-privacy
-[General]
-stun-response-ip = 1.1.1.1
-stun-response-ipv6 = ::1`,
-  },
   {
     id: "disable-ipv6",
     content: `# sandrone:shadowrocket-preset=disable-ipv6

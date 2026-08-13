@@ -105,8 +105,6 @@ func TestServiceCommunityPresetShadowrocketINIOverrideScenariosApplyOnlyNamedGen
 		"[General]\r\n" +
 		"# preserve general comment\r\n" +
 		"profile = keep\r\n" +
-		"stun-response-ip = 9.9.9.9\r\n" +
-		"stun-response-ipv6 = 2001:db8::9\r\n" +
 		"ipv6 = true\r\n" +
 		"prefer-ipv6 = true\r\n" +
 		"udp-policy-not-supported-behaviour = REJECT\r\n" +
@@ -159,24 +157,6 @@ func TestServiceCommunityPresetShadowrocketINIOverrideScenariosApplyOnlyNamedGen
 		wantGeneral []string
 	}{
 		{
-			name: "WebRTC privacy",
-			content: `# sandrone:shadowrocket-preset=webrtc-privacy
-[General]
-stun-response-ip = 1.1.1.1
-stun-response-ipv6 = ::1`,
-			wantGeneral: []string{
-				"# preserve general comment",
-				"profile = keep",
-				"stun-response-ip = 1.1.1.1",
-				"stun-response-ipv6 = ::1",
-				"ipv6 = true",
-				"prefer-ipv6 = true",
-				"udp-policy-not-supported-behaviour = REJECT",
-				"dns-direct-fallback-proxy = false",
-				"; preserve general tail",
-			},
-		},
-		{
 			name: "disable IPv6",
 			content: `# sandrone:shadowrocket-preset=disable-ipv6
 [General]
@@ -185,8 +165,6 @@ prefer-ipv6 = false`,
 			wantGeneral: []string{
 				"# preserve general comment",
 				"profile = keep",
-				"stun-response-ip = 9.9.9.9",
-				"stun-response-ipv6 = 2001:db8::9",
 				"ipv6 = false",
 				"prefer-ipv6 = false",
 				"udp-policy-not-supported-behaviour = REJECT",
@@ -202,8 +180,6 @@ udp-policy-not-supported-behaviour = DIRECT`,
 			wantGeneral: []string{
 				"# preserve general comment",
 				"profile = keep",
-				"stun-response-ip = 9.9.9.9",
-				"stun-response-ipv6 = 2001:db8::9",
 				"ipv6 = true",
 				"prefer-ipv6 = true",
 				"udp-policy-not-supported-behaviour = DIRECT",
@@ -219,8 +195,6 @@ dns-direct-fallback-proxy = true`,
 			wantGeneral: []string{
 				"# preserve general comment",
 				"profile = keep",
-				"stun-response-ip = 9.9.9.9",
-				"stun-response-ipv6 = 2001:db8::9",
 				"ipv6 = true",
 				"prefer-ipv6 = true",
 				"udp-policy-not-supported-behaviour = REJECT",

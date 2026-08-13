@@ -88,10 +88,6 @@ udp-policy-not-supported-behaviour = REJECT
 # 包含配置。如“include=a.conf”表示当前配置包含另一个配置 a.conf 的内容，当前配置的优先级高于 a.conf。此选项是对配置建立包含关系，以满足同时使用多个配置的需求。
 # include =
 
-# 此选项允许返回一个虚假的 IP 地址，如“stun-response-ip=1.1.1.1”、“stun-response-ipv6=::1”，目的是防止真实 IP 地址泄漏，提高 WebRTC 的隐私和安全性。
-# stun-response-ip =
-# stun-response-ipv6 =
-
 # 网络兼容模式。当参数的值设定为 3 时的效果等同于：设置 > 代理 > 代理类型 > None。
 # compatibility-mode =
 

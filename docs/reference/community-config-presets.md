@@ -73,11 +73,10 @@
 
 | 预设 | 动机 | 默认 | 精确生成行为 | 风险 | 依赖 / 冲突 | 主要来源 |
 | --- | --- | --- | --- | --- | --- | --- |
-| WebRTC 隐私 | 减少应用通过 STUN 看到真实公网出口。 | 关 | 只在 `[General]` 写入 `stun-response-ip=1.1.1.1` 与 `stun-response-ipv6=::1`。 | WebRTC、语音、视频会议或 P2P 可能降级/失败。 | 与 Tailscale 原生接管冲突。 | [Shadowrocket 社区配置](https://github.com/LOWERTOP/Shadowrocket/blob/5f1916b5897fc59fb7172aca59ae52050a3532fe/lazy.conf) |
 | 关闭 IPv6 | 兼容 IPv6 路由、DNS 或策略不完整的网络。 | 关 | 只在 `[General]` 写入 `ipv6=false`、`prefer-ipv6=false`。 | 只控制配置可表达的行为；不保证节点底层传输永远不使用 IPv6。 | 无。 | [Shadowrocket 社区配置](https://github.com/LOWERTOP/Shadowrocket/blob/5f1916b5897fc59fb7172aca59ae52050a3532fe/lazy.conf) |
 | 不支持 UDP 时直连 | 兼容不支持 UDP 转发的节点策略。 | 关 | 只写入 `udp-policy-not-supported-behaviour=DIRECT`；基础默认仍是 `REJECT`。 | 流量绕过代理，真实出口、运营商路径和本地 DNS 可能暴露。 | 无。 | [Shadowrocket 社区配置](https://github.com/LOWERTOP/Shadowrocket/blob/5f1916b5897fc59fb7172aca59ae52050a3532fe/lazy.conf) |
 | 受限网络 DNS 回退 | 直连 DNS 在受限网络失败时经代理重试。 | 关 | 只写入 `dns-direct-fallback-proxy=true`；基础默认仍为 false。 | 本应直连解析的域名可能改经代理。 | 无。 | [Shadowrocket 社区配置](https://github.com/LOWERTOP/Shadowrocket/blob/5f1916b5897fc59fb7172aca59ae52050a3532fe/lazy.conf) |
-| Tailscale 原生接管 | 使用 Shadowrocket 自身的 TAILSCALE policy。 | 关 | 在通用/FINAL 前精确插入 `DOMAIN-SUFFIX,ts.net,TAILSCALE`、`IP-CIDR,100.64.0.0/10,TAILSCALE,no-resolve`、`IP-CIDR,fd7a:115c:a1e0::/48,TAILSCALE,no-resolve`。没有外部共存模式，也不显示模块启用提醒。 | Tailscale 的可用性和认证由 Shadowrocket 自身控制。 | 与 WebRTC 隐私冲突。 | [Shadowrocket 社区配置](https://github.com/LOWERTOP/Shadowrocket/blob/5f1916b5897fc59fb7172aca59ae52050a3532fe/lazy.conf) |
+| Tailscale 原生接管 | 使用 Shadowrocket 自身的 TAILSCALE policy。 | 关 | 在通用/FINAL 前精确插入 `DOMAIN-SUFFIX,ts.net,TAILSCALE`、`IP-CIDR,100.64.0.0/10,TAILSCALE,no-resolve`、`IP-CIDR,fd7a:115c:a1e0::/48,TAILSCALE,no-resolve`。没有外部共存模式，也不显示模块启用提醒。 | Tailscale 的可用性和认证由 Shadowrocket 自身控制。 | 无。 | [Shadowrocket 社区配置](https://github.com/LOWERTOP/Shadowrocket/blob/5f1916b5897fc59fb7172aca59ae52050a3532fe/lazy.conf) |
 
 ## Tailscale 三态与安全边界
 
