@@ -26,7 +26,7 @@ const previewPageActions = {
 };
 
 describe("SubscriptionPreviewPage", () => {
-  it("keeps the summary warning metric raw while collapsing the grouped warning list", async () => {
+  it("shows the grouped warning count in the summary and warning list", async () => {
     const user = userEvent.setup();
     const repeatedWarnings: SubscriptionPreview = {
       ...subscriptionPreview,
@@ -48,7 +48,7 @@ describe("SubscriptionPreviewPage", () => {
     render(<SubscriptionPreviewPage {...previewPageActions} item={subscriptions[0]} preview={repeatedWarnings} />);
 
     const summary = screen.getByLabelText("预览统计");
-    expect(within(summary).getAllByText(/^\d+$/).map((node) => node.textContent)).toEqual(["2", "1", "1", "2"]);
+    expect(within(summary).getAllByText(/^\d+$/).map((node) => node.textContent)).toEqual(["2", "1", "1", "1"]);
     const warningRegion = screen.getByRole("region", { name: "预览警告" });
     expect(within(warningRegion).getByText("1 组警告 · 2 条记录")).toBeInTheDocument();
     expect(within(warningRegion).queryByText("2 个节点或位置受到影响")).not.toBeInTheDocument();

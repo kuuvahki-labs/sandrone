@@ -18,6 +18,7 @@ import Typography from "@mui/material/Typography";
 import type { SubscriptionItem, SubscriptionPreview, SubscriptionPreviewNode, SubscriptionPreviewNodeDiff, SubscriptionPreviewProbe, SubscriptionPreviewStatus } from "~/features/subscriptions/model/types";
 import { type Translator, useI18n } from "~/shared/i18n/context";
 import { PreviewPendingStatus } from "~/shared/preview/preview-pending-status";
+import { groupPreviewWarnings } from "~/shared/resources/warning-groups";
 import { CollapsibleWarningPanel } from "~/shared/resources/warning-panel";
 import { CodeBlock } from "~/shared/ui/code-editor";
 import { Metric, PageHeader } from "~/shared/ui/page";
@@ -46,6 +47,7 @@ export function SubscriptionPreviewPage({ backLabel, elapsedSeconds = 0, failed 
   const [filter, setFilter] = useState<PreviewFilter>("all");
   const nodes = preview?.nodes ?? [];
   const visibleNodes = filter === "all" ? nodes : nodes.filter((node) => node.status === filter);
+  const warningGroupCount = preview ? groupPreviewWarnings(preview.warnings).length : undefined;
 
   return (
     <section className="grid gap-6">
@@ -62,7 +64,7 @@ export function SubscriptionPreviewPage({ backLabel, elapsedSeconds = 0, failed 
         <Metric label={t("subscriptions.preview.metricBefore")} value={preview?.beforeCount} />
         <Metric label={t("subscriptions.preview.metricAfter")} value={preview?.afterCount} />
         <Metric label={t("subscriptions.preview.metricRemoved")} value={preview?.statusCounts.removed} />
-        <Metric label={t("subscriptions.preview.metricWarnings")} value={preview?.warnings.length} />
+        <Metric label={t("subscriptions.preview.metricWarnings")} value={warningGroupCount} />
       </div>
 
       {pending ? <PreviewPendingStatus elapsedSeconds={elapsedSeconds} /> : null}
