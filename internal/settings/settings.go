@@ -32,7 +32,6 @@ func Decode(body []byte) (domain.Settings, error) {
 func DecodeStored(body []byte) (domain.Settings, bool, error) {
 	var stored storedSettings
 	decoder := json.NewDecoder(bytes.NewReader(body))
-	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&stored); err != nil {
 		return domain.Settings{}, false, err
 	}

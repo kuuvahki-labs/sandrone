@@ -13,7 +13,7 @@ func (s *Server) getSettings(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) putSettings(w http.ResponseWriter, r *http.Request) {
 	var update domain.SettingsUpdate
-	if !decodeStrictJSON(w, r, &update) {
+	if !decodeJSON(w, r, &update) {
 		return
 	}
 	result, err := s.rt.Service.PutSettings(r.Context(), update)

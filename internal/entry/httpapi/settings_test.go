@@ -61,7 +61,7 @@ func TestSettingsEndpointRoundTripOmitsRemovedStartupFields(t *testing.T) {
 	require.Contains(t, string(body), `"scheduled_refresh"`)
 }
 
-func TestSettingsEndpointRejectsRemovedStartupFields(t *testing.T) {
+func TestSettingsEndpointIgnoresRemovedStartupFields(t *testing.T) {
 	rt := testRuntime(t, app.Config{})
 	server := httpapi.New(rt)
 	base, err := json.Marshal(settingsUpdate())
@@ -76,32 +76,24 @@ func TestSettingsEndpointRejectsRemovedStartupFields(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			response := httptest.NewRecorder()
 			server.Handler().ServeHTTP(response, httptest.NewRequest(http.MethodPut, "/v1/settings", strings.NewReader(body)))
-			require.Equal(t, http.StatusBadRequest, response.Code)
+			require.Equal(t, http.StatusOK, response.Code)
 		})
 	}
 }
 
-func TestSettingsEndpointRejectsUnknownFieldWithoutChangingFile(t *testing.T) {
+func TestSettingsEndpointIgnoresUnknownField(t *testing.T) {
 	rt := testRuntime(t, app.Config{})
 	server := httpapi.New(rt)
 
-	update := settingsUpdate()
+	body, err := json.Marshal(settingsUpdate())
+	require.NoError(t, err)
+	body = bytes.Replace(body, []byte(`"schema_version":1`), []byte(`"schema_version":1,"future":true`), 1)
 	response := httptest.NewRecorder()
-	server.Handler().ServeHTTP(response, httptest.NewRequest(http.MethodPut, "/v1/settings", jsonBody(t, update)))
+	server.Handler().ServeHTTP(response, httptest.NewRequest(http.MethodPut, "/v1/settings", bytes.NewReader(body)))
 	require.Equal(t, http.StatusOK, response.Code)
-	before, err := os.ReadFile(filepath.Join(rt.Config.DataDir, "settings.json"))
+	stored, err := os.ReadFile(filepath.Join(rt.Config.DataDir, "settings.json"))
 	require.NoError(t, err)
-
-	response = httptest.NewRecorder()
-	server.Handler().ServeHTTP(response, httptest.NewRequest(
-		http.MethodPut,
-		"/v1/settings",
-		strings.NewReader(`{"schema_version":1,"future":true}`),
-	))
-	require.Equal(t, http.StatusBadRequest, response.Code)
-	after, err := os.ReadFile(filepath.Join(rt.Config.DataDir, "settings.json"))
-	require.NoError(t, err)
-	require.Equal(t, before, after)
+	require.NotContains(t, string(stored), `"future"`)
 }
 
 func TestRuntimeSettingsEndpointIsRemoved(t *testing.T) {

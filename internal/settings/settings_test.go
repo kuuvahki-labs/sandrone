@@ -48,19 +48,21 @@ func TestStoredAndPublicSettingsOmitRemovedStartupFields(t *testing.T) {
 	}
 }
 
-func TestDecodeRejectsRemovedProbeCacheTTLField(t *testing.T) {
+func TestDecodeIgnoresUnknownProjectFields(t *testing.T) {
 	body, err := json.Marshal(settings.Default())
 	require.NoError(t, err)
 
 	var stored map[string]any
 	require.NoError(t, json.Unmarshal(body, &stored))
+	stored["future"] = true
 	probeDefaults := stored["probe_defaults"].(map[string]any)
 	probeDefaults["cache_ttl_seconds"] = 60
 	body, err = json.Marshal(stored)
 	require.NoError(t, err)
 
-	_, err = settings.Decode(body)
-	require.ErrorContains(t, err, "unknown field \"cache_ttl_seconds\"")
+	got, err := settings.Decode(body)
+	require.NoError(t, err)
+	require.Zero(t, got.CacheDefaults.ProbeTTLSeconds)
 }
 
 func TestNormalizePreservesEmptyAndExplicitRemoteUserAgents(t *testing.T) {

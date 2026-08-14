@@ -87,8 +87,8 @@ SettingsEnvelope {
 
 ### `PUT /v1/settings`
 
-请求体是完整设置对象，不是 merge patch。未知字段会被拒绝，正文上限为
-16 MiB。成功返回更新后的同一 envelope。
+请求体是完整设置对象，不是 merge patch。未知字段会被忽略，正文上限为
+16 MiB；已知字段仍执行类型、范围和枚举校验。成功返回更新后的同一 envelope。
 
 所有字段必须按完整对象提交。典型请求：
 

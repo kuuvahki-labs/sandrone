@@ -121,7 +121,7 @@ func TestBackupRestoreRejectsInvalidSettingsWithoutMutation(t *testing.T) {
 	svc := service.New(service.WithStore(resourceStore))
 	archive := validBackupZip(t, backupZipMember{
 		name: "data/settings.json",
-		body: []byte(`{"schema_version":1,"future":true}`),
+		body: []byte(`{"schema_version":1,"cache_defaults":{"probe_ttl_seconds":-1}}`),
 	})
 
 	err := svc.RestoreBackup(ctx, archive)
