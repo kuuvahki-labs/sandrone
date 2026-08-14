@@ -73,12 +73,17 @@ processors:
 
 ### dedup
 
-保留每个 key 首次出现的节点：
+以下策略保留每个 key 首次出现的节点：
 
-- `strategy: identity`（缺省）：使用 `type`、`server`、`port`、`uuid`、
+- `strategy: name`（缺省）：只使用节点名；
+- `strategy: identity`：使用 `type`、`server`、`port`、`uuid`、
   `password`；
-- `strategy: name`：只使用节点名；
 - `strategy: fields`：按 `fields` 声明顺序组合 key，数组不能为空。
+
+同名节点也可以选择保留并改名：
+
+- `strategy: random_suffix`：不删除同名节点；保留首次出现的名称，后续同名节点
+  追加 `-` 和 4 位随机数字，并避开当前批次已有名称。
 
 `fields` 中有意义的当前字段为 `name`、`type`、`server`、`port`、`uuid`、
 `password`、`username`、`cipher`。

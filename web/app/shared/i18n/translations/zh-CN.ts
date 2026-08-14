@@ -337,6 +337,7 @@ export const zhCN = {
   "processors.dedup": "去重",
   "processors.dedup.fields": "指定字段",
   "processors.dedup.identity": "节点身份",
+  "processors.dedup.randomSuffix": "添加随机数字",
   "processors.dedup.strategy": "去重策略",
   "processors.failMode": "失败处理",
   "processors.failMode.drop": "丢弃",

@@ -94,11 +94,12 @@ function ProcessorParamsEditor({ draft, onChange, probeDefaults, scriptFiles }: 
           <SelectField
             label={t("processors.dedup.strategy")}
             options={[
-              { value: "identity", label: t("processors.dedup.identity") },
               { value: "name", label: t("labels.name") },
+              { value: "random_suffix", label: t("processors.dedup.randomSuffix") },
+              { value: "identity", label: t("processors.dedup.identity") },
               { value: "fields", label: t("processors.dedup.fields") },
             ]}
-            value={stringValue(params.strategy) || "identity"}
+            value={stringValue(params.strategy) || "name"}
             onChange={(value) => onChange({ strategy: value, fields: value === "fields" ? arrayValue(params.fields) : [] })}
           />
           {stringValue(params.strategy) === "fields" ? (
@@ -311,7 +312,7 @@ function defaultParams(type: string): Record<string, unknown> {
     case "filter":
       return { action: "keep", field: "name", match: "regex", pattern: "" };
     case "dedup":
-      return { strategy: "identity" };
+      return { strategy: "name" };
     case "rename":
       return { trim: true };
     case "sort":

@@ -5,17 +5,16 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	mathrand "math/rand/v2"
 	"strings"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/processor"
 )
 
-// DedupParams chooses the dedup key. By default a node is identified by
-// (type, server, port, uuid, password); set Strategy to "name" to dedup by
-// name only.
+// DedupParams chooses how duplicate nodes or names are handled.
 type DedupParams struct {
-	Strategy string   `json:"strategy,omitempty" jsonschema:"Key strategy used to identify duplicates" enum:"identity,name,fields" default:"identity"`
+	Strategy string   `json:"strategy,omitempty" jsonschema:"Strategy used to handle duplicates" enum:"identity,name,fields,random_suffix" default:"name"`
 	Fields   []string `json:"fields,omitempty" jsonschema:"Node fields used when strategy is fields"`
 }
 
@@ -31,10 +30,10 @@ func buildDedup(spec domain.ProcessorSpec) (domain.NodeProcessor, error) {
 	}
 	strategy := strings.ToLower(strings.TrimSpace(params.Strategy))
 	if strategy == "" {
-		strategy = "identity"
+		strategy = "name"
 	}
 	switch strategy {
-	case "identity", "name", "fields":
+	case "identity", "name", "fields", "random_suffix":
 	default:
 		return nil, &domain.AppError{
 			Code:      domain.CodeProcessorConfigInvalid,
@@ -55,6 +54,9 @@ func buildDedup(spec domain.ProcessorSpec) (domain.NodeProcessor, error) {
 func (p *dedupProc) Name() string { return "dedup" }
 
 func (p *dedupProc) ApplyNodes(_ context.Context, in domain.NodeProcessInput) (domain.NodeProcessOutput, error) {
+	if p.strategy == "random_suffix" {
+		return p.applyRandomSuffix(in)
+	}
 	seen := map[string]struct{}{}
 	out := make([]domain.NodeIR, 0, len(in.Nodes))
 	for _, n := range in.Nodes {
@@ -66,6 +68,45 @@ func (p *dedupProc) ApplyNodes(_ context.Context, in domain.NodeProcessInput) (d
 		out = append(out, n)
 	}
 	return domain.NodeProcessOutput{Nodes: out}, nil
+}
+
+func (p *dedupProc) applyRandomSuffix(in domain.NodeProcessInput) (domain.NodeProcessOutput, error) {
+	usedNames := make(map[string]struct{}, len(in.Nodes))
+	for _, node := range in.Nodes {
+		usedNames[node.Name] = struct{}{}
+	}
+	seenNames := make(map[string]struct{}, len(in.Nodes))
+	out := make([]domain.NodeIR, 0, len(in.Nodes))
+	for _, node := range in.Nodes {
+		if _, exists := seenNames[node.Name]; !exists {
+			seenNames[node.Name] = struct{}{}
+			out = append(out, node)
+			continue
+		}
+		name, err := uniqueRandomName(node.Name, usedNames)
+		if err != nil {
+			return domain.NodeProcessOutput{}, err
+		}
+		node.Name = name
+		usedNames[name] = struct{}{}
+		out = append(out, node)
+	}
+	return domain.NodeProcessOutput{Nodes: out}, nil
+}
+
+func uniqueRandomName(base string, used map[string]struct{}) (string, error) {
+	start := mathrand.IntN(10_000)
+	for offset := range 10_000 {
+		digits := (start + offset) % 10_000
+		candidate := fmt.Sprintf("%s-%04d", base, digits)
+		if base == "" {
+			candidate = fmt.Sprintf("%04d", digits)
+		}
+		if _, exists := used[candidate]; !exists {
+			return candidate, nil
+		}
+	}
+	return "", fmt.Errorf("no four-digit random suffix is available for node name %q", base)
 }
 
 func (p *dedupProc) keyFor(n domain.NodeIR) string {

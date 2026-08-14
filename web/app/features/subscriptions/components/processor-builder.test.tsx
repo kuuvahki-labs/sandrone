@@ -67,6 +67,31 @@ describe("ProcessorBuilder", () => {
     expect(serializedProcessors()).toEqual([]);
   });
 
+  it("defaults dedup to names and offers random digits", async () => {
+    const user = userEvent.setup();
+    const { serializedProcessors } = renderProcessorBuilder();
+
+    await selectMuiOption(user, screen.getByRole("combobox", { name: "类型" }), "去重");
+    await user.click(screen.getByRole("button", { name: "添加处理器" }));
+
+    const dedupGroup = screen.getByRole("group", { name: "处理器 去重" });
+    const strategy = within(dedupGroup).getByRole("combobox", { name: "去重策略" });
+    expect(strategy).toHaveTextContent("名称");
+    expect(serializedProcessors()).toEqual([{
+      type: "dedup",
+      stage: "nodes",
+      params: { strategy: "name" },
+    }]);
+
+    await selectMuiOption(user, strategy, "添加随机数字");
+
+    expect(serializedProcessors()).toEqual([{
+      type: "dedup",
+      stage: "nodes",
+      params: { strategy: "random_suffix" },
+    }]);
+  });
+
   it("does not append quick settings to persisted processors", async () => {
     const user = userEvent.setup();
     const { serializedProcessors } = renderProcessorBuilder({

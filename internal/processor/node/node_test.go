@@ -140,9 +140,24 @@ func TestFilterRejectsInvalidConfig(t *testing.T) {
 	}
 }
 
-func TestDedupIdentity(t *testing.T) {
+func TestDedupDefaultsToName(t *testing.T) {
 	r := makeRegistry()
 	proc := buildNode(t, r, "dedup", nil)
+	nodes := []domain.NodeIR{
+		{Name: "a", Type: "ss", Server: "x", Port: 1, Password: "p"},
+		{Name: "a", Type: "ss", Server: "y", Port: 2, Password: "other"},
+		{Name: "c", Type: "ss", Server: "x", Port: 2, Password: "p"},
+	}
+	out, err := proc.ApplyNodes(context.Background(), domain.NodeProcessInput{Nodes: nodes})
+	require.NoError(t, err)
+	require.Len(t, out.Nodes, 2)
+	require.Equal(t, "a", out.Nodes[0].Name)
+	require.Equal(t, "c", out.Nodes[1].Name)
+}
+
+func TestDedupIdentity(t *testing.T) {
+	r := makeRegistry()
+	proc := buildNode(t, r, "dedup", map[string]any{"strategy": "identity"})
 	nodes := []domain.NodeIR{
 		{Name: "a", Type: "ss", Server: "x", Port: 1, Password: "p"},
 		{Name: "b", Type: "ss", Server: "x", Port: 1, Password: "p"},
@@ -153,6 +168,31 @@ func TestDedupIdentity(t *testing.T) {
 	require.Len(t, out.Nodes, 2)
 	require.Equal(t, "a", out.Nodes[0].Name)
 	require.Equal(t, "c", out.Nodes[1].Name)
+}
+
+func TestDedupAddsRandomSuffixToDuplicateNames(t *testing.T) {
+	r := makeRegistry()
+	proc := buildNode(t, r, "dedup", map[string]any{"strategy": "random_suffix"})
+	nodes := []domain.NodeIR{
+		{Name: "same", Server: "one.example"},
+		{Name: "same", Server: "two.example"},
+		{Name: "same", Server: "three.example"},
+		{Name: "other", Server: "four.example"},
+	}
+	out, err := proc.ApplyNodes(context.Background(), domain.NodeProcessInput{Nodes: nodes})
+	require.NoError(t, err)
+	require.Len(t, out.Nodes, len(nodes))
+	require.Equal(t, "same", out.Nodes[0].Name)
+	require.Regexp(t, `^same-\d{4}$`, out.Nodes[1].Name)
+	require.Regexp(t, `^same-\d{4}$`, out.Nodes[2].Name)
+	require.NotEqual(t, out.Nodes[1].Name, out.Nodes[2].Name)
+	require.Equal(t, "other", out.Nodes[3].Name)
+	require.Equal(t, []domain.NodeIR{
+		{Name: "same", Server: "one.example"},
+		{Name: "same", Server: "two.example"},
+		{Name: "same", Server: "three.example"},
+		{Name: "other", Server: "four.example"},
+	}, nodes)
 }
 
 func TestDedupInvalidStrategy(t *testing.T) {

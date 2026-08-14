@@ -25,9 +25,9 @@ func Register(r *processor.Registry, probes ...ProbeRunner) {
 		ErrorCodes: []domain.ErrorCode{domain.CodeProcessorConfigInvalid},
 	})
 	r.RegisterNodeWithDescriptor("dedup", buildDedup, processor.Descriptor{
-		Description:     "Remove duplicate nodes by identity, name, or selected fields.",
+		Description:     "Remove duplicate nodes or disambiguate duplicate names with random digits.",
 		ParamsPrototype: DedupParams{}, Public: true,
-		Examples:   []map[string]any{{"strategy": "identity"}},
+		Examples:   []map[string]any{{"strategy": "name"}, {"strategy": "random_suffix"}},
 		ErrorCodes: []domain.ErrorCode{domain.CodeProcessorConfigInvalid},
 	})
 	r.RegisterNodeWithDescriptor("rename", buildRename, processor.Descriptor{

@@ -339,6 +339,7 @@ export const enUS: Record<TranslationKey, string> = {
   "processors.dedup": "Deduplicate",
   "processors.dedup.fields": "Specific fields",
   "processors.dedup.identity": "Node identity",
+  "processors.dedup.randomSuffix": "Add random digits",
   "processors.dedup.strategy": "Dedup strategy",
   "processors.failMode": "Failure handling",
   "processors.failMode.drop": "Drop",
