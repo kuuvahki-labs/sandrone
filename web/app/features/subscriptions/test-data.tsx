@@ -37,8 +37,9 @@ export const probeDefaults: ProbeDefaultsInput = {
   timeout_ms: 5000,
   attempts: 1,
   concurrency: 10,
-  cache_ttl_seconds: 0,
 };
+
+export const probeCacheTTLSeconds = 0;
 
 export const remoteSubscriptionDefinition: SubscriptionDefinition = {
   name: "provider",

@@ -357,7 +357,7 @@ export const zhCN = {
   "processors.probe": "测活",
   "processors.probe.annotate": "写入测活元数据",
   "processors.probe.attempts": "尝试次数",
-  "processors.probe.cacheTTLSeconds": "缓存秒数",
+  "processors.probe.cacheTTLSeconds": "测活结果缓存（秒）",
   "processors.probe.inherit": "继承全局设置（当前：{value}）",
   "processors.probe.concurrency": "并发数",
   "processors.probe.expectedStatus": "期望状态",

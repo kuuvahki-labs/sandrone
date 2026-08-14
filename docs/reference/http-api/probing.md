@@ -29,7 +29,7 @@ backend 中执行可达性检查。它不保存输入、节点或 report，但�
 | `timeout_ms` | integer | 非负；正数限制每次尝试，`0`/省略使用项目设置。 |
 | `attempts` | integer | 非负；正数限制每个节点的尝试次数，`0`/省略使用项目设置。 |
 | `concurrency` | integer | 非负；正数限制并行节点数，`0`/省略使用项目设置。 |
-| `cache_ttl_seconds` | integer | 非负；正数允许复用成功 probe 结果，`0`/省略使用项目设置。 |
+| `cache_ttl_seconds` | integer | 非负；正数允许复用成功 probe 结果，`0`/省略使用 `cache_defaults.probe_ttl_seconds`。 |
 | `meta` | object | 可选 string-to-string metadata，进入本次受控执行与 report 上下文。 |
 
 默认项目设置是 `method: "url_test"`、`core: "sing-box"`、

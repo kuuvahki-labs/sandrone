@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { ProcessorBuilder } from "~/features/subscriptions/components/processor-builder";
 import {
+  probeCacheTTLSeconds,
   probeDefaults,
   remoteSubscriptionDefinition,
   scriptFiles,
@@ -33,6 +34,7 @@ function renderProcessorBuilder({
       <ProcessorBuilder
         defaultValue={defaultValue}
         onDirty={onDirty}
+        probeCacheTTLSeconds={probeCacheTTLSeconds}
         probeDefaults={probeDefaults}
         scriptFiles={availableScriptFiles}
       />
@@ -132,7 +134,7 @@ describe("ProcessorBuilder", () => {
     expect(within(probeGroup).getByRole("spinbutton", { name: "超时毫秒" })).toHaveValue(5000);
     expect(within(probeGroup).getByRole("spinbutton", { name: "尝试次数" })).toHaveValue(2);
     expect(within(probeGroup).getByRole("spinbutton", { name: "并发数" })).toHaveValue(3);
-    expect(within(probeGroup).getByRole("spinbutton", { name: "缓存秒数" })).toHaveValue(300);
+    expect(within(probeGroup).getByRole("spinbutton", { name: "测活结果缓存（秒）" })).toHaveValue(300);
     expect(within(probeGroup).getByRole("checkbox", { name: "写入测活元数据" })).toBeChecked();
     expect(within(probeGroup).getByRole("combobox", { name: "排序" })).toHaveTextContent("按耗时");
     expect(within(probeGroup).getByRole("combobox", { name: "失败处理" })).toHaveTextContent("丢弃");
@@ -215,8 +217,8 @@ describe("ProcessorBuilder", () => {
     expect(within(probeGroup).getByRole("spinbutton", { name: "尝试次数" })).toHaveAttribute("placeholder", "1");
     expect(within(probeGroup).getByRole("spinbutton", { name: "并发数" })).toHaveValue(null);
     expect(within(probeGroup).getByRole("spinbutton", { name: "并发数" })).toHaveAttribute("placeholder", "10");
-    expect(within(probeGroup).getByRole("spinbutton", { name: "缓存秒数" })).toHaveValue(null);
-    expect(within(probeGroup).getByRole("spinbutton", { name: "缓存秒数" })).toHaveAttribute("placeholder", "0");
+    expect(within(probeGroup).getByRole("spinbutton", { name: "测活结果缓存（秒）" })).toHaveValue(null);
+    expect(within(probeGroup).getByRole("spinbutton", { name: "测活结果缓存（秒）" })).toHaveAttribute("placeholder", "0");
 
     expect(serializedProcessors()).toEqual([
       {

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   noop,
+  probeCacheTTLSeconds,
   probeDefaults,
   remoteSubscriptionDefinition,
   subscriptions,
@@ -30,6 +31,7 @@ describe("SubscriptionEditPage", () => {
         onPreview={onPreview}
         onSave={onSave}
         onShare={onShare}
+        probeCacheTTLSeconds={probeCacheTTLSeconds}
         probeDefaults={probeDefaults}
         sources={subscriptions}
       />,
@@ -74,6 +76,7 @@ describe("SubscriptionEditPage", () => {
         onBack={noop}
         onSave={() => false}
         onShare={noop}
+        probeCacheTTLSeconds={probeCacheTTLSeconds}
         probeDefaults={probeDefaults}
         sources={subscriptions}
       />,
@@ -89,7 +92,7 @@ describe("SubscriptionEditPage", () => {
   it("switches remote edits across local and collection modes without stale fields", async () => {
     const user = userEvent.setup();
     const onSave = vi.fn(saveSuccess);
-    render(<SubscriptionEditPage item={subscriptions[0]} onBack={noop} onSave={onSave} onShare={noop} probeDefaults={probeDefaults} definition={remoteSubscriptionDefinition} sources={subscriptions} />);
+    render(<SubscriptionEditPage item={subscriptions[0]} onBack={noop} onSave={onSave} onShare={noop} probeCacheTTLSeconds={probeCacheTTLSeconds} probeDefaults={probeDefaults} definition={remoteSubscriptionDefinition} sources={subscriptions} />);
 
     expect(screen.getByRole("button", { name: "远程" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("textbox", { name: "名称" })).toBeDisabled();
@@ -164,7 +167,7 @@ describe("SubscriptionEditPage", () => {
   });
   it("prefills and orders the full remote-source editing workflow", async () => {
     const user = userEvent.setup();
-    const { container } = render(<SubscriptionEditPage item={subscriptions[0]} onBack={noop} onSave={saveSuccess} probeDefaults={probeDefaults} definition={remoteSubscriptionDefinition} sources={subscriptions} />);
+    const { container } = render(<SubscriptionEditPage item={subscriptions[0]} onBack={noop} onSave={saveSuccess} probeCacheTTLSeconds={probeCacheTTLSeconds} probeDefaults={probeDefaults} definition={remoteSubscriptionDefinition} sources={subscriptions} />);
 
     expect(screen.getByRole("textbox", { name: "订阅地址" })).toHaveValue("https://example.com/sub");
     expect(screen.getByRole("textbox", { name: "User-Agent" })).toHaveValue("Sandrone Test");

@@ -299,7 +299,7 @@ func normalizeRemoteDefaults(value, defaults domain.RemoteDefaults) (domain.Remo
 }
 
 func normalizeProbeDefaults(value, defaults domain.ProbeDefaults) (domain.ProbeDefaults, error) {
-	if value.TimeoutMS < 0 || value.Attempts < 0 || value.Concurrency < 0 || value.CacheTTLSeconds < 0 {
+	if value.TimeoutMS < 0 || value.Attempts < 0 || value.Concurrency < 0 {
 		return domain.ProbeDefaults{}, invalid("probe numeric defaults must be non-negative")
 	}
 	out := defaults
@@ -327,7 +327,6 @@ func normalizeProbeDefaults(value, defaults domain.ProbeDefaults) (domain.ProbeD
 	if value.Concurrency > 0 {
 		out.Concurrency = value.Concurrency
 	}
-	out.CacheTTLSeconds = value.CacheTTLSeconds
 	switch out.Method {
 	case string(domain.ProbeTCPConnect), string(domain.ProbeUDPNTP), string(domain.ProbeURLTest):
 	default:
@@ -402,6 +401,9 @@ func validateAppearance(value domain.AppearanceSettings) error {
 func validateCacheDefaults(value domain.CacheDefaults) error {
 	if value.RemoteFetchTTLSeconds < 0 {
 		return invalid("remote_fetch_ttl_seconds must be non-negative")
+	}
+	if value.ProbeTTLSeconds < 0 {
+		return invalid("probe_ttl_seconds must be non-negative")
 	}
 	if value.SubscriptionTrafficTTLSeconds < 0 {
 		return invalid("subscription_traffic_ttl_seconds must be non-negative")

@@ -121,7 +121,7 @@ registry、第三方 cache 依赖或缓存管理 HTTP API；以后更换为内�
 | canonical 层 | 缓存值 | TTL 来源 |
 | --- | --- | --- |
 | `remote_fetch` | 受控 HTTP(S) 响应 | `RemoteInput.cache_ttl_seconds`，零值继承项目默认 |
-| `probe` | 完整批次 `ProbeResult` | probe 请求，零值继承项目 probe 默认 |
+| `probe` | 完整批次 `ProbeResult` | probe 请求，零值继承项目 `cache_defaults.probe_ttl_seconds` |
 | `subscription_traffic` | 远程订阅用量 | 项目设置默认 |
 | `subscription_render` | 已保存订阅的完整 `RenderResult` | Subscription 三态覆盖或项目默认 |
 | `file_render` | 已保存文件的完整 `FileResult` | FileSpec 三态覆盖或项目默认 |

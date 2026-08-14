@@ -17,7 +17,6 @@ const defaults: ProbeDefaultsInput = {
   timeout_ms: 8000,
   attempts: 2,
   concurrency: 4,
-  cache_ttl_seconds: 60,
 };
 
 describe("probe processor params", () => {

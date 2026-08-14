@@ -87,10 +87,10 @@ function settingsEnvelope() {
       timeout_ms: 5000,
       attempts: 1,
       concurrency: 10,
-      cache_ttl_seconds: 0,
     },
     cache_defaults: {
       remote_fetch_ttl_seconds: 0,
+      probe_ttl_seconds: 0,
       subscription_traffic_ttl_seconds: 60,
       subscription_render_ttl_seconds: 0,
       file_render_ttl_seconds: 0,

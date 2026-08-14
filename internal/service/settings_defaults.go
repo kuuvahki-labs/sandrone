@@ -55,7 +55,7 @@ func (s *Service) probeRequestWithDefaults(req domain.ProbeRequest) domain.Probe
 		out.Concurrency = defaults.Concurrency
 	}
 	if out.CacheTTLSeconds <= 0 {
-		out.CacheTTLSeconds = defaults.CacheTTLSeconds
+		out.CacheTTLSeconds = settings.CacheDefaults.ProbeTTLSeconds
 	}
 	return out
 }

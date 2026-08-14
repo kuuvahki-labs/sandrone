@@ -44,13 +44,13 @@ const fieldOptions = fields.map((field) => ({ value: field, label: field }));
 const informationNodePattern =
   "(?i)(网址|官网|流量|剩余|时间|应急|套餐|订阅|公告|重置|过期|到期|bandwidth|traffic|quota|reset|expire|expiry|expiration)";
 
-export function ProcessorBuilder({ defaultValue = [], onDirty, probeDefaults, scriptFiles = [] }: { defaultValue?: ProcessorDetail[]; onDirty?: () => void; probeDefaults: ProbeDefaultsInput; scriptFiles?: ResourceOption[] }) {
+export function ProcessorBuilder({ defaultValue = [], onDirty, probeCacheTTLSeconds, probeDefaults, scriptFiles = [] }: { defaultValue?: ProcessorDetail[]; onDirty?: () => void; probeCacheTTLSeconds: number; probeDefaults: ProbeDefaultsInput; scriptFiles?: ResourceOption[] }) {
   const { t } = useI18n();
   const { hasFeature } = useUICapabilities();
   const options = processorOptions(t, hasFeature("probe.enabled"));
 
   function ParamsEditor(props: ProcessorParamsEditorProps) {
-    return <ProcessorParamsEditor {...props} probeDefaults={probeDefaults} scriptFiles={scriptFiles} />;
+    return <ProcessorParamsEditor {...props} probeCacheTTLSeconds={probeCacheTTLSeconds} probeDefaults={probeDefaults} scriptFiles={scriptFiles} />;
   }
 
   return (
@@ -69,7 +69,7 @@ export function ProcessorBuilder({ defaultValue = [], onDirty, probeDefaults, sc
   );
 }
 
-function ProcessorParamsEditor({ draft, onChange, probeDefaults, scriptFiles }: ProcessorParamsEditorProps & { probeDefaults: ProbeDefaultsInput; scriptFiles: ResourceOption[] }) {
+function ProcessorParamsEditor({ draft, onChange, probeCacheTTLSeconds, probeDefaults, scriptFiles }: ProcessorParamsEditorProps & { probeCacheTTLSeconds: number; probeDefaults: ProbeDefaultsInput; scriptFiles: ResourceOption[] }) {
   const { t } = useI18n();
   const params = draft.params;
   switch (draft.type) {
@@ -162,7 +162,7 @@ function ProcessorParamsEditor({ draft, onChange, probeDefaults, scriptFiles }: 
           <TextField fullWidth label={t("files.form.timeoutMs")} placeholder={String(probeDefaults.timeout_ms)} type="number" value={numberInputValue(params.timeout_ms)} onChange={(event) => onChange({ timeout_ms: numberOrEmpty(event.target.value) })} />
           <TextField fullWidth label={t("processors.probe.attempts")} placeholder={String(probeDefaults.attempts)} type="number" value={numberInputValue(params.attempts)} onChange={(event) => onChange({ attempts: numberOrEmpty(event.target.value) })} />
           <TextField fullWidth label={t("processors.probe.concurrency")} placeholder={String(probeDefaults.concurrency)} type="number" value={numberInputValue(params.concurrency)} onChange={(event) => onChange({ concurrency: numberOrEmpty(event.target.value) })} />
-          <TextField fullWidth label={t("processors.probe.cacheTTLSeconds")} placeholder={String(probeDefaults.cache_ttl_seconds)} type="number" value={numberInputValue(params.cache_ttl_seconds)} onChange={(event) => onChange({ cache_ttl_seconds: numberOrEmpty(event.target.value) })} />
+          <TextField fullWidth label={t("processors.probe.cacheTTLSeconds")} placeholder={String(probeCacheTTLSeconds)} type="number" value={numberInputValue(params.cache_ttl_seconds)} onChange={(event) => onChange({ cache_ttl_seconds: numberOrEmpty(event.target.value) })} />
           <SelectField label={t("processors.sort")} options={probeSortOptions(t)} value={stringValue(params.sort)} onChange={(value) => onChange({ sort: value })} />
           <SelectField
             label={t("processors.failMode")}

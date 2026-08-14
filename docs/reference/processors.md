@@ -135,7 +135,8 @@ processors:
 `timeout_ms`、`attempts`、`concurrency`、`cache_ttl_seconds`。
 processor 的 `expected_status` 遵循 [HTTP probe](http-api/probing.md) 契约。
 除 `expected_status` 外，省略值由 probe service 使用当前项目运行默认值处理；
-`timeout_ms`、`attempts`、`concurrency` 和 `cache_ttl_seconds` 的 `0` 与省略等价。
+`timeout_ms`、`attempts`、`concurrency` 和 `cache_ttl_seconds` 的 `0` 与省略等价，
+其中缓存默认值来自 `cache_defaults.probe_ttl_seconds`。
 客户端不应把某次读取到的运行默认值写入新 processor，否则后续全局设置变化不会
 再传递到该 processor。
 method 只接受 `tcp_connect`、`udp_ntp` 和 `url_test`；默认 `url_test`。

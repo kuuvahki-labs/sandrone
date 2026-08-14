@@ -147,7 +147,7 @@ sandrone probe [--format <format>] \
 | `--timeout` | 服务缺省 | 每节点超时，Go duration |
 | `--attempts` | `0` | 每节点尝试次数；`0` 使用服务缺省 |
 | `--concurrency` | `0` | 最大并发；`0` 使用服务缺省 |
-| `--cache-ttl` | `0` | 缓存秒数；`0` 继承项目设置的 probe cache TTL，两者都为 `0` 时禁用缓存 |
+| `--cache-ttl` | `0` | 缓存秒数；`0` 继承 `cache_defaults.probe_ttl_seconds`，两者都为 `0` 时禁用缓存 |
 | `--output` | 标准输出 | JSON 输出路径或 `-` |
 
 `tcp-connect` 不使用核心；`udp-ntp` 当前使用 sing-box；`url-test` 支持

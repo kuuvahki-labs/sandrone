@@ -22,6 +22,7 @@ func TestDefaultSettingsContainsWholeProject(t *testing.T) {
 	require.Equal(t, "dark", got.Appearance.ThemeMode)
 	require.Equal(t, "auto", got.Appearance.Locale)
 	require.False(t, got.Subscriptions.AutoLoadTraffic)
+	require.Zero(t, got.CacheDefaults.ProbeTTLSeconds)
 	require.Equal(t, 60, got.CacheDefaults.SubscriptionTrafficTTLSeconds)
 	require.Equal(t, "https://cp.cloudflare.com", got.ProbeDefaults.URL)
 	require.False(t, got.ScheduledRefresh.Enabled)
@@ -45,6 +46,21 @@ func TestStoredAndPublicSettingsOmitRemovedStartupFields(t *testing.T) {
 		require.NotContains(t, string(body), `"transport"`)
 		require.NotContains(t, string(body), `"webui"`)
 	}
+}
+
+func TestDecodeRejectsRemovedProbeCacheTTLField(t *testing.T) {
+	body, err := json.Marshal(settings.Default())
+	require.NoError(t, err)
+
+	var stored map[string]any
+	require.NoError(t, json.Unmarshal(body, &stored))
+	probeDefaults := stored["probe_defaults"].(map[string]any)
+	probeDefaults["cache_ttl_seconds"] = 60
+	body, err = json.Marshal(stored)
+	require.NoError(t, err)
+
+	_, err = settings.Decode(body)
+	require.ErrorContains(t, err, "unknown field \"cache_ttl_seconds\"")
 }
 
 func TestNormalizePreservesEmptyAndExplicitRemoteUserAgents(t *testing.T) {
@@ -112,6 +128,12 @@ func TestNormalizeRejectsInvalidProjectFields(t *testing.T) {
 			name: "locale",
 			mutate: func(value *domain.Settings) {
 				value.Appearance.Locale = "fr-FR"
+			},
+		},
+		{
+			name: "probe ttl",
+			mutate: func(value *domain.Settings) {
+				value.CacheDefaults.ProbeTTLSeconds = -1
 			},
 		},
 		{

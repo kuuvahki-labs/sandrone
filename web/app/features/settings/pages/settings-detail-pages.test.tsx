@@ -54,7 +54,7 @@ describe("settings runtime page", () => {
 
     expect(screen.getByRole("heading", { name: "订阅流量" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "运行默认值" })).toBeInTheDocument();
-    const automaticTraffic = screen.getByRole("switch", { name: "自动获取流量" });
+    const automaticTraffic = screen.getByRole("switch", { name: "在订阅列表显示" });
     expect(automaticTraffic).not.toBeChecked();
     expect(screen.getByRole("button", { name: "远程请求" })).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByRole("button", { name: "缓存" })).toHaveAttribute("aria-expanded", "false");
@@ -79,6 +79,9 @@ describe("settings runtime page", () => {
     fireEvent.change(within(cacheGroup).getByRole("spinbutton", { name: "远程请求缓存（秒）" }), {
       target: { value: "120" },
     });
+    fireEvent.change(within(cacheGroup).getByRole("spinbutton", { name: "测活结果缓存（秒）" }), {
+      target: { value: "300" },
+    });
     fireEvent.change(within(cacheGroup).getByRole("spinbutton", { name: "订阅流量缓存（秒）" }), {
       target: { value: "15" },
     });
@@ -99,10 +102,6 @@ describe("settings runtime page", () => {
     await user.click(await screen.findByRole("option", {
       name: "Cloudflare http://cp.cloudflare.com/generate_204",
     }));
-    fireEvent.change(within(probeGroup).getByRole("spinbutton", { name: "缓存（秒）" }), {
-      target: { value: "300" },
-    });
-
     const pageHeader = screen.getByRole("heading", { name: "高级设置" }).closest("header");
     expect(pageHeader).not.toBeNull();
     const saveRuntimeDefaults = within(pageHeader as HTMLElement).getByRole("button", { name: "保存设置" });
@@ -114,12 +113,12 @@ describe("settings runtime page", () => {
         timeout_ms: 15000,
       }),
       probe_defaults: expect.objectContaining({
-        cache_ttl_seconds: 300,
         core: "sing-box",
         url: "http://cp.cloudflare.com/generate_204",
       }),
       cache_defaults: expect.objectContaining({
         remote_fetch_ttl_seconds: 120,
+        probe_ttl_seconds: 300,
         subscription_traffic_ttl_seconds: 15,
         subscription_render_ttl_seconds: 180,
         file_render_ttl_seconds: 240,

@@ -40,7 +40,6 @@ export function ScheduledRefreshSettingsSection({
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <Typography component="h3" variant="h6">{t("settings.scheduledRefresh.title")}</Typography>
-            <Typography color="text.secondary" variant="body2">{t("settings.scheduledRefresh.description")}</Typography>
           </div>
           <FormControlLabel
             className="m-0"

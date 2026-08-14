@@ -35,6 +35,7 @@ export interface SubscriptionEditPageProps {
   onPreview?: () => void;
   onSave: (form: FormData) => boolean | Promise<boolean>;
   onShare?: () => void;
+  probeCacheTTLSeconds: number;
   probeDefaults: ProbeDefaultsInput;
 }
 
@@ -49,6 +50,7 @@ export function SubscriptionEditPage({
   onPreview,
   onSave,
   onShare,
+  probeCacheTTLSeconds,
   probeDefaults,
 }: SubscriptionEditPageProps) {
   const { t } = useI18n();
@@ -127,6 +129,7 @@ export function SubscriptionEditPage({
             definition={definition}
             item={item}
             mode="edit"
+            probeCacheTTLSeconds={probeCacheTTLSeconds}
             probeDefaults={probeDefaults}
             scriptFiles={scriptFiles}
             sources={sources}

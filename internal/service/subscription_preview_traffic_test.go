@@ -125,15 +125,15 @@ func TestServiceProbeProcessorAllowsRuntimeProbeDefaults(t *testing.T) {
 	)
 	putProjectSettings(t, svc, context.Background(), func(update *domain.SettingsUpdate) {
 		update.ProbeDefaults = domain.ProbeDefaults{
-			Method:          "url_test",
-			Core:            "mihomo",
-			URL:             "https://probe.example/generate_204",
-			NTPServer:       "time.example",
-			TimeoutMS:       8000,
-			Attempts:        2,
-			Concurrency:     4,
-			CacheTTLSeconds: 60,
+			Method:      "url_test",
+			Core:        "mihomo",
+			URL:         "https://probe.example/generate_204",
+			NTPServer:   "time.example",
+			TimeoutMS:   8000,
+			Attempts:    2,
+			Concurrency: 4,
 		}
+		update.CacheDefaults.ProbeTTLSeconds = 60
 	})
 	require.NoError(t, svc.PutSubscription(context.Background(), domain.Subscription{
 		Name:    "provider",

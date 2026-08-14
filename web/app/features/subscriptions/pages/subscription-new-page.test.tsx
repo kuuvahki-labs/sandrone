@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import { noop, probeDefaults, subscriptions } from "~/features/subscriptions/test-data";
+import { noop, probeCacheTTLSeconds, probeDefaults, subscriptions } from "~/features/subscriptions/test-data";
 
 import { SubscriptionNewPage } from "./subscription-new-page";
 
@@ -11,7 +11,7 @@ describe("SubscriptionNewPage", () => {
     const user = userEvent.setup();
     const onCopySource = vi.fn(async (_value: string, _target: "content" | "url") => undefined);
 
-    render(<SubscriptionNewPage probeDefaults={probeDefaults} sources={subscriptions} type="remote" onBack={noop} onCopySource={onCopySource} onSave={noop} onTypeChange={noop} />);
+    render(<SubscriptionNewPage probeCacheTTLSeconds={probeCacheTTLSeconds} probeDefaults={probeDefaults} sources={subscriptions} type="remote" onBack={noop} onCopySource={onCopySource} onSave={noop} onTypeChange={noop} />);
 
     fireEvent.change(screen.getByRole("textbox", { name: "订阅地址" }), {
       target: { value: "https://example.com/sub" },
@@ -27,7 +27,7 @@ describe("SubscriptionNewPage", () => {
     const user = userEvent.setup();
     const onCopySource = vi.fn(async (_value: string, _target: "content" | "url") => undefined);
 
-    render(<SubscriptionNewPage probeDefaults={probeDefaults} sources={subscriptions} type="local" onBack={noop} onCopySource={onCopySource} onSave={noop} onTypeChange={noop} />);
+    render(<SubscriptionNewPage probeCacheTTLSeconds={probeCacheTTLSeconds} probeDefaults={probeDefaults} sources={subscriptions} type="local" onBack={noop} onCopySource={onCopySource} onSave={noop} onTypeChange={noop} />);
 
     fireEvent.change(screen.getByRole("textbox", { name: "内容" }), {
       target: { value: "ss://example" },

@@ -237,13 +237,13 @@ func TestServiceProbeUsesRuntimeDefaultsBeforeCache(t *testing.T) {
 	)
 	putProjectSettings(t, svc, context.Background(), func(update *domain.SettingsUpdate) {
 		update.ProbeDefaults = domain.ProbeDefaults{
-			Method:          "tcp_connect",
-			Core:            "mihomo",
-			TimeoutMS:       777,
-			Attempts:        3,
-			Concurrency:     4,
-			CacheTTLSeconds: 60,
+			Method:      "tcp_connect",
+			Core:        "mihomo",
+			TimeoutMS:   777,
+			Attempts:    3,
+			Concurrency: 4,
 		}
+		update.CacheDefaults.ProbeTTLSeconds = 60
 	})
 	req := domain.ProbeRequest{
 		Input: domain.NodeInput{

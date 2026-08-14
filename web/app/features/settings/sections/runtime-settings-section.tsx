@@ -94,6 +94,13 @@ export function RuntimeSettingsSection({
               />
               <TextField
                 fullWidth
+                label={t("settings.runtime.probeResultCacheTTLSeconds")}
+                type="number"
+                value={numberInputValue(value.cache_defaults.probe_ttl_seconds)}
+                onChange={(event) => updateCacheDefaults({ probe_ttl_seconds: numberOrZero(event.target.value) })}
+              />
+              <TextField
+                fullWidth
                 label={t("settings.runtime.subscriptionTrafficCacheTTLSeconds")}
                 type="number"
                 value={numberInputValue(value.cache_defaults.subscription_traffic_ttl_seconds)}
@@ -160,13 +167,6 @@ export function RuntimeSettingsSection({
                 type="number"
                 value={numberInputValue(value.probe_defaults.concurrency)}
                 onChange={(event) => updateProbeDefaults({ concurrency: numberOrZero(event.target.value) })}
-              />
-              <TextField
-                fullWidth
-                label={t("settings.runtime.probeCacheTTLSeconds")}
-                type="number"
-                value={numberInputValue(value.probe_defaults.cache_ttl_seconds)}
-                onChange={(event) => updateProbeDefaults({ cache_ttl_seconds: numberOrZero(event.target.value) })}
               />
             </RuntimeSettingsGroup> : null}
           </div>

@@ -101,6 +101,7 @@ export default function SubscriptionEditRoute() {
       onPreview={() => navigate(subscriptionPreviewPath(kind || item.kind, item.name, "edit"))}
       onSave={(form) => subscriptionActions.saveSubscriptionEdit(item, form, definition)}
       onShare={() => shareDialog.open({ kind: "subscription", name: item.name })}
+      probeCacheTTLSeconds={app.effectiveSettings.cache_defaults.probe_ttl_seconds}
       probeDefaults={app.effectiveSettings.probe_defaults}
       scriptFiles={files.items.map(({ name, title }) => ({ name, title }))}
       sources={sourceItems}

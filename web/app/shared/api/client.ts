@@ -84,11 +84,11 @@ export interface ProbeDefaultsInput {
   timeout_ms: number;
   attempts: number;
   concurrency: number;
-  cache_ttl_seconds: number;
 }
 
 export interface CacheDefaultsInput {
   remote_fetch_ttl_seconds: number;
+  probe_ttl_seconds: number;
   subscription_traffic_ttl_seconds: number;
   subscription_render_ttl_seconds: number;
   file_render_ttl_seconds: number;

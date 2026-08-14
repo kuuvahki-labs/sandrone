@@ -57,6 +57,7 @@ SettingsEnvelope {
   },
   "cache_defaults": {
     "remote_fetch_ttl_seconds": 0,
+    "probe_ttl_seconds": 0,
     "subscription_traffic_ttl_seconds": 60,
     "subscription_render_ttl_seconds": 0,
     "file_render_ttl_seconds": 0
@@ -115,11 +116,11 @@ SettingsEnvelope {
     "ntp_server": "time.example",
     "timeout_ms": 5000,
     "attempts": 2,
-    "concurrency": 10,
-    "cache_ttl_seconds": 300
+    "concurrency": 10
   },
   "cache_defaults": {
     "remote_fetch_ttl_seconds": 120,
+    "probe_ttl_seconds": 300,
     "subscription_traffic_ttl_seconds": 60,
     "subscription_render_ttl_seconds": 300,
     "file_render_ttl_seconds": 300
