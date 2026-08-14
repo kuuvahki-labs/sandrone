@@ -108,6 +108,53 @@ func TestServiceSingBoxURLTestAcceptsDisabledVLESSPacketEncoding(t *testing.T) {
 	}
 }
 
+func TestServiceSingBoxURLTestDefaultsRealityClientFingerprint(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer listener.Close()
+	accepted := make(chan struct{})
+	go func() {
+		defer close(accepted)
+		conn, acceptErr := listener.Accept()
+		if acceptErr != nil {
+			return
+		}
+		_ = conn.Close()
+	}()
+	host, port := splitSingBoxHostPort(t, listener.Addr().String())
+
+	svc := service.New()
+	result, err := svc.Probe(context.Background(), domain.ProbeRequest{
+		Input: domain.NodeInput{
+			Type: "inline_nodes",
+			Nodes: []domain.NodeIR{{
+				Name: "vless-reality", Type: domain.NodeTypeVLESS, Server: host, Port: port,
+				UUID: "11111111-1111-1111-1111-111111111111", Encryption: "none", Flow: "xtls-rprx-vision",
+				TLS: &domain.TLSOptions{
+					Enabled: true, ServerName: "example.com",
+					Reality: &domain.RealityOptions{
+						Enabled: true, PublicKey: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", ShortID: "01",
+					},
+				},
+			}},
+		},
+		Method:    domain.ProbeURLTest,
+		Core:      "sing-box",
+		URL:       "http://127.0.0.1:1",
+		TimeoutMS: 1000,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.Results, 1)
+	require.False(t, result.Results[0].Alive)
+	require.NotEqual(t, string(domain.CodeProbeCoreStartFailed), result.Results[0].ErrorCode)
+	select {
+	case <-accepted:
+	case <-time.After(time.Second):
+		t.Fatal("sing-box did not initialize the Reality outbound")
+	}
+}
+
 func TestServiceSingBoxURLTestRejectsUnexpectedStatus(t *testing.T) {
 	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)

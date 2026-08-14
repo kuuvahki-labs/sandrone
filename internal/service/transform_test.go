@@ -111,6 +111,69 @@ func TestServiceCanonicalizesVMessAndVLESSUserIDsAcrossEntryPointsAndTargets(t *
 	require.Equal(t, "a9dk23bz0", rawNodes[1].UUID)
 }
 
+func TestServiceDefaultsRealityClientFingerprintAcrossEntryPointsAndTargets(t *testing.T) {
+	svc := service.New()
+	const raw = "vless://11111111-1111-1111-1111-111111111111@example.com:443?encryption=none&security=reality&pbk=public-key&sid=01&type=tcp#reality"
+
+	parsed, err := svc.Parse(context.Background(), domain.ParseRequest{Format: "uri-list", Content: []byte(raw)})
+	require.NoError(t, err)
+	require.Len(t, parsed.Nodes, 1)
+	require.Equal(t, "chrome", parsed.Nodes[0].TLS.ClientFingerprint)
+
+	validated, err := svc.ValidateNodes(context.Background(), domain.ParseRequest{Format: "uri-list", Content: []byte(raw)})
+	require.NoError(t, err)
+	require.True(t, validated.OK)
+
+	rawNode := domain.NodeIR{
+		Name: "reality", Type: domain.NodeTypeVLESS, Server: "example.com", Port: 443,
+		UUID: "11111111-1111-1111-1111-111111111111", Encryption: "none",
+		TLS: &domain.TLSOptions{
+			Enabled: true, ServerName: "example.com",
+			Reality: &domain.RealityOptions{Enabled: true, PublicKey: "public-key", ShortID: "01"},
+		},
+	}
+
+	jsonResult, err := svc.Render(context.Background(), domain.RenderRequest{
+		Format: "json-nodes",
+		Nodes:  []domain.NodeIR{rawNode},
+	})
+	require.NoError(t, err)
+	var jsonNodes []domain.NodeIR
+	require.NoError(t, json.Unmarshal(jsonResult.Body, &jsonNodes))
+	require.Equal(t, "chrome", jsonNodes[0].TLS.ClientFingerprint)
+
+	mihomoResult, err := svc.Render(context.Background(), domain.RenderRequest{
+		Format: "mihomo-proxies",
+		Nodes:  []domain.NodeIR{rawNode},
+	})
+	require.NoError(t, err)
+	require.Contains(t, string(mihomoResult.Body), "client-fingerprint: chrome")
+
+	singBoxResult, err := svc.Render(context.Background(), domain.RenderRequest{
+		Format: "sing-box-outbounds",
+		Nodes:  []domain.NodeIR{rawNode},
+	})
+	require.NoError(t, err)
+	var singBoxDoc struct {
+		Outbounds []struct {
+			TLS struct {
+				UTLS map[string]any `json:"utls"`
+			} `json:"tls"`
+		} `json:"outbounds"`
+	}
+	require.NoError(t, json.Unmarshal(singBoxResult.Body, &singBoxDoc))
+	require.Equal(t, true, singBoxDoc.Outbounds[0].TLS.UTLS["enabled"])
+	require.Equal(t, "chrome", singBoxDoc.Outbounds[0].TLS.UTLS["fingerprint"])
+
+	uriResult, err := svc.Render(context.Background(), domain.RenderRequest{
+		Format: "uri-list",
+		Nodes:  []domain.NodeIR{rawNode},
+	})
+	require.NoError(t, err)
+	require.Contains(t, string(uriResult.Body), "fp=chrome")
+	require.Empty(t, rawNode.TLS.ClientFingerprint)
+}
+
 func TestServicePreservesDisabledPacketEncodingAcrossTargets(t *testing.T) {
 	svc := service.New()
 	content := []byte("vless://11111111-1111-1111-1111-111111111111@example.com:443?encryption=none&packetEncoding=none#disabled-packet-encoding")

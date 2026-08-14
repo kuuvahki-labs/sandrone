@@ -10,11 +10,13 @@ import (
 )
 
 const vlessVisionFlow = "xtls-rprx-vision"
+const defaultRealityClientFingerprint = "chrome"
 
-func normalizeNodeUUIDs(nodes []domain.NodeIR) []domain.NodeIR {
+func normalizeNodes(nodes []domain.NodeIR) []domain.NodeIR {
 	out := append([]domain.NodeIR{}, nodes...)
 	for index := range out {
 		normalizeNodeUUID(&out[index])
+		normalizeNodeRealityClientFingerprints(&out[index])
 	}
 	return out
 }
@@ -35,6 +37,37 @@ func normalizeNodeUUID(node *domain.NodeIR) {
 			node.UUID = parsed.String()
 		}
 	}
+}
+
+func normalizeNodeRealityClientFingerprints(node *domain.NodeIR) {
+	if node == nil {
+		return
+	}
+	node.TLS = normalizeRealityClientFingerprint(node.TLS)
+	if node.Transport == nil || node.Transport.XHTTP == nil || node.Transport.XHTTP.DownloadSettings == nil {
+		return
+	}
+	downloadTLS := node.Transport.XHTTP.DownloadSettings.TLS
+	normalizedDownloadTLS := normalizeRealityClientFingerprint(downloadTLS)
+	if normalizedDownloadTLS == downloadTLS {
+		return
+	}
+	transport := *node.Transport
+	xhttp := *transport.XHTTP
+	download := *xhttp.DownloadSettings
+	download.TLS = normalizedDownloadTLS
+	xhttp.DownloadSettings = &download
+	transport.XHTTP = &xhttp
+	node.Transport = &transport
+}
+
+func normalizeRealityClientFingerprint(options *domain.TLSOptions) *domain.TLSOptions {
+	if options == nil || options.Reality == nil || strings.TrimSpace(options.ClientFingerprint) != "" {
+		return options
+	}
+	normalized := *options
+	normalized.ClientFingerprint = defaultRealityClientFingerprint
+	return &normalized
 }
 
 func normalizeParsedNodes(parsed *parseInputResult) {

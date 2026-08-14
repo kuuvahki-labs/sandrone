@@ -93,6 +93,12 @@ canonical UUID 字符串，否则静默映射为以 nil UUID 为 namespace、原
 身份；这项语义保持规范化不产生 warning。空用户 ID 仍无效。TUIC 不使用该映射，
 其 UUID/password 凭据中的 UUID 必须能被标准 UUID parser 接受。
 
+Reality TLS 的有效 client fingerprint 也在共享 service 边界规范化：顶层
+`tls.reality` 或 xHTTP download TLS 包含 Reality、但
+`tls.client_fingerprint` 为空时，Sandrone 静默补为 `chrome`。显式 fingerprint
+保持不变；规范化后的值写入 `NodeIR`，因此 URI、Mihomo、sing-box 和 JSON Nodes
+输出使用同一有效语义，而不是由单个目标 renderer 私自选择默认值。
+
 ## 输出格式
 
 | format | 产物 |
