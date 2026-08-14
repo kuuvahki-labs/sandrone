@@ -1,7 +1,6 @@
 package httpapi
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
@@ -77,30 +76,6 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, out any) bool {
 	}
 	if err := json.Unmarshal(body, out); err != nil {
 		writeError(w, domain.WrapError(domain.CodeInvalidArgument, "invalid JSON body", err), http.StatusBadRequest)
-		return false
-	}
-	return true
-}
-
-func decodeStrictJSON(w http.ResponseWriter, r *http.Request, out any) bool {
-	defer func() { _ = r.Body.Close() }()
-	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 16<<20))
-	if err != nil {
-		writeError(w, domain.NewError(domain.CodeInvalidArgument, "request body is too large"), http.StatusRequestEntityTooLarge)
-		return false
-	}
-	if len(strings.TrimSpace(string(body))) == 0 {
-		writeError(w, domain.NewError(domain.CodeInvalidArgument, "request body is required"), http.StatusBadRequest)
-		return false
-	}
-	decoder := json.NewDecoder(bytes.NewReader(body))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(out); err != nil {
-		writeError(w, domain.WrapError(domain.CodeInvalidArgument, "invalid JSON body", err), http.StatusBadRequest)
-		return false
-	}
-	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
-		writeError(w, domain.NewError(domain.CodeInvalidArgument, "invalid JSON body: trailing JSON value"), http.StatusBadRequest)
 		return false
 	}
 	return true
