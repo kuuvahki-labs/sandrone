@@ -104,7 +104,7 @@ describe("FileProcessorBuilder", () => {
     expect(currentProcessors()).toEqual([legacy]);
   });
 
-  it("inserts a missing dependency before native Tailscale", async () => {
+  it("shows only dependency changes when adding a preset", async () => {
     localStorage.setItem("sandrone.locale", "en-US");
     const user = userEvent.setup();
     const before: ProcessorDetail = {
@@ -124,7 +124,7 @@ describe("FileProcessorBuilder", () => {
         kind="sing-box"
         defaultValue={[
           before,
-          singBoxProcessorPreset("tailscale-native", "Native Tailscale"),
+          singBoxProcessorPreset("mptcp-direct", "MPTCP direct"),
           after,
         ]}
       />,
@@ -134,19 +134,19 @@ describe("FileProcessorBuilder", () => {
     expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue("Before");
 
     await user.click(screen.getByRole("combobox", { name: "Type" }));
-    expect(screen.getByRole("option", { name: "Native Tailscale" })).toBeInTheDocument();
-    expect(screen.getByText("Tailscale")).toBeInTheDocument();
-    await user.click(screen.getByRole("option", { name: "Native Tailscale" }));
+    expect(screen.getByRole("option", { name: "MPTCP direct" })).toBeInTheDocument();
+    await user.click(screen.getByRole("option", { name: "MPTCP direct" }));
     await user.click(screen.getByRole("button", { name: "Add processor" }));
 
     expect(currentProcessors().map((processor) => processor.name)).toEqual([
       "Before",
-      "Ensure TUN inbound",
-      "Native Tailscale",
+      "Linux/OpenWrt TUN acceleration",
+      "MPTCP direct",
       "After",
     ]);
     expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue("Before");
-    expect(screen.getByRole("alert")).toHaveTextContent("Added dependencies: Ensure TUN inbound");
+    expect(screen.getByRole("alert")).toHaveTextContent("Added dependencies: Linux/OpenWrt TUN acceleration");
+    expect(screen.getByRole("alert")).not.toHaveTextContent("Description");
   });
 
   it("preserves unsupported processors byte-for-byte in their original order", () => {

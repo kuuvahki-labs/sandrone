@@ -53,44 +53,12 @@ describe("Shadowrocket processor presets", () => {
     })).toBeNull();
   });
 
-  it("builds the exact optional INI override scenarios", () => {
-    expect(Object.fromEntries(SCENARIOS.map(({ id }) => {
-      const processor = presetDescriptor(id).build(en);
-      return [id, {
-        type: processor.type,
-        stage: processor.stage,
-        params: processor.params,
-      }];
-    }))).toEqual(Object.fromEntries(SCENARIOS.map(({ id, content }) => [id, {
-      type: "merge",
-      stage: "file",
-      params: { mode: "ini_override", content },
-    }])));
-  });
-
-  it("declares every optional scenario default off without dependencies or conflicts", () => {
+  it("declares only the supported presets", () => {
     expect(shadowrocketProcessorPresets.map((descriptor) => descriptor.id)).toEqual([
       "ntp-direct",
       "github-rule-source-mirror",
-      "disable-ipv6",
-      "udp-unsupported-direct",
-      "restricted-network-dns-fallback",
       "tailscale-native",
     ]);
-    expect(SCENARIOS.map(({ id }) => {
-      const descriptor = presetDescriptor(id);
-      return {
-        id,
-        defaultOn: descriptor.defaultOn,
-        dependencies: descriptor.dependencies,
-        conflicts: descriptor.conflicts,
-      };
-    })).toEqual(SCENARIOS.map(({ id }) => ({
-      id,
-      defaultOn: false,
-      dependencies: [],
-      conflicts: [],
-    })));
     expect(defaultShadowrocketProcessors(en).map((processor) => processor.name)).toEqual([
       "Traditional NTP Direct",
     ]);
@@ -125,10 +93,6 @@ describe("Shadowrocket processor presets", () => {
     });
     expect(recognizedFileProcessorPresetID(shadowrocketProcessorPresets, processor))
       .toBe("tailscale-native");
-    expect(`${enUS[descriptor.descriptionKey]} ${enUS[descriptor.riskKey!]}`.toLowerCase())
-      .not.toContain("module");
-    expect(`${zhCN[descriptor.descriptionKey]} ${zhCN[descriptor.riskKey!]}`)
-      .not.toContain("模块");
   });
 
   it("does not declare conflicts for native Tailscale", () => {
@@ -142,35 +106,7 @@ describe("Shadowrocket processor presets", () => {
     ).additions).toEqual([]);
   });
 
-  it.each(SCENARIOS)("recognizes only the exact INI override for $id", ({ id }) => {
-    const preset = presetDescriptor(id).build(en);
-
-    expect(recognizedFileProcessorPresetID(shadowrocketProcessorPresets, preset)).toBe(id);
-    expect(recognizedFileProcessorPresetID(shadowrocketProcessorPresets, {
-      ...preset,
-      params: { ...preset.params, content: `${String(preset.params?.content)}\n# user edit` },
-    })).toBeNull();
-    expect(recognizedFileProcessorPresetID(shadowrocketProcessorPresets, {
-      ...preset,
-      params: { ...preset.params, mode: "append" },
-    })).toBeNull();
-    expect(recognizedFileProcessorPresetID(shadowrocketProcessorPresets, {
-      ...preset,
-      type: "script",
-    })).toBeNull();
-  });
-
-  it("uses the fixed risk copy and exposes no Shadowrocket QUIC preset surface", () => {
-    expect(enUS["processors.filePreset.shadowrocket.disableIPv6.risk"]).toBe(
-      "This controls only the IPv6 behavior expressible in Shadowrocket configuration and does not guarantee that underlying node transport never uses IPv6.",
-    );
-    expect(enUS["processors.filePreset.shadowrocket.udpUnsupportedDirect.risk"]).toBe(
-      "Matching traffic bypasses the proxy, so the real egress address, carrier path, and local DNS may be exposed.",
-    );
-    expect(enUS["processors.filePreset.shadowrocket.restrictedNetworkDNSFallback.risk"]).toBe(
-      "Domains intended for direct resolution may instead be resolved through the proxy.",
-    );
-
+  it("exposes no Shadowrocket QUIC preset surface", () => {
     const surface = shadowrocketProcessorPresets.map((preset) => ({
       id: preset.id,
       labelKey: preset.labelKey,
@@ -181,28 +117,6 @@ describe("Shadowrocket processor presets", () => {
     expect(JSON.stringify(surface).toLowerCase()).not.toContain("quic");
   });
 });
-
-const SCENARIOS = [
-  {
-    id: "disable-ipv6",
-    content: `# sandrone:shadowrocket-preset=disable-ipv6
-[General]
-ipv6 = false
-prefer-ipv6 = false`,
-  },
-  {
-    id: "udp-unsupported-direct",
-    content: `# sandrone:shadowrocket-preset=udp-unsupported-direct
-[General]
-udp-policy-not-supported-behaviour = DIRECT`,
-  },
-  {
-    id: "restricted-network-dns-fallback",
-    content: `# sandrone:shadowrocket-preset=restricted-network-dns-fallback
-[General]
-dns-direct-fallback-proxy = true`,
-  },
-] as const;
 
 function presetDescriptor(id: string) {
   const descriptor = shadowrocketProcessorPresets.find((preset) => preset.id === id);

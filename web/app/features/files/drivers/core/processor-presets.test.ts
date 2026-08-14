@@ -30,13 +30,13 @@ describe("file processor preset planner", () => {
     const plan = planFileProcessorPresetAddition(catalog, "tailscale-native", current);
 
     expect(plan.additions).toEqual([{
-      presetID: "ensure-tun",
-      processor: built("ensure-tun"),
+      presetID: "native-base",
+      processor: built("native-base"),
       beforeIndex: 1,
     }]);
     expect(plan.removeIndices).toEqual([]);
     const applied = applyPlan(current, plan);
-    expect(applied.map(nameOf)).toEqual(["before", "Ensure TUN", "Tailscale Native", "after"]);
+    expect(applied.map(nameOf)).toEqual(["before", "Native Base", "Tailscale Native", "after"]);
     expect(applied[0]).toBe(before);
     expect(applied[2]).toBe(native);
     expect(applied[3]).toBe(after);
@@ -115,8 +115,8 @@ describe("file processor preset planner", () => {
     const plan = planFileProcessorPresetAddition(catalog, "tailscale-native", [native]);
 
     expect(plan.removeIndices).toEqual([]);
-    expect(plan.addedPresetIDs).toEqual(["ensure-tun"]);
-    expect(applyPlan([native], plan)).toEqual([built("ensure-tun"), native]);
+    expect(plan.addedPresetIDs).toEqual(["native-base"]);
+    expect(applyPlan([native], plan)).toEqual([built("native-base"), native]);
   });
 
   it("preserves every surviving current processor by identity and relative order", () => {
@@ -198,13 +198,13 @@ const catalog: readonly FileProcessorPreset[] = [
   preset("tun", "TUN"),
   preset("linux-acceleration", "Linux", { dependencies: ["tun"], conflicts: ["stun"] }),
   preset("mptcp", "MPTCP", { dependencies: ["linux-acceleration", "tun"] }),
-  preset("ensure-tun", "Ensure TUN"),
+  preset("native-base", "Native Base"),
   preset("tailscale-external", "Tailscale External"),
   preset("tailnet-share", "Tailnet Share", { dependencies: ["tailscale-external"] }),
   preset("tailnet-access", "Tailnet Access", { dependencies: ["tailnet-share"] }),
   preset("stun", "STUN"),
   preset("tailscale-native", "Tailscale Native", {
-    dependencies: ["ensure-tun"],
+    dependencies: ["native-base"],
     conflicts: ["tailscale-external", "stun"],
   }),
   preset("unrelated", "Unrelated"),
@@ -233,7 +233,6 @@ function preset(
     id,
     category: "network",
     labelKey: "files.kind.static",
-    descriptionKey: "files.kind.static",
     defaultOn: false,
     dependencies: edges.dependencies ?? [],
     conflicts: edges.conflicts ?? [],

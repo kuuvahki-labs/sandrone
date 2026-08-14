@@ -16,7 +16,7 @@
   副本不会随 Sandrone 升级自动更新。只有内容仍与受管预设完全一致的副本才能被
   冲突规划器识别并移除；编辑过或未知的 processor 始终归用户所有。
 - 依赖补齐和冲突移除在一次明确的添加操作中完成，并保留所有非冲突 processor 的
-  相对顺序。界面会列出新增依赖、风险和被移除的冲突项。
+  相对顺序。界面只列出新增依赖和被移除的冲突项。
 - 有序规则固定为“用户/服务规则 → 按 processor 声明顺序生成的场景规则 → 私网、
   地区等通用规则 → `MATCH`/`FINAL`”。预设不改写最终策略；无法找到安全锚点时
   整步失败，不发布半成品。
@@ -48,7 +48,7 @@
 | UDP/P2P 兼容 | 改善部分游戏、语音、P2P 和打洞；Mihomo。 | 关 | 写入 `tun.endpoint-independent-nat: true`。 | 可能轻微降低性能与隐私。 | 无。 | [Mihomo TUN](https://wiki.metacubex.one/en/config/inbound/tun/) |
 | Linux/OpenWrt TUN 加速 | 在支持平台减少 TUN 路由开销；Mihomo。 | 关 | 写入 `tun.auto-route: true`、`tun.auto-redirect: true`、`find-process-mode: strict`；不会生成 `off` 或 keepalive 字段。 | 仅适合 Linux/OpenWrt；依赖 auto-route，可能与 routing mark 冲突。`strict` 只在规则需要时查询进程数据，转发流量未必能对应本地进程。 | 依赖 TUN。 | [Mihomo TUN](https://wiki.metacubex.one/en/config/inbound/tun/)、[v1.19.25 process mode](https://github.com/MetaCubeX/mihomo/blob/v1.19.25/component/process/find_process_mode.go) |
 | Windows 宽松路由 | 兼容虚拟机、多网卡或特殊路由；Mihomo。 | 关 | 写入 `tun.strict-route: false`。 | 降低 Windows 多宿主 DNS 防泄漏与不支持流量的 fail-closed 能力。 | 无。 | [Mihomo TUN](https://wiki.metacubex.one/en/config/inbound/tun/) |
-| Tailscale 原生接管 | 由 Mihomo 自身建立 Tailnet 端点；Mihomo。 | 关 | 创建唯一 `{name: TAILSCALE,type: tailscale,ephemeral:false,udp:true,accept-routes:false}` proxy；为 `+.ts.net` 配置 MagicDNS；移除两个标准外部 exclusions；在通用/最终规则前依次插入域名、IPv4 与 IPv6 TAILSCALE 规则。 | 首次启动可能由目标核心在日志打印交互式登录 URL，端点启动时首次访问可能超时。 | 依赖 TUN；与外部共存。 | [Mihomo Tailscale](https://wiki.metacubex.one/en/config/proxies/tailscale/)、[Tailscale MagicDNS](https://tailscale.com/docs/features/magicdns) |
+| Tailscale 原生接管 | 由 Mihomo 自身建立 Tailnet 端点；Mihomo。 | 关 | 创建唯一 `{name: TAILSCALE,type: tailscale,ephemeral:false,udp:true,accept-routes:false}` proxy；可编辑 processor 参数 `auth_key` 非空时写入 `auth-key`；为 `+.ts.net` 配置 MagicDNS；移除两个标准外部 exclusions；在通用/最终规则前依次插入域名、IPv4 与 IPv6 TAILSCALE 规则。 | 未填写 Auth Key 时由目标核心在日志打印交互式登录 URL；端点启动时首次访问可能超时。 | 依赖 TUN；与外部共存。 | [Mihomo Tailscale](https://wiki.metacubex.one/en/config/proxies/tailscale/)、[Tailscale MagicDNS](https://tailscale.com/docs/features/magicdns) |
 | Tailscale 共存 | 让系统中独立运行的 Tailscale 与 Mihomo TUN 共存；Mihomo。 | 关 | 把 `+.ts.net` 加入 fake-IP 例外并定向到 `100.100.100.100`；把 `100.64.0.0/10`、`fd7a:115c:a1e0::/48` 追加到 TUN route exclusions；不创建 Tailscale proxy。 | 系统 Tailscale 必须已运行并正确配置。 | 依赖 TUN；与原生接管。 | [Tailscale MagicDNS](https://tailscale.com/docs/features/magicdns)、[Tailscale DNS](https://tailscale.com/docs/reference/dns-in-tailscale) |
 | Tailnet 代理共享 | 允许 Tailnet 设备访问 Mihomo LAN listener；Mihomo。 | 关 | 把标准 Tailnet IPv4/IPv6 段追加到 `lan-allowed-ips`。 | 扩大入站来源范围；必须核对监听端口和访问控制。 | 依赖 TUN 与 Tailscale 外部共存。 | [Mihomo 全局配置](https://wiki.metacubex.one/en/config/general/)、[Tailscale CGNAT](https://tailscale.com/kb/1015/100.x-addresses) |
 
@@ -57,23 +57,18 @@
 | 预设 | 动机 | 默认 | 精确生成行为 | 风险 | 依赖 / 冲突 | 主要来源 |
 | --- | --- | --- | --- | --- | --- | --- |
 | Sniff & DNS Hijack | 在路由前识别协议并接管 DNS。 | 开 | 通过 JSON override 前插 `{action:"sniff"}`，再前插匹配 DNS 协议或端口 53 的 `hijack-dns` logical rule。 | 检查连接元数据并改变 resolver 路径。 | QUIC 预设依赖它。 | [sing-box Sniff](https://sing-box.sagernet.org/configuration/route/rule_action/#sniff)、[DNS Hijack](https://sing-box.sagernet.org/configuration/route/rule_action/#hijack-dns) |
-| 确保 TUN 入站 | 为结构预设提供唯一安全 TUN 目标。 | 关 | `tag: tun-in` 优先；否则接受唯一 `type: tun`。没有 TUN 时仅本预设追加标准 `tun-in`（双栈地址、auto_route/strict_route 为 true）；歧义或同名非 TUN 安全失败。 | 新 TUN 会接管系统路由并需要平台权限。 | Linux 加速和两种 Tailscale 模式依赖它。 | [sing-box TUN](https://sing-box.sagernet.org/configuration/inbound/tun/) |
 | QUIC 强制回退 | 迫使兼容流量回退至 TCP。 | 关 | 依赖 sniff，在通用规则前插入 `{protocol:"quic",action:"reject"}`。 | 失去 HTTP/3 优势，必须使用 QUIC 的应用可能失败。 | 依赖 Sniff & DNS Hijack。 | [RFC 9000](https://www.rfc-editor.org/rfc/rfc9000)、[sing-box Protocol](https://sing-box.sagernet.org/configuration/route/rule/#protocol) |
-| 仅 IPv4 | 修复 IPv6 路由、DNS 或节点能力不完整的网络。 | 关 | 设置 `dns.strategy="ipv4_only"`，仅从选定 TUN 的 `address` 删除 IPv6 前缀；其它 IPv6 配置不变。 | IPv6-only 资源不可达；不是通用性能优化。 | 需要当前配置已有唯一 TUN。 | [sing-box DNS](https://sing-box.sagernet.org/configuration/dns/)、[sing-box TUN](https://sing-box.sagernet.org/configuration/inbound/tun/) |
 | UDP/P2P 兼容 | 改善部分游戏、语音、P2P 和打洞。 | 关 | 在选定 TUN 写入 `endpoint_independent_nat: true`。 | 仅 gVisor 栈有额外效果；其它支持栈本身已使用 EIM。可能轻微降低性能。 | 需要唯一 TUN。 | [sing-box TUN](https://sing-box.sagernet.org/configuration/inbound/tun/) |
-| Linux/OpenWrt TUN 加速 | 在支持平台启用 auto-redirect。 | 关 | 在选定 TUN 写入 `auto_route: true` 与 `auto_redirect: true`。 | 仅适合支持的 Linux/OpenWrt 环境；依赖 auto-route，可能与 routing mark 冲突。 | 依赖确保 TUN。 | [sing-box TUN](https://sing-box.sagernet.org/configuration/inbound/tun/) |
-| MPTCP 直连 | 避免 sing-box 无法透明代理的 MPTCP 被错误处理。 | 关 | 在选定 TUN 写入 `exclude_mptcp: true`。 | MPTCP 绕过代理策略并暴露真实直连出口。 | 依赖 Linux/OpenWrt TUN 加速（继而依赖确保 TUN）。 | [sing-box TUN](https://sing-box.sagernet.org/configuration/inbound/tun/) |
+| Linux/OpenWrt TUN 加速 | 在支持平台启用 auto-redirect。 | 关 | 在选定 TUN 写入 `auto_route: true` 与 `auto_redirect: true`。 | 仅适合支持的 Linux/OpenWrt 环境；依赖 auto-route，可能与 routing mark 冲突。 | 需要当前配置已有唯一 TUN。 | [sing-box TUN](https://sing-box.sagernet.org/configuration/inbound/tun/) |
+| MPTCP 直连 | 避免 sing-box 无法透明代理的 MPTCP 被错误处理。 | 关 | 在选定 TUN 写入 `exclude_mptcp: true`。 | MPTCP 绕过代理策略并暴露真实直连出口。 | 依赖 Linux/OpenWrt TUN 加速。 | [sing-box TUN](https://sing-box.sagernet.org/configuration/inbound/tun/) |
 | Windows 宽松路由 | 兼容 Windows 虚拟机、多网卡或特殊路由。 | 关 | 在选定 TUN 写入 `strict_route: false`。 | 降低多宿主 DNS 防泄漏与不支持流量的 fail-closed 能力。 | 需要当前配置已有唯一 TUN。 | [sing-box TUN](https://sing-box.sagernet.org/configuration/inbound/tun/) |
-| Tailscale 原生接管 | 由 sing-box v1.13.14 自身建立 Tailnet endpoint。 | 关 | 创建唯一 `{type:"tailscale",tag:"ts-ep",ephemeral:false,accept_routes:false}` endpoint；移除标准外部 exclusions；添加 `{type:"tailscale",tag:"ts-dns",endpoint:"ts-ep",accept_default_resolvers:false}` DNS server、legacy `{ip_accept_any:true,server:"ts-dns"}` DNS rule，以及在通用/最终规则前的 `{preferred_by:["ts-ep"],action:"route",outbound:"ts-ep"}` route rule；`dns.final`、`route.final` 不变。 | 首次启动可能由目标核心在日志打印交互式登录 URL，端点启动时首次访问可能超时。 | 依赖确保 TUN；与外部共存。 | [sing-box Tailscale endpoint](https://sing-box.sagernet.org/configuration/endpoint/tailscale/)、[Tailscale DNS server](https://sing-box.sagernet.org/configuration/dns/server/tailscale/)、[preferred_by](https://sing-box.sagernet.org/configuration/route/rule/#preferred_by) |
-| Tailscale 共存 | 让系统 Tailscale 与 sing-box TUN 共存。 | 关 | 精确去重后把两个标准地址段加入选定 TUN `route_exclude_address`；添加 `{type:"udp",tag:"ts-dns",server:"100.100.100.100"}`，并只用 `domain_suffix:["ts.net"]` DNS rule 路由到它；不创建 endpoint；`dns.final`、`route.final` 不变。 | 系统 Tailscale 必须已运行并正确配置。 | 依赖确保 TUN；与原生接管。 | [Tailscale MagicDNS](https://tailscale.com/docs/features/magicdns)、[Tailscale DNS](https://tailscale.com/docs/reference/dns-in-tailscale) |
+| Tailscale 原生接管 | 由 sing-box v1.13.14 自身建立 Tailnet endpoint。 | 关 | 创建唯一 `{type:"tailscale",tag:"ts-ep",ephemeral:false,accept_routes:false}` endpoint；可编辑 processor 参数 `auth_key` 非空时写入同名 endpoint 字段；移除标准外部 exclusions；添加 `{type:"tailscale",tag:"ts-dns",endpoint:"ts-ep",accept_default_resolvers:false}` DNS server、legacy `{ip_accept_any:true,server:"ts-dns"}` DNS rule，以及在通用/最终规则前的 `{preferred_by:["ts-ep"],action:"route",outbound:"ts-ep"}` route rule；`dns.final`、`route.final` 不变。 | 未填写 Auth Key 时由目标核心在日志打印交互式登录 URL；端点启动时首次访问可能超时。 | 需要当前配置已有唯一 TUN；与外部共存。 | [sing-box Tailscale endpoint](https://sing-box.sagernet.org/configuration/endpoint/tailscale/)、[Tailscale DNS server](https://sing-box.sagernet.org/configuration/dns/server/tailscale/)、[preferred_by](https://sing-box.sagernet.org/configuration/route/rule/#preferred_by) |
+| Tailscale 共存 | 让系统 Tailscale 与 sing-box TUN 共存。 | 关 | 精确去重后把两个标准地址段加入选定 TUN `route_exclude_address`；添加 `{type:"udp",tag:"ts-dns",server:"100.100.100.100"}`，并只用 `domain_suffix:["ts.net"]` DNS rule 路由到它；不创建 endpoint；`dns.final`、`route.final` 不变。 | 系统 Tailscale 必须已运行并正确配置。 | 需要当前配置已有唯一 TUN；与原生接管。 | [Tailscale MagicDNS](https://tailscale.com/docs/features/magicdns)、[Tailscale DNS](https://tailscale.com/docs/reference/dns-in-tailscale) |
 
 ## Shadowrocket 预设
 
 | 预设 | 动机 | 默认 | 精确生成行为 | 风险 | 依赖 / 冲突 | 主要来源 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 关闭 IPv6 | 兼容 IPv6 路由、DNS 或策略不完整的网络。 | 关 | 只在 `[General]` 写入 `ipv6=false`、`prefer-ipv6=false`。 | 只控制配置可表达的行为；不保证节点底层传输永远不使用 IPv6。 | 无。 | [Shadowrocket 社区配置](https://github.com/LOWERTOP/Shadowrocket/blob/5f1916b5897fc59fb7172aca59ae52050a3532fe/lazy.conf) |
-| 不支持 UDP 时直连 | 兼容不支持 UDP 转发的节点策略。 | 关 | 只写入 `udp-policy-not-supported-behaviour=DIRECT`；基础默认仍是 `REJECT`。 | 流量绕过代理，真实出口、运营商路径和本地 DNS 可能暴露。 | 无。 | [Shadowrocket 社区配置](https://github.com/LOWERTOP/Shadowrocket/blob/5f1916b5897fc59fb7172aca59ae52050a3532fe/lazy.conf) |
-| 受限网络 DNS 回退 | 直连 DNS 在受限网络失败时经代理重试。 | 关 | 只写入 `dns-direct-fallback-proxy=true`；基础默认仍为 false。 | 本应直连解析的域名可能改经代理。 | 无。 | [Shadowrocket 社区配置](https://github.com/LOWERTOP/Shadowrocket/blob/5f1916b5897fc59fb7172aca59ae52050a3532fe/lazy.conf) |
 | Tailscale 原生接管 | 使用 Shadowrocket 自身的 TAILSCALE policy。 | 关 | 在通用/FINAL 前精确插入 `DOMAIN-SUFFIX,ts.net,TAILSCALE`、`IP-CIDR,100.64.0.0/10,TAILSCALE,no-resolve`、`IP-CIDR,fd7a:115c:a1e0::/48,TAILSCALE,no-resolve`。没有外部共存模式，也不显示模块启用提醒。 | Tailscale 的可用性和认证由 Shadowrocket 自身控制。 | 无。 | [Shadowrocket 社区配置](https://github.com/LOWERTOP/Shadowrocket/blob/5f1916b5897fc59fb7172aca59ae52050a3532fe/lazy.conf) |
 
 ## Tailscale 三态与安全边界
@@ -83,11 +78,12 @@
 模式互斥且默认都关闭。Shadowrocket 只有关闭和原生 TAILSCALE policy 两态，
 不提供外部共存。
 
-Sandrone 不接收、保存或生成 Auth Key，不提供登录表单、登录 URL、二维码、
-Headscale 或自定义 control URL，也不自动选择 Exit Node。原生 endpoint 使用默认
-hostname/state directory，省略 advertise、relay、SSH、MTU 与 system-interface
-等高级字段；`accept_routes` 保持 false。目标核心自身可能在日志中提供登录信息，
-这不是 Sandrone 的登录交互。
+Mihomo 与 sing-box 原生预设都在 processor `args` 中提供可编辑 `auth_key`。非空值
+会随文件配置保存并写入目标核心；空值则省略该字段，由目标核心提供交互式登录。
+Sandrone 不生成 Auth Key，也不提供登录表单、登录 URL、二维码、Headscale、
+自定义 control URL 或 Exit Node 选择。原生 endpoint 使用默认 hostname/state
+directory，省略 advertise、relay、SSH、MTU 与 system-interface 等高级字段；
+`accept_routes` 保持 false。
 
 标准 `100.64.0.0/10` 与 `fd7a:115c:a1e0::/48` 只是可编辑起点，不代表用户
 发布的 subnet routes。需要额外子网 CIDR 时，用户应编辑已经复制到文件中的

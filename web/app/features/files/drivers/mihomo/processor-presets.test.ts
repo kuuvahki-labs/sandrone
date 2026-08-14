@@ -156,7 +156,7 @@ tun:
     });
   });
 
-  it("builds an exact no-argument native Tailscale script and recognizes only its raw source", () => {
+  it("builds native Tailscale with editable auth_key and recognizes its managed params", () => {
     const id = "tailscale-native";
     const preset = mihomoProcessorPreset(id);
 
@@ -166,6 +166,7 @@ tun:
       stage: "file",
       params: {
         source: { type: "inline", content: expect.any(String) },
+        args: { auth_key: "" },
       },
     });
     expect(recognizedFileProcessorPresetID(mihomoProcessorPresets, preset)).toBe(id);
@@ -180,6 +181,10 @@ tun:
       ...preset,
       params: { ...params, args: {} },
     })).toBeNull();
+    expect(recognizedFileProcessorPresetID(mihomoProcessorPresets, {
+      ...preset,
+      params: { ...params, args: { auth_key: "tskey-auth-test" } },
+    })).toBe(id);
   });
 
   it("applies native Tailscale atomically, exactly once, and before the safe generic anchor", () => {
@@ -210,10 +215,10 @@ tun:
       },
     };
 
-    const first = runNativeTailscale(original);
+    const first = runNativeTailscale(original, "tskey-auth-test");
     expect(first.stringifyCalls).toBe(1);
     expect(first.document.proxies).toEqual([
-      { name: "TAILSCALE", type: "tailscale", ephemeral: false, udp: true, "accept-routes": false },
+      { name: "TAILSCALE", type: "tailscale", "auth-key": "tskey-auth-test", ephemeral: false, udp: true, "accept-routes": false },
       original.proxies[1],
     ]);
     expect(first.document.rules).toEqual([
@@ -235,7 +240,7 @@ tun:
       "route-exclude-address": ["192.0.2.0/24"],
     });
 
-    const second = runNativeTailscale(first.document);
+    const second = runNativeTailscale(first.document, "tskey-auth-test");
     expect(second.document).toEqual(first.document);
     expect(second.stringifyCalls).toBe(1);
   });
@@ -422,13 +427,6 @@ tun:
     expect(nativeSurvivors[0]).toBe(editedTailnetShare);
   });
 
-  it("explains external ownership and native login/startup risks in both locales", () => {
-    expect(enUS["processors.filePreset.mihomo.tailscaleExternal.risk"]).toContain("independent system Tailscale");
-    expect(zhCN["processors.filePreset.mihomo.tailscaleExternal.risk"]).toContain("独立的系统 Tailscale");
-    expect(enUS["processors.filePreset.mihomo.tailscaleNative.risk"]).toMatch(/omits the Auth Key.*interactive login URL.*first access may time out/);
-    expect(zhCN["processors.filePreset.mihomo.tailscaleNative.risk"]).toMatch(/省略 Auth Key.*交互式登录 URL.*首次访问可能超时/);
-  });
-
   it("has no keepalive preset surface and never disables process lookup", () => {
     const managedSurface = mihomoProcessorPresets.map((preset) => ({
       id: preset.id,
@@ -494,8 +492,8 @@ function presetContent(id: MihomoProcessorPresetID): string {
   return String(content);
 }
 
-function runNativeTailscale(document: Record<string, unknown>) {
-  const execution = prepareNativeTailscale(document);
+function runNativeTailscale(document: Record<string, unknown>, authKey = "") {
+  const execution = prepareNativeTailscale(document, undefined, authKey);
   execution.run();
   return {
     document: load(execution.input.file.content) as Record<string, unknown>,
@@ -506,11 +504,12 @@ function runNativeTailscale(document: Record<string, unknown>) {
 function prepareNativeTailscale(
   document: Record<string, unknown>,
   stringify = (value: unknown) => dump(JSON.parse(JSON.stringify(value))),
+  authKey = "",
 ) {
   const preset = mihomoProcessorPreset("tailscale-native");
   const source = (preset.params?.source as Record<string, unknown> | undefined)?.content;
   expect(typeof source).toBe("string");
-  const input = { file: { content: dump(document) } };
+  const input = { file: { content: dump(document) }, args: { auth_key: authKey } };
   let stringifyCalls = 0;
   const api = {
     yaml: {

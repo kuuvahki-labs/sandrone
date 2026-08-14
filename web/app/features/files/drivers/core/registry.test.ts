@@ -248,7 +248,6 @@ function processorPreset(
     id,
     category: "network",
     labelKey: "files.kind.static",
-    descriptionKey: "files.kind.static",
     defaultOn: false,
     dependencies: edges.dependencies ?? [],
     conflicts: edges.conflicts ?? [],

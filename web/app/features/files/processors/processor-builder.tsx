@@ -54,8 +54,6 @@ const FILE_PROCESSOR_PRESET_CATALOGS = FILE_DRIVER_REGISTRY.drivers
   .map((driver) => driver.processors.presets);
 
 type PresetNotice = {
-  description: string;
-  risk?: string;
   dependencyLabels: string[];
   removedLabels: string[];
 };
@@ -108,14 +106,13 @@ export function FileProcessorBuilder({ defaultValue = [], kind, onDirty, onValid
         t,
       );
       const addedIDs = new Set(plan.addedPresetIDs);
-      setPresetNotice({
-        description: t(requested.descriptionKey),
-        ...(requested.riskKey ? { risk: t(requested.riskKey) } : {}),
+      const notice = {
         dependencyLabels: plan.dependencyPresetIDs
           .filter((id) => addedIDs.has(id))
           .map((id) => presetLabel(driver, id, t)),
         removedLabels: plan.removedPresetIDs.map((id) => presetLabel(driver, id, t)),
-      });
+      };
+      setPresetNotice(notice.dependencyLabels.length || notice.removedLabels.length ? notice : null);
       return applyFileProcessorPresetPlan(current, plan);
     }
     return [...current, { id: createProcessorID(), name: "", type, params: defaultParams(type, kind) }];
@@ -142,10 +139,8 @@ export function FileProcessorBuilder({ defaultValue = [], kind, onDirty, onValid
         onValueChange={handleValueChange}
       />
       {presetNotice ? (
-        <Alert severity={presetNotice.risk ? "warning" : "info"}>
+        <Alert severity="info">
           <div className="grid gap-1">
-            <div><strong>{t("processors.filePreset.notice.description")}:</strong> {presetNotice.description}</div>
-            {presetNotice.risk ? <div>{presetNotice.risk}</div> : null}
             {presetNotice.dependencyLabels.length ? (
               <div><strong>{t("processors.filePreset.notice.addedDependencies")}:</strong> {presetNotice.dependencyLabels.join(", ")}</div>
             ) : null}

@@ -21,9 +21,7 @@ import type { ProcessorDetail } from "~/shared/resources/types";
 export type SingBoxProcessorPresetID =
   | "sniff"
   | "ntp-direct"
-  | "ensure-tun"
   | "quic-fallback"
-  | "ipv4-only"
   | "udp-p2p-eim"
   | "linux-tun-acceleration"
   | "mptcp-direct"
@@ -78,8 +76,6 @@ const STRUCTURE_PRESETS: Record<
   SingBoxStructureProcessorPresetID,
   SingBoxStructureProcessorPresetOptions
 > = {
-  "ensure-tun": { operation: "ensure-tun" },
-  "ipv4-only": { operation: "ipv4-only" },
   "udp-p2p-eim": { operation: "udp-p2p-eim" },
   "linux-tun-acceleration": {
     operation: "linux-tun-acceleration",
@@ -102,8 +98,6 @@ export const singBoxProcessorPresets: readonly FileProcessorPreset[] = [
     id: "sniff",
     category: "network",
     labelKey: "processors.filePreset.singBox.sniff.label",
-    descriptionKey: "processors.filePreset.singBox.sniff.description",
-    riskKey: "processors.filePreset.singBox.sniff.risk",
     defaultOn: true,
     dependencies: [],
     conflicts: [],
@@ -118,8 +112,6 @@ export const singBoxProcessorPresets: readonly FileProcessorPreset[] = [
     id: NTP_DIRECT_PRESET.id,
     category: "network",
     labelKey: "processors.filePreset.ntpDirect.label",
-    descriptionKey: "processors.filePreset.ntpDirect.description",
-    riskKey: "processors.filePreset.ntpDirect.risk",
     defaultOn: true,
     dependencies: [],
     conflicts: [],
@@ -127,71 +119,43 @@ export const singBoxProcessorPresets: readonly FileProcessorPreset[] = [
     recognize: (processor) => recognizeOrderedRuleProcessorPreset(processor, NTP_DIRECT_PRESET),
   },
   githubRuleSourceMirrorPreset,
-  structureDescriptor(
-    "ensure-tun",
-    "network",
-    "processors.filePreset.singBox.ensureTun.label",
-    "processors.filePreset.singBox.ensureTun.description",
-    "processors.filePreset.singBox.ensureTun.risk",
-  ),
   orderedRuleDescriptor(
     ORDERED_RULE_PRESETS["quic-fallback"],
     "network",
     "processors.filePreset.singBox.quicFallback.label",
-    "processors.filePreset.singBox.quicFallback.description",
-    "processors.filePreset.singBox.quicFallback.risk",
     ["sniff"],
-  ),
-  structureDescriptor(
-    "ipv4-only",
-    "network",
-    "processors.filePreset.singBox.ipv4Only.label",
-    "processors.filePreset.singBox.ipv4Only.description",
-    "processors.filePreset.singBox.ipv4Only.risk",
   ),
   structureDescriptor(
     "udp-p2p-eim",
     "network",
     "processors.filePreset.singBox.udpP2pEim.label",
-    "processors.filePreset.singBox.udpP2pEim.description",
-    "processors.filePreset.singBox.udpP2pEim.risk",
     [],
   ),
   structureDescriptor(
     "linux-tun-acceleration",
     "platform",
     "processors.filePreset.singBox.linuxTunAcceleration.label",
-    "processors.filePreset.singBox.linuxTunAcceleration.description",
-    "processors.filePreset.singBox.linuxTunAcceleration.risk",
-    ["ensure-tun"],
+    [],
   ),
   structureDescriptor(
     "mptcp-direct",
     "platform",
     "processors.filePreset.singBox.mptcpDirect.label",
-    "processors.filePreset.singBox.mptcpDirect.description",
-    "processors.filePreset.singBox.mptcpDirect.risk",
     ["linux-tun-acceleration"],
   ),
   structureDescriptor(
     "windows-relaxed-route",
     "platform",
     "processors.filePreset.singBox.windowsRelaxedRoute.label",
-    "processors.filePreset.singBox.windowsRelaxedRoute.description",
-    "processors.filePreset.singBox.windowsRelaxedRoute.risk",
   ),
   tailscaleDescriptor(
     "tailscale-native",
     "processors.filePreset.singBox.tailscaleNative.label",
-    "processors.filePreset.singBox.tailscaleNative.description",
-    "processors.filePreset.singBox.tailscaleNative.risk",
     ["tailscale-external"],
   ),
   tailscaleDescriptor(
     "tailscale-external",
     "processors.filePreset.singBox.tailscaleExternal.label",
-    "processors.filePreset.singBox.tailscaleExternal.description",
-    "processors.filePreset.singBox.tailscaleExternal.risk",
     ["tailscale-native"],
   ),
 ];
@@ -218,8 +182,6 @@ function orderedRuleDescriptor(
   options: OrderedRuleProcessorPresetOptions,
   category: FileProcessorPresetCategory,
   labelKey: FileProcessorPreset["labelKey"],
-  descriptionKey: FileProcessorPreset["descriptionKey"],
-  riskKey: NonNullable<FileProcessorPreset["riskKey"]>,
   dependencies: readonly SingBoxProcessorPresetID[] = [],
   conflicts: readonly SingBoxProcessorPresetID[] = [],
 ): FileProcessorPreset {
@@ -227,8 +189,6 @@ function orderedRuleDescriptor(
     id: options.id,
     category,
     labelKey,
-    descriptionKey,
-    riskKey,
     defaultOn: false,
     dependencies,
     conflicts,
@@ -241,8 +201,6 @@ function structureDescriptor(
   id: SingBoxStructureProcessorPresetID,
   category: FileProcessorPresetCategory,
   labelKey: FileProcessorPreset["labelKey"],
-  descriptionKey: FileProcessorPreset["descriptionKey"],
-  riskKey: NonNullable<FileProcessorPreset["riskKey"]>,
   dependencies: readonly SingBoxProcessorPresetID[] = [],
   conflicts: readonly SingBoxProcessorPresetID[] = [],
 ): FileProcessorPreset {
@@ -251,8 +209,6 @@ function structureDescriptor(
     id,
     category,
     labelKey,
-    descriptionKey,
-    riskKey,
     defaultOn: false,
     dependencies,
     conflicts,
@@ -271,6 +227,7 @@ function tailscaleProcessor(id: SingBoxTailscaleProcessorPresetID, name: string)
         type: "inline",
         content: TAILSCALE_SCRIPTS[id],
       },
+      ...(id === "tailscale-native" ? { args: { auth_key: "" } } : {}),
     },
   };
 }
@@ -278,27 +235,30 @@ function tailscaleProcessor(id: SingBoxTailscaleProcessorPresetID, name: string)
 function tailscaleDescriptor(
   id: SingBoxTailscaleProcessorPresetID,
   labelKey: FileProcessorPreset["labelKey"],
-  descriptionKey: FileProcessorPreset["descriptionKey"],
-  riskKey: NonNullable<FileProcessorPreset["riskKey"]>,
   conflicts: readonly SingBoxProcessorPresetID[],
 ): FileProcessorPreset {
   return {
     id,
     category: "tailscale",
     labelKey,
-    descriptionKey,
-    riskKey,
     defaultOn: false,
-    dependencies: ["ensure-tun"],
+    dependencies: [],
     conflicts,
     build: (t) => tailscaleProcessor(id, t(labelKey)),
     recognize: (processor) => {
-      if (processor.type !== "script") return false;
-      if (!isExactRecord(processor.params, ["source"])) return false;
+      if (processor.type !== "script" || !processor.params) return false;
+      const expectedKeys = id === "tailscale-native" && "args" in processor.params
+        ? ["args", "source"]
+        : ["source"];
+      if (!isExactRecord(processor.params, expectedKeys)) return false;
       const source = processor.params.source;
-      return isExactRecord(source, ["content", "type"])
-        && source.type === "inline"
-        && source.content === TAILSCALE_SCRIPTS[id];
+      if (!isExactRecord(source, ["content", "type"])
+        || source.type !== "inline"
+        || source.content !== TAILSCALE_SCRIPTS[id]) return false;
+      if (!("args" in processor.params)) return true;
+      const args = processor.params.args;
+      return isExactRecord(args, ["auth_key"])
+        && typeof args.auth_key === "string";
     },
   };
 }

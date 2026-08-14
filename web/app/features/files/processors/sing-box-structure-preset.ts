@@ -3,8 +3,6 @@ import type { ProcessorDetail } from "~/shared/resources/types";
 import updateSingBoxTunScript from "./scripts/update-sing-box-tun.js?raw";
 
 export type SingBoxStructureOperation =
-  | "ensure-tun"
-  | "ipv4-only"
   | "udp-p2p-eim"
   | "linux-tun-acceleration"
   | "mptcp-direct"

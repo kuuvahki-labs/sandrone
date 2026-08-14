@@ -12,8 +12,6 @@ import {
 } from "./sing-box-structure-preset";
 
 const OPTIONS: Readonly<Record<SingBoxStructureOperation, SingBoxStructureProcessorPresetOptions>> = {
-  "ensure-tun": { operation: "ensure-tun" },
-  "ipv4-only": { operation: "ipv4-only" },
   "udp-p2p-eim": { operation: "udp-p2p-eim" },
   "linux-tun-acceleration": {
     operation: "linux-tun-acceleration",
@@ -25,25 +23,15 @@ const OPTIONS: Readonly<Record<SingBoxStructureOperation, SingBoxStructureProces
 };
 
 const NAMES: Readonly<Record<SingBoxStructureOperation, string>> = {
-  "ensure-tun": "确保 TUN 入站",
-  "ipv4-only": "仅 IPv4",
   "udp-p2p-eim": "UDP/P2P 兼容",
   "linux-tun-acceleration": "Linux/OpenWrt TUN 加速",
   "mptcp-direct": "MPTCP 直连",
   "windows-relaxed-route": "Windows 宽松路由",
 };
 
-const EXPECTED_TUN = {
-  type: "tun",
-  tag: "tun-in",
-  address: ["172.19.0.1/30", "fdfe:dcba:9876::1/126"],
-  auto_route: true,
-  strict_route: true,
-};
-
 describe("sing-box structure processor presets", () => {
   it("documents the managed operation parameter in the script header", () => {
-    const header = inlineSource(singBoxStructureProcessorPreset(OPTIONS["ensure-tun"]))
+    const header = inlineSource(singBoxStructureProcessorPreset(OPTIONS["udp-p2p-eim"]))
       .split("function main")[0];
 
     expect(header).toContain("// Parameters:");
@@ -67,7 +55,7 @@ describe("sing-box structure processor presets", () => {
   });
 
   it("requires the exact raw source, operation, source shape, and args shape", () => {
-    const options = OPTIONS["ipv4-only"];
+    const options = OPTIONS["udp-p2p-eim"];
     const processor = singBoxStructureProcessorPreset(options);
     const params = processor.params as Record<string, unknown>;
     const source = params.source as Record<string, unknown>;
@@ -79,7 +67,7 @@ describe("sing-box structure processor presets", () => {
     }, options)).toBe(false);
     expect(recognizeSingBoxStructureProcessorPreset({
       ...processor,
-      params: { ...params, args: { operation: "ensure-tun" } },
+      params: { ...params, args: { operation: "mptcp-direct" } },
     }, options)).toBe(false);
     expect(recognizeSingBoxStructureProcessorPreset({
       ...processor,
@@ -91,31 +79,7 @@ describe("sing-box structure processor presets", () => {
     }, options)).toBe(false);
   });
 
-  it("appends the canonical TUN only when no TUN exists", () => {
-    const original = {
-      dns: { strategy: "prefer_ipv4" },
-      inbounds: [
-        { type: "mixed", tag: "mixed-in", listen_port: 2080 },
-        { type: "redirect", tag: "custom-in", listen: "::1" },
-      ],
-    };
-
-    const first = runOperation("ensure-tun", original);
-    expect(first.document.inbounds).toEqual([
-      original.inbounds[0],
-      original.inbounds[1],
-      EXPECTED_TUN,
-    ]);
-    expect(first.stringifyCalls).toBe(1);
-
-    const second = runOperation("ensure-tun", first.document);
-    expect(second.document.inbounds).toEqual(first.document.inbounds);
-    expect(second.document.inbounds).toHaveLength(3);
-    expect(second.stringifyCalls).toBe(1);
-  });
-
   it.each([
-    ["ipv4-only", { address: ["172.19.0.1/30"], dnsStrategy: "ipv4_only" }],
     ["udp-p2p-eim", { endpoint_independent_nat: true }],
     ["linux-tun-acceleration", { auto_route: true, auto_redirect: true }],
     ["mptcp-direct", { exclude_mptcp: true }],
@@ -154,15 +118,7 @@ describe("sing-box structure processor presets", () => {
     expect(inbounds[2]).toEqual(custom);
     expect(result.document.experimental).toEqual(original.experimental);
     expect((result.document.dns as Record<string, unknown>).servers).toEqual(original.dns.servers);
-    if ("dnsStrategy" in expected) {
-      expect(inbounds[3]).toMatchObject({ address: expected.address });
-      expect((result.document.dns as Record<string, unknown>).strategy).toBe(expected.dnsStrategy);
-      expect(inbounds[3].address).toEqual(expected.address);
-      expect(inbounds[1].address).toEqual(unrelatedTun.address);
-      expect(inbounds[3].custom).toEqual(selected.custom);
-    } else {
-      expect(inbounds[3]).toMatchObject(expected);
-    }
+    expect(inbounds[3]).toMatchObject(expected);
     expect(result.stringifyCalls).toBe(1);
   });
 
@@ -185,7 +141,7 @@ describe("sing-box structure processor presets", () => {
     ]);
   });
 
-  it.each(["ipv4-only", "udp-p2p-eim", "linux-tun-acceleration", "mptcp-direct", "windows-relaxed-route"] as const)(
+  it.each(["udp-p2p-eim", "linux-tun-acceleration", "mptcp-direct", "windows-relaxed-route"] as const)(
     "rejects a missing TUN for %s without stringifying or assigning partial content",
     (operation) => {
       const execution = prepareOperation(operation, { inbounds: [{ type: "mixed", tag: "mixed-in" }] });
@@ -197,8 +153,8 @@ describe("sing-box structure processor presets", () => {
     },
   );
 
-  it("rejects ambiguous TUN selection even for ensure without mutation", () => {
-    const execution = prepareOperation("ensure-tun", {
+  it("rejects ambiguous TUN selection without mutation", () => {
+    const execution = prepareOperation("udp-p2p-eim", {
       inbounds: [
         { type: "tun", tag: "first" },
         { type: "tun", tag: "second" },
@@ -212,7 +168,7 @@ describe("sing-box structure processor presets", () => {
   });
 
   it("fails closed when the exact tun-in tag belongs to a non-TUN inbound", () => {
-    const execution = prepareOperation("ensure-tun", {
+    const execution = prepareOperation("udp-p2p-eim", {
       inbounds: [
         { type: "mixed", tag: "tun-in" },
         { type: "tun", tag: "custom-tun" },
@@ -242,19 +198,6 @@ describe("sing-box structure processor presets", () => {
     expect(execution.stringifyCalls()).toBe(0);
   });
 
-  it("validates the selected address before cloning the IPv4-only result", () => {
-    const execution = prepareOperation("ipv4-only", {
-      dns: { strategy: "prefer_ipv4" },
-      inbounds: [{ type: "tun", tag: "tun-in", address: "172.19.0.1/30" }],
-    });
-    const before = execution.input.file.content;
-
-    expect(execution.run).toThrowError(
-      "Sandrone sing-box IPv4-only preset requires TUN address to be an array of strings",
-    );
-    expect(execution.input.file.content).toBe(before);
-    expect(execution.stringifyCalls()).toBe(0);
-  });
 });
 
 function inlineSource(processor: ProcessorDetail): string {

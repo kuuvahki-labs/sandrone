@@ -77,7 +77,6 @@ export const fileEnUS = {
   "files.config.replaceRawSettingsConfirm": "Replace raw settings with the structured template? This discards fields the editor cannot represent.",
   "files.processor.opaquePreserved": "This processor is unsupported by the editor and will be preserved unchanged.",
   "files.processor.githubRuleSourceMirrorPreset": "GitHub rule source mirror replacement",
-  "files.processor.githubRuleSourceMirrorPresetDescription": "Replace built-in GitHub Raw rule-source URLs with editable mirror URLs.",
   "processor.merge.mode.jsonOverlay": "JSON overlay",
   "processor.merge.mode.jsonOverride": "JSON composable override",
   "processor.merge.mode.iniOverride": "INI override",

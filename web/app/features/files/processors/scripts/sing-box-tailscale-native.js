@@ -2,6 +2,7 @@
 
 function main(input, api) {
   const document = api.json.parse(input.file.content);
+  const authKey = optionalStringArg(input, "auth_key");
   if (!isObject(document)) {
     throw new Error("Sandrone sing-box Tailscale native preset requires a JSON object");
   }
@@ -47,7 +48,7 @@ function main(input, api) {
   );
 
   for (const endpoint of endpoints) {
-    if (endpoint.tag === "ts-ep" && !exactEqual(endpoint, NATIVE_ENDPOINT)) {
+    if (endpoint.tag === "ts-ep" && !isCompatibleNativeEndpoint(endpoint)) {
       throw new Error("Sandrone sing-box Tailscale native preset found incompatible endpoint tag ts-ep");
     }
   }
@@ -81,7 +82,7 @@ function main(input, api) {
   };
   const updated = {
     ...document,
-    endpoints: ensureOneExactObject(endpoints, NATIVE_ENDPOINT),
+    endpoints: ensureOneTaggedObject(endpoints, nativeEndpoint(authKey)),
     dns: {
       ...dns,
       servers: ensureOneExactObject(dnsServers, NATIVE_DNS_SERVER),
@@ -107,6 +108,27 @@ const NATIVE_ENDPOINT = {
   ephemeral: false,
   accept_routes: false,
 };
+
+function nativeEndpoint(authKey) {
+  return {
+    ...NATIVE_ENDPOINT,
+    ...(authKey ? { auth_key: authKey } : {}),
+  };
+}
+
+function isCompatibleNativeEndpoint(endpoint) {
+  const expectedKeys = Object.hasOwn(endpoint, "auth_key")
+    ? ["accept_routes", "auth_key", "ephemeral", "tag", "type"]
+    : ["accept_routes", "ephemeral", "tag", "type"];
+  const keys = Object.keys(endpoint).sort();
+  return keys.length === expectedKeys.length
+    && keys.every((key, index) => key === expectedKeys[index])
+    && endpoint.type === NATIVE_ENDPOINT.type
+    && endpoint.tag === NATIVE_ENDPOINT.tag
+    && endpoint.ephemeral === NATIVE_ENDPOINT.ephemeral
+    && endpoint.accept_routes === NATIVE_ENDPOINT.accept_routes
+    && (!Object.hasOwn(endpoint, "auth_key") || typeof endpoint.auth_key === "string");
+}
 
 const NATIVE_DNS_SERVER = {
   type: "tailscale",
@@ -190,6 +212,30 @@ function ensureOneExactObject(values, expected) {
   }
   if (!found) result.push(expected);
   return result;
+}
+
+function ensureOneTaggedObject(values, expected) {
+  const result = [];
+  let found = false;
+  for (const value of values) {
+    if (value.tag !== expected.tag) {
+      result.push(value);
+    } else if (!found) {
+      result.push(expected);
+      found = true;
+    }
+  }
+  if (!found) result.push(expected);
+  return result;
+}
+
+function optionalStringArg(input, name) {
+  const value = input.args && input.args[name];
+  if (value === undefined || value === null || value === "") return "";
+  if (typeof value !== "string") {
+    throw new Error(`Sandrone sing-box Tailscale native preset requires ${name} to be a string`);
+  }
+  return value;
 }
 
 function exactEqual(left, right) {

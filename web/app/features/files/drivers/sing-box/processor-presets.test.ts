@@ -7,7 +7,6 @@ import {
   recognizedFileProcessorPresetID,
 } from "~/features/files/drivers/core/processor-presets";
 import { createTranslator } from "~/shared/i18n/context";
-import { enUS } from "~/shared/i18n/translations/en-US";
 
 import {
   defaultSingBoxProcessors,
@@ -96,8 +95,6 @@ describe("sing-box file processor defaults", () => {
   });
 
   it.each([
-    ["ensure-tun", "Ensure TUN inbound", "ensure-tun"],
-    ["ipv4-only", "IPv4 only", "ipv4-only"],
     ["udp-p2p-eim", "UDP/P2P compatibility", "udp-p2p-eim"],
     ["linux-tun-acceleration", "Linux/OpenWrt TUN acceleration", "linux-tun-acceleration"],
     ["mptcp-direct", "MPTCP direct", "mptcp-direct"],
@@ -119,9 +116,7 @@ describe("sing-box file processor defaults", () => {
       "sniff",
       "ntp-direct",
       "github-rule-source-mirror",
-      "ensure-tun",
       "quic-fallback",
-      "ipv4-only",
       "udp-p2p-eim",
       "linux-tun-acceleration",
       "mptcp-direct",
@@ -130,9 +125,7 @@ describe("sing-box file processor defaults", () => {
       "tailscale-external",
     ]);
     const scenarioIDs = [
-      "ensure-tun",
       "quic-fallback",
-      "ipv4-only",
       "udp-p2p-eim",
       "linux-tun-acceleration",
       "mptcp-direct",
@@ -147,72 +140,46 @@ describe("sing-box file processor defaults", () => {
         conflicts: preset.conflicts,
       };
     })).toEqual([
-      { id: "ensure-tun", defaultOn: false, dependencies: [], conflicts: [] },
       { id: "quic-fallback", defaultOn: false, dependencies: ["sniff"], conflicts: [] },
-      { id: "ipv4-only", defaultOn: false, dependencies: [], conflicts: [] },
       { id: "udp-p2p-eim", defaultOn: false, dependencies: [], conflicts: [] },
-      { id: "linux-tun-acceleration", defaultOn: false, dependencies: ["ensure-tun"], conflicts: [] },
+      { id: "linux-tun-acceleration", defaultOn: false, dependencies: [], conflicts: [] },
       { id: "mptcp-direct", defaultOn: false, dependencies: ["linux-tun-acceleration"], conflicts: [] },
       { id: "windows-relaxed-route", defaultOn: false, dependencies: [], conflicts: [] },
     ]);
 
     expect(planFileProcessorPresetAddition(singBoxProcessorPresets, "mptcp-direct", [], en).addedPresetIDs)
-      .toEqual(["ensure-tun", "linux-tun-acceleration", "mptcp-direct"]);
+      .toEqual(["linux-tun-acceleration", "mptcp-direct"]);
     expect(planFileProcessorPresetAddition(singBoxProcessorPresets, "quic-fallback", [], en).addedPresetIDs)
       .toEqual(["sniff", "quic-fallback"]);
   });
 
-  it("builds exact no-argument native and external Tailscale scripts in native-first order", () => {
+  it("builds native Tailscale with editable auth_key and external Tailscale without args", () => {
     for (const id of ["tailscale-native", "tailscale-external"] as const) {
       const preset = singBoxProcessorPreset(id as SingBoxProcessorPresetID);
       expect(preset).toEqual({
         name: id === "tailscale-native" ? "Native Tailscale" : "Tailscale coexistence",
         type: "script",
         stage: "file",
-        params: { source: { type: "inline", content: expect.any(String) } },
+        params: {
+          source: { type: "inline", content: expect.any(String) },
+          ...(id === "tailscale-native" ? { args: { auth_key: "" } } : {}),
+        },
       });
       expect(recognizedFileProcessorPresetID(singBoxProcessorPresets, preset)).toBe(id);
-      expect(preset.params).not.toHaveProperty("args");
     }
 
     expect(presetDescriptor("tailscale-native" as SingBoxProcessorPresetID)).toMatchObject({
       category: "tailscale",
       defaultOn: false,
-      dependencies: ["ensure-tun"],
+      dependencies: [],
       conflicts: ["tailscale-external"],
     });
     expect(presetDescriptor("tailscale-external" as SingBoxProcessorPresetID)).toMatchObject({
       category: "tailscale",
       defaultOn: false,
-      dependencies: ["ensure-tun"],
+      dependencies: [],
       conflicts: ["tailscale-native"],
     });
-  });
-
-  it("plans a missing TUN dependency before an existing exact native Tailscale processor", () => {
-    const before = customProcessor("before");
-    const native = singBoxProcessorPreset("tailscale-native");
-    const after = customProcessor("after");
-    const current = [before, native, after];
-
-    const plan = planFileProcessorPresetAddition(
-      singBoxProcessorPresets,
-      "tailscale-native",
-      current,
-      en,
-    );
-
-    expect(plan.additions).toEqual([{
-      presetID: "ensure-tun",
-      processor: singBoxProcessorPreset("ensure-tun"),
-      beforeIndex: 1,
-    }]);
-    expect(applyPlan(current, plan)).toEqual([
-      before,
-      singBoxProcessorPreset("ensure-tun"),
-      native,
-      after,
-    ]);
   });
 
   it("applies external Tailscale coexistence atomically and idempotently", () => {
@@ -340,9 +307,12 @@ describe("sing-box file processor defaults", () => {
       },
     };
 
-    const first = runTailscale("tailscale-native", original);
+    const first = runTailscale("tailscale-native", original, "tskey-auth-test");
     expect(first.stringifyCalls).toBe(1);
-    expect(first.document.endpoints).toEqual([original.endpoints[0], endpoint]);
+    expect(first.document.endpoints).toEqual([
+      original.endpoints[0],
+      { ...endpoint, auth_key: "tskey-auth-test" },
+    ]);
     expect((first.document.dns as Record<string, unknown>).servers).toEqual([
       { type: "local", tag: "dns-local" },
       dnsServer,
@@ -373,7 +343,7 @@ describe("sing-box file processor defaults", () => {
       accept_routes: false,
     });
 
-    const second = runTailscale("tailscale-native", first.document);
+    const second = runTailscale("tailscale-native", first.document, "tskey-auth-test");
     expect(second.document).toEqual(first.document);
     expect(second.stringifyCalls).toBe(1);
   });
@@ -540,7 +510,6 @@ describe("sing-box file processor defaults", () => {
     expect(applyPlan(current, native)).toEqual([
       customBefore,
       customAfter,
-      singBoxProcessorPreset("ensure-tun"),
       singBoxProcessorPreset("tailscale-native" as SingBoxProcessorPresetID),
     ]);
 
@@ -562,23 +531,12 @@ describe("sing-box file processor defaults", () => {
       en,
     );
     expect(external.removedPresetIDs).toEqual(["tailscale-native"]);
-    expect(external.addedPresetIDs).toEqual(["ensure-tun", "tailscale-external"]);
+    expect(external.addedPresetIDs).toEqual(["tailscale-external"]);
 
-  });
-
-  it("uses the explicit scenario risks", () => {
-    expect(enUS["processors.filePreset.singBox.udpP2pEim.risk"]).toContain("gVisor");
-    expect(enUS["processors.filePreset.singBox.mptcpDirect.risk"]).toContain("cannot transparently proxy MPTCP");
-    expect(enUS["processors.filePreset.singBox.mptcpDirect.risk"]).toContain("direct egress");
-    expect(enUS["processors.filePreset.singBox.ipv4Only.risk"]).toContain("IPv6-only resources");
-    expect(enUS["processors.filePreset.singBox.linuxTunAcceleration.risk"]).toContain("Linux/OpenWrt");
-    expect(enUS["processors.filePreset.singBox.windowsRelaxedRoute.risk"]).toContain("Windows");
   });
 
   it.each([
     "quic-fallback",
-    "ensure-tun",
-    "ipv4-only",
     "udp-p2p-eim",
     "linux-tun-acceleration",
     "mptcp-direct",
@@ -611,8 +569,9 @@ type TailscalePresetID = "tailscale-native" | "tailscale-external";
 function runTailscale(
   id: TailscalePresetID,
   document: Record<string, unknown>,
+  authKey = "",
 ): { document: Record<string, unknown>; stringifyCalls: number } {
-  const execution = prepareTailscale(id, document);
+  const execution = prepareTailscale(id, document, JSON.stringify, authKey);
   execution.run();
   return {
     document: JSON.parse(execution.input.file.content) as Record<string, unknown>,
@@ -624,11 +583,15 @@ function prepareTailscale(
   id: TailscalePresetID,
   document: Record<string, unknown>,
   stringify: (value: unknown) => string = JSON.stringify,
+  authKey = "",
 ) {
   const preset = singBoxProcessorPreset(id as SingBoxProcessorPresetID);
   const source = (preset.params?.source as Record<string, unknown> | undefined)?.content;
   expect(typeof source).toBe("string");
-  const input = { file: { content: JSON.stringify(document) } };
+  const input = {
+    file: { content: JSON.stringify(document) },
+    args: id === "tailscale-native" ? { auth_key: authKey } : {},
+  };
   let stringifyCalls = 0;
   const api = {
     json: {

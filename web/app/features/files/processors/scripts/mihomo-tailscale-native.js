@@ -2,6 +2,7 @@
 
 function main(input, api) {
   const document = api.yaml.parse(input.file.content);
+  const authKey = optionalStringArg(input, "auth_key");
   if (!isObject(document)) {
     throw new Error("Sandrone Mihomo Tailscale native preset requires a YAML object");
   }
@@ -56,18 +57,12 @@ function main(input, api) {
     if (proxy.name !== "TAILSCALE") {
       proxies.push(proxy);
     } else if (!hasTailscaleProxy) {
-      proxies.push(proxy);
+      proxies.push(tailscaleProxy(authKey));
       hasTailscaleProxy = true;
     }
   }
   if (!hasTailscaleProxy) {
-    proxies.push({
-      name: "TAILSCALE",
-      type: "tailscale",
-      ephemeral: false,
-      udp: true,
-      "accept-routes": false,
-    });
+    proxies.push(tailscaleProxy(authKey));
   }
 
   const rules = document.rules.filter((rule) => !TAILSCALE_RULES.includes(rule));
@@ -110,14 +105,37 @@ const TAILSCALE_RULES = [
 
 function isExactTailscaleProxy(proxy) {
   const keys = Object.keys(proxy).sort();
-  const expectedKeys = ["accept-routes", "ephemeral", "name", "type", "udp"];
+  const baseKeys = ["accept-routes", "ephemeral", "name", "type", "udp"];
+  const authKeys = ["accept-routes", "auth-key", "ephemeral", "name", "type", "udp"];
+  const expectedKeys = Object.hasOwn(proxy, "auth-key") ? authKeys : baseKeys;
   return keys.length === expectedKeys.length
     && keys.every((key, index) => key === expectedKeys[index])
     && proxy.name === "TAILSCALE"
     && proxy.type === "tailscale"
     && proxy.ephemeral === false
     && proxy.udp === true
-    && proxy["accept-routes"] === false;
+    && proxy["accept-routes"] === false
+    && (!Object.hasOwn(proxy, "auth-key") || typeof proxy["auth-key"] === "string");
+}
+
+function tailscaleProxy(authKey) {
+  return {
+    name: "TAILSCALE",
+    type: "tailscale",
+    ...(authKey ? { "auth-key": authKey } : {}),
+    ephemeral: false,
+    udp: true,
+    "accept-routes": false,
+  };
+}
+
+function optionalStringArg(input, name) {
+  const value = input.args && input.args[name];
+  if (value === undefined || value === null || value === "") return "";
+  if (typeof value !== "string") {
+    throw new Error(`Sandrone Mihomo Tailscale native preset requires ${name} to be a string`);
+  }
+  return value;
 }
 
 function firstAnchorIndex(rules, prefixes) {

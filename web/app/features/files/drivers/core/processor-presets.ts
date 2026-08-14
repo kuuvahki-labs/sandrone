@@ -7,8 +7,6 @@ export interface FileProcessorPreset {
   readonly id: string;
   readonly category: FileProcessorPresetCategory;
   readonly labelKey: Parameters<Translator>[0];
-  readonly descriptionKey: Parameters<Translator>[0];
-  readonly riskKey?: Parameters<Translator>[0];
   readonly defaultOn: boolean;
   readonly dependencies: readonly string[];
   readonly conflicts: readonly string[];

@@ -24,53 +24,25 @@ function main(input, api) {
   if (selectedIndex === -3) {
     throw new Error("Sandrone sing-box structure preset tag tun-in is not a TUN inbound");
   }
-  if (selectedIndex < 0 && operation !== "ensure-tun") {
+  if (selectedIndex < 0) {
     throw new Error("Sandrone sing-box structure preset requires a TUN inbound");
   }
 
-  const selectedTun = selectedIndex >= 0 ? inbounds[selectedIndex] : null;
-  if (operation === "ipv4-only") {
-    if (document.dns !== undefined && !isObject(document.dns)) {
-      throw new Error("Sandrone sing-box IPv4-only preset requires dns to be an object");
-    }
-    if (
-      !selectedTun
-      || !Array.isArray(selectedTun.address)
-      || selectedTun.address.some((address) => typeof address !== "string")
-    ) {
-      throw new Error("Sandrone sing-box IPv4-only preset requires TUN address to be an array of strings");
-    }
-  }
-
+  const selectedTun = inbounds[selectedIndex];
   const updated = { ...document };
   const updatedInbounds = [...inbounds];
-  if (operation === "ensure-tun") {
-    if (selectedIndex < 0) {
-      updatedInbounds.push({
-        type: "tun",
-        tag: "tun-in",
-        address: ["172.19.0.1/30", "fdfe:dcba:9876::1/126"],
-        auto_route: true,
-        strict_route: true,
-      });
-    }
-  } else {
-    const updatedTun = { ...selectedTun };
-    if (operation === "ipv4-only") {
-      updated.dns = { ...(document.dns || {}), strategy: "ipv4_only" };
-      updatedTun.address = selectedTun.address.filter((address) => !address.includes(":"));
-    } else if (operation === "udp-p2p-eim") {
-      updatedTun.endpoint_independent_nat = true;
-    } else if (operation === "linux-tun-acceleration") {
-      updatedTun.auto_route = true;
-      updatedTun.auto_redirect = true;
-    } else if (operation === "mptcp-direct") {
-      updatedTun.exclude_mptcp = true;
-    } else if (operation === "windows-relaxed-route") {
-      updatedTun.strict_route = false;
-    }
-    updatedInbounds[selectedIndex] = updatedTun;
+  const updatedTun = { ...selectedTun };
+  if (operation === "udp-p2p-eim") {
+    updatedTun.endpoint_independent_nat = true;
+  } else if (operation === "linux-tun-acceleration") {
+    updatedTun.auto_route = true;
+    updatedTun.auto_redirect = true;
+  } else if (operation === "mptcp-direct") {
+    updatedTun.exclude_mptcp = true;
+  } else if (operation === "windows-relaxed-route") {
+    updatedTun.strict_route = false;
   }
+  updatedInbounds[selectedIndex] = updatedTun;
   updated.inbounds = updatedInbounds;
 
   const content = api.json.stringify(updated);
@@ -107,9 +79,7 @@ function selectTunIndex(inbounds) {
 }
 
 function isSupportedOperation(value) {
-  return value === "ensure-tun"
-    || value === "ipv4-only"
-    || value === "udp-p2p-eim"
+  return value === "udp-p2p-eim"
     || value === "linux-tun-acceleration"
     || value === "mptcp-direct"
     || value === "windows-relaxed-route";

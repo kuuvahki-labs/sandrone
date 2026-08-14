@@ -100,124 +100,6 @@ func TestServiceCommunityPresetOrderedNTPUsesExactRawAssets(t *testing.T) {
 	}
 }
 
-func TestServiceCommunityPresetShadowrocketINIOverrideScenariosApplyOnlyNamedGeneralAssignments(t *testing.T) {
-	base := "\ufeff# preserve file comment\r\n" +
-		"[General]\r\n" +
-		"# preserve general comment\r\n" +
-		"profile = keep\r\n" +
-		"ipv6 = true\r\n" +
-		"prefer-ipv6 = true\r\n" +
-		"udp-policy-not-supported-behaviour = REJECT\r\n" +
-		"dns-direct-fallback-proxy = false\r\n" +
-		"; preserve general tail\r\n" +
-		"[Host]\r\n" +
-		"# preserve host comment\r\n" +
-		"example.com = 192.0.2.1\r\n" +
-		"[Custom]\r\n" +
-		"; preserve custom comment\r\n" +
-		"value = keep\r\n" +
-		"[Proxy]\r\n" +
-		"[Proxy Group]\r\n" +
-		"[Rule]\r\n"
-	render := func(t *testing.T, processor *domain.ProcessorSpec) inidoc.Model {
-		t.Helper()
-		processors := []domain.ProcessorSpec(nil)
-		if processor != nil {
-			processors = []domain.ProcessorSpec{*processor}
-		}
-		spec := domain.FileSpec{
-			Name:       "shadowrocket-scenario.conf",
-			Kind:       domain.FileKindShadowrocket,
-			Source:     domain.FileSource{Type: "inline", Content: base},
-			Config:     &domain.FileConfig{Settings: raw(t, map[string]any{"groups": []any{}, "rules": []any{}})},
-			Processors: processors,
-		}
-
-		result, err := service.New().GetFile(context.Background(), domain.FileRequest{Spec: &spec})
-
-		require.NoError(t, err)
-		require.NotNil(t, result)
-		model, err := inidoc.ParseModel(result.Content)
-		require.NoError(t, err)
-		return model
-	}
-
-	baseline := render(t, nil)
-	require.True(t, baseline.BOM)
-	require.Equal(t, "\r\n", baseline.Newline)
-	require.True(t, baseline.TrailingNewline)
-	require.Equal(t, []string{"# preserve file comment"}, baseline.Preamble)
-	require.Equal(t, []string{"General", "Host", "Custom", "Proxy", "Proxy Group", "Rule"}, modelSectionNames(baseline))
-	require.Contains(t, baseline.Sections[0].Lines, "udp-policy-not-supported-behaviour = REJECT")
-	require.NotContains(t, baseline.Sections[0].Lines, "udp-policy-not-supported-behaviour = DIRECT")
-
-	tests := []struct {
-		name        string
-		content     string
-		wantGeneral []string
-	}{
-		{
-			name: "disable IPv6",
-			content: `# sandrone:shadowrocket-preset=disable-ipv6
-[General]
-ipv6 = false
-prefer-ipv6 = false`,
-			wantGeneral: []string{
-				"# preserve general comment",
-				"profile = keep",
-				"ipv6 = false",
-				"prefer-ipv6 = false",
-				"udp-policy-not-supported-behaviour = REJECT",
-				"dns-direct-fallback-proxy = false",
-				"; preserve general tail",
-			},
-		},
-		{
-			name: "unsupported UDP direct",
-			content: `# sandrone:shadowrocket-preset=udp-unsupported-direct
-[General]
-udp-policy-not-supported-behaviour = DIRECT`,
-			wantGeneral: []string{
-				"# preserve general comment",
-				"profile = keep",
-				"ipv6 = true",
-				"prefer-ipv6 = true",
-				"udp-policy-not-supported-behaviour = DIRECT",
-				"dns-direct-fallback-proxy = false",
-				"; preserve general tail",
-			},
-		},
-		{
-			name: "restricted-network DNS fallback",
-			content: `# sandrone:shadowrocket-preset=restricted-network-dns-fallback
-[General]
-dns-direct-fallback-proxy = true`,
-			wantGeneral: []string{
-				"# preserve general comment",
-				"profile = keep",
-				"ipv6 = true",
-				"prefer-ipv6 = true",
-				"udp-policy-not-supported-behaviour = REJECT",
-				"dns-direct-fallback-proxy = true",
-				"; preserve general tail",
-			},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			processor := shadowrocketINIOverrideProcessor(t, test.name, test.content)
-			got := render(t, &processor)
-			want := baseline
-			want.Preamble = append([]string(nil), baseline.Preamble...)
-			want.Sections = append([]inidoc.ModelSection(nil), baseline.Sections...)
-			want.Sections[0].Lines = test.wantGeneral
-
-			require.Equal(t, want, got)
-		})
-	}
-}
-
 func TestServiceCommunityPresetMihomoOrderedScenariosUseExactRawAsset(t *testing.T) {
 	script := communityPresetRawScript(t, "insert-mihomo-rules.js")
 	spec := domain.FileSpec{
@@ -360,8 +242,8 @@ tun:
 			}),
 		},
 		Processors: []domain.ProcessorSpec{
-			mihomoTailscaleNativeProcessor(t, script),
-			mihomoTailscaleNativeProcessor(t, script),
+			mihomoTailscaleNativeProcessor(t, script, "tskey-auth-test"),
+			mihomoTailscaleNativeProcessor(t, script, "tskey-auth-test"),
 		},
 	}
 
@@ -376,6 +258,7 @@ tun:
 	require.Equal(t, map[string]any{
 		"name":          "TAILSCALE",
 		"type":          "tailscale",
+		"auth-key":      "tskey-auth-test",
 		"ephemeral":     false,
 		"udp":           true,
 		"accept-routes": false,
@@ -396,7 +279,7 @@ tun:
 	}, dns["nameserver-policy"])
 	tun := requireStringMap(t, doc["tun"])
 	require.Equal(t, []any{"192.0.2.0/24"}, tun["route-exclude-address"])
-	assertNoTailscaleSecretsOrExitNode(t, doc, result.Content)
+	require.NotContains(t, strings.ToLower(string(result.Content)), "exit-node")
 }
 
 func TestServiceCommunityPresetMihomoTailscaleExternalGeneratesDistinctFullFile(t *testing.T) {
@@ -506,20 +389,6 @@ func TestServiceCommunityPresetSingBoxStructureScenariosUseExactRawAsset(t *test
 		assertTun func(*testing.T, map[string]any)
 	}{
 		{
-			operation: "ensure-tun",
-			assertTun: func(t *testing.T, tun map[string]any) {
-				require.Equal(t, originalInbounds[2], tun)
-			},
-		},
-		{
-			operation: "ipv4-only",
-			assertTun: func(t *testing.T, tun map[string]any) {
-				require.Equal(t, []any{"172.19.0.1/30"}, tun["address"])
-				require.Equal(t, originalInbounds[2].(map[string]any)["custom"], tun["custom"])
-				require.Equal(t, originalInbounds[2].(map[string]any)["route_exclude_address"], tun["route_exclude_address"])
-			},
-		},
-		{
 			operation: "udp-p2p-eim",
 			assertTun: func(t *testing.T, tun map[string]any) {
 				require.True(t, tun["endpoint_independent_nat"].(bool))
@@ -574,53 +443,9 @@ func TestServiceCommunityPresetSingBoxStructureScenariosUseExactRawAsset(t *test
 			dns := requireStringMap(t, doc["dns"])
 			require.Equal(t, originalDNS["servers"], dns["servers"])
 			require.Equal(t, originalDNS["rules"], dns["rules"])
-			if test.operation == "ipv4-only" {
-				require.Equal(t, "ipv4_only", dns["strategy"])
-			} else {
-				require.Equal(t, originalDNS["strategy"], dns["strategy"])
-			}
+			require.Equal(t, originalDNS["strategy"], dns["strategy"])
 		})
 	}
-}
-
-func TestServiceCommunityPresetSingBoxEnsureTunAppendsOnlyWhenAbsent(t *testing.T) {
-	script := communityPresetRawScript(t, "update-sing-box-tun.js")
-	spec := domain.FileSpec{
-		Name: "sing-box-ensure-tun.json",
-		Kind: domain.FileKindSingBox,
-		Source: domain.FileSource{Type: "inline", Content: `{
-			"inbounds": [
-				{"type":"mixed","tag":"mixed-in","listen":"::1"},
-				{"type":"direct","tag":"custom-in","metadata":{"ipv6":"2001:db8::8"}}
-			],
-			"route":{"rules":[]}
-		}`},
-		Config: &domain.FileConfig{Settings: raw(t, map[string]any{
-			"rules": []map[string]any{{"outbound": "LockedFinal"}},
-		})},
-		Processors: []domain.ProcessorSpec{
-			singBoxStructureProcessor(t, script, "ensure-tun"),
-			singBoxStructureProcessor(t, script, "ensure-tun"),
-		},
-	}
-
-	result, err := service.New().GetFile(context.Background(), domain.FileRequest{Spec: &spec})
-
-	require.NoError(t, err)
-	require.NotNil(t, result)
-	doc := decodeSingBoxCommunityPresetResult(t, result.Content)
-	inbounds := requireAnySlice(t, doc["inbounds"])
-	require.Equal(t, []any{
-		map[string]any{"type": "mixed", "tag": "mixed-in", "listen": "::1"},
-		map[string]any{"type": "direct", "tag": "custom-in", "metadata": map[string]any{"ipv6": "2001:db8::8"}},
-		map[string]any{
-			"type":         "tun",
-			"tag":          "tun-in",
-			"address":      []any{"172.19.0.1/30", "fdfe:dcba:9876::1/126"},
-			"auto_route":   true,
-			"strict_route": true,
-		},
-	}, inbounds)
 }
 
 func TestServiceCommunityPresetSingBoxStructureRejectsAmbiguousTunWithoutPartial(t *testing.T) {
@@ -638,7 +463,7 @@ func TestServiceCommunityPresetSingBoxStructureRejectsAmbiguousTunWithoutPartial
 		Config: &domain.FileConfig{Settings: raw(t, map[string]any{
 			"rules": []map[string]any{{"outbound": "LockedFinal"}},
 		})},
-		Processors: []domain.ProcessorSpec{singBoxStructureProcessor(t, script, "ensure-tun")},
+		Processors: []domain.ProcessorSpec{singBoxStructureProcessor(t, script, "udp-p2p-eim")},
 	}
 
 	result, err := service.New().GetFile(context.Background(), domain.FileRequest{Spec: &spec})
@@ -722,7 +547,7 @@ func TestServiceCommunityPresetSingBoxTailscaleNativeGeneratesFullFile(t *testin
 		Content: "ss://aes-128-gcm:example-password@example.com:8388#Native-Node",
 	}))
 	script := communityPresetRawScript(t, "sing-box-tailscale-native.js")
-	processor := singBoxTailscaleProcessor(t, "Tailscale 原生接管", script)
+	processor := singBoxTailscaleProcessor(t, "Tailscale 原生接管", script, "tskey-auth-test")
 	spec := domain.FileSpec{
 		Name: "sing-box-tailscale-native.json",
 		Kind: domain.FileKindSingBox,
@@ -767,6 +592,7 @@ func TestServiceCommunityPresetSingBoxTailscaleNativeGeneratesFullFile(t *testin
 		map[string]any{
 			"type":          "tailscale",
 			"tag":           "ts-ep",
+			"auth_key":      "tskey-auth-test",
 			"ephemeral":     false,
 			"accept_routes": false,
 		},
@@ -800,7 +626,7 @@ func TestServiceCommunityPresetSingBoxTailscaleNativeGeneratesFullFile(t *testin
 		map[string]any{"rule_set": []any{"private"}, "outbound": "direct"},
 		map[string]any{"outbound": "LockedFinal"},
 	}, route["rules"])
-	assertNoTailscaleSecretsOrExitNode(t, doc, result.Content)
+	require.NotContains(t, strings.ToLower(string(result.Content)), "exit_node")
 }
 
 func TestServiceCommunityPresetSingBoxTailscaleExternalGeneratesDistinctFullFile(t *testing.T) {
@@ -1119,27 +945,19 @@ func mihomoMergeProcessor(t *testing.T, name, content string) domain.ProcessorSp
 	}
 }
 
-func mihomoTailscaleNativeProcessor(t *testing.T, script string) domain.ProcessorSpec {
+func mihomoTailscaleNativeProcessor(t *testing.T, script string, authKeys ...string) domain.ProcessorSpec {
 	t.Helper()
+	authKey := ""
+	if len(authKeys) > 0 {
+		authKey = authKeys[0]
+	}
 	return domain.ProcessorSpec{
 		Name:  "Tailscale 原生接管",
 		Type:  "script",
 		Stage: domain.StageFile,
 		Params: params(t, map[string]any{
 			"source": inlineScriptSource(script),
-		}),
-	}
-}
-
-func shadowrocketINIOverrideProcessor(t *testing.T, name, content string) domain.ProcessorSpec {
-	t.Helper()
-	return domain.ProcessorSpec{
-		Name:  name,
-		Type:  "merge",
-		Stage: domain.StageFile,
-		Params: params(t, map[string]any{
-			"mode":    "ini_override",
-			"content": content,
+			"args":   map[string]any{"auth_key": authKey},
 		}),
 	}
 }
@@ -1157,15 +975,17 @@ func singBoxStructureProcessor(t *testing.T, script, operation string) domain.Pr
 	}
 }
 
-func singBoxTailscaleProcessor(t *testing.T, name, script string) domain.ProcessorSpec {
+func singBoxTailscaleProcessor(t *testing.T, name, script string, authKeys ...string) domain.ProcessorSpec {
 	t.Helper()
+	paramsValue := map[string]any{"source": inlineScriptSource(script)}
+	if len(authKeys) > 0 {
+		paramsValue["args"] = map[string]any{"auth_key": authKeys[0]}
+	}
 	return domain.ProcessorSpec{
-		Name:  name,
-		Type:  "script",
-		Stage: domain.StageFile,
-		Params: params(t, map[string]any{
-			"source": inlineScriptSource(script),
-		}),
+		Name:   name,
+		Type:   "script",
+		Stage:  domain.StageFile,
+		Params: params(t, paramsValue),
 	}
 }
 

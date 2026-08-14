@@ -81,24 +81,18 @@ export const mihomoProcessorPresets: readonly FileProcessorPreset[] = [
     "sniffer",
     "network",
     "processor.mihomoPreset.sniffer",
-    "processors.filePreset.mihomo.sniffer.description",
-    "processors.filePreset.mihomo.sniffer.risk",
     true,
   ),
   descriptor(
     "tun",
     "network",
     "processor.mihomoPreset.tun",
-    "processors.filePreset.mihomo.tun.description",
-    "processors.filePreset.mihomo.tun.risk",
     true,
   ),
   orderedRuleDescriptor(
     ORDERED_RULE_PRESETS["ntp-direct"],
     "network",
     "processors.filePreset.ntpDirect.label",
-    "processors.filePreset.ntpDirect.description",
-    "processors.filePreset.ntpDirect.risk",
     true,
   ),
   githubRuleSourceMirrorPreset,
@@ -106,22 +100,16 @@ export const mihomoProcessorPresets: readonly FileProcessorPreset[] = [
     "fake-ip-compat",
     "network",
     "processor.mihomoPreset.fakeIpCompat",
-    "processors.filePreset.mihomo.fakeIpCompat.description",
-    "processors.filePreset.mihomo.fakeIpCompat.risk",
   ),
   orderedRuleDescriptor(
     ORDERED_RULE_PRESETS["quic-fallback"],
     "network",
     "processors.filePreset.mihomo.quicFallback.label",
-    "processors.filePreset.mihomo.quicFallback.description",
-    "processors.filePreset.mihomo.quicFallback.risk",
   ),
   descriptor(
     "udp-p2p-eim",
     "network",
     "processors.filePreset.mihomo.udpP2pEim.label",
-    "processors.filePreset.mihomo.udpP2pEim.description",
-    "processors.filePreset.mihomo.udpP2pEim.risk",
     false,
     [],
   ),
@@ -129,8 +117,6 @@ export const mihomoProcessorPresets: readonly FileProcessorPreset[] = [
     "linux-tun-acceleration",
     "platform",
     "processors.filePreset.mihomo.linuxTunAcceleration.label",
-    "processors.filePreset.mihomo.linuxTunAcceleration.description",
-    "processors.filePreset.mihomo.linuxTunAcceleration.risk",
     false,
     ["tun"],
   ),
@@ -138,16 +124,12 @@ export const mihomoProcessorPresets: readonly FileProcessorPreset[] = [
     "windows-relaxed-route",
     "platform",
     "processors.filePreset.mihomo.windowsRelaxedRoute.label",
-    "processors.filePreset.mihomo.windowsRelaxedRoute.description",
-    "processors.filePreset.mihomo.windowsRelaxedRoute.risk",
   ),
   mihomoTailscaleNativeDescriptor(),
   descriptor(
     "tailscale-external",
     "tailscale",
     "processor.mihomoPreset.tailscale",
-    "processors.filePreset.mihomo.tailscaleExternal.description",
-    "processors.filePreset.mihomo.tailscaleExternal.risk",
     false,
     ["tun"],
     ["tailscale-native"],
@@ -156,8 +138,6 @@ export const mihomoProcessorPresets: readonly FileProcessorPreset[] = [
     "tailnet-share",
     "tailscale",
     "processor.mihomoPreset.tailnetShare",
-    "processors.filePreset.mihomo.tailnetShare.description",
-    "processors.filePreset.mihomo.tailnetShare.risk",
     false,
     ["tun", "tailscale-external"],
   ),
@@ -173,8 +153,6 @@ function descriptor(
   id: MihomoMergeProcessorPresetID,
   category: FileProcessorPresetCategory,
   labelKey: FileProcessorPreset["labelKey"],
-  descriptionKey: FileProcessorPreset["descriptionKey"],
-  riskKey: NonNullable<FileProcessorPreset["riskKey"]>,
   defaultOn = false,
   dependencies: readonly MihomoProcessorPresetID[] = [],
   conflicts: readonly MihomoProcessorPresetID[] = [],
@@ -184,8 +162,6 @@ function descriptor(
     id,
     category,
     labelKey,
-    descriptionKey,
-    riskKey,
     defaultOn,
     dependencies,
     conflicts,
@@ -202,8 +178,6 @@ function orderedRuleDescriptor(
   options: OrderedRuleProcessorPresetOptions,
   category: FileProcessorPresetCategory,
   labelKey: FileProcessorPreset["labelKey"],
-  descriptionKey: FileProcessorPreset["descriptionKey"],
-  riskKey: NonNullable<FileProcessorPreset["riskKey"]>,
   defaultOn = false,
   dependencies: readonly MihomoProcessorPresetID[] = [],
   conflicts: readonly MihomoProcessorPresetID[] = [],
@@ -212,8 +186,6 @@ function orderedRuleDescriptor(
     id: options.id,
     category,
     labelKey,
-    descriptionKey,
-    riskKey,
     defaultOn,
     dependencies,
     conflicts,
@@ -232,6 +204,7 @@ function mihomoTailscaleNativeProcessor(name: string): ProcessorDetail {
         type: "inline",
         content: mihomoTailscaleNativeScript,
       },
+      args: { auth_key: "" },
     },
   };
 }
@@ -241,19 +214,22 @@ function mihomoTailscaleNativeDescriptor(): FileProcessorPreset {
     id: "tailscale-native",
     category: "tailscale",
     labelKey: "processors.filePreset.mihomo.tailscaleNative.label",
-    descriptionKey: "processors.filePreset.mihomo.tailscaleNative.description",
-    riskKey: "processors.filePreset.mihomo.tailscaleNative.risk",
     defaultOn: false,
     dependencies: ["tun"],
     conflicts: ["tailscale-external"],
     build: (t) => mihomoTailscaleNativeProcessor(t("processors.filePreset.mihomo.tailscaleNative.label")),
     recognize: (processor) => {
       if (processor.type !== "script") return false;
-      if (!isExactRecord(processor.params, ["source"])) return false;
+      if (!isExactRecord(processor.params, ["source"])
+        && !isExactRecord(processor.params, ["args", "source"])) return false;
       const source = processor.params.source;
-      return isExactRecord(source, ["content", "type"])
-        && source.type === "inline"
-        && source.content === mihomoTailscaleNativeScript;
+      if (!isExactRecord(source, ["content", "type"])
+        || source.type !== "inline"
+        || source.content !== mihomoTailscaleNativeScript) return false;
+      if (!("args" in processor.params)) return true;
+      const args = processor.params.args;
+      return isExactRecord(args, ["auth_key"])
+        && typeof args.auth_key === "string";
     },
   };
 }

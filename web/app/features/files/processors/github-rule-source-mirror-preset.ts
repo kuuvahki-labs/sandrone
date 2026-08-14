@@ -26,7 +26,6 @@ export const githubRuleSourceMirrorPreset: FileProcessorPreset = {
   id: GITHUB_RULE_SOURCE_MIRROR_PRESET_ID,
   category: "network",
   labelKey: "files.processor.githubRuleSourceMirrorPreset",
-  descriptionKey: "files.processor.githubRuleSourceMirrorPresetDescription",
   defaultOn: false,
   dependencies: [],
   conflicts: [],
