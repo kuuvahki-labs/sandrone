@@ -150,7 +150,7 @@ func vmessAEADKnownQueryFields(node domain.NodeIR, values url.Values, xhttpExtra
 			if values.Get("method") != "" {
 				known["method"] = true
 			}
-		} else if queryValuesAreNoopHeaderType(values, "headerType") {
+		} else if queryValuesAreNoopHeaderType(values) {
 			known["headerType"] = true
 		}
 	}

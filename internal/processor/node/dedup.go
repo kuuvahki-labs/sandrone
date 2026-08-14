@@ -2,10 +2,11 @@ package node
 
 import (
 	"context"
+	cryptorand "crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	mathrand "math/rand/v2"
+	"math/big"
 	"strings"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
@@ -95,7 +96,11 @@ func (p *dedupProc) applyRandomSuffix(in domain.NodeProcessInput) (domain.NodePr
 }
 
 func uniqueRandomName(base string, used map[string]struct{}) (string, error) {
-	start := mathrand.IntN(10_000)
+	randomStart, err := cryptorand.Int(cryptorand.Reader, big.NewInt(10_000))
+	if err != nil {
+		return "", fmt.Errorf("generate random suffix for node name %q: %w", base, err)
+	}
+	start := int(randomStart.Int64())
 	for offset := range 10_000 {
 		digits := (start + offset) % 10_000
 		candidate := fmt.Sprintf("%s-%04d", base, digits)

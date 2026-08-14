@@ -280,8 +280,8 @@ func queryValuesAreEmpty(values url.Values, key string) bool {
 	return true
 }
 
-func queryValuesAreNoopHeaderType(values url.Values, key string) bool {
-	return queryValuesEqualFold(values, key, "none")
+func queryValuesAreNoopHeaderType(values url.Values) bool {
+	return queryValuesEqualFold(values, "headerType", "none")
 }
 
 func queryValuesEqualFold(values url.Values, key, want string) bool {

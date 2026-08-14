@@ -49,7 +49,7 @@ func parseVLESS(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 		known["mode"] = true
 		known["extra"] = true
 	}
-	if queryValuesAreNoopHeaderType(values, "headerType") {
+	if queryValuesAreNoopHeaderType(values) {
 		known["headerType"] = true
 	} else if node.Transport != nil && node.Transport.HeaderType == "http" {
 		known["headerType"] = true
@@ -113,7 +113,7 @@ func parseTrojan(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 		"path": true, "wspath": true, "obfs-uri": true, "serviceName": true, "service_name": true,
 		"wsHost": true, "ws-host": true, "wsPath": true, "ws-path": true,
 	}
-	if queryValuesAreNoopHeaderType(values, "headerType") {
+	if queryValuesAreNoopHeaderType(values) {
 		known["headerType"] = true
 	} else if node.Transport != nil && node.Transport.HeaderType == "http" {
 		known["headerType"] = true

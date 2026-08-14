@@ -52,7 +52,7 @@ func parseAnyTLS(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 	if queryValuesEqualFold(values, "type", "tcp") {
 		known["type"] = true
 	}
-	if queryValuesAreNoopHeaderType(values, "headerType") {
+	if queryValuesAreNoopHeaderType(values) {
 		known["headerType"] = true
 	}
 	preserveURIQuery(&node, values, known)
