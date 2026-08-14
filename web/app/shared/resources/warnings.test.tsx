@@ -116,4 +116,34 @@ describe("warning list", () => {
     expect(details).toHaveTextContent('"node_index": 1');
     expect(details).toHaveTextContent('"mode": "multi"');
   });
+
+  it("shows different node probe errors in one semantic group", async () => {
+    const user = userEvent.setup();
+    render(
+      <WarningList
+        warnings={[{
+          code: "probe_timeout",
+          message: "probe_timeout: dial tcp 192.0.2.1:443: i/o timeout",
+          node: "node-a",
+          node_index: 0,
+        }, {
+          code: "probe_core_api_failed",
+          message: "probe_core_api_failed: read tcp 192.0.2.2:443: connection reset by peer",
+          node: "node-b",
+          node_index: 1,
+        }]}
+      />,
+    );
+
+    expect(screen.getByText("1 组警告 · 2 条记录")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "节点测活失败" })).toBeInTheDocument();
+    expect(screen.queryByText("node-a")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /展开 节点测活失败 的 2 条同类警告/ }));
+
+    expect(screen.getByText("node-a")).toBeInTheDocument();
+    expect(screen.getByText("probe_timeout · probe_timeout: dial tcp 192.0.2.1:443: i/o timeout")).toBeInTheDocument();
+    expect(screen.getByText("node-b")).toBeInTheDocument();
+    expect(screen.getByText("probe_core_api_failed · probe_core_api_failed: read tcp 192.0.2.2:443: connection reset by peer")).toBeInTheDocument();
+  });
 });

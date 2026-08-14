@@ -48,6 +48,7 @@ export const zhCN = {
   "warnings.affectedLocations": "{count} 个节点或位置受到影响",
   "warnings.groupWithTitle": "展开 {title} 的 {count} 条同类警告",
   "warnings.occurrenceList": "同类警告节点",
+  "warnings.probeFailure": "节点测活失败",
   "warnings.lineTitle": "第 {line} 行",
   "warnings.unnamed": "未定位警告",
   "dialog.discard.body": "离开后当前编辑内容不会保存。",

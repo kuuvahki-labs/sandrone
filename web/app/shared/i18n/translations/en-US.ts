@@ -49,6 +49,7 @@ export const enUS: Record<TranslationKey, string> = {
   "warnings.affectedLocations": "{count} affected nodes or locations",
   "warnings.groupWithTitle": "Expand {count} matching warnings for {title}",
   "warnings.occurrenceList": "Matching warning nodes",
+  "warnings.probeFailure": "Node probe failures",
   "warnings.lineTitle": "Line {line}",
   "warnings.unnamed": "Unlocated warning",
   "dialog.discard.body": "Current edits will not be saved after you leave.",

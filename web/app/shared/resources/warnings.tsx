@@ -26,7 +26,7 @@ export function WarningList({ className, showSummary = true, warnings }: { class
       ) : null}
       <List className="grid gap-2 p-0">
         {groups.map((group, index) => (
-          group.warnings.length === 1
+          group.kind === "diagnostic" && group.warnings.length === 1
             ? <WarningListItem key={index} warning={group.warning} />
             : <WarningGroupListItem group={group} key={index} />
         ))}
@@ -39,8 +39,11 @@ function WarningGroupListItem({ group }: { group: PreviewWarningGroup }) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const detailsId = useId();
-  const title = warningSubtitle(group.warning) || warningLocation(group.warning, t);
-  const context = warningFingerprintContext(group.warning);
+  const isProbeFailure = group.kind === "probe-failure";
+  const title = isProbeFailure
+    ? t("warnings.probeFailure")
+    : warningSubtitle(group.warning) || warningLocation(group.warning, t);
+  const context = isProbeFailure ? [] : warningFingerprintContext(group.warning);
   const affectedCount = warningLocationCount(group.warnings);
 
   return (
@@ -65,7 +68,7 @@ function WarningGroupListItem({ group }: { group: PreviewWarningGroup }) {
           <div className="min-w-0 border-t border-divider p-3">
             <List aria-label={t("warnings.occurrenceList")} className="grid gap-2 p-0">
               {group.warnings.map((warning, index) => (
-                <WarningOccurrenceItem key={index} warning={warning} />
+                <WarningOccurrenceItem key={index} showDiagnostic={isProbeFailure} warning={warning} />
               ))}
             </List>
           </div>
@@ -107,7 +110,7 @@ function WarningListItem({ warning }: { warning: PreviewWarning }) {
   );
 }
 
-function WarningOccurrenceItem({ warning }: { warning: PreviewWarning }) {
+function WarningOccurrenceItem({ showDiagnostic, warning }: { showDiagnostic: boolean; warning: PreviewWarning }) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const detailsId = useId();
@@ -125,7 +128,13 @@ function WarningOccurrenceItem({ warning }: { warning: PreviewWarning }) {
           type="button"
           onClick={() => setExpanded((value) => !value)}
         >
-          <WarningSummary context={context} expanded={expanded} heading="h5" title={location} />
+          <WarningSummary
+            context={context}
+            expanded={expanded}
+            heading="h5"
+            subtitle={showDiagnostic ? warningSubtitle(warning) : undefined}
+            title={location}
+          />
         </ButtonBase>
         <Collapse id={detailsId} in={expanded} timeout="auto" unmountOnExit>
           <div className="min-w-0 border-t border-divider p-3">

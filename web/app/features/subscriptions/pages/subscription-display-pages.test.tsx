@@ -104,6 +104,8 @@ describe("SubscriptionPreviewPage", () => {
 
     expect(within(warningRegion).getByText("keep")).toBeInTheDocument();
     expect(within(warningRegion).getByText("quick_settings_warning · left unchanged")).toBeInTheDocument();
+    expect(within(warningRegion).getByText("节点测活失败")).toBeInTheDocument();
+    await user.click(within(warningRegion).getByRole("button", { name: /展开 节点测活失败 的 1 条同类警告/ }));
     expect(within(warningRegion).getByText("probe-dead")).toBeInTheDocument();
     expect(within(warningRegion).getByText("probe_tcp_failed · probe result reported probe_tcp_failed")).toBeInTheDocument();
     expect(within(warningRegion).queryByRole("region", { name: "警告详情" })).not.toBeInTheDocument();
