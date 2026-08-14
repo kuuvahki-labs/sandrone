@@ -203,6 +203,11 @@ renderer 跳过整个节点并产生 `render_node_skipped`。
   `NodeIR.transport.type` 相互独立。Mihomo 的 VMess/VLESS/Trojan
   `network` 和 URI 的 `type`/`net`/`transport` 都解析到后者；输出到无法表达
   TCP/UDP 协议选择器的格式时报告有损字段，不借用同名字段改写语义。
+- VMess、VLESS 和 Trojan URI 的 TCP `headerType=http` 使用
+  `NodeIR.transport.header_type=http` 表达 HTTP header obfs，与
+  `transport.type=http` 所表示的 H2 transport 分离；Mihomo 可以为
+  VMess/VLESS 渲染该语义，sing-box 无等价 transport 时产生
+  `transport.header_type` 有损告警。
 - WebSocket early-data、gRPC、xHTTP、Reality、ECH、multiplex、UDP-over-TCP
   都是独立字段族；某个 renderer 支持 transport 基础字段，并不表示它支持该族
   的所有扩展。

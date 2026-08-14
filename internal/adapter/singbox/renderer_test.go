@@ -933,6 +933,33 @@ func TestRenderSingBoxTransportVariantsAndPluginOptions(t *testing.T) {
 	}
 }
 
+func TestRenderSingBoxWarnsForVMessTCPHTTPHeader(t *testing.T) {
+	r := singbox.NewRenderer()
+	nodes := []domain.NodeIR{{
+		Name:   "vmess-http-header",
+		Type:   domain.NodeTypeVMess,
+		Server: "example.com",
+		Port:   443,
+		UUID:   "11111111-1111-1111-1111-111111111111",
+		Transport: &domain.TransportOptions{
+			Type:       "tcp",
+			HeaderType: "http",
+			Path:       "/api",
+			Host:       "cdn.example.com",
+		},
+	}}
+
+	out, report, err := r.RenderWithReport(context.Background(), nodes, domain.RenderOptions{Format: "sing-box-outbounds"})
+	require.NoError(t, err)
+	require.Len(t, report.Warnings, 1)
+	require.Equal(t, "transport.header_type", report.Warnings[0].Field)
+
+	var doc map[string]any
+	require.NoError(t, json.Unmarshal(out, &doc))
+	outbound := doc["outbounds"].([]any)[0].(map[string]any)
+	require.NotContains(t, outbound, "transport")
+}
+
 func TestRenderSingBoxWireGuardAddressAndPeerFallbacks(t *testing.T) {
 	r := singbox.NewRenderer()
 	nodes := []domain.NodeIR{{

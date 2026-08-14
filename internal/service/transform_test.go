@@ -251,6 +251,38 @@ func TestServicePreservesURIWebSocketEarlyDataAcrossTargets(t *testing.T) {
 	}
 }
 
+func TestServicePreservesVMessTCPHTTPHeaderForSupportedTargets(t *testing.T) {
+	svc := service.New()
+	doc := `{"v":"2","ps":"payload-name","add":"example.com","port":"443","id":"11111111-1111-1111-1111-111111111111","aid":"0","net":"tcp","type":"http","method":"GET","host":"cdn.example.com","path":"/api"}`
+	content := []byte("vmess://" + base64.StdEncoding.EncodeToString([]byte(doc)) + "#fragment-name")
+
+	parsed, err := svc.Parse(context.Background(), domain.ParseRequest{Format: "uri-list", Content: content})
+
+	require.NoError(t, err)
+	require.Empty(t, parsed.Report.Warnings)
+	require.Len(t, parsed.Nodes, 1)
+	require.Equal(t, "fragment-name", parsed.Nodes[0].Name)
+	require.Equal(t, "tcp", parsed.Nodes[0].Transport.Type)
+	require.Equal(t, "http", parsed.Nodes[0].Transport.HeaderType)
+
+	mihomoResult, err := svc.Render(context.Background(), domain.RenderRequest{
+		Format: "mihomo-proxies",
+		Nodes:  parsed.Nodes,
+	})
+	require.NoError(t, err)
+	require.Empty(t, mihomoResult.Report.Warnings)
+	require.Contains(t, string(mihomoResult.Body), "network: http")
+	require.Contains(t, string(mihomoResult.Body), "http-opts:")
+
+	singBoxResult, err := svc.Render(context.Background(), domain.RenderRequest{
+		Format: "sing-box-outbounds",
+		Nodes:  parsed.Nodes,
+	})
+	require.NoError(t, err)
+	require.Len(t, singBoxResult.Report.Warnings, 1)
+	require.Equal(t, "transport.header_type", singBoxResult.Report.Warnings[0].Field)
+}
+
 func TestServiceConvertRunsParseAndRender(t *testing.T) {
 	targets := []string{}
 	svc := service.New(service.WithProcessor(func(r *processor.Registry) {

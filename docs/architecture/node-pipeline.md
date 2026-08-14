@@ -50,6 +50,11 @@ parser 不访问 Store、不执行节点探测，也不根据最终客户端策�
 
 normalize 是 adapter 把外部别名、默认语义和目标结构统一成 `NodeIR` 的边界。service 随后用共享的 node validation 检查协议必填项与结构约束。
 
+VMess、VLESS 和 Trojan URI 的 TCP `headerType=http` 规范化为
+`transport.type=tcp` 与 `transport.header_type=http`，不能改写成表示 H2 的
+`transport.type=http`。空 `vmess.vcn`、`headerType=none`、gRPC `mode=gun`、
+AnyTLS `type=tcp` 和默认 TCP `path=/` 作为无语义差异的兼容默认值消费。
+
 URI adapter 会把 WebSocket path 中独占的 `?ed=<正整数>` 约定转换为
 `transport.max_early_data`，同时将
 `transport.early_data_header_name` 设为 `Sec-WebSocket-Protocol`。VMess AEAD、

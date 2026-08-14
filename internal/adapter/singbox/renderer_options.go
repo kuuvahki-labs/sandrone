@@ -195,7 +195,8 @@ func isDefaultTCPTransport(transport *domain.TransportOptions) bool {
 	if transport == nil || strings.TrimSpace(strings.ToLower(transport.Type)) != "tcp" {
 		return false
 	}
-	return transport.Method == "" &&
+	return transport.HeaderType == "" &&
+		transport.Method == "" &&
 		transport.Path == "" &&
 		transport.Host == "" &&
 		len(transport.Hosts) == 0 &&

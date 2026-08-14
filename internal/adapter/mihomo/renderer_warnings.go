@@ -16,7 +16,9 @@ func mihomoStructuredLossWarnings(node domain.NodeIR) []domain.Warning {
 	if node.Dialer != nil && node.Dialer.UDPRelay != nil && !mihomoSupportsUDPRelay(node.Type) {
 		add("dialer.udp_relay", "mihomo proxy schema for "+string(node.Type)+" does not expose a udp relay field")
 	}
-	if node.Transport != nil && node.Transport.Type != "" && !mihomoSupportsTransport(node.Type, node.Transport.Type) && !isDefaultTCPTransport(node.Transport) {
+	if isHTTPHeaderTransport(node.Transport) && !mihomoSupportsHTTPHeaderTransport(node.Type, node.Transport) {
+		add("transport.header_type", "mihomo proxy schema for "+string(node.Type)+" does not support TCP HTTP header obfuscation")
+	} else if node.Transport != nil && node.Transport.Type != "" && !mihomoSupportsTransport(node.Type, node.Transport.Type) && !isDefaultTCPTransport(node.Transport) && !mihomoSupportsHTTPHeaderTransport(node.Type, node.Transport) {
 		add("transport.type", "mihomo proxy schema for "+string(node.Type)+" does not support "+node.Transport.Type+" transport")
 	}
 	if node.TLS != nil && node.TLS.ECH != nil {

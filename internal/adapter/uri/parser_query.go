@@ -115,8 +115,17 @@ func applyTransportQuery(node *domain.NodeIR, values url.Values) bool {
 	}
 	normalizeTransport(node.Transport)
 	normalizeWebSocketEarlyData(node.Transport)
-	if node.Transport.Type == "tcp" && tcpHeaderTypeIsDefault(values) {
-		node.Transport.Host = ""
+	if node.Transport.Type == "tcp" {
+		switch {
+		case queryValuesEqualFold(values, "headerType", "http"):
+			node.Transport.HeaderType = "http"
+			node.Transport.Method = values.Get("method")
+		case tcpHeaderTypeIsDefault(values):
+			node.Transport.Host = ""
+			if node.Transport.Path == "/" {
+				node.Transport.Path = ""
+			}
+		}
 	}
 	if node.Transport.Host != "" {
 		node.Transport.Headers = map[string]string{"Host": node.Transport.Host}

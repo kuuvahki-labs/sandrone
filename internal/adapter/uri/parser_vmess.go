@@ -15,6 +15,7 @@ var errVMessZeroPort = errors.New("zero vmess port")
 
 func parseVMess(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 	payload := strings.TrimPrefix(raw, "vmess://")
+	payload, _, _ = strings.Cut(payload, "#")
 	if strings.Contains(payload, "@") {
 		return parseVMessAEAD(raw)
 	}
@@ -120,11 +121,15 @@ func vmessAEADKnownQueryFields(node domain.NodeIR, values url.Values, xhttpExtra
 		if key, value := vmessAEADFirstQueryField(values, "type", "net", "transport"); value != "" {
 			known[key] = true
 		}
-		if key, value := vmessAEADFirstQueryField(values, "path", "wspath", "wsPath", "ws-path", "obfs-uri"); value != "" && transport.Path == value {
-			known[key] = true
+		if key, value := vmessAEADFirstQueryField(values, "path", "wspath", "wsPath", "ws-path", "obfs-uri"); value != "" {
+			if transport.Path == value || (value == "/" && transport.Type == "tcp" && transport.HeaderType == "") {
+				known[key] = true
+			}
 		}
-		if key, value := vmessAEADFirstQueryField(values, "host", "authority", "wsHost", "ws-host", "requestHost", "http-host"); value != "" && (transport.Host == value || transport.Headers["Host"] == value) {
-			known[key] = true
+		if key, value := vmessAEADFirstQueryField(values, "host", "authority", "wsHost", "ws-host", "requestHost", "http-host"); value != "" {
+			if transport.Host == value || transport.Headers["Host"] == value || (transport.Type == "tcp" && transport.HeaderType == "") {
+				known[key] = true
+			}
 		}
 		if key, value := vmessAEADFirstQueryField(values, "serviceName", "service_name"); value != "" && transport.ServiceName == value {
 			known[key] = true
@@ -136,6 +141,17 @@ func vmessAEADKnownQueryFields(node domain.NodeIR, values url.Values, xhttpExtra
 			if xhttpExtraComplete && values.Get("extra") != "" {
 				known["extra"] = true
 			}
+		}
+		if transport.Type == "grpc" && queryValuesEqualFold(values, "mode", "gun") {
+			known["mode"] = true
+		}
+		if transport.HeaderType == "http" && queryValuesEqualFold(values, "headerType", "http") {
+			known["headerType"] = true
+			if values.Get("method") != "" {
+				known["method"] = true
+			}
+		} else if queryValuesAreNoopHeaderType(values, "headerType") {
+			known["headerType"] = true
 		}
 	}
 	return known
@@ -172,6 +188,7 @@ func parseLegacyVMess(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 	node := domain.NodeIR{Type: domain.NodeTypeVMess, SourceFormat: "uri"}
 	source := shared.SourceInfo("vmess", shared.SourceRefs("vmess"))
 	payload := strings.TrimPrefix(raw, "vmess://")
+	payload, fragment, _ := strings.Cut(payload, "#")
 	decoded, ok := decodeBase64Bytes(payload)
 	if !ok {
 		return node, source, domain.NewError(domain.CodeParseFailed, "decode vmess payload")
@@ -180,7 +197,7 @@ func parseLegacyVMess(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 	if err := json.Unmarshal(decoded, &doc); err != nil {
 		return node, source, domain.WrapError(domain.CodeParseFailed, "unmarshal vmess json", err)
 	}
-	node.Name = firstNonEmpty(shared.StringValue(doc["ps"]), shared.StringValue(doc["name"]), shared.StringValue(doc["remarks"]), shared.StringValue(doc["add"]), "vmess")
+	node.Name = shared.DecodeName(fragment, firstNonEmpty(shared.StringValue(doc["ps"]), shared.StringValue(doc["name"]), shared.StringValue(doc["remarks"]), shared.StringValue(doc["add"]), "vmess"))
 	node.Server = shared.StringValue(doc["add"])
 	if node.Server == "" {
 		return node, source, domain.NewError(domain.CodeParseFailed, "missing vmess server")
@@ -253,22 +270,38 @@ func parseLegacyVMess(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 		shared.StringValue(doc["obfs-uri"]),
 	)
 	serviceName := firstNonEmpty(shared.StringValue(doc["serviceName"]), shared.StringValue(doc["service_name"]))
+	headerType := legacyVMessHTTPHeaderType(doc, network)
+	if headerType == "http" && network == "" {
+		network = "tcp"
+	}
 	if host != "" || path != "" || serviceName != "" || network != "" {
 		node.Transport = &domain.TransportOptions{
 			Type:        network,
+			HeaderType:  headerType,
 			Host:        host,
 			Path:        path,
 			ServiceName: serviceName,
 		}
 		normalizeTransport(node.Transport)
+		if node.Transport.HeaderType == "http" {
+			node.Transport.Method = shared.StringValue(doc["method"])
+			if node.Transport.Host != "" {
+				node.Transport.Headers = map[string]string{"Host": node.Transport.Host}
+			}
+		} else if node.Transport.Type == "tcp" {
+			node.Transport.Host = ""
+			if node.Transport.Path == "/" {
+				node.Transport.Path = ""
+			}
+		}
 		if node.Transport.Type == "grpc" && node.Transport.ServiceName == "" && node.Transport.Path != "" {
 			node.Transport.ServiceName = node.Transport.Path
 			node.Transport.Path = ""
 		}
 	}
 	node.Raw = map[string]json.RawMessage{}
-	preserveVMessHeaderTypeRaw(node.Raw, doc, "type")
-	preserveVMessHeaderTypeRaw(node.Raw, doc, "headerType")
+	preserveVMessHeaderTypeRaw(node.Raw, doc, "type", node.Transport)
+	preserveVMessHeaderTypeRaw(node.Raw, doc, "headerType", node.Transport)
 	knownFields := map[string]bool{
 		"v": true, "ps": true, "name": true, "remarks": true, "add": true, "port": true,
 		"id": true, "uuid": true, "aid": true, "alterId": true, "alter_id": true,
@@ -281,6 +314,12 @@ func parseLegacyVMess(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 		"fp": true, "fingerprint": true, "pinSHA256": true, "pcs": true,
 		"serviceName": true, "service_name": true,
 		"packetEncoding": true, "packet-encoding": true,
+	}
+	if node.Transport != nil && node.Transport.HeaderType == "http" {
+		knownFields["method"] = true
+	}
+	if value, ok := doc["vcn"].(string); ok && value == "" {
+		knownFields["vcn"] = true
 	}
 	if alpnKnown {
 		knownFields["alpn"] = true
@@ -313,9 +352,25 @@ func parseLegacyVMessALPN(value any) ([]string, bool) {
 	return alpn, true
 }
 
-func preserveVMessHeaderTypeRaw(raw map[string]json.RawMessage, doc map[string]any, key string) {
+func legacyVMessHTTPHeaderType(doc map[string]any, network string) string {
+	network = strings.TrimSpace(network)
+	if network != "" && !strings.EqualFold(network, "tcp") {
+		return ""
+	}
+	for _, key := range []string{"headerType", "type"} {
+		if strings.EqualFold(strings.TrimSpace(shared.StringValue(doc[key])), "http") {
+			return "http"
+		}
+	}
+	return ""
+}
+
+func preserveVMessHeaderTypeRaw(raw map[string]json.RawMessage, doc map[string]any, key string, transport *domain.TransportOptions) {
 	value := shared.StringValue(doc[key])
 	if value == "" || value == "auto" || value == "none" {
+		return
+	}
+	if transport != nil && transport.HeaderType == "http" && strings.EqualFold(strings.TrimSpace(value), "http") {
 		return
 	}
 	raw["vmess."+key] = shared.RawNumberOrString(value)

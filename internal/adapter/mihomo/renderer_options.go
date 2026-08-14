@@ -95,6 +95,26 @@ func applyMihomoTransport(out map[string]any, node domain.NodeIR) {
 	if node.Transport == nil || node.Transport.Type == "" {
 		return
 	}
+	if mihomoSupportsHTTPHeaderTransport(node.Type, node.Transport) {
+		out["network"] = "http"
+		path := node.Transport.Path
+		if path == "" {
+			path = "/"
+		}
+		opts := map[string]any{"path": []string{path}}
+		if node.Transport.Method != "" {
+			opts["method"] = node.Transport.Method
+		}
+		headers := node.Transport.Headers
+		if len(headers) == 0 && node.Transport.Host != "" {
+			headers = map[string]string{"Host": node.Transport.Host}
+		}
+		if len(headers) > 0 {
+			opts["headers"] = mapStringToStringList(headers)
+		}
+		out["http-opts"] = opts
+		return
+	}
 	if !mihomoSupportsTransport(node.Type, node.Transport.Type) {
 		return
 	}
@@ -222,7 +242,8 @@ func isDefaultTCPTransport(transport *domain.TransportOptions) bool {
 	if transport == nil || strings.TrimSpace(strings.ToLower(transport.Type)) != "tcp" {
 		return false
 	}
-	return transport.Method == "" &&
+	return transport.HeaderType == "" &&
+		transport.Method == "" &&
 		transport.Path == "" &&
 		transport.Host == "" &&
 		len(transport.Hosts) == 0 &&
@@ -233,6 +254,15 @@ func isDefaultTCPTransport(transport *domain.TransportOptions) bool {
 		!transport.V2RayHTTPUpgrade &&
 		!transport.V2RayHTTPUpgradeFastOpen &&
 		transport.XHTTP == nil
+}
+
+func mihomoSupportsHTTPHeaderTransport(nodeType domain.NodeType, transport *domain.TransportOptions) bool {
+	return (nodeType == domain.NodeTypeVMess || nodeType == domain.NodeTypeVLESS) && isHTTPHeaderTransport(transport)
+}
+
+func isHTTPHeaderTransport(transport *domain.TransportOptions) bool {
+	return transport != nil && strings.EqualFold(strings.TrimSpace(transport.Type), "tcp") &&
+		strings.EqualFold(strings.TrimSpace(transport.HeaderType), "http")
 }
 
 func renderMihomoXHTTPReuseSettings(settings *domain.XHTTPReuseSettings) map[string]any {

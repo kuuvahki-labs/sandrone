@@ -22,6 +22,7 @@ type DialerOptions struct {
 
 type TransportOptions struct {
 	Type                     string                 `json:"type,omitempty" yaml:"type,omitempty"`
+	HeaderType               string                 `json:"header_type,omitempty" yaml:"header_type,omitempty"`
 	Method                   string                 `json:"method,omitempty" yaml:"method,omitempty"`
 	Path                     string                 `json:"path,omitempty" yaml:"path,omitempty"`
 	Host                     string                 `json:"host,omitempty" yaml:"host,omitempty"`

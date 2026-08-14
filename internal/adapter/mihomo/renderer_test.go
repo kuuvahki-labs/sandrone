@@ -1045,6 +1045,38 @@ func TestRenderMihomoHTTPUpgradeHeadersAsStringLists(t *testing.T) {
 	}
 }
 
+func TestRenderMihomoVMessTCPHTTPHeader(t *testing.T) {
+	r := mihomo.NewRenderer()
+	nodes := []domain.NodeIR{{
+		Name:   "vmess-http-header",
+		Type:   domain.NodeTypeVMess,
+		Server: "example.com",
+		Port:   443,
+		UUID:   "11111111-1111-1111-1111-111111111111",
+		Transport: &domain.TransportOptions{
+			Type:       "tcp",
+			HeaderType: "http",
+			Method:     "GET",
+			Path:       "/api",
+			Host:       "cdn.example.com",
+			Headers:    map[string]string{"Host": "cdn.example.com"},
+		},
+	}}
+
+	out, report, err := r.RenderWithReport(context.Background(), nodes, domain.RenderOptions{Format: "mihomo-proxies"})
+	require.NoError(t, err)
+	require.Empty(t, report.Warnings)
+
+	var doc map[string]any
+	require.NoError(t, yaml.Unmarshal(out, &doc))
+	proxy := doc["proxies"].([]any)[0].(map[string]any)
+	require.Equal(t, "http", proxy["network"])
+	opts := proxy["http-opts"].(map[string]any)
+	require.Equal(t, "GET", opts["method"])
+	require.Equal(t, "/api", opts["path"].([]any)[0])
+	require.Equal(t, "cdn.example.com", opts["headers"].(map[string]any)["Host"].([]any)[0])
+}
+
 func TestRenderMihomoHysteriaHopIntervalVariants(t *testing.T) {
 	r := mihomo.NewRenderer()
 	nodes := []domain.NodeIR{

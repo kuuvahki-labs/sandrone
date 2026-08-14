@@ -51,3 +51,14 @@ func TestParseAnyTLSExplicitNoneRetainsTLSModifiers(t *testing.T) {
 	require.Equal(t, "sni.example.com", nodes[0].TLS.ServerName)
 	require.True(t, nodes[0].TLS.InsecureSkipVerify)
 }
+
+func TestParseAnyTLSCompatibilityDefaultsAreConsumed(t *testing.T) {
+	raw := "anytls://secret@example.com:443?security=tls&type=tcp&headerType=none#anytls"
+
+	nodes, source, err := uriadapter.NewParser().ParseList(context.Background(), []byte(raw))
+
+	require.NoError(t, err)
+	require.Empty(t, source.Warnings)
+	require.Len(t, nodes, 1)
+	require.Empty(t, nodes[0].Raw)
+}

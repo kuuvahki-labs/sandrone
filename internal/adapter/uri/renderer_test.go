@@ -426,6 +426,34 @@ func TestRenderURIVLESSWithReality(t *testing.T) {
 	require.Contains(t, string(out), "type=h2")
 }
 
+func TestRenderURIVMessTCPHTTPHeader(t *testing.T) {
+	r := uri.NewRenderer()
+	node := domain.NodeIR{
+		Name:   "vmess-http-header",
+		Type:   domain.NodeTypeVMess,
+		Server: "example.com",
+		Port:   443,
+		UUID:   "11111111-1111-1111-1111-111111111111",
+		Transport: &domain.TransportOptions{
+			Type:       "tcp",
+			HeaderType: "http",
+			Method:     "GET",
+			Path:       "/api",
+			Host:       "cdn.example.com",
+			Headers:    map[string]string{"Host": "cdn.example.com"},
+		},
+	}
+
+	out, report, err := r.RenderWithReport(context.Background(), []domain.NodeIR{node}, domain.RenderOptions{})
+	require.NoError(t, err)
+	require.Empty(t, report.Warnings)
+
+	parsed, _, err := uri.NewParser().Parse(context.Background(), out)
+	require.NoError(t, err)
+	require.Len(t, parsed, 1)
+	require.Equal(t, node.Transport, parsed[0].Transport)
+}
+
 func TestRenderURIReportsCanonicalNetworkAsLossyForV2RayProtocols(t *testing.T) {
 	nodes := []domain.NodeIR{
 		{

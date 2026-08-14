@@ -142,6 +142,15 @@ func renderVMessURI(node domain.NodeIR) (string, []domain.Warning, error) {
 	}
 	if node.Transport != nil {
 		switch node.Transport.Type {
+		case "tcp":
+			if node.Transport.HeaderType == "http" {
+				doc["type"] = "http"
+				doc["host"] = firstNonEmptyURI(node.Transport.Host, node.Transport.Headers["Host"])
+				doc["path"] = node.Transport.Path
+				if node.Transport.Method != "" {
+					doc["method"] = node.Transport.Method
+				}
+			}
 		case "websocket", "ws":
 			doc["net"] = "ws"
 			doc["host"] = firstNonEmptyURI(node.Transport.Host, node.Transport.Headers["Host"])
@@ -478,6 +487,20 @@ func applyURIQueryTransport(q url.Values, node domain.NodeIR) {
 		return
 	}
 	switch node.Transport.Type {
+	case "tcp":
+		q.Set("type", "tcp")
+		if node.Transport.HeaderType != "" {
+			q.Set("headerType", node.Transport.HeaderType)
+		}
+		if node.Transport.Method != "" {
+			q.Set("method", node.Transport.Method)
+		}
+		if node.Transport.Path != "" {
+			q.Set("path", node.Transport.Path)
+		}
+		if node.Transport.Host != "" {
+			q.Set("host", node.Transport.Host)
+		}
 	case "websocket", "ws":
 		q.Set("type", "ws")
 		if node.Transport.Path != "" {

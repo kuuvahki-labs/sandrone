@@ -70,6 +70,18 @@ func TestParseVMessURI(t *testing.T) {
 	require.Equal(t, "example.com", got.TLS.ServerName)
 }
 
+func TestParseLegacyVMessFragment(t *testing.T) {
+	p := uri.NewParser()
+	doc := `{"v":"2","ps":"payload-name","add":"example.com","port":"443","id":"11111111-1111-1111-1111-111111111111","aid":"0","scy":"auto","net":"tcp","type":"none"}`
+	raw := "vmess://" + base64.StdEncoding.EncodeToString([]byte(doc)) + "#fragment@name"
+
+	nodes, _, err := p.Parse(context.Background(), []byte(raw))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	require.Equal(t, "fragment@name", nodes[0].Name)
+}
+
 func TestParseLegacyVMessALPN(t *testing.T) {
 	p := uri.NewParser()
 	tests := []struct {
@@ -219,6 +231,26 @@ func TestParseVMessAEADWebSocketTLSURL(t *testing.T) {
 	require.Equal(t, "/ws", got.Transport.Path)
 	require.Equal(t, map[string]string{"Host": "cdn.example.com"}, got.Transport.Headers)
 	require.Empty(t, got.Raw)
+}
+
+func TestParseVMessAEADTCPHTTPHeader(t *testing.T) {
+	p := uri.NewParser()
+	raw := "vmess://11111111-1111-1111-1111-111111111111@example.com:443?type=tcp&headerType=http&method=GET&host=cdn.example.com&path=%2Fapi#vmess-http"
+
+	nodes, source, err := p.ParseList(context.Background(), []byte(raw))
+
+	require.NoError(t, err)
+	require.Empty(t, source.Warnings)
+	require.Len(t, nodes, 1)
+	require.Equal(t, &domain.TransportOptions{
+		Type:       "tcp",
+		HeaderType: "http",
+		Method:     "GET",
+		Path:       "/api",
+		Host:       "cdn.example.com",
+		Headers:    map[string]string{"Host": "cdn.example.com"},
+	}, nodes[0].Transport)
+	require.Empty(t, nodes[0].Raw)
 }
 
 func TestParseVMessAEADIPv6URL(t *testing.T) {
@@ -1044,17 +1076,23 @@ func TestParseVMessCompatAliasVariants(t *testing.T) {
 	}
 }
 
-func TestParseVMessHeaderTypeAliasPreservedRaw(t *testing.T) {
+func TestParseVMessHeaderTypeAliasPromoted(t *testing.T) {
 	p := uri.NewParser()
-	doc := `{"v":"2","ps":"alias","add":"example.com","port":"443","id":"11111111-1111-1111-1111-111111111111","net":"tcp","headerType":"http","type":"none"}`
+	doc := `{"v":"2","ps":"alias","add":"example.com","port":"443","id":"11111111-1111-1111-1111-111111111111","net":"tcp","headerType":"http","type":"none","method":"GET","host":"cdn.example.com","path":"/api"}`
 	raw := "vmess://" + base64.StdEncoding.EncodeToString([]byte(doc))
 
-	nodes, _, err := p.Parse(context.Background(), []byte(raw))
+	nodes, source, err := p.ParseList(context.Background(), []byte(raw))
 	require.NoError(t, err)
+	require.Empty(t, source.Warnings)
 	got := nodes[0]
 	require.NotNil(t, got.Transport)
 	require.Equal(t, "tcp", got.Transport.Type)
-	require.JSONEq(t, `"http"`, string(got.Raw["vmess.headerType"]))
+	require.Equal(t, "http", got.Transport.HeaderType)
+	require.Equal(t, "GET", got.Transport.Method)
+	require.Equal(t, "cdn.example.com", got.Transport.Host)
+	require.Equal(t, "/api", got.Transport.Path)
+	require.Equal(t, "cdn.example.com", got.Transport.Headers["Host"])
+	require.Empty(t, got.Raw)
 	require.NotContains(t, got.Raw, "vmess.type")
 }
 
@@ -1077,7 +1115,7 @@ func TestParseVMessPromotesKnownCompatibilityFields(t *testing.T) {
 	require.Empty(t, got.Raw)
 }
 
-func TestParseVMessNonDefaultHeaderTypeStaysRaw(t *testing.T) {
+func TestParseVMessHTTPHeaderTypePromoted(t *testing.T) {
 	p := uri.NewParser()
 	doc := `{"v":"2","ps":"http-header","add":"example.com","port":"443","id":"11111111-1111-1111-1111-111111111111","aid":"0","net":"tcp","type":"http"}`
 	raw := "vmess://" + base64.StdEncoding.EncodeToString([]byte(doc))
@@ -1087,9 +1125,74 @@ func TestParseVMessNonDefaultHeaderTypeStaysRaw(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, source)
 	require.Len(t, nodes, 1)
+	require.Empty(t, source.Warnings)
+	require.NotNil(t, nodes[0].Transport)
+	require.Equal(t, "tcp", nodes[0].Transport.Type)
+	require.Equal(t, "http", nodes[0].Transport.HeaderType)
+	require.Empty(t, nodes[0].Raw)
+}
+
+func TestParseVMessCompatibilityDefaultsAreConsumed(t *testing.T) {
+	p := uri.NewParser()
+	doc := `{"v":"2","ps":"defaults","add":"example.com","port":"443","id":"11111111-1111-1111-1111-111111111111","aid":"0","net":"tcp","type":"none","host":"ignored.example.com","path":"/","vcn":""}`
+	raw := "vmess://" + base64.StdEncoding.EncodeToString([]byte(doc))
+
+	nodes, source, err := p.ParseList(context.Background(), []byte(raw))
+
+	require.NoError(t, err)
+	require.Empty(t, source.Warnings)
+	require.Len(t, nodes, 1)
+	require.Equal(t, &domain.TransportOptions{Type: "tcp"}, nodes[0].Transport)
+	require.Empty(t, nodes[0].Raw)
+}
+
+func TestParseVMessNonEmptyVCNRemainsRaw(t *testing.T) {
+	p := uri.NewParser()
+	doc := `{"v":"2","ps":"vcn","add":"example.com","port":"443","id":"11111111-1111-1111-1111-111111111111","net":"tcp","type":"none","vcn":"future"}`
+	raw := "vmess://" + base64.StdEncoding.EncodeToString([]byte(doc))
+
+	nodes, source, err := p.ParseList(context.Background(), []byte(raw))
+
+	require.NoError(t, err)
 	require.Len(t, source.Warnings, 1)
-	require.Equal(t, "vmess.type", source.Warnings[0].Field)
-	require.JSONEq(t, `"http"`, string(nodes[0].Raw["vmess.type"]))
+	require.Equal(t, "vmess.vcn", source.Warnings[0].Field)
+	require.JSONEq(t, `"future"`, string(nodes[0].Raw["vmess.vcn"]))
+}
+
+func TestParseV2RayQueryCompatibilityDefaultsAreConsumed(t *testing.T) {
+	p := uri.NewParser()
+	tests := []struct {
+		name string
+		raw  string
+	}{
+		{
+			name: "vless grpc gun mode",
+			raw:  "vless://11111111-1111-1111-1111-111111111111@example.com:443?encryption=none&type=grpc&serviceName=svc&mode=gun#vless",
+		},
+		{
+			name: "vless default tcp path",
+			raw:  "vless://11111111-1111-1111-1111-111111111111@example.com:443?encryption=none&type=tcp&path=%2F#vless",
+		},
+		{
+			name: "trojan default tcp header",
+			raw:  "trojan://secret@example.com:443?type=tcp&headerType=none&host=ignored.example.com&path=%2F#trojan",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			nodes, source, err := p.ParseList(context.Background(), []byte(tc.raw))
+
+			require.NoError(t, err)
+			require.Empty(t, source.Warnings)
+			require.Len(t, nodes, 1)
+			require.Empty(t, nodes[0].Raw)
+			if nodes[0].Transport != nil && nodes[0].Transport.Type == "tcp" {
+				require.Empty(t, nodes[0].Transport.Path)
+				require.Empty(t, nodes[0].Transport.Host)
+			}
+		})
+	}
 }
 
 func TestParseVMessGRPCPathBecomesServiceName(t *testing.T) {

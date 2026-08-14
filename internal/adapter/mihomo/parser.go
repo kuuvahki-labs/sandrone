@@ -292,6 +292,8 @@ func parseMihomoTransport(node *domain.NodeIR, proxy map[string]any) {
 		node.Transport.Path = shared.StringValue(opts["path"])
 	case "http":
 		opts := shared.AnyMapValue(proxy["http-opts"])
+		node.Transport.Type = "tcp"
+		node.Transport.HeaderType = "http"
 		node.Transport.Method = shared.StringValue(opts["method"])
 		paths := shared.StringSliceValue(opts["path"])
 		if len(paths) > 0 {
@@ -299,6 +301,9 @@ func parseMihomoTransport(node *domain.NodeIR, proxy map[string]any) {
 		}
 		if headers := shared.AnyMapValue(opts["headers"]); headers != nil {
 			node.Transport.Headers = mapStringListToString(headers)
+			if host := node.Transport.Headers["Host"]; host != "" {
+				node.Transport.Host = host
+			}
 		}
 	case "xhttp":
 		opts := shared.AnyMapValue(proxy["xhttp-opts"])

@@ -30,10 +30,16 @@ func singBoxStructuredLossWarnings(node domain.NodeIR) []domain.Warning {
 	if node.Type == domain.NodeTypeHysteria && node.Hysteria != nil && node.Hysteria.Protocol != "" {
 		warnings = append(warnings, lossyWarning(node, "hysteria.protocol", "sing-box v1.13.14 hysteria outbound schema has no protocol selector"))
 	}
-	if singBoxNodeUsesV2RayTransport(node.Type) && node.Transport != nil && node.Transport.Type != "" && !singBoxSupportsTransport(node.Transport.Type) && !isDefaultTCPTransport(node.Transport) {
+	if singBoxNodeUsesV2RayTransport(node.Type) && isHTTPHeaderTransport(node.Transport) {
+		warnings = append(warnings, lossyWarning(node, "transport.header_type", "sing-box V2Ray transport schema does not support TCP HTTP header obfuscation"))
+	} else if singBoxNodeUsesV2RayTransport(node.Type) && node.Transport != nil && node.Transport.Type != "" && !singBoxSupportsTransport(node.Transport.Type) && !isDefaultTCPTransport(node.Transport) {
 		warnings = append(warnings, lossyWarning(node, "transport.type", "sing-box v1.13.14 V2Ray transport schema does not support "+node.Transport.Type))
 	}
 	return warnings
+}
+
+func isHTTPHeaderTransport(transport *domain.TransportOptions) bool {
+	return transport != nil && transport.Type == "tcp" && transport.HeaderType == "http"
 }
 
 func singBoxNodeUsesV2RayTransport(nodeType domain.NodeType) bool {

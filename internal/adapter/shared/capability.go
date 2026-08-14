@@ -347,8 +347,10 @@ func mihomoLossyFieldNames(nodeType domain.NodeType) []string {
 	switch nodeType {
 	case domain.NodeTypeShadowsocks:
 		return fields(common, "transport.type")
-	case domain.NodeTypeVMess, domain.NodeTypeVLESS, domain.NodeTypeTrojan:
+	case domain.NodeTypeVMess, domain.NodeTypeVLESS:
 		return fieldGroups(common, tlsECHAdvanced, []string{"multiplex", "transport.type"})
+	case domain.NodeTypeTrojan:
+		return fieldGroups(common, tlsECHAdvanced, []string{"multiplex", "transport.type", "transport.header_type"})
 	case domain.NodeTypeHysteria:
 		return fields(common, "dialer.udp_relay", "hysteria.quic", "transport.type")
 	case domain.NodeTypeHysteria2:
@@ -373,9 +375,9 @@ func singBoxLossyFieldNames(nodeType domain.NodeType) []string {
 	tlsFingerprint := fields(common, "tls.fingerprint")
 	switch nodeType {
 	case domain.NodeTypeVLESS:
-		return fields(tlsFingerprint, "encryption", "transport.type")
+		return fields(tlsFingerprint, "encryption", "transport.type", "transport.header_type")
 	case domain.NodeTypeVMess, domain.NodeTypeTrojan:
-		return fields(tlsFingerprint, "transport.type")
+		return fields(tlsFingerprint, "transport.type", "transport.header_type")
 	case domain.NodeTypeHysteria:
 		return fields(tlsFingerprint, "hysteria.protocol", "hysteria.quic")
 	case domain.NodeTypeHysteria2:
@@ -434,7 +436,7 @@ func shadowrocketLossyFieldNames(nodeType domain.NodeType) []string {
 		"dialer.network", "multiplex", "udp_over_tcp",
 		"tls.client_fingerprint", "tls.fingerprint", "tls.certificate", "tls.private_key",
 		"tls.disable_sni", "tls.ech", "tls.reality",
-		"transport.method", "transport.path", "transport.host", "transport.hosts",
+		"transport.header_type", "transport.method", "transport.path", "transport.host", "transport.hosts",
 		"transport.headers", "transport.service_name", "transport.max_early_data",
 		"transport.early_data_header_name", "transport.xhttp",
 	}

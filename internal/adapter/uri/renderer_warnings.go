@@ -217,13 +217,17 @@ func addTransportLossWarnings(node domain.NodeIR, target string, emitsBasic bool
 			add("transport.service_name")
 		}
 	}
-	if transport.Method != "" {
+	rendersHTTPHeader := uriRendersHTTPHeader(node.Type, transport)
+	if transport.HeaderType != "" && !rendersHTTPHeader {
+		add("transport.header_type")
+	}
+	if transport.Method != "" && !rendersHTTPHeader {
 		add("transport.method")
 	}
 	if len(transport.Hosts) > 0 {
 		add("transport.hosts")
 	}
-	if len(transport.Headers) > 0 {
+	if len(transport.Headers) > 0 && (!rendersHTTPHeader || hasNonHostHeader(transport.Headers)) {
 		add("transport.headers")
 	}
 	if transport.MaxEarlyData != 0 {
@@ -232,6 +236,27 @@ func addTransportLossWarnings(node domain.NodeIR, target string, emitsBasic bool
 	if transport.EarlyDataHeaderName != "" {
 		add("transport.early_data_header_name")
 	}
+}
+
+func uriRendersHTTPHeader(nodeType domain.NodeType, transport *domain.TransportOptions) bool {
+	if transport == nil || transport.Type != "tcp" || transport.HeaderType != "http" {
+		return false
+	}
+	switch nodeType {
+	case domain.NodeTypeVMess, domain.NodeTypeVLESS, domain.NodeTypeTrojan:
+		return true
+	default:
+		return false
+	}
+}
+
+func hasNonHostHeader(headers map[string]string) bool {
+	for key := range headers {
+		if key != "Host" {
+			return true
+		}
+	}
+	return false
 }
 
 func addHysteriaLossWarnings(node domain.NodeIR, target string, hysteria2 bool, warnings *[]domain.Warning) {

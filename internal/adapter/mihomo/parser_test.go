@@ -241,7 +241,8 @@ proxies:
 			check: func(t *testing.T, n domain.NodeIR) {
 				require.NotNil(t, n.Transport)
 				if n.Name == "http-node" {
-					require.Equal(t, "http", n.Transport.Type)
+					require.Equal(t, "tcp", n.Transport.Type)
+					require.Equal(t, "http", n.Transport.HeaderType)
 					require.Equal(t, "GET", n.Transport.Method)
 					require.Equal(t, "/api", n.Transport.Path)
 					require.Equal(t, "curl/8", n.Transport.Headers["User-Agent"])
