@@ -12,6 +12,7 @@ import (
 func TestVersion(t *testing.T) {
 	original := rawVersion
 	t.Cleanup(func() { rawVersion = original })
+	canonical := canonicalVersion(t)
 
 	tests := []struct {
 		name string
@@ -19,7 +20,7 @@ func TestVersion(t *testing.T) {
 		want string
 	}{
 		{name: "default", raw: "0.1.0", want: "0.1.0"},
-		{name: "blank falls back to default", raw: " \t\n", want: "0.1.1"},
+		{name: "blank falls back to default", raw: " \t\n", want: canonical},
 		{name: "trims whitespace", raw: "  1.2.3\n", want: "1.2.3"},
 		{name: "removes leading v", raw: "v1.2.3", want: "1.2.3"},
 		{name: "removes only one leading v", raw: "vv1.2.3", want: "v1.2.3"},
@@ -191,6 +192,15 @@ func TestDefaultVersionHasSingleCanonicalFile(t *testing.T) {
 	}
 }
 
+func canonicalVersion(t *testing.T) string {
+	t.Helper()
+	version := strings.TrimSpace(defaultVersion)
+	if version == "" {
+		t.Fatal("embedded VERSION is empty")
+	}
+	return version
+}
+
 func TestMakeAcceptsSafeBuildVersions(t *testing.T) {
 	for _, version := range []string{"v0.1.0", "0.1.0-rc.1+meta"} {
 		t.Run(version, func(t *testing.T) {
@@ -283,6 +293,8 @@ func TestResolveBuildRevisionRequiresCleanGitWorktree(t *testing.T) {
 }
 
 func TestMakeImageDerivesIdentityFromWorktreeState(t *testing.T) {
+	canonical := canonicalVersion(t)
+
 	t.Run("clean worktree", func(t *testing.T) {
 		repo, revision := newMakeFixtureRepo(t)
 		output, err := runMakeAt(repo, "image", "DOCKER=echo")
@@ -290,7 +302,7 @@ func TestMakeImageDerivesIdentityFromWorktreeState(t *testing.T) {
 			t.Fatalf("make image in clean worktree: %v\n%s", err, output)
 		}
 		for _, want := range []string{
-			"--build-arg VERSION=0.1.1",
+			"--build-arg VERSION=" + canonical,
 			"--build-arg REVISION=" + revision,
 		} {
 			if !strings.Contains(string(output), want) {
@@ -332,7 +344,7 @@ func TestMakeInjectsBuildRevision(t *testing.T) {
 	if err != nil {
 		t.Fatalf("built binary --version failed: %v\n%s", err, versionOutput)
 	}
-	if got, want := string(versionOutput), "sandrone version 0.1.1 (deadbeefcafe)\n"; got != want {
+	if got, want := string(versionOutput), "sandrone version "+canonicalVersion(t)+" (deadbeefcafe)\n"; got != want {
 		t.Fatalf("built binary --version = %q, want %q", got, want)
 	}
 }
@@ -888,6 +900,7 @@ func TestBuildMetadataContracts(t *testing.T) {
 
 func TestMakeImageInjectsCanonicalVersionAndRevision(t *testing.T) {
 	revision := "deadbeefcafe0123456789abcdef0123456789ab"
+	canonical := canonicalVersion(t)
 	output, err := runMake(
 		t,
 		"image",
@@ -899,9 +912,9 @@ func TestMakeImageInjectsCanonicalVersionAndRevision(t *testing.T) {
 		t.Fatalf("make image failed: %v\n%s", err, output)
 	}
 	for _, want := range []string{
-		"--build-arg VERSION=0.1.1",
+		"--build-arg VERSION=" + canonical,
 		"--build-arg REVISION=" + revision,
-		"--label org.opencontainers.image.version=0.1.1",
+		"--label org.opencontainers.image.version=" + canonical,
 		"--label org.opencontainers.image.revision=" + revision,
 		"--tag example.test/sandrone:test",
 	} {

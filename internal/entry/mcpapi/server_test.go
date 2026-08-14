@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/kuuvahki-labs/sandrone/internal/app"
+	"github.com/kuuvahki-labs/sandrone/internal/buildinfo"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/entry/mcpapi"
 )
@@ -58,7 +59,7 @@ func TestServerReportsBuildAndProtocolVersionDuringDiscovery(t *testing.T) {
 	session := connect(t, ctx, mcpapi.SDKServer(testRuntime(t, app.Config{})))
 	defer session.Close()
 
-	require.Equal(t, "0.1.1", session.InitializeResult().ServerInfo.Version)
+	require.Equal(t, buildinfo.Version(), session.InitializeResult().ServerInfo.Version)
 	require.Equal(t, mcpapi.ProtocolVersion, session.InitializeResult().ProtocolVersion)
 }
 

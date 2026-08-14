@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/kuuvahki-labs/sandrone/internal/app"
+	"github.com/kuuvahki-labs/sandrone/internal/buildinfo"
 	"github.com/kuuvahki-labs/sandrone/internal/entry/mcpapi"
 )
 
@@ -101,7 +102,7 @@ func TestStreamableHTTPDiscover(t *testing.T) {
 	var serverInfo mcp.Implementation
 	require.NoError(t, json.Unmarshal(envelope.Result.Meta[mcp.MetaKeyServerInfo], &serverInfo))
 	require.Equal(t, "sandrone", serverInfo.Name)
-	require.Equal(t, "0.1.1", serverInfo.Version)
+	require.Equal(t, buildinfo.Version(), serverInfo.Version)
 }
 
 func TestStreamableHTTPListMetadata(t *testing.T) {

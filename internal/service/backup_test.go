@@ -18,6 +18,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 
+	"github.com/kuuvahki-labs/sandrone/internal/buildinfo"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/service"
 	projectsettings "github.com/kuuvahki-labs/sandrone/internal/settings"
@@ -68,7 +69,7 @@ func TestBackupExportAndRestoreRoundTripRawStore(t *testing.T) {
 	require.Equal(t, "sandrone-store-backup", manifest["format"])
 	require.Equal(t, float64(1), manifest["storage_schema_version"])
 	require.Equal(t, "2026-07-21T19:34:56Z", manifest["created_at"])
-	require.Equal(t, "0.1.1", manifest["app_version"])
+	require.Equal(t, buildinfo.Version(), manifest["app_version"])
 
 	target := store.NewFSStore(afero.NewMemMapFs())
 	writeBackupTestFile(t, target, "stale/value", []byte("replace me"))
