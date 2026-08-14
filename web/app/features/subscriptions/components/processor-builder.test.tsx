@@ -14,18 +14,20 @@ import type { ProcessorDetail, ResourceOption } from "~/shared/resources/types";
 function renderProcessorBuilder({
   defaultValue = [],
   onDirty,
+	probeEnabled = true,
   scriptFiles: availableScriptFiles = [],
 }: {
   defaultValue?: ProcessorDetail[];
   onDirty?: () => void;
+	probeEnabled?: boolean;
   scriptFiles?: ResourceOption[];
 } = {}) {
   const { container } = render(
     <UICapabilityProvider value={{
-      capabilities: [{ key: "probe.enabled", enabled: true }],
+      capabilities: [{ key: "probe.enabled", enabled: probeEnabled }],
       loaded: true,
-      hasFeature: (key) => key === "probe.enabled",
-      getFeature: (key) => key === "probe.enabled" ? { key, enabled: true } : undefined,
+      hasFeature: (key) => key === "probe.enabled" && probeEnabled,
+      getFeature: (key) => key === "probe.enabled" ? { key, enabled: probeEnabled } : undefined,
     }}>
       <ProcessorBuilder
         defaultValue={defaultValue}
@@ -47,6 +49,14 @@ function renderProcessorBuilder({
 }
 
 describe("ProcessorBuilder", () => {
+	it("hides the probe processor option when probe is unavailable", async () => {
+		const user = userEvent.setup();
+		renderProcessorBuilder({ probeEnabled: false });
+
+		await user.click(screen.getByRole("combobox", { name: "类型" }));
+		expect(screen.queryByRole("option", { name: "测活" })).not.toBeInTheDocument();
+	});
+
   it("keeps an empty processor chain empty", () => {
     const { serializedProcessors } = renderProcessorBuilder();
 

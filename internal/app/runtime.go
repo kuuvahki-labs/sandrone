@@ -10,13 +10,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/spf13/afero"
-
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/service"
 	projectsettings "github.com/kuuvahki-labs/sandrone/internal/settings"
 	"github.com/kuuvahki-labs/sandrone/internal/store"
-	"github.com/kuuvahki-labs/sandrone/pkg/sandrone"
 )
 
 const (
@@ -27,6 +24,7 @@ const (
 
 type Config struct {
 	DataDir           string
+	Storage           StorageConfig
 	HTTP              HTTPConfig
 	MCP               MCPConfig
 	Log               LogConfig
@@ -52,9 +50,38 @@ type LogConfig struct {
 
 type Runtime struct {
 	Service *service.Service
-	Engine  *sandrone.Engine
 	Config  Config
 	Logger  *slog.Logger
+}
+
+type StoreFactory func(context.Context, string, StorageConfig) (store.Store, error)
+
+type runtimeOptions struct {
+	schedulerEnabled bool
+	probeEngine      service.ProbeEngine
+	storeFactory     StoreFactory
+}
+
+type RuntimeOption func(*runtimeOptions)
+
+func WithSchedulerEnabled(enabled bool) RuntimeOption {
+	return func(options *runtimeOptions) {
+		options.schedulerEnabled = enabled
+	}
+}
+
+func WithProbeEngine(engine service.ProbeEngine) RuntimeOption {
+	return func(options *runtimeOptions) {
+		options.probeEngine = engine
+	}
+}
+
+func WithStoreFactory(factory StoreFactory) RuntimeOption {
+	return func(options *runtimeOptions) {
+		if factory != nil {
+			options.storeFactory = factory
+		}
+	}
 }
 
 type Entrypoint interface {
@@ -63,15 +90,28 @@ type Entrypoint interface {
 }
 
 func NewRuntime(cfg Config, logger *slog.Logger) (*Runtime, error) {
+	return NewRuntimeContext(context.Background(), cfg, logger)
+}
+
+func NewRuntimeContext(ctx context.Context, cfg Config, logger *slog.Logger, opts ...RuntimeOption) (*Runtime, error) {
 	if cfg.DataDir == "" {
 		cfg.DataDir = DefaultDataDir
 	}
+	if cfg.Storage.Backend == "" {
+		cfg.Storage.Backend = StorageFilesystem
+	}
+	options := runtimeOptions{schedulerEnabled: true, storeFactory: NewStore}
+	for _, option := range opts {
+		option(&options)
+	}
 	cfg = withProgrammaticOverrideSources(cfg)
-	fs := afero.NewBasePathFs(afero.NewOsFs(), cfg.DataDir)
-	coordinator := store.Coordinate(store.NewFSStore(fs))
+	rawStore, err := options.storeFactory(ctx, cfg.DataDir, cfg.Storage)
+	if err != nil {
+		return nil, err
+	}
+	coordinator := store.Coordinate(rawStore)
 	settingsStore := store.NewSettingsStore(coordinator)
-	var err error
-	cfg, err = ResolveSettings(context.Background(), cfg, settingsStore)
+	cfg, err = ResolveSettings(ctx, cfg, settingsStore)
 	if err != nil {
 		return nil, err
 	}
@@ -85,15 +125,18 @@ func NewRuntime(cfg Config, logger *slog.Logger) (*Runtime, error) {
 			return nil, err
 		}
 	}
-	svc := service.New(
+	serviceOptions := []service.Option{
 		service.WithStore(coordinator),
 		service.WithProjectSettings(settingsStore, cfg.StoredSettings, cfg.EffectiveSettings, cfg.OverrideSources),
 		service.WithLogger(logger),
-		service.WithSchedulerEnabled(true),
-	)
+		service.WithSchedulerEnabled(options.schedulerEnabled),
+	}
+	if options.probeEngine != nil {
+		serviceOptions = append(serviceOptions, service.WithProbeEngine(options.probeEngine))
+	}
+	svc := service.New(serviceOptions...)
 	return &Runtime{
 		Service: svc,
-		Engine:  sandrone.NewWithFS(fs),
 		Config:  cfg,
 		Logger:  logger,
 	}, nil
@@ -103,6 +146,9 @@ func Defaults(cfg Config) Config {
 	defaults := projectsettings.Default()
 	if cfg.DataDir == "" {
 		cfg.DataDir = DefaultDataDir
+	}
+	if cfg.Storage.Backend == "" {
+		cfg.Storage.Backend = StorageFilesystem
 	}
 	if cfg.HTTP.Listen == "" {
 		cfg.HTTP.Listen = defaults.HTTP.Listen

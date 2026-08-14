@@ -74,6 +74,28 @@ describe("useScheduledRefreshStatus", () => {
     await vi.advanceTimersByTimeAsync(30_000);
     expect(getScheduledRefreshStatus).toHaveBeenCalledTimes(2);
   });
+
+	it("does not request or poll when scheduler is unavailable", async () => {
+		vi.useFakeTimers();
+		const getScheduledRefreshStatus = vi.fn();
+		const client = { getScheduledRefreshStatus } as unknown as ApiClient;
+		renderHook(() => useScheduledRefreshStatus(client), {
+			wrapper: ({ children }) => (
+				<UICapabilityProvider value={{
+					capabilities: [{ key: "scheduler.enabled", enabled: false }],
+					loaded: true,
+					hasFeature: () => false,
+					getFeature: (key) => ({ key, enabled: false }),
+				}}>
+					{children}
+				</UICapabilityProvider>
+			),
+		});
+
+		await act(async () => Promise.resolve());
+		await act(async () => vi.advanceTimersByTimeAsync(30_000));
+		expect(getScheduledRefreshStatus).not.toHaveBeenCalled();
+	});
 });
 
 const t = createTranslator("zh-CN");

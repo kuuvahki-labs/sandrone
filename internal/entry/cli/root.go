@@ -7,11 +7,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	"github.com/kuuvahki-labs/sandrone/internal/app"
 	"github.com/kuuvahki-labs/sandrone/internal/buildinfo"
+	"github.com/kuuvahki-labs/sandrone/internal/service"
+	"github.com/kuuvahki-labs/sandrone/internal/store"
 	"github.com/kuuvahki-labs/sandrone/pkg/sandrone"
 )
 
@@ -138,11 +139,10 @@ func newRootCommand(cfg *config) *cobra.Command {
 
 func newConfig(opts ...Option) *config {
 	cfg := &config{
-		stdin:         os.Stdin,
-		stdout:        os.Stdout,
-		stderr:        os.Stderr,
-		env:           osEnv(),
-		engineFactory: newEngine,
+		stdin:  os.Stdin,
+		stdout: os.Stdout,
+		stderr: os.Stderr,
+		env:    osEnv(),
 		runtimeFactory: func(cfg app.Config) (*app.Runtime, error) {
 			return app.NewRuntime(cfg, nil)
 		},
@@ -165,9 +165,31 @@ func osEnv() map[string]string {
 	return env
 }
 
-func newEngine(dataDir string) engine {
-	fs := afero.NewBasePathFs(afero.NewOsFs(), dataDir)
-	return sandrone.NewWithFS(fs)
+func (cfg *config) newEngine(ctx context.Context) (engine, error) {
+	if cfg.engineFactory != nil {
+		return cfg.engineFactory(cfg.dataDir), nil
+	}
+	storageConfig, err := app.StorageConfigFromEnv(cfg.env)
+	if err != nil {
+		return nil, err
+	}
+	rawStore, err := app.NewStore(ctx, cfg.dataDir, storageConfig)
+	if err != nil {
+		return nil, err
+	}
+	return service.New(service.WithStore(store.Coordinate(rawStore))), nil
+}
+
+func (cfg *config) newStore(ctx context.Context) (store.Store, app.StorageConfig, error) {
+	storageConfig, err := app.StorageConfigFromEnv(cfg.env)
+	if err != nil {
+		return nil, app.StorageConfig{}, err
+	}
+	rawStore, err := app.NewStore(ctx, cfg.dataDir, storageConfig)
+	if err != nil {
+		return nil, app.StorageConfig{}, err
+	}
+	return rawStore, storageConfig, nil
 }
 
 func firstNonEmpty(values ...string) string {

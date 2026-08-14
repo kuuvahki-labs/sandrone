@@ -9,6 +9,32 @@ import { SettingsDataPage } from "./settings-data-page";
 import { SettingsRuntimePage } from "./settings-runtime-page";
 
 describe("settings runtime page", () => {
+	it("hides probe defaults and scheduled refresh when capabilities are unavailable", () => {
+		render(
+			<UICapabilityProvider value={{
+				capabilities: [
+					{ key: "probe.enabled", enabled: false },
+					{ key: "scheduler.enabled", enabled: false },
+				],
+				loaded: true,
+				hasFeature: () => false,
+				getFeature: (key) => ({ key, enabled: false }),
+			}}>
+				<SettingsRuntimePage
+					overrides={{}}
+					restartRequired={[]}
+					scheduledRefreshResources={[]}
+					settings={defaultProjectSettings}
+					onBack={vi.fn()}
+					onSave={vi.fn()}
+				/>
+			</UICapabilityProvider>,
+		);
+
+		expect(screen.queryByRole("button", { name: "测活" })).not.toBeInTheDocument();
+		expect(screen.queryByRole("heading", { name: "定时更新" })).not.toBeInTheDocument();
+	});
+
   it("edits the complete runtime page and saves every nested group before returning", async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();

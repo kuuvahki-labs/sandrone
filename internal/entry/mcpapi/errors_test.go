@@ -14,6 +14,7 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/app"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/entry/mcpapi"
+	"github.com/kuuvahki-labs/sandrone/internal/probe"
 )
 
 type structuredToolError struct {
@@ -30,6 +31,30 @@ type structuredToolError struct {
 		Processor    string `json:"processor,omitempty"`
 		Path         string `json:"path,omitempty"`
 	} `json:"error"`
+}
+
+func TestDisabledProbeReturnsStructuredUnavailableError(t *testing.T) {
+	ctx := context.Background()
+	rt, err := app.NewRuntimeContext(
+		ctx,
+		app.Config{DataDir: t.TempDir()},
+		nil,
+		app.WithProbeEngine(probe.NewDisabled()),
+		app.WithSchedulerEnabled(false),
+	)
+	require.NoError(t, err)
+	session := connect(t, ctx, mcpapi.SDKServer(rt))
+	defer session.Close()
+
+	body := callStructuredToolError(t, ctx, session, "sandrone_probe_nodes", map[string]any{
+		"input": map[string]any{
+			"name":    "disabled-probe",
+			"type":    "inline",
+			"format":  "uri-list",
+			"content": "ss://aes-128-gcm:secret@example.com:8388#node",
+		},
+	})
+	require.Equal(t, string(domain.CodeProbeBackendUnavailable), body.Error.Code)
 }
 
 func TestStructuredToolErrorsInputValidationForEveryAlwaysRegisteredTool(t *testing.T) {

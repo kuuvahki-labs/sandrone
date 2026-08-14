@@ -12,6 +12,10 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/probe"
 )
 
+type probeAvailability interface {
+	ProbeAvailable() bool
+}
+
 func (s *Service) Probe(ctx context.Context, req domain.ProbeRequest) (out *domain.ProbeResult, err error) {
 	start := time.Now()
 	nodeCount := 0
@@ -31,6 +35,9 @@ func (s *Service) Probe(ctx context.Context, req domain.ProbeRequest) (out *doma
 	}()
 	if s.prober == nil {
 		return nil, domain.NewError(domain.CodeNotImplemented, "probe engine is not configured")
+	}
+	if availability, ok := s.prober.(probeAvailability); ok && !availability.ProbeAvailable() {
+		return nil, domain.NewError(domain.CodeProbeBackendUnavailable, "probe backend is not available")
 	}
 	req = s.probeRequestWithDefaults(req)
 	req.Method = probe.NormalizeMethod(req.Method)

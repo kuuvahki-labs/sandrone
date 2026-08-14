@@ -680,6 +680,8 @@ func TestDoctorReportsFormatsAndDataDir(t *testing.T) {
 	var result doctorResult
 	require.NoError(t, json.Unmarshal([]byte(stdout), &result))
 	require.True(t, result.OK)
+	require.Equal(t, "filesystem", result.StorageBackend)
+	require.True(t, result.StorageOK)
 	require.True(t, result.DataDirWritable)
 	parseFormats := make([]string, 0, len(result.ParseFormats))
 	for _, check := range result.ParseFormats {
@@ -691,6 +693,16 @@ func TestDoctorReportsFormatsAndDataDir(t *testing.T) {
 		renderFormats = append(renderFormats, check.Name)
 	}
 	require.ElementsMatch(t, []string{"base64", "mihomo-proxies", "shadowrocket-proxies", "sing-box-outbounds", "json-nodes", "uri-list"}, renderFormats)
+}
+
+func TestCLIRejectsInvalidStorageBackend(t *testing.T) {
+	code, stdout, stderr := runCLI(t, []string{"inspect"}, "", WithEnv(map[string]string{
+		app.EnvStorageBackend: "r2",
+	}))
+
+	require.Equal(t, 1, code)
+	require.Empty(t, stdout)
+	require.Contains(t, stderr, app.EnvStorageBackend)
 }
 
 func TestServeCommandRunsWithoutSubcommands(t *testing.T) {
@@ -896,6 +908,32 @@ func TestServePassesLogLevelToRuntime(t *testing.T) {
 	require.Equal(t, 1, code)
 	require.Contains(t, stderr, stopErr.Error())
 	require.Equal(t, "debug", got.Log.Level)
+}
+
+func TestServePassesS3StorageToRuntime(t *testing.T) {
+	stopErr := errors.New("stop after runtime")
+	var got app.Config
+	env := map[string]string{
+		app.EnvStorageBackend:    "s3",
+		app.EnvS3Endpoint:        "https://account.example.invalid",
+		app.EnvS3Region:          "auto",
+		app.EnvS3Bucket:          "bucket",
+		app.EnvS3AccessKeyID:     "access-marker",
+		app.EnvS3SecretAccessKey: "secret-marker",
+	}
+
+	code, _, stderr := runCLI(t, []string{"serve"}, "",
+		WithEnv(env),
+		WithRuntimeFactory(func(cfg app.Config) (*app.Runtime, error) {
+			got = cfg
+			return nil, stopErr
+		}),
+	)
+
+	require.Equal(t, 1, code)
+	require.Contains(t, stderr, stopErr.Error())
+	require.Equal(t, app.StorageS3, got.Storage.Backend)
+	require.Equal(t, app.DefaultS3Prefix, got.Storage.S3.Prefix)
 }
 
 func TestServeRejectsInvalidLogLevel(t *testing.T) {

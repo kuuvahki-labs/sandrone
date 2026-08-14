@@ -83,8 +83,13 @@ func newServeRuntime(cmd *cobra.Command, cfg *config, opts serveOptions) (*app.R
 		opts.maxOutput = value
 	}
 	overrideSources := startupOverrideSources(cmd, cfg.env)
+	storageConfig, err := app.StorageConfigFromEnv(cfg.env)
+	if err != nil {
+		return nil, err
+	}
 	appCfg := app.Config{
 		DataDir:         cfg.dataDir,
+		Storage:         storageConfig,
 		OverrideSources: overrideSources,
 		HTTP: app.HTTPConfig{
 			Listen: opts.listen,

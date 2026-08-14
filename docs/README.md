@@ -12,6 +12,7 @@
 - [渲染客户端配置](how-to/render-client-config.md)：生成 Mihomo、sing-box 或 Shadowrocket 文件。
 - [编写 processor 脚本](how-to/write-processor-script.md)：挂载并验证 nodes-stage 或 file-stage 脚本。
 - [排查 Mihomo fake-IP](how-to/troubleshoot-mihomo-fake-ip.md)：按症状定位并验证最小修复。
+- [部署到 Vercel 与 Cloudflare R2](how-to/deploy-vercel-r2.md)：使用 Vercel Go Function 和私有 R2 Store 运行单租户服务。
 
 ## 查契约
 

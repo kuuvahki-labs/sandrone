@@ -4,18 +4,26 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"os"
+	"time"
 
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
+	"github.com/kuuvahki-labs/sandrone/internal/app"
+	"github.com/kuuvahki-labs/sandrone/internal/store"
 	"github.com/kuuvahki-labs/sandrone/pkg/sandrone"
 )
 
 type doctorResult struct {
 	OK              bool                `json:"ok"`
-	DataDir         string              `json:"data_dir"`
-	DataDirWritable bool                `json:"data_dir_writable"`
+	StorageBackend  string              `json:"storage_backend"`
+	StorageOK       bool                `json:"storage_ok"`
+	StorageError    string              `json:"storage_error,omitempty"`
+	DataDir         string              `json:"data_dir,omitempty"`
+	DataDirWritable bool                `json:"data_dir_writable,omitempty"`
 	DataDirError    string              `json:"data_dir_error,omitempty"`
 	ParseFormats    []doctorFormatCheck `json:"parse_formats"`
 	RenderFormats   []doctorFormatCheck `json:"render_formats"`
@@ -36,9 +44,17 @@ func newDoctorCommand(cfg *config) *cobra.Command {
 	var output string
 	cmd := &cobra.Command{
 		Use:   "doctor",
-		Short: "Check built-in formats and data-dir writability",
+		Short: "Check built-in formats and configured storage",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			result := runDoctor(cmd.Context(), cfg.engineFactory(cfg.dataDir), cfg.dataDir)
+			engine, err := cfg.newEngine(cmd.Context())
+			if err != nil {
+				return err
+			}
+			rawStore, storageConfig, err := cfg.newStore(cmd.Context())
+			if err != nil {
+				return err
+			}
+			result := runDoctor(cmd.Context(), engine, rawStore, storageConfig, cfg.dataDir)
 			body, err := json.MarshalIndent(result, "", "  ")
 			if err != nil {
 				return err
@@ -57,16 +73,28 @@ func newDoctorCommand(cfg *config) *cobra.Command {
 	return cmd
 }
 
-func runDoctor(ctx context.Context, engine engine, dataDir string) doctorResult {
+func runDoctor(ctx context.Context, engine engine, rawStore store.Store, storageConfig app.StorageConfig, dataDir string) doctorResult {
 	result := doctorResult{
-		OK:      true,
-		DataDir: dataDir,
+		OK:             true,
+		StorageBackend: string(storageConfig.Backend),
 	}
-	if err := checkDataDirWritable(dataDir); err != nil {
-		result.OK = false
-		result.DataDirError = err.Error()
+	if storageConfig.Backend == app.StorageS3 {
+		if err := checkStore(ctx, rawStore); err != nil {
+			result.OK = false
+			result.StorageError = err.Error()
+		} else {
+			result.StorageOK = true
+		}
 	} else {
-		result.DataDirWritable = true
+		result.DataDir = dataDir
+		if err := checkDataDirWritable(dataDir); err != nil {
+			result.OK = false
+			result.DataDirError = err.Error()
+			result.StorageError = err.Error()
+		} else {
+			result.DataDirWritable = true
+			result.StorageOK = true
+		}
 	}
 
 	for _, input := range doctorParseInputs() {
@@ -93,6 +121,55 @@ func runDoctor(ctx context.Context, engine engine, dataDir string) doctorResult 
 		}
 	}
 	return result
+}
+
+func checkStore(ctx context.Context, rawStore store.Store) (retErr error) {
+	key := fmt.Sprintf("_doctor/%d.check", time.Now().UnixNano())
+	written := false
+	defer func() {
+		if written {
+			cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			_ = rawStore.Delete(cleanupCtx, key)
+		}
+	}()
+	if err := rawStore.Write(ctx, key, []byte("ok")); err != nil {
+		return fmt.Errorf("write check: %w", err)
+	}
+	written = true
+	body, err := rawStore.Read(ctx, key)
+	if err != nil {
+		return fmt.Errorf("read check: %w", err)
+	}
+	if string(body) != "ok" {
+		return errors.New("read check returned unexpected content")
+	}
+	entry, err := rawStore.Stat(ctx, key)
+	if err != nil {
+		return fmt.Errorf("stat check: %w", err)
+	}
+	if entry.Size != 2 || entry.IsDir {
+		return errors.New("stat check returned unexpected metadata")
+	}
+	entries, err := rawStore.List(ctx, "_doctor")
+	if err != nil {
+		return fmt.Errorf("list check: %w", err)
+	}
+	found := false
+	for _, candidate := range entries {
+		found = found || candidate.Key == key
+	}
+	if !found {
+		return errors.New("list check did not return temporary object")
+	}
+	if err := rawStore.Delete(ctx, key); err != nil {
+		return fmt.Errorf("delete check: %w", err)
+	}
+	written = false
+	if _, err := rawStore.Read(ctx, key); !errors.Is(err, os.ErrNotExist) {
+		return errors.New("deleted check object is still readable")
+	}
+	return nil
 }
 
 func checkDataDirWritable(dataDir string) error {

@@ -36,13 +36,31 @@ revision 的来源和职责见[构建身份](build-info.md)。
 | --- | --- | --- | --- |
 | `--data-dir <dir>` | `SANDRONE_DATA_DIR` | `./data` | 配置与资源存储目录 |
 
-`data_dir` 是唯一不进入项目设置文件的引导值，解析顺序固定为：
+`data_dir` 是不进入项目设置文件的 filesystem 引导值，解析顺序固定为：
 
 ```text
 显式 --data-dir > SANDRONE_DATA_DIR > ./data
 ```
 
 目录内可选的 `settings.json` 保存其余项目设置。文件不存在时使用内建默认值。
+选择 S3 后 `--data-dir` 不生效。
+
+存储后端只通过环境变量选择，不提供对应 flag：
+
+| 环境变量 | 缺省值 | S3 模式要求 | 含义 |
+| --- | --- | --- | --- |
+| `SANDRONE_STORAGE_BACKEND` | `filesystem` | 是 | `filesystem` 或 `s3` |
+| `SANDRONE_S3_ENDPOINT` | 空 | 必填 | 绝对 HTTP(S) S3 endpoint |
+| `SANDRONE_S3_REGION` | 空 | 必填 | 服务 region；R2 使用 `auto` |
+| `SANDRONE_S3_BUCKET` | 空 | 必填 | 已存在的私有 bucket |
+| `SANDRONE_S3_PREFIX` | `sandrone/` | 否 | 非空安全 namespace |
+| `SANDRONE_S3_FORCE_PATH_STYLE` | `false` | 否 | path-style addressing |
+| `SANDRONE_S3_ACCESS_KEY_ID` | 空 | 必填 | 显式 access key ID |
+| `SANDRONE_S3_SECRET_ACCESS_KEY` | 空 | 必填 | 显式 secret access key |
+| `SANDRONE_S3_SESSION_TOKEN` | 空 | 否 | 临时凭据的 session token |
+
+这些字段不会写入 `settings.json` 或备份。Sandrone 不使用 AWS 默认凭据链。
+R2 常规配置保持 `SANDRONE_S3_FORCE_PATH_STYLE=false`。
 
 `serve` 及其子命令继承以下 flags：
 
@@ -169,10 +187,13 @@ probe 方法与运行时可用的 probe backend；不内嵌字段级 capability�
 
 `doctor` 执行两类启动前检查：
 
-- `--data-dir` 是否可创建、写入并删除临时检查文件；
+- filesystem 模式检查 `--data-dir` 是否可创建、写入并删除临时文件；
+- S3 模式在 `_doctor/` 下执行 write/read/stat/list/delete round trip，并
+  best-effort 清理临时对象；
 - 所有内建输入 parser 与输出 renderer 能否处理各自的最小样本。
 
-结果为缩进 JSON，包含顶层 `ok`、数据目录状态以及逐格式检查。任一检查失败时，
+结果为缩进 JSON，包含顶层 `ok`、`storage_backend`、`storage_ok`、可选数据目录
+状态以及逐格式检查。任一检查失败时，
 仍先输出结果，随后命令以 `1` 退出并在标准错误写入 `doctor checks failed`。
 
 ## `file render`
@@ -213,6 +234,10 @@ Web 开发与嵌入构建见 [Web UI 快速说明](../../web/README.md)，HTTP e
 契约见 [HTTP API 通用约定](http-api/README.md)。
 MCP path 不能是 `/`、`/healthz`、`/version`、`/convert`、`/s` 或 `/s/*`，
 避免 MCP 绕过共享 bearer token 或与公开分享/Web 路由冲突。
+
+选择 S3 只替换持久化 Store；长驻 `serve` 仍运行定时更新，并保留构建中可用的
+probe backend。Vercel serverless profile 的不同能力边界见
+[Vercel + Cloudflare R2 部署](../how-to/deploy-vercel-r2.md)。
 
 ### 监听与鉴权约束
 

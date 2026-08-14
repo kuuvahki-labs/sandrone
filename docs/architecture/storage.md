@@ -6,7 +6,7 @@ Sandrone 不要求数据库。持久化层保存命名资源和统一项目设�
 
 稳定目标是：
 
-- 本地服务可以使用文件系统目录。
+- 本地服务默认使用文件系统目录，也可以显式选择 S3-compatible 对象存储。
 - 测试可以使用内存或只读文件系统。
 - 嵌入方可以提供自定义 Store。
 - 复合读取和维护操作在单进程内有一致性边界。
@@ -53,7 +53,31 @@ service 对资源名和备份条目重复应用同一 `CleanKey` 语义。Store 
 
 普通 `Write` 是覆盖写，不承诺临时文件 rename、fsync 或崩溃恢复。底层文件系统的 durability 和多个 Store 实例之间的协调属于部署边界。
 
-仓库只内建这一类 Store 后端。对象存储、数据库或远程 KV 由嵌入方实现同一接口，并自行满足 key、列举和 durability 契约。
+## `S3Store`
+
+`S3Store` 使用 AWS SDK for Go v2 直接实现同一 Store 契约，不把对象存储模拟成
+`afero.Fs`。运行时通过 `SANDRONE_STORAGE_BACKEND=s3` 选择它；filesystem
+仍是默认后端。
+
+每个逻辑 key 映射为配置 namespace 下的一个对象。实现只依赖
+`GetObject`、`PutObject`、`DeleteObject`、`HeadObject` 和分页
+`ListObjectsV2`：
+
+- 普通写入和 `WriteAtomic` 都是单对象 PUT；后者不模拟 rename，也不使用临时
+  对象。
+- 删除先检查对象存在性，使删除缺失 key 继续返回 `os.ErrNotExist`。
+- `List` 读取全部分页，移除物理 namespace，拒绝非法或重复逻辑 key，并合成
+  中间目录 entry。
+- `Stat` 优先读取对象 metadata；只有后代对象存在时才返回合成目录。
+- provider 的 `NoSuchKey`/`NotFound` 映射为现有 not-found 语义。
+
+支持的 S3-compatible 服务必须对对象读取、覆盖、删除和列举提供强一致语义。
+Cloudflare R2 是文档化并执行集成验证的首个目标。实现不依赖 ACL、versioning、
+object lock、multipart upload、presigned URL 或 provider 专属 metadata。
+
+S3 endpoint、region、bucket、namespace 和显式 access key 由进程环境提供。
+Sandrone 不调用 AWS 默认凭据链，不读取 shared profile 或 instance metadata。
+凭据不进入 Store entry、项目设置或备份。
 
 ## `MetaStore`
 
@@ -71,7 +95,8 @@ service 对资源名和备份条目重复应用同一 `CleanKey` 语义。Store 
 类型。覆盖和删除 file 因此都是单个资源 key 操作。
 
 项目设置由独立的 `SettingsStore` 严格解码，并通过 `AtomicWriter` 在 Store 根部
-原子写入 `settings.json`。`Report`、`FileResult`、`ProbeResult` 和编译后的
+写入 `settings.json`。FSStore 使用临时文件 rename；S3Store 使用单对象 PUT，
+由对象存储的完整对象发布语义保证读者不会得到部分正文。`Report`、`FileResult`、`ProbeResult` 和编译后的
 客户端文件不是 MetaStore 管理资源。内部 cache 可以暂存请求结果，但它有独立
 前缀和 TTL 语义。
 
@@ -184,6 +209,10 @@ Coordinator 提供的是单进程 isolation：
 - MetaStore 的资源操作和备份操作共享同一 coordinator 边界。
 
 它不是事务管理器。`Update` 回调中前一个 Write 成功、后一个 Write 失败时，不会自动回滚；它也不提供 write-ahead log、crash atomicity 或多个 Sandrone 进程之间的锁。
+
+多个进程或 Vercel Function instance 共享同一 S3 namespace 时，Coordinator
+不能阻止跨实例交错。backup restore 必须在停止其他 writer 的维护窗口执行；
+Sandrone 不为对象存储增加分布式锁。
 
 实现见 [`internal/store/coordinated.go`](../../internal/store/coordinated.go)。
 

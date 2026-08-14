@@ -109,7 +109,10 @@ need a complete client configuration file.
 					return err
 				}
 			}
-			engine := cfg.engineFactory(cfg.dataDir)
+			engine, err := cfg.newEngine(cmd.Context())
+			if err != nil {
+				return err
+			}
 			rendered, err := engine.Convert(cmd.Context(), sandrone.ConvertRequest{
 				FromFormat: fromFormat,
 				ToFormat:   toFormat,
@@ -222,7 +225,10 @@ service default; caching is disabled when both values are 0. Use
 			if timeout > 0 {
 				req.TimeoutMS = int(timeout / time.Millisecond)
 			}
-			engine := cfg.engineFactory(cfg.dataDir)
+			engine, err := cfg.newEngine(cmd.Context())
+			if err != nil {
+				return err
+			}
 			probed, err := engine.Probe(cmd.Context(), req)
 			if err != nil {
 				return err
@@ -288,7 +294,10 @@ stdout.
   sandrone validate --format json-nodes --input nodes.json
   sandrone validate --file mihomo.yaml`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			engine := cfg.engineFactory(cfg.dataDir)
+			engine, err := cfg.newEngine(cmd.Context())
+			if err != nil {
+				return err
+			}
 			remoteInput := remote.remoteInput()
 			if fileTarget != "" {
 				if remoteInput != nil {
@@ -351,7 +360,10 @@ and the current store summary for the selected data directory. Use capability
 commands for detailed format contracts.`,
 		Example: `  sandrone inspect`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			engine := cfg.engineFactory(cfg.dataDir)
+			engine, err := cfg.newEngine(cmd.Context())
+			if err != nil {
+				return err
+			}
 			result, err := engine.Inspect(cmd.Context())
 			if err != nil {
 				return err
@@ -387,7 +399,10 @@ func newCapabilityFormatsCommand(cfg *config) *cobra.Command {
 		Short: "List parse and render format capability summaries",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			engine := cfg.engineFactory(cfg.dataDir)
+			engine, err := cfg.newEngine(cmd.Context())
+			if err != nil {
+				return err
+			}
 			result, err := engine.ListFormatCapabilities(cmd.Context())
 			if err != nil {
 				return err
@@ -406,7 +421,10 @@ func newCapabilityFormatCommand(cfg *config) *cobra.Command {
 		Short: "Show one exact format capability contract",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			engine := cfg.engineFactory(cfg.dataDir)
+			engine, err := cfg.newEngine(cmd.Context())
+			if err != nil {
+				return err
+			}
 			result, err := engine.GetFormatCapability(cmd.Context(), sandrone.FormatCapabilityRequest{
 				Direction: sandrone.CapabilityDirection(args[0]),
 				Format:    args[1],
@@ -460,7 +478,10 @@ JSON.`,
 			if err := validateOutputPaths(output, reportOutput); err != nil {
 				return err
 			}
-			engine := cfg.engineFactory(cfg.dataDir)
+			engine, err := cfg.newEngine(cmd.Context())
+			if err != nil {
+				return err
+			}
 			result, err := renderFile(cmd.Context(), engine, args[0], sandrone.FileRequest{})
 			if err != nil {
 				return err
