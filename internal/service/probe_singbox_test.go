@@ -67,6 +67,47 @@ func TestServiceSingBoxURLTestWithLocalProxy(t *testing.T) {
 	}
 }
 
+func TestServiceSingBoxURLTestAcceptsDisabledVLESSPacketEncoding(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer listener.Close()
+	accepted := make(chan struct{})
+	go func() {
+		defer close(accepted)
+		conn, acceptErr := listener.Accept()
+		if acceptErr != nil {
+			return
+		}
+		_ = conn.Close()
+	}()
+	host, port := splitSingBoxHostPort(t, listener.Addr().String())
+
+	svc := service.New()
+	result, err := svc.Probe(context.Background(), domain.ProbeRequest{
+		Input: domain.NodeInput{
+			Type: "inline_nodes",
+			Nodes: []domain.NodeIR{{
+				Name: "vless-none", Type: domain.NodeTypeVLESS, Server: host, Port: port,
+				UUID: "11111111-1111-1111-1111-111111111111", PacketEncoding: "none",
+			}},
+		},
+		Method:    domain.ProbeURLTest,
+		Core:      "sing-box",
+		URL:       "http://127.0.0.1:1",
+		TimeoutMS: 1000,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.Results, 1)
+	require.False(t, result.Results[0].Alive)
+	require.NotEqual(t, string(domain.CodeProbeCoreStartFailed), result.Results[0].ErrorCode)
+	select {
+	case <-accepted:
+	case <-time.After(time.Second):
+		t.Fatal("sing-box did not initialize the VLESS outbound")
+	}
+}
+
 func TestServiceSingBoxURLTestRejectsUnexpectedStatus(t *testing.T) {
 	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)

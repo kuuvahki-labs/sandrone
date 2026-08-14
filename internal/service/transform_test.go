@@ -111,6 +111,39 @@ func TestServiceCanonicalizesVMessAndVLESSUserIDsAcrossEntryPointsAndTargets(t *
 	require.Equal(t, "a9dk23bz0", rawNodes[1].UUID)
 }
 
+func TestServicePreservesDisabledPacketEncodingAcrossTargets(t *testing.T) {
+	svc := service.New()
+	content := []byte("vless://11111111-1111-1111-1111-111111111111@example.com:443?encryption=none&packetEncoding=none#disabled-packet-encoding")
+
+	parsed, err := svc.Parse(context.Background(), domain.ParseRequest{Format: "uri-list", Content: content})
+	require.NoError(t, err)
+	require.Len(t, parsed.Nodes, 1)
+	require.Equal(t, "none", parsed.Nodes[0].PacketEncoding)
+
+	singBoxResult, err := svc.Render(context.Background(), domain.RenderRequest{
+		Format: "sing-box-outbounds",
+		Nodes:  parsed.Nodes,
+	})
+	require.NoError(t, err)
+	require.Empty(t, singBoxResult.Report.Warnings)
+	var singBoxDoc struct {
+		Outbounds []map[string]any `json:"outbounds"`
+	}
+	require.NoError(t, json.Unmarshal(singBoxResult.Body, &singBoxDoc))
+	require.Len(t, singBoxDoc.Outbounds, 1)
+	packetEncoding, exists := singBoxDoc.Outbounds[0]["packet_encoding"]
+	require.True(t, exists)
+	require.Equal(t, "", packetEncoding)
+
+	mihomoResult, err := svc.Render(context.Background(), domain.RenderRequest{
+		Format: "mihomo-proxies",
+		Nodes:  parsed.Nodes,
+	})
+	require.NoError(t, err)
+	require.Empty(t, mihomoResult.Report.Warnings)
+	require.Contains(t, string(mihomoResult.Body), "packet-encoding: none")
+}
+
 func TestServicePreservesURIWebSocketEarlyDataAcrossTargets(t *testing.T) {
 	svc := service.New()
 	content := []byte("vless://11111111-1111-1111-1111-111111111111@example.com:443?encryption=none&type=ws&path=%2Fws&ed=2560&eh=Sec-WebSocket-Protocol#early-data")

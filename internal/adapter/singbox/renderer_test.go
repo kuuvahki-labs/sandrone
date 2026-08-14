@@ -101,6 +101,42 @@ func TestRenderSingBoxSkipsNonCanonicalNetwork(t *testing.T) {
 	}
 }
 
+func TestRenderSingBoxMapsDisabledPacketEncodingAndRejectsUnknownValue(t *testing.T) {
+	r := singbox.NewRenderer()
+	nodes := []domain.NodeIR{
+		{
+			Name: "vless-none", Type: domain.NodeTypeVLESS, Server: "vless.example", Port: 443,
+			UUID: "11111111-1111-1111-1111-111111111111", PacketEncoding: "none",
+		},
+		{
+			Name: "vmess-xudp", Type: domain.NodeTypeVMess, Server: "vmess.example", Port: 443,
+			UUID: "22222222-2222-2222-2222-222222222222", Cipher: "auto", PacketEncoding: "XUDP",
+		},
+		{
+			Name: "vless-unknown", Type: domain.NodeTypeVLESS, Server: "invalid.example", Port: 443,
+			UUID: "33333333-3333-3333-3333-333333333333", PacketEncoding: "future",
+		},
+	}
+
+	out, report, err := r.RenderWithReport(context.Background(), nodes, domain.RenderOptions{})
+
+	require.NoError(t, err)
+	require.Equal(t, 2, report.SuccessCount)
+	require.Len(t, report.Warnings, 1)
+	require.Equal(t, "render_node_skipped", report.Warnings[0].Code)
+	require.Equal(t, "vless-unknown", report.Warnings[0].Node)
+	require.Contains(t, report.Warnings[0].Message, `unsupported sing-box packet_encoding "future"`)
+	var doc struct {
+		Outbounds []map[string]any `json:"outbounds"`
+	}
+	require.NoError(t, json.Unmarshal(out, &doc))
+	require.Len(t, doc.Outbounds, 2)
+	packetEncoding, exists := doc.Outbounds[0]["packet_encoding"]
+	require.True(t, exists)
+	require.Equal(t, "", packetEncoding)
+	require.Equal(t, "xudp", doc.Outbounds[1]["packet_encoding"])
+}
+
 func TestRenderSingBoxHysteriaFromOfficialURIUsesCanonicalObfsPassword(t *testing.T) {
 	nodes, _, err := uriadapter.NewParser().Parse(context.Background(), []byte(
 		"hysteria://hy.example.com:8443?protocol=wechat-video&auth=secret&upmbps=100&downmbps=200&obfs=xplus&obfsParam=obfs-pass#hy",

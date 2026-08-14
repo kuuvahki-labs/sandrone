@@ -123,8 +123,8 @@ func renderVMess(node domain.NodeIR) (map[string]any, bool, map[string]bool, []d
 	if node.AlterID != 0 {
 		out["alter_id"] = node.AlterID
 	}
-	if node.PacketEncoding != "" {
-		out["packet_encoding"] = node.PacketEncoding
+	if err := applyPacketEncoding(out, node.PacketEncoding); err != nil {
+		return nil, false, nil, nil, err
 	}
 	applyTLS(out, node)
 	applyTransport(out, node)
@@ -141,8 +141,8 @@ func renderVLESS(node domain.NodeIR) (map[string]any, bool, map[string]bool, []d
 	if node.Flow != "" {
 		out["flow"] = node.Flow
 	}
-	if node.PacketEncoding != "" {
-		out["packet_encoding"] = node.PacketEncoding
+	if err := applyPacketEncoding(out, node.PacketEncoding); err != nil {
+		return nil, false, nil, nil, err
 	}
 	applyTLS(out, node)
 	applyTransport(out, node)
@@ -152,6 +152,27 @@ func renderVLESS(node domain.NodeIR) (map[string]any, bool, map[string]bool, []d
 		warnings = append(warnings, lossyWarning(node, "encryption", "sing-box vless outbound schema has no encryption field in the referenced version"))
 	}
 	return out, false, nil, warnings, nil
+}
+
+func applyPacketEncoding(out map[string]any, value string) error {
+	switch normalized := strings.ToLower(strings.TrimSpace(value)); normalized {
+	case "":
+		return nil
+	case "none":
+		// sing-box represents an explicitly disabled VLESS packet encoding as an
+		// empty string. Omitting the field is not equivalent: VLESS defaults to
+		// xudp when packet_encoding is absent.
+		out["packet_encoding"] = ""
+		return nil
+	case "packetaddr", "xudp":
+		out["packet_encoding"] = normalized
+		return nil
+	default:
+		return domain.NewError(
+			domain.CodeRenderFailed,
+			fmt.Sprintf("unsupported sing-box packet_encoding %q", value),
+		)
+	}
 }
 
 func renderTrojan(node domain.NodeIR) (map[string]any, bool, map[string]bool, []domain.Warning, error) {
