@@ -152,6 +152,7 @@ test.beforeEach(async ({ page }) => {
 
 const routes = [
   { path: "/subscriptions", heading: "我的订阅", content: "default", focus: false },
+  { path: "/subscriptions/new?type=local", heading: "新建订阅", content: "内容", focus: true },
   { path: "/subscriptions/remote/provider/preview", heading: "节点预览", content: longPreviewNode, focus: true },
   { path: "/files", heading: "我的文件", content: "default.yaml", focus: false },
   { path: "/files/new?source=mihomo", heading: "新建文件", content: "节点来源", focus: true },
@@ -200,6 +201,37 @@ for (const route of routes) {
     }));
     expect(pageMetrics.scrollWidth, `${testInfo.project.name} ${route.path} should not scroll horizontally`)
       .toBeLessThanOrEqual(pageMetrics.clientWidth + 1);
+
+    if (testInfo.project.name === "mobile") {
+      const undersizedInputs = await page.locator("input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]), textarea, select").evaluateAll((elements) => (
+        elements
+          .filter((element) => {
+            const style = getComputedStyle(element);
+            return style.display !== "none" && style.visibility !== "hidden" && element.getBoundingClientRect().width > 0;
+          })
+          .map((element) => ({
+            fontSize: Number.parseFloat(getComputedStyle(element).fontSize),
+            label: element.getAttribute("aria-label") || element.getAttribute("name") || element.tagName.toLowerCase(),
+          }))
+          .filter(({ fontSize }) => fontSize < 16)
+      ));
+      expect(undersizedInputs, `${route.path} inputs should not trigger iOS focus zoom`).toEqual([]);
+
+      if (route.path === "/subscriptions/new?type=local") {
+        const contentInput = page.getByRole("textbox", { name: "内容" });
+        const viewportBeforeFocus = await page.evaluate(() => ({
+          clientWidth: document.documentElement.clientWidth,
+          scale: window.visualViewport?.scale ?? 1,
+        }));
+        await contentInput.focus();
+        await expect(contentInput).toBeFocused();
+        await expect.poll(() => contentInput.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize))).toBeGreaterThanOrEqual(16);
+        expect(await page.evaluate(() => ({
+          clientWidth: document.documentElement.clientWidth,
+          scale: window.visualViewport?.scale ?? 1,
+        }))).toEqual(viewportBeforeFocus);
+      }
+    }
 
     const bottomNav = page.getByRole("navigation", { name: "底部导航" });
     const drawer = page.getByRole("navigation", { name: "桌面导航" });

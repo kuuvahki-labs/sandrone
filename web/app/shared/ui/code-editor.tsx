@@ -160,7 +160,7 @@ export function HighlightedTextarea({
       <Paper className="relative min-w-0 overflow-hidden border-divider bg-background-default focus-within:border-primary" variant="outlined">
         <div
           aria-hidden
-          className="pointer-events-none absolute bottom-0 left-0 right-0 top-0 overflow-hidden whitespace-pre p-3 font-mono text-sm leading-6 text-text-primary"
+          className="pointer-events-none absolute bottom-0 left-0 right-0 top-0 overflow-hidden whitespace-pre p-3 font-mono text-base leading-6 text-text-primary"
           data-highlighted-textarea-layer
           style={editorStyle}
         >
@@ -180,7 +180,7 @@ export function HighlightedTextarea({
         <textarea
           aria-label={label}
           className={[
-            "highlighted-textarea-input relative block min-w-0 w-full resize-y overflow-auto whitespace-pre border-0 bg-transparent font-mono text-sm leading-6 text-transparent caret-text-primary outline-none placeholder:text-text-secondary",
+            "highlighted-textarea-input relative block min-w-0 w-full resize-y overflow-auto whitespace-pre border-0 bg-transparent font-mono text-base leading-6 text-transparent caret-text-primary outline-none placeholder:text-text-secondary",
             showLineNumbers ? "py-3 pr-3 pl-14" : "p-3",
           ].join(" ")}
           id={textareaId}
