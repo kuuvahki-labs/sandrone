@@ -214,10 +214,6 @@ func (s *Service) readProbeCache(ctx context.Context, req domain.ProbeRequest, n
 		result.Report.Probe = &domain.ProbeReport{Method: string(probe.NormalizeMethod(req.Method)), Core: probe.NormalizeCore(req.Core)}
 	}
 	result.Report.Probe.CacheHitCount = len(result.Results)
-	result.Report.Warnings = append(result.Report.Warnings, domain.Warning{
-		Code:    "probe_cache_hit",
-		Message: fmt.Sprintf("%d probe result(s) loaded from cache", len(result.Results)),
-	})
 	return &result
 }
 

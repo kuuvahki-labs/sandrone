@@ -208,6 +208,8 @@ func TestServiceProbeCache(t *testing.T) {
 	second, err := svc.Probe(context.Background(), req)
 	require.NoError(t, err)
 	require.True(t, second.Results[0].CacheHit)
+	require.Equal(t, 1, second.Report.Probe.CacheHitCount)
+	require.Empty(t, second.Report.Warnings)
 	require.Equal(t, 1, calls)
 }
 
