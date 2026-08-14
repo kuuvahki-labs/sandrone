@@ -69,11 +69,19 @@ export function PageHeader({
     };
   }, [sticky]);
 
-  const overflowActions = secondaryActions.map(toDestinationListAction);
-  const actionMenu = useCompactLayout && overflowActions.length > 1 ? (
-    <div className="min-[820px]:hidden">
-      <ActionMenu actions={overflowActions} buttonSize="medium" label={t("actions.more")} />
-    </div>
+  const mobileVisibleActions = secondaryActions.filter((action) => action.mobileVisible);
+  const compactVisibleActions = mobile
+    ? mobileVisibleActions.length
+      ? mobileVisibleActions
+      : secondaryActions.length === 1
+        ? secondaryActions
+        : []
+    : secondaryActions;
+  const compactOverflowActions = mobile
+    ? secondaryActions.filter((action) => !compactVisibleActions.includes(action)).map(toDestinationListAction)
+    : [];
+  const actionMenu = useCompactLayout && compactOverflowActions.length ? (
+    <ActionMenu actions={compactOverflowActions} buttonSize="medium" label={t("actions.more")} />
   ) : null;
 
   return (
@@ -97,8 +105,8 @@ export function PageHeader({
               {title}
             </Typography>
             <div className="flex shrink-0 items-center gap-1">
-              <div className={`items-center gap-1 min-[820px]:flex ${secondaryActions.length === 1 ? "flex" : "hidden"}`}>
-                {secondaryActions.map((action) => <PageHeaderActionButton action={action} compact key={action.accessibleLabel ?? action.label} />)}
+              <div className="flex items-center gap-1">
+                {compactVisibleActions.map((action) => <PageHeaderActionButton action={action} compact key={action.accessibleLabel ?? action.label} />)}
               </div>
               {primaryAction ? <PageHeaderActionButton action={primaryAction} compact /> : null}
               {actionMenu}
@@ -155,6 +163,7 @@ export interface PageHeaderAction {
   disabledReason?: string;
   icon?: ReactNode;
   label: string;
+  mobileVisible?: boolean;
   onSelect?: () => void;
   tone?: "default" | "danger";
   type?: "button" | "submit";

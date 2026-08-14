@@ -115,7 +115,7 @@ export function SubscriptionEditPage({
           label=""
           primaryAction={{ accessibleLabel: t("subscriptions.save"), disabled: definitionPending || saving, icon: <SaveIcon aria-hidden fontSize="small" />, label: t("actions.save"), type: "submit", variant: "contained" }}
           secondaryActions={[
-            ...(onPreview ? [{ accessibleLabel: t("subscriptions.actions.preview"), disabled: Boolean(previewDisabledReason), disabledReason: previewDisabledReason, icon: <VisibilityOutlinedIcon aria-hidden fontSize="small" />, label: t("common.preview"), onSelect: onPreview }] : []),
+            ...(onPreview ? [{ accessibleLabel: t("subscriptions.actions.preview"), disabled: Boolean(previewDisabledReason), disabledReason: previewDisabledReason, icon: <VisibilityOutlinedIcon aria-hidden fontSize="small" />, label: t("common.preview"), mobileVisible: true, onSelect: onPreview }] : []),
             ...(onShare ? [{ accessibleLabel: t("subscriptions.actions.share"), disabled: Boolean(shareDisabledReason), disabledReason: shareDisabledReason, icon: <ShareOutlinedIcon aria-hidden fontSize="small" />, label: t("actions.share"), onSelect: onShare }] : []),
           ]}
           sticky

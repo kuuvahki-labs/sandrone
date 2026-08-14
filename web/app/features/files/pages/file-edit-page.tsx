@@ -98,7 +98,7 @@ export function FileEditPage({ detail, detailPending = false, item, loadRuleSetC
           backAction={{ label: t("actions.back"), onSelect: onBack }}
           label=""
           secondaryActions={[
-            { accessibleLabel: t("files.actions.preview"), icon: <VisibilityIcon aria-hidden fontSize="small" />, label: t("common.preview"), onSelect: onPreview },
+            { accessibleLabel: t("files.actions.preview"), icon: <VisibilityIcon aria-hidden fontSize="small" />, label: t("common.preview"), mobileVisible: true, onSelect: onPreview },
             { accessibleLabel: t("files.actions.share"), icon: <ShareOutlinedIcon aria-hidden fontSize="small" />, label: t("actions.share"), onSelect: onShare },
           ]}
           sticky
@@ -122,7 +122,7 @@ export function FileEditPage({ detail, detailPending = false, item, loadRuleSetC
           label=""
           primaryAction={{ accessibleLabel: t("files.actions.save"), disabled: detailPending || saving || !valid, icon: <SaveIcon aria-hidden fontSize="small" />, label: t("actions.save"), type: "submit", variant: "contained" }}
           secondaryActions={[
-            { accessibleLabel: t("files.actions.preview"), disabled: Boolean(previewDisabledReason), disabledReason: previewDisabledReason, icon: <VisibilityIcon aria-hidden fontSize="small" />, label: t("common.preview"), onSelect: onPreview },
+            { accessibleLabel: t("files.actions.preview"), disabled: Boolean(previewDisabledReason), disabledReason: previewDisabledReason, icon: <VisibilityIcon aria-hidden fontSize="small" />, label: t("common.preview"), mobileVisible: true, onSelect: onPreview },
             { accessibleLabel: t("files.actions.share"), disabled: Boolean(shareDisabledReason), disabledReason: shareDisabledReason, icon: <ShareOutlinedIcon aria-hidden fontSize="small" />, label: t("actions.share"), onSelect: onShare },
           ]}
           sticky
