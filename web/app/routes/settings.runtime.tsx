@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import { useSandrone } from "~/core/provider/context";
 import { useFileResources } from "~/features/files/data/use-file-resources";
 import { useScheduledRefreshStatus } from "~/features/settings/data/use-scheduled-refresh-status";
+import { useVersionInfo } from "~/features/settings/data/use-version-info";
 import { SettingsRuntimePage } from "~/features/settings/pages/settings-runtime-page";
 import { useSubscriptionResources } from "~/features/subscriptions/data/use-subscription-resources";
 import { useI18n } from "~/shared/i18n/context";
@@ -16,6 +17,8 @@ export default function SettingsRuntimeRoute() {
   const subscriptions = useSubscriptionResources(ports);
   const files = useFileResources(ports);
   const scheduledRefreshStatus = useScheduledRefreshStatus(app.client);
+  const version = useVersionInfo({ client: app.client });
+  const defaultUserAgent = version.name && version.version ? `${version.name}/${version.version}` : "";
   const scheduledRefreshResources = [
     ...subscriptions.items.map((item) => ({ kind: "subscription" as const, name: item.name, label: resourceOptionText(item) })),
     ...files.items.map((item) => ({ kind: "file" as const, name: item.name, label: resourceOptionText(item) })),
@@ -23,6 +26,7 @@ export default function SettingsRuntimeRoute() {
 
   return (
     <SettingsRuntimePage
+      defaultUserAgent={defaultUserAgent}
       overrides={app.settingsOverrides}
       restartRequired={app.restartRequired}
       scheduledRefreshResources={scheduledRefreshResources}

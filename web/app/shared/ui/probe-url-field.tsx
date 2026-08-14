@@ -18,11 +18,12 @@ const probeURLPresets: ProbeURLPreset[] = [
 export interface ProbeURLFieldProps {
   className?: string;
   label: string;
+  placeholder?: string;
   value: string;
   onChange: (value: string) => void;
 }
 
-export function ProbeURLField({ className, label, onChange, value }: ProbeURLFieldProps) {
+export function ProbeURLField({ className, label, onChange, placeholder, value }: ProbeURLFieldProps) {
   const selected = probeURLPresets.find((option) => option.url === value) ?? value;
   return (
     <Autocomplete<ProbeURLPreset, false, false, true>
@@ -37,7 +38,7 @@ export function ProbeURLField({ className, label, onChange, value }: ProbeURLFie
       isOptionEqualToValue={(option, current) =>
         typeof current !== "string" && option.url === current.url
       }
-      renderInput={(params) => <TextField {...params} fullWidth label={label} />}
+      renderInput={(params) => <TextField {...params} fullWidth label={label} placeholder={placeholder} />}
       renderOption={(props, option) => (
         <li {...props} aria-label={`${option.provider} ${option.url}`} key={option.provider}>
           <span className="grid min-w-0 gap-0.5">

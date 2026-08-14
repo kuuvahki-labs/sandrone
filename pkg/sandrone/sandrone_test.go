@@ -180,7 +180,7 @@ func TestEngineSettingsRoundTrip(t *testing.T) {
 
 	defaults, err := engine.GetSettings(ctx)
 	require.NoError(t, err)
-	require.Equal(t, "sandrone/0.1.1", defaults.Settings.RemoteDefaults.UserAgent)
+	require.Empty(t, defaults.Settings.RemoteDefaults.UserAgent)
 	require.Equal(t, "url_test", defaults.Settings.ProbeDefaults.Method)
 	require.Equal(t, "sing-box", defaults.Settings.ProbeDefaults.Core)
 	require.Equal(t, 60, defaults.Settings.CacheDefaults.SubscriptionTrafficTTLSeconds)

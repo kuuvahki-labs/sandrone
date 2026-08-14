@@ -15,7 +15,6 @@ import (
 
 	"github.com/robfig/cron/v3"
 
-	"github.com/kuuvahki-labs/sandrone/internal/buildinfo"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/fetcher"
 	"github.com/kuuvahki-labs/sandrone/internal/probe"
@@ -115,7 +114,6 @@ func Default() domain.Settings {
 		},
 		Log: domain.LogSettings{Level: "info"},
 		RemoteDefaults: domain.RemoteDefaults{
-			UserAgent: buildinfo.UserAgent(),
 			TimeoutMS: int(fetcher.DefaultTimeout / time.Millisecond),
 		},
 		ProbeDefaults: domain.ProbeDefaults{

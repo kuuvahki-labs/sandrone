@@ -18,11 +18,13 @@ import { useI18n } from "~/shared/i18n/context";
 import { ProbeURLField } from "~/shared/ui/probe-url-field";
 
 interface RuntimeSettingsSectionProps {
+  defaultUserAgent?: string;
   value: Pick<SettingsView, "remote_defaults" | "probe_defaults" | "cache_defaults">;
   onChange: (value: Pick<SettingsView, "remote_defaults" | "probe_defaults" | "cache_defaults">) => void;
 }
 
 export function RuntimeSettingsSection({
+  defaultUserAgent,
   value,
   onChange,
 }: RuntimeSettingsSectionProps) {
@@ -63,6 +65,7 @@ export function RuntimeSettingsSection({
               <TextField
                 fullWidth
                 label={t("settings.runtime.remoteUserAgent")}
+                placeholder={defaultUserAgent}
                 value={value.remote_defaults.user_agent ?? ""}
                 onChange={(event) => updateRemoteDefaults({ user_agent: event.target.value })}
               />

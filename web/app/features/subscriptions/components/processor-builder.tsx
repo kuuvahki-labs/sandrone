@@ -2,9 +2,15 @@ import Checkbox from "@mui/material/Checkbox";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import TextField from "@mui/material/TextField";
 
+import {
+  newProbeProcessorParams,
+  probeMethodForDisplay,
+  probeMethodPatch,
+  sanitizeProbeParams,
+} from "~/features/subscriptions/model/probe-processor";
+import type { ProbeDefaultsInput } from "~/shared/api/client";
 import { useUICapabilities } from "~/shared/capabilities/context";
 import { type Translator, useI18n } from "~/shared/i18n/context";
-import { DEFAULT_PROBE_URL } from "~/shared/probe/defaults";
 import {
   KeyValueParamsEditor,
   ProcessorEditorList,
@@ -37,25 +43,14 @@ const fields = ["name", "type", "server"];
 const fieldOptions = fields.map((field) => ({ value: field, label: field }));
 const informationNodePattern =
   "(?i)(网址|官网|流量|剩余|时间|应急|套餐|订阅|公告|重置|过期|到期|bandwidth|traffic|quota|reset|expire|expiry|expiration)";
-const probeRuntimeDefaults = {
-  method: "url_test",
-  core: "sing-box",
-  url: DEFAULT_PROBE_URL,
-  ntpServer: "time.apple.com",
-  failMode: "keep",
-  timeoutMS: 5000,
-  attempts: 1,
-  concurrency: 10,
-  cacheTTLSeconds: 0,
-};
 
-export function ProcessorBuilder({ defaultValue = [], onDirty, scriptFiles = [] }: { defaultValue?: ProcessorDetail[]; onDirty?: () => void; scriptFiles?: ResourceOption[] }) {
+export function ProcessorBuilder({ defaultValue = [], onDirty, probeDefaults, scriptFiles = [] }: { defaultValue?: ProcessorDetail[]; onDirty?: () => void; probeDefaults: ProbeDefaultsInput; scriptFiles?: ResourceOption[] }) {
   const { t } = useI18n();
   const { hasFeature } = useUICapabilities();
   const options = processorOptions(t, hasFeature("probe.enabled"));
 
   function ParamsEditor(props: ProcessorParamsEditorProps) {
-    return <ProcessorParamsEditor {...props} scriptFiles={scriptFiles} />;
+    return <ProcessorParamsEditor {...props} probeDefaults={probeDefaults} scriptFiles={scriptFiles} />;
   }
 
   return (
@@ -74,7 +69,7 @@ export function ProcessorBuilder({ defaultValue = [], onDirty, scriptFiles = [] 
   );
 }
 
-function ProcessorParamsEditor({ draft, onChange, scriptFiles }: ProcessorParamsEditorProps & { scriptFiles: ResourceOption[] }) {
+function ProcessorParamsEditor({ draft, onChange, probeDefaults, scriptFiles }: ProcessorParamsEditorProps & { probeDefaults: ProbeDefaultsInput; scriptFiles: ResourceOption[] }) {
   const { t } = useI18n();
   const params = draft.params;
   switch (draft.type) {
@@ -147,25 +142,26 @@ function ProcessorParamsEditor({ draft, onChange, scriptFiles }: ProcessorParams
         </>
       );
     case "probe": {
-      const method = stringValue(params.method) || probeRuntimeDefaults.method;
-      const showNTPServer = method === "udp_ntp";
-      const showURLTarget = method === "url_test";
+      const method = stringValue(params.method);
+      const effectiveMethod = probeMethodForDisplay(params, probeDefaults);
+      const showNTPServer = effectiveMethod === "udp_ntp";
+      const showURLTarget = effectiveMethod === "url_test";
       return (
         <>
-          <SelectField label={t("processors.probe.method")} options={probeMethodOptions()} value={method} onChange={(value) => onChange(probeMethodPatch(value))} />
+          <SelectField label={t("processors.probe.method")} options={probeMethodOptions(t, probeDefaults.method)} value={method} onChange={(value) => onChange(probeMethodPatch(value))} />
           {showNTPServer ? (
-            <TextField fullWidth label={t("processors.probe.ntpServer")} value={stringValue(params.ntp_server)} onChange={(event) => onChange({ ntp_server: event.target.value })} />
+            <TextField fullWidth label={t("processors.probe.ntpServer")} placeholder={probeDefaults.ntp_server} value={stringValue(params.ntp_server)} onChange={(event) => onChange({ ntp_server: event.target.value })} />
           ) : null}
           {showURLTarget ? (
             <>
-              <ProbeURLField label={t("processors.probe.url")} value={stringValue(params.url)} onChange={(url) => onChange({ url })} />
+              <ProbeURLField label={t("processors.probe.url")} placeholder={probeDefaults.url} value={stringValue(params.url)} onChange={(url) => onChange({ url })} />
               <TextField fullWidth label={t("processors.probe.expectedStatus")} placeholder="200-299" value={stringValue(params.expected_status)} onChange={(event) => onChange({ expected_status: event.target.value })} />
             </>
           ) : null}
-          <TextField fullWidth label={t("files.form.timeoutMs")} type="number" value={numberInputValue(params.timeout_ms)} onChange={(event) => onChange({ timeout_ms: numberOrEmpty(event.target.value) })} />
-          <TextField fullWidth label={t("processors.probe.attempts")} type="number" value={numberInputValue(params.attempts)} onChange={(event) => onChange({ attempts: numberOrEmpty(event.target.value) })} />
-          <TextField fullWidth label={t("processors.probe.concurrency")} type="number" value={numberInputValue(params.concurrency)} onChange={(event) => onChange({ concurrency: numberOrEmpty(event.target.value) })} />
-          <TextField fullWidth label={t("processors.probe.cacheTTLSeconds")} type="number" value={numberInputValue(params.cache_ttl_seconds)} onChange={(event) => onChange({ cache_ttl_seconds: numberOrEmpty(event.target.value) })} />
+          <TextField fullWidth label={t("files.form.timeoutMs")} placeholder={String(probeDefaults.timeout_ms)} type="number" value={numberInputValue(params.timeout_ms)} onChange={(event) => onChange({ timeout_ms: numberOrEmpty(event.target.value) })} />
+          <TextField fullWidth label={t("processors.probe.attempts")} placeholder={String(probeDefaults.attempts)} type="number" value={numberInputValue(params.attempts)} onChange={(event) => onChange({ attempts: numberOrEmpty(event.target.value) })} />
+          <TextField fullWidth label={t("processors.probe.concurrency")} placeholder={String(probeDefaults.concurrency)} type="number" value={numberInputValue(params.concurrency)} onChange={(event) => onChange({ concurrency: numberOrEmpty(event.target.value) })} />
+          <TextField fullWidth label={t("processors.probe.cacheTTLSeconds")} placeholder={String(probeDefaults.cache_ttl_seconds)} type="number" value={numberInputValue(params.cache_ttl_seconds)} onChange={(event) => onChange({ cache_ttl_seconds: numberOrEmpty(event.target.value) })} />
           <SelectField label={t("processors.sort")} options={probeSortOptions(t)} value={stringValue(params.sort)} onChange={(value) => onChange({ sort: value })} />
           <SelectField
             label={t("processors.failMode")}
@@ -202,7 +198,7 @@ function draftProcessors(processors: ProcessorDetail[]): ProcessorDraft[] {
 
 function draftFromProcessor(processor: ProcessorDetail, index: number): ProcessorDraft {
   const type = processor.type || "filter";
-  const params = type === "probe" ? { ...defaultPersistedProbeParams(), ...(processor.params ?? {}) } : processor.params ?? {};
+  const params = type === "probe" ? sanitizeProbeParams(processor.params ?? {}) : processor.params ?? {};
   return {
     id: createProcessorID(index),
     name: stringValue(processor.name),
@@ -220,37 +216,6 @@ function serializeDraft(draft: ProcessorDraft, t: Translator): ProcessorDetail {
     stage: defaultStage(),
     ...(Object.keys(params).length ? { params } : {}),
   };
-}
-
-function sanitizeProbeParams(params: Record<string, unknown>): Record<string, unknown> {
-  const out = cleanParams(params);
-  const method = stringValue(out.method) || probeRuntimeDefaults.method;
-  out.method = method;
-  delete out.layer;
-  if (method === "tcp_connect") {
-    delete out.core;
-  } else {
-    out.core = probeRuntimeDefaults.core;
-  }
-  if (method !== "udp_ntp") {
-    delete out.ntp_server;
-  }
-  if (method !== "url_test") {
-    delete out.url;
-    delete out.expected_status;
-  }
-  return out;
-}
-
-function probeMethodPatch(method: string): Record<string, unknown> {
-  switch (method) {
-    case "tcp_connect":
-      return { method, core: undefined, url: undefined, expected_status: undefined, ntp_server: undefined };
-    case "udp_ntp":
-      return { method, core: probeRuntimeDefaults.core, url: undefined, expected_status: undefined, ntp_server: probeRuntimeDefaults.ntpServer };
-    default:
-      return { method: "url_test", core: probeRuntimeDefaults.core, url: probeRuntimeDefaults.url, expected_status: undefined, ntp_server: undefined };
-  }
 }
 
 function processorOptions(t: Translator, probeEnabled = true) {
@@ -321,8 +286,9 @@ function quickValues(t: Translator) {
   ];
 }
 
-function probeMethodOptions() {
+function probeMethodOptions(t: Translator, defaultMethod: string) {
   return [
+    { value: "", label: t("processors.probe.inherit", { value: defaultMethod }) },
     { value: "tcp_connect", label: "tcp_connect" },
     { value: "udp_ntp", label: "udp_ntp" },
     { value: "url_test", label: "url_test" },
@@ -354,28 +320,13 @@ function defaultParams(type: string): Record<string, unknown> {
       return {};
     case "probe":
       return {
-        ...defaultPersistedProbeParams(),
-        annotate: true,
-        fail_mode: "drop",
+        ...newProbeProcessorParams(),
       };
     case "script":
       return defaultScriptParams();
     default:
       return {};
   }
-}
-
-function defaultPersistedProbeParams(): Record<string, unknown> {
-  return {
-    method: probeRuntimeDefaults.method,
-    core: probeRuntimeDefaults.core,
-    url: probeRuntimeDefaults.url,
-    timeout_ms: probeRuntimeDefaults.timeoutMS,
-    attempts: probeRuntimeDefaults.attempts,
-    concurrency: probeRuntimeDefaults.concurrency,
-    cache_ttl_seconds: probeRuntimeDefaults.cacheTTLSeconds,
-    fail_mode: probeRuntimeDefaults.failMode,
-  };
 }
 
 function createProcessorID(index = Date.now()): string {

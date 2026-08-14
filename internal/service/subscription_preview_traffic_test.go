@@ -125,9 +125,14 @@ func TestServiceProbeProcessorAllowsRuntimeProbeDefaults(t *testing.T) {
 	)
 	putProjectSettings(t, svc, context.Background(), func(update *domain.SettingsUpdate) {
 		update.ProbeDefaults = domain.ProbeDefaults{
-			Core:      "mihomo",
-			URL:       "https://probe.example/generate_204",
-			TimeoutMS: 8000,
+			Method:          "url_test",
+			Core:            "mihomo",
+			URL:             "https://probe.example/generate_204",
+			NTPServer:       "time.example",
+			TimeoutMS:       8000,
+			Attempts:        2,
+			Concurrency:     4,
+			CacheTTLSeconds: 60,
 		}
 	})
 	require.NoError(t, svc.PutSubscription(context.Background(), domain.Subscription{
@@ -136,11 +141,9 @@ func TestServiceProbeProcessorAllowsRuntimeProbeDefaults(t *testing.T) {
 		Format:  "uri-list",
 		Content: "ss://aes-128-gcm:secret@example.com:8388#node-a",
 		Processors: []domain.ProcessorSpec{{
-			Type:  "probe",
-			Stage: domain.StageNodes,
-			Params: params(t, map[string]any{
-				"method": "url_test",
-			}),
+			Type:   "probe",
+			Stage:  domain.StageNodes,
+			Params: params(t, map[string]any{}),
 		}},
 	}))
 
@@ -152,6 +155,9 @@ func TestServiceProbeProcessorAllowsRuntimeProbeDefaults(t *testing.T) {
 	require.Equal(t, "mihomo", seen[0].Core)
 	require.Equal(t, "https://probe.example/generate_204", seen[0].URL)
 	require.Equal(t, 8000, seen[0].TimeoutMS)
+	require.Equal(t, 2, seen[0].Attempts)
+	require.Equal(t, 4, seen[0].Concurrency)
+	require.Equal(t, 60, seen[0].CacheTTLSeconds)
 }
 
 func TestServiceSubscriptionProcessorsRoundtripAndPreviewOrder(t *testing.T) {

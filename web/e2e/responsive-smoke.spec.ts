@@ -70,7 +70,7 @@ function settingsEnvelope() {
     http: { listen: "127.0.0.1:1137" },
     mcp: { path: "/mcp", allow_management_tools: false, max_output_bytes: 1048576 },
     log: { level: "info" },
-    remote_defaults: { user_agent: "sandrone/0.1.0", timeout_ms: 15000 },
+    remote_defaults: { timeout_ms: 15000 },
     probe_defaults: {
       method: "url_test",
       core: "sing-box",

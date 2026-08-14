@@ -14,6 +14,7 @@ import { useI18n } from "~/shared/i18n/context";
 import { PageHeader } from "~/shared/ui/page";
 
 interface SettingsRuntimePageProps {
+  defaultUserAgent?: string;
   settings: SettingsView;
   overrides: Record<string, string>;
   restartRequired: string[];
@@ -24,6 +25,7 @@ interface SettingsRuntimePageProps {
 }
 
 export function SettingsRuntimePage({
+  defaultUserAgent,
   settings,
   overrides,
   restartRequired,
@@ -79,6 +81,7 @@ export function SettingsRuntimePage({
         />
       ) : null}
       <RuntimeSettingsSection
+        defaultUserAgent={defaultUserAgent}
         value={draft}
         onChange={(runtime) => setDraft((current) => ({ ...current, ...runtime }))}
       />

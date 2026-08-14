@@ -42,6 +42,7 @@ describe("settings runtime page", () => {
 
     renderRuntimePage(
       <SettingsRuntimePage
+        defaultUserAgent="sandrone/0.2.0"
         overrides={{ "http.listen": "environment" }}
         restartRequired={[]}
         scheduledRefreshResources={[]}
@@ -67,6 +68,8 @@ describe("settings runtime page", () => {
     });
     await user.click(automaticTraffic);
     const remoteGroup = screen.getByRole("region", { name: "远程请求" });
+    expect(within(remoteGroup).getByRole("textbox", { name: "User-Agent" })).toHaveValue("");
+    expect(within(remoteGroup).getByRole("textbox", { name: "User-Agent" })).toHaveAttribute("placeholder", "sandrone/0.2.0");
     fireEvent.change(within(remoteGroup).getByRole("textbox", { name: "User-Agent" }), {
       target: { value: "Sandrone Global" },
     });

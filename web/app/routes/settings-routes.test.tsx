@@ -90,7 +90,8 @@ describe("SettingsRuntimeRoute", () => {
 
     renderSettingsRuntimeRoute();
 
-    expect(client.getVersion).not.toHaveBeenCalled();
+    await waitFor(() => expect(client.getVersion).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole("textbox", { name: "User-Agent" })).toHaveAttribute("placeholder", "sandrone/0.2.0");
     await user.click(screen.getByRole("switch", { name: "自动获取流量" }));
     await user.click(screen.getByRole("button", { name: "保存设置" }));
     await waitFor(() => expect(updateSettings).toHaveBeenCalledWith(expect.objectContaining({
@@ -199,7 +200,11 @@ function mockSettingsRuntimeApp() {
       last_failure_count: 0,
       skipped_count: 0,
     }),
-    getVersion: vi.fn(),
+    getVersion: vi.fn().mockResolvedValue({
+      name: "sandrone",
+      revision: "fedcba9876543210",
+      version: "0.2.0",
+    }),
     listFiles: vi.fn().mockResolvedValue({ files: [] }),
     listSubscriptions: vi.fn().mockResolvedValue({ subscriptions: [] }),
     restoreBackup: vi.fn(),

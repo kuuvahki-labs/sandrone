@@ -34,6 +34,7 @@ export default function NewSubscriptionRoute() {
 
   return (
     <SubscriptionNewPage
+      probeDefaults={app.effectiveSettings.probe_defaults}
       scriptFiles={files.items.map(({ name, title }) => ({ name, title }))}
       sources={subscriptions.items}
       type={type}

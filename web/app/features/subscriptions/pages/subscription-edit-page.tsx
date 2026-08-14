@@ -5,6 +5,7 @@ import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 
 import { type SubscriptionCopyTarget, SubscriptionFormFields } from "~/features/subscriptions/components/subscription-form";
 import type { SubscriptionDefinition, SubscriptionItem } from "~/features/subscriptions/model/types";
+import type { ProbeDefaultsInput } from "~/shared/api/client";
 import { useI18n } from "~/shared/i18n/context";
 import {
   changeEditSession,
@@ -34,6 +35,7 @@ export interface SubscriptionEditPageProps {
   onPreview?: () => void;
   onSave: (form: FormData) => boolean | Promise<boolean>;
   onShare?: () => void;
+  probeDefaults: ProbeDefaultsInput;
 }
 
 export function SubscriptionEditPage({
@@ -47,6 +49,7 @@ export function SubscriptionEditPage({
   onPreview,
   onSave,
   onShare,
+  probeDefaults,
 }: SubscriptionEditPageProps) {
   const { t } = useI18n();
   const [editSession, setEditSession] = useState(createEditSession);
@@ -124,6 +127,7 @@ export function SubscriptionEditPage({
             definition={definition}
             item={item}
             mode="edit"
+            probeDefaults={probeDefaults}
             scriptFiles={scriptFiles}
             sources={sources}
             type={selectedType}

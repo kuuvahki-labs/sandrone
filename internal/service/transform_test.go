@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 
+	"github.com/kuuvahki-labs/sandrone/internal/buildinfo"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/processor"
 	"github.com/kuuvahki-labs/sandrone/internal/service"
@@ -322,6 +323,33 @@ func TestServiceConvertPreservesExplicitLegacyLookingUserAgent(t *testing.T) {
 	})
 
 	require.NoError(t, err)
+}
+
+func TestServiceConvertResolvesEmptyUserAgentBeforeRemoteCacheLookup(t *testing.T) {
+	body := base64.StdEncoding.EncodeToString([]byte("ss://aes-128-gcm:secret@example.com:8388#remote-node"))
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		require.Equal(t, buildinfo.UserAgent(), r.UserAgent())
+		_, _ = w.Write([]byte(body))
+	}))
+	defer server.Close()
+
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	putProjectSettings(t, svc, context.Background(), func(update *domain.SettingsUpdate) {
+		update.RemoteDefaults.UserAgent = ""
+		update.CacheDefaults.RemoteFetchTTLSeconds = 60
+	})
+
+	for range 2 {
+		_, err := svc.Convert(context.Background(), domain.ConvertRequest{
+			ToFormat: "json-nodes",
+			Remote:   &domain.RemoteInput{URL: server.URL},
+		})
+		require.NoError(t, err)
+	}
+
+	require.Equal(t, 1, calls)
 }
 
 func TestServiceConvertRemoteInputUsesRuntimeDefaultsAndLocalOverride(t *testing.T) {

@@ -1,6 +1,7 @@
 import { screen, within } from "@testing-library/react";
 import type userEvent from "@testing-library/user-event";
 
+import type { ProbeDefaultsInput } from "~/shared/api/client";
 import type { ResourceOption } from "~/shared/resources/types";
 import type { CreateSpeedDialAction } from "~/shared/ui/resource-list";
 
@@ -27,6 +28,17 @@ export const scriptFiles: ResourceOption[] = [
   { name: "rename.js", title: "rename.js" },
   { name: "other.js", title: "other.js" },
 ];
+
+export const probeDefaults: ProbeDefaultsInput = {
+  method: "url_test",
+  core: "sing-box",
+  url: "https://cp.cloudflare.com",
+  ntp_server: "time.apple.com",
+  timeout_ms: 5000,
+  attempts: 1,
+  concurrency: 10,
+  cache_ttl_seconds: 0,
+};
 
 export const remoteSubscriptionDefinition: SubscriptionDefinition = {
   name: "provider",

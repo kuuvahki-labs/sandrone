@@ -18,6 +18,7 @@ func TestDefaultSettingsContainsWholeProject(t *testing.T) {
 	require.Equal(t, "/mcp", got.MCP.Path)
 	require.Equal(t, 1<<20, got.MCP.MaxOutputBytes)
 	require.Equal(t, "info", got.Log.Level)
+	require.Empty(t, got.RemoteDefaults.UserAgent)
 	require.Equal(t, "dark", got.Appearance.ThemeMode)
 	require.Equal(t, "auto", got.Appearance.Locale)
 	require.False(t, got.Subscriptions.AutoLoadTraffic)
@@ -37,11 +38,26 @@ func TestStoredAndPublicSettingsOmitRemovedStartupFields(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, body := range [][]byte{stored, public} {
+		require.NotContains(t, string(body), `"user_agent"`)
 		require.NotContains(t, string(body), `"token"`)
 		require.NotContains(t, string(body), `"token_required"`)
 		require.NotContains(t, string(body), `"token_configured"`)
 		require.NotContains(t, string(body), `"transport"`)
 		require.NotContains(t, string(body), `"webui"`)
+	}
+}
+
+func TestNormalizePreservesEmptyAndExplicitRemoteUserAgents(t *testing.T) {
+	for _, userAgent := range []string{"", "Sandrone Client", "sandrone/0"} {
+		t.Run(userAgent, func(t *testing.T) {
+			value := settings.Default()
+			value.RemoteDefaults.UserAgent = userAgent
+
+			got, err := settings.Normalize(value)
+
+			require.NoError(t, err)
+			require.Equal(t, userAgent, got.RemoteDefaults.UserAgent)
+		})
 	}
 }
 

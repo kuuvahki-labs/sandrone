@@ -3,6 +3,7 @@ package service
 import (
 	"strings"
 
+	"github.com/kuuvahki-labs/sandrone/internal/buildinfo"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
 
@@ -12,6 +13,9 @@ func (s *Service) remoteInputWithDefaults(input domain.RemoteInput) domain.Remot
 	out := input
 	if strings.TrimSpace(out.UserAgent) == "" {
 		out.UserAgent = defaults.UserAgent
+	}
+	if strings.TrimSpace(out.UserAgent) == "" {
+		out.UserAgent = buildinfo.UserAgent()
 	}
 	if strings.TrimSpace(out.Proxy) == "" {
 		out.Proxy = defaults.Proxy

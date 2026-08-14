@@ -4,6 +4,7 @@ import Alert from "@mui/material/Alert";
 
 import { type SubscriptionCopyTarget, SubscriptionFormFields } from "~/features/subscriptions/components/subscription-form";
 import type { SubscriptionItem } from "~/features/subscriptions/model/types";
+import type { ProbeDefaultsInput } from "~/shared/api/client";
 import { useI18n } from "~/shared/i18n/context";
 import type { ResourceOption } from "~/shared/resources/types";
 import type { SubscriptionCreateType } from "~/shared/routing/paths";
@@ -17,10 +18,11 @@ export interface SubscriptionNewPageProps {
   onCopySource?: (value: string, target: SubscriptionCopyTarget) => void | Promise<void>;
   onSave: (form: FormData) => void | Promise<void>;
   onTypeChange: (type: SubscriptionCreateType) => void;
+  probeDefaults: ProbeDefaultsInput;
   scriptFiles?: ResourceOption[];
 }
 
-export function SubscriptionNewPage({ sources, type, onBack, onCopySource, onSave, onTypeChange, scriptFiles }: SubscriptionNewPageProps) {
+export function SubscriptionNewPage({ sources, type, onBack, onCopySource, onSave, onTypeChange, probeDefaults, scriptFiles }: SubscriptionNewPageProps) {
   const { t } = useI18n();
   const [dirty, setDirty] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
@@ -55,7 +57,7 @@ export function SubscriptionNewPage({ sources, type, onBack, onCopySource, onSav
           title={t("subscriptions.create")}
         />
 
-        <SubscriptionFormFields mode="create" scriptFiles={scriptFiles} sources={sources} type={type} onCopySource={onCopySource} onTypeChange={onTypeChange} />
+        <SubscriptionFormFields mode="create" probeDefaults={probeDefaults} scriptFiles={scriptFiles} sources={sources} type={type} onCopySource={onCopySource} onTypeChange={onTypeChange} />
         {error ? <Alert severity="error">{error}</Alert> : null}
       </form>
       {confirmLeave ? <DiscardChangesDialog onCancel={() => setConfirmLeave(false)} onConfirm={onBack} /> : null}

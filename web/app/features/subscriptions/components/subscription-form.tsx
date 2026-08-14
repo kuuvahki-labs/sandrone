@@ -15,6 +15,7 @@ import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 
 import type { SubscriptionDefinition, SubscriptionItem } from "~/features/subscriptions/model/types";
+import type { ProbeDefaultsInput } from "~/shared/api/client";
 import { useI18n } from "~/shared/i18n/context";
 import type { ResourceOption } from "~/shared/resources/types";
 import type { SubscriptionCreateType } from "~/shared/routing/paths";
@@ -31,6 +32,7 @@ export interface SubscriptionFormFieldsProps {
   onCopySource?: (value: string, target: SubscriptionCopyTarget) => void | Promise<void>;
   onDirty?: () => void;
   onTypeChange: (type: SubscriptionCreateType) => void;
+  probeDefaults: ProbeDefaultsInput;
   scriptFiles?: ResourceOption[];
   sources: SubscriptionItem[];
   type: SubscriptionCreateType;
@@ -40,7 +42,7 @@ export type SubscriptionCopyTarget = "content" | "url";
 
 const emptySourceRefs: string[] = [];
 
-export function SubscriptionFormFields({ definition, item, mode, onCopySource, onDirty, onTypeChange, scriptFiles, sources, type }: SubscriptionFormFieldsProps) {
+export function SubscriptionFormFields({ definition, item, mode, onCopySource, onDirty, onTypeChange, probeDefaults, scriptFiles, sources, type }: SubscriptionFormFieldsProps) {
   const { t } = useI18n();
   const meta = definition?.meta ?? (item?.description ? { description: item.description } : {});
   const description = meta.description ?? item?.description ?? "";
@@ -163,7 +165,7 @@ export function SubscriptionFormFields({ definition, item, mode, onCopySource, o
         <Typography className="px-1 font-semibold" component="legend">
           {t("subscriptions.form.processors")}
         </Typography>
-        <ProcessorBuilder defaultValue={processorDefaultValue} onDirty={onDirty} scriptFiles={scriptFiles} />
+        <ProcessorBuilder defaultValue={processorDefaultValue} onDirty={onDirty} probeDefaults={probeDefaults} scriptFiles={scriptFiles} />
       </Paper>
     </div>
   );

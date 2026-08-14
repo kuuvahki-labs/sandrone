@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { ProcessorBuilder } from "~/features/subscriptions/components/processor-builder";
 import {
+  probeDefaults,
   remoteSubscriptionDefinition,
   scriptFiles,
   selectMuiOption,
@@ -32,6 +33,7 @@ function renderProcessorBuilder({
       <ProcessorBuilder
         defaultValue={defaultValue}
         onDirty={onDirty}
+        probeDefaults={probeDefaults}
         scriptFiles={availableScriptFiles}
       />
     </UICapabilityProvider>,
@@ -145,8 +147,7 @@ describe("ProcessorBuilder", () => {
     const probeGroup = screen.getByRole("group", { name: "处理器 测活" });
     expect(within(probeGroup).getByRole("checkbox", { name: "写入测活元数据" })).not.toBeChecked();
     expect(within(probeGroup).getByRole("combobox", { name: "失败处理" })).toHaveTextContent("保留");
-    expect(serializedProcessors()[0]?.params).toMatchObject({ fail_mode: "keep" });
-    expect(serializedProcessors()[0]?.params).not.toHaveProperty("annotate");
+    expect(serializedProcessors()[0]).not.toHaveProperty("params");
   });
 
   it("preserves the persisted position of quick settings", () => {
@@ -174,32 +175,29 @@ describe("ProcessorBuilder", () => {
     await user.click(screen.getByRole("button", { name: "添加处理器" }));
 
     const probeGroup = screen.getByRole("group", { name: "处理器 测活" });
-    expect(within(probeGroup).getByRole("combobox", { name: "方式" })).toHaveTextContent("url_test");
+    expect(within(probeGroup).getByRole("combobox", { name: "方式" })).toHaveTextContent("继承全局设置（当前：url_test）");
     expect(within(probeGroup).getAllByRole("combobox")).toHaveLength(4);
     expect(probeGroup).not.toHaveTextContent(/sing-box|mihomo/);
     expect(within(probeGroup).getByRole("checkbox", { name: "写入测活元数据" })).toBeChecked();
     expect(within(probeGroup).getByRole("combobox", { name: "失败处理" })).toHaveTextContent("丢弃");
     expect(within(probeGroup).queryByRole("textbox", { name: "NTP 服务器" })).not.toBeInTheDocument();
     const probeURL = within(probeGroup).getByRole("combobox", { name: "URL" });
-    expect(probeURL).toHaveValue("https://cp.cloudflare.com");
-    expect(within(probeGroup).getByRole("spinbutton", { name: "超时毫秒" })).toHaveValue(5000);
-    expect(within(probeGroup).getByRole("spinbutton", { name: "尝试次数" })).toHaveValue(1);
-    expect(within(probeGroup).getByRole("spinbutton", { name: "并发数" })).toHaveValue(10);
-    expect(within(probeGroup).getByRole("spinbutton", { name: "缓存秒数" })).toHaveValue(0);
-    expect(within(probeGroup).queryByText(/默认/)).not.toBeInTheDocument();
+    expect(probeURL).toHaveValue("");
+    expect(probeURL).toHaveAttribute("placeholder", "https://cp.cloudflare.com");
+    expect(within(probeGroup).getByRole("spinbutton", { name: "超时毫秒" })).toHaveValue(null);
+    expect(within(probeGroup).getByRole("spinbutton", { name: "超时毫秒" })).toHaveAttribute("placeholder", "5000");
+    expect(within(probeGroup).getByRole("spinbutton", { name: "尝试次数" })).toHaveValue(null);
+    expect(within(probeGroup).getByRole("spinbutton", { name: "尝试次数" })).toHaveAttribute("placeholder", "1");
+    expect(within(probeGroup).getByRole("spinbutton", { name: "并发数" })).toHaveValue(null);
+    expect(within(probeGroup).getByRole("spinbutton", { name: "并发数" })).toHaveAttribute("placeholder", "10");
+    expect(within(probeGroup).getByRole("spinbutton", { name: "缓存秒数" })).toHaveValue(null);
+    expect(within(probeGroup).getByRole("spinbutton", { name: "缓存秒数" })).toHaveAttribute("placeholder", "0");
 
     expect(serializedProcessors()).toEqual([
       {
         type: "probe",
         stage: "nodes",
         params: {
-          method: "url_test",
-          core: "sing-box",
-          url: "https://cp.cloudflare.com",
-          timeout_ms: 5000,
-          attempts: 1,
-          concurrency: 10,
-          cache_ttl_seconds: 0,
           fail_mode: "drop",
           annotate: true,
         },
@@ -214,13 +212,6 @@ describe("ProcessorBuilder", () => {
         type: "probe",
         stage: "nodes",
         params: {
-          method: "url_test",
-          core: "sing-box",
-          url: "https://cp.cloudflare.com",
-          timeout_ms: 5000,
-          attempts: 1,
-          concurrency: 10,
-          cache_ttl_seconds: 0,
           fail_mode: "drop",
           annotate: true,
         },

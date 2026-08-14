@@ -52,6 +52,31 @@ func TestServiceSettingsReportsOverridesWithoutRestartDuplicates(t *testing.T) {
 	require.Equal(t, "127.0.0.1:3237", after.Effective.HTTP.Listen)
 }
 
+func TestServiceSettingsCanClearRemoteUserAgent(t *testing.T) {
+	svc := newProjectSettingsService()
+	before, err := svc.GetSettings(context.Background())
+	require.NoError(t, err)
+
+	custom := settingsUpdate(before.Settings)
+	custom.RemoteDefaults.UserAgent = "Sandrone Custom"
+	stored, err := svc.PutSettings(context.Background(), custom)
+	require.NoError(t, err)
+	require.Equal(t, "Sandrone Custom", stored.Settings.RemoteDefaults.UserAgent)
+	require.Equal(t, "Sandrone Custom", stored.Effective.RemoteDefaults.UserAgent)
+
+	cleared := settingsUpdate(stored.Settings)
+	cleared.RemoteDefaults.UserAgent = ""
+	after, err := svc.PutSettings(context.Background(), cleared)
+	require.NoError(t, err)
+	require.Empty(t, after.Settings.RemoteDefaults.UserAgent)
+	require.Empty(t, after.Effective.RemoteDefaults.UserAgent)
+
+	readBack, err := svc.GetSettings(context.Background())
+	require.NoError(t, err)
+	require.Empty(t, readBack.Settings.RemoteDefaults.UserAgent)
+	require.Empty(t, readBack.Effective.RemoteDefaults.UserAgent)
+}
+
 func newProjectSettingsService() *service.Service {
 	value := projectsettings.Default()
 	return newProjectSettingsServiceWithState(value, value, nil)

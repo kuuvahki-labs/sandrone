@@ -358,6 +358,7 @@ export const enUS: Record<TranslationKey, string> = {
   "processors.probe.annotate": "Write health metadata",
   "processors.probe.attempts": "Attempts",
   "processors.probe.cacheTTLSeconds": "Cache seconds",
+  "processors.probe.inherit": "Inherit global setting (current: {value})",
   "processors.probe.concurrency": "Concurrency",
   "processors.probe.expectedStatus": "Expected status",
   "processors.probe.method": "Method",

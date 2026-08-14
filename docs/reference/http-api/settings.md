@@ -44,7 +44,6 @@ SettingsEnvelope {
   },
   "log": {"level": "info"},
   "remote_defaults": {
-    "user_agent": "sandrone/0.1.0",
     "timeout_ms": 15000
   },
   "probe_defaults": {
@@ -74,6 +73,8 @@ SettingsEnvelope {
 
 `settings` 和 `effective` 都使用上面的完整结构。`settings` 是持久化目标；
 `effective` 是当前进程实际使用的值。启动 token 不属于这两个对象。
+`remote_defaults.user_agent` 可选；省略或保存为空时不固定版本，执行远程请求时
+动态使用当前二进制的 `sandrone/<version>`。非空值是显式覆盖，并会跨版本保留。
 `mcp` 不包含启停开关：统一服务始终挂载 MCP；这三个字段只控制 MCP 路径、
 管理 tools 注册范围和最终内联正文上限。
 `mcp.path` 必须以 `/` 开头，且不能是 `/`、`/healthz`、`/version`、`/convert`、

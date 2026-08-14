@@ -6,7 +6,8 @@ Sandrone 将发布版本与源码 revision 作为两个独立事实：
 - `revision` 是生成当前二进制的完整 Git object ID，用于诊断和追溯。
 
 不要把 revision 拼进 `version`。User-Agent、MCP server version 和备份清单中的
-`app_version` 都继续使用纯版本号。
+`app_version` 都继续使用纯版本号。项目设置未显式覆盖 User-Agent 时，每次远程
+请求都使用当前构建的 `sandrone/<version>`，不会把版本字符串固化进设置文件。
 
 规范发布版本只维护在
 [`internal/buildinfo/VERSION`](../../internal/buildinfo/VERSION)。Go 二进制嵌入

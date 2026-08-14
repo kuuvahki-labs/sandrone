@@ -21,7 +21,7 @@ export const defaultProjectSettings: SettingsView = {
     level: "info",
   },
   remote_defaults: {
-    user_agent: "sandrone/0.1.0",
+    user_agent: "",
     proxy: "",
     timeout_ms: 15000,
   },

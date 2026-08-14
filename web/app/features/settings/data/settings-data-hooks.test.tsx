@@ -21,6 +21,7 @@ describe("useVersionInfo", () => {
 
     await waitFor(() => {
       expect(result.current).toEqual({
+        name: "sandrone",
         revision: "0123456789abcdef",
         version: "0.1.0",
       });
@@ -34,7 +35,7 @@ describe("useVersionInfo", () => {
     const { result } = renderHook(() => useVersionInfo({ client }));
 
     await waitFor(() => expect(getVersion).toHaveBeenCalledTimes(1));
-    expect(result.current).toEqual({ revision: undefined, version: undefined });
+    expect(result.current).toEqual({ name: undefined, revision: undefined, version: undefined });
   });
 });
 
