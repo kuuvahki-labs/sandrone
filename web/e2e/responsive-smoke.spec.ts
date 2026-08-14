@@ -63,6 +63,14 @@ const formatCapabilities = {
     href: "/v1/capabilities/formats/render/mihomo-proxies",
   }],
 };
+const uiCapabilities = {
+  features: [
+    { key: "probe.enabled", enabled: true },
+    { key: "scheduler.enabled", enabled: true },
+    { key: "core.mihomo", enabled: true },
+    { key: "core.sing_box", enabled: true },
+  ],
+};
 
 function settingsEnvelope() {
   const settings = {
@@ -115,6 +123,9 @@ test.beforeEach(async ({ page }) => {
   });
   await page.route("**/v1/capabilities/formats", async (route) => {
     await route.fulfill({ json: formatCapabilities });
+  });
+  await page.route("**/v1/capabilities/ui", async (route) => {
+    await route.fulfill({ json: uiCapabilities });
   });
   await page.route("**/v1/rule-set-catalog?target=*", async (route) => {
     await route.fulfill({ json: { items: [] } });
