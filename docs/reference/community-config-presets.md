@@ -69,14 +69,21 @@
 
 | 预设 | 动机 | 默认 | 精确生成行为 | 风险 | 依赖 / 冲突 | 主要来源 |
 | --- | --- | --- | --- | --- | --- | --- |
-| Tailscale 原生接管 | 使用 Shadowrocket 自身的 TAILSCALE policy。 | 关 | 在通用/FINAL 前精确插入 `DOMAIN-SUFFIX,ts.net,TAILSCALE`、`IP-CIDR,100.64.0.0/10,TAILSCALE,no-resolve`、`IP-CIDR,fd7a:115c:a1e0::/48,TAILSCALE,no-resolve`。没有外部共存模式，也不显示模块启用提醒。 | Tailscale 的可用性和认证由 Shadowrocket 自身控制。 | 无。 | [Shadowrocket 社区配置](https://github.com/LOWERTOP/Shadowrocket/blob/5f1916b5897fc59fb7172aca59ae52050a3532fe/lazy.conf) |
+| Tailscale 原生接管 | 使用 Shadowrocket 自身的 TAILSCALE policy。 | 关 | 在第一段规则顶部精确插入 `DOMAIN-SUFFIX,ts.net,TAILSCALE`、`IP-CIDR,100.64.0.0/10,TAILSCALE,no-resolve`、`IP-CIDR,fd7a:115c:a1e0::/48,TAILSCALE,no-resolve`；不显示模块启用提醒。 | Tailscale 的可用性和认证由 Shadowrocket 自身控制。 | 与外部共存冲突。 | [Shadowrocket 社区配置](https://github.com/LOWERTOP/Shadowrocket/blob/5f1916b5897fc59fb7172aca59ae52050a3532fe/lazy.conf) |
+| Tailscale 共存 | 把 Tailnet 流量交给当前 LAN 中运行 Tailscale 的路由器；Shadowrocket。 | 关 | 精确去重后把 `100.64.0.0/10`、`fd7a:115c:a1e0::/48` 同时追加到 `skip-proxy` 与 `tun-excluded-routes`；在第一段规则顶部依次插入域名、IPv4 与 IPv6 的 `DIRECT` 规则；不修改 `[Host]` 或 DNS。 | LAN 网关必须拥有对应 Tailnet 路由；MagicDNS 需要用户现有 DNS 或独立 Host 配置支持。离开该网络后继续使用此配置会把 Tailnet 流量旁路到错误的物理网关。 | 与原生接管冲突。 | [Shadowrocket Tailscale 与通用参数](https://github.com/LOWERTOP/Shadowrocket/wiki/) |
 
 ## Tailscale 三态与安全边界
 
-对 Mihomo 和 sing-box，状态是：没有 Tailscale processor 即关闭；外部共存表示
-系统中的独立 Tailscale 拥有隧道；原生接管表示目标核心创建文件局部端点。两种
-模式互斥且默认都关闭。Shadowrocket 只有关闭和原生 TAILSCALE policy 两态，
-不提供外部共存。
+三种客户端的状态都是：没有 Tailscale processor 即关闭；外部共存表示独立于
+目标客户端的路由所有者负责 Tailnet；原生接管表示目标客户端自身处理 Tailnet。
+两种模式互斥且默认都关闭。Mihomo 与 sing-box 的外部所有者是本机系统
+Tailscale；Shadowrocket 共存的外部所有者是当前 LAN 网关上的 Tailscale。
+
+三种客户端的外部共存实现不同。Mihomo 与 sing-box 排除目标 TUN 路由并把
+MagicDNS 定向到 `100.100.100.100`；Shadowrocket 使用 `DIRECT`、`skip-proxy`
+和 `tun-excluded-routes` 把 Tailnet 流量完整旁路到物理网络，不接管 MagicDNS。
+它不支持同机双 VPN 共存语义，只适用于当前默认网关已经提供 Tailnet 路由的网络；
+移动设备离开该网络后应切换回原生接管或关闭模式。
 
 Mihomo 与 sing-box 原生预设都在 processor `args` 中提供可编辑 `auth_key`。非空值
 会随文件配置保存并写入目标核心；空值则省略该字段，由目标核心提供交互式登录。

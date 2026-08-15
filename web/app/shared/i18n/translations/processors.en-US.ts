@@ -7,6 +7,7 @@ export const processorEnUS = {
   "processors.filePreset.notice.removedConflicts": "Removed conflicts",
   "processors.filePreset.ntpDirect.label": "Traditional NTP Direct",
   "processors.filePreset.shadowrocket.tailscaleNative.label": "Native Tailscale",
+  "processors.filePreset.shadowrocket.tailscaleExternal.label": "Tailscale coexistence",
   "processors.filePreset.mihomo.quicFallback.label": "Force QUIC fallback",
   "processors.filePreset.mihomo.udpP2pEim.label": "UDP/P2P compatibility",
   "processors.filePreset.mihomo.linuxTunAcceleration.label": "Linux/OpenWrt TUN acceleration",

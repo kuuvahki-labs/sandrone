@@ -7,6 +7,7 @@ export const processorZhCN = {
   "processors.filePreset.notice.removedConflicts": "已移除冲突项",
   "processors.filePreset.ntpDirect.label": "传统 NTP 直连",
   "processors.filePreset.shadowrocket.tailscaleNative.label": "Tailscale 原生接管",
+  "processors.filePreset.shadowrocket.tailscaleExternal.label": "Tailscale 共存",
   "processors.filePreset.mihomo.quicFallback.label": "QUIC 强制回退",
   "processors.filePreset.mihomo.udpP2pEim.label": "UDP/P2P 兼容",
   "processors.filePreset.mihomo.linuxTunAcceleration.label": "Linux/OpenWrt TUN 加速",

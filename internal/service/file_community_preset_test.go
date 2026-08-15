@@ -765,6 +765,75 @@ func TestServiceCommunityPresetShadowrocketTailscaleNativeGeneratesFullFile(t *t
 	assertNoTailscaleSecretsOrExitNode(t, map[string]any{}, result.Content)
 }
 
+func TestServiceCommunityPresetShadowrocketTailscaleExternalGeneratesFullFile(t *testing.T) {
+	ctx := context.Background()
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+		Name:    "shadowrocket-external-node",
+		Type:    domain.SubscriptionTypeLocal,
+		Format:  "uri-list",
+		Content: "ss://aes-128-gcm:example-password@example.com:8388#Shadow-Node",
+	}))
+	script := communityPresetRawScript(t, "shadowrocket-tailscale-external.js")
+	processor := domain.ProcessorSpec{
+		Name:  "Tailscale 共存",
+		Type:  "script",
+		Stage: domain.StageFile,
+		Params: params(t, map[string]any{
+			"source": inlineScriptSource(script),
+		}),
+	}
+	spec := domain.FileSpec{
+		Name: "shadowrocket-tailscale-external.conf",
+		Kind: domain.FileKindShadowrocket,
+		Source: domain.FileSource{Type: "inline", Content: "[General]\n" +
+			"profile = keep\n" +
+			"skip-proxy = 192.168.0.0/16,100.64.0.0/10\n" +
+			"tun-excluded-routes = 192.168.0.0/16\n\n" +
+			"[Host]\nexample.com = 192.0.2.1\n"},
+		Config: &domain.FileConfig{
+			Subscriptions: []string{"shadowrocket-external-node"},
+			Settings: raw(t, map[string]any{
+				"groups": []map[string]any{
+					{"name": "Proxy", "type": "select", "proxies": []string{"$nodes", "DIRECT"}},
+				},
+				"rules": []string{
+					"DOMAIN,user.example,DIRECT",
+					"IP-CIDR,10.0.0.0/8,DIRECT,no-resolve",
+					"FINAL,Proxy",
+				},
+			}),
+		},
+		Processors: []domain.ProcessorSpec{processor, processor},
+	}
+
+	result, err := svc.GetFile(ctx, domain.FileRequest{Spec: &spec})
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	model, err := inidoc.ParseModel(result.Content)
+	require.NoError(t, err)
+	require.Equal(t, []string{
+		"profile = keep",
+		"skip-proxy = 192.168.0.0/16,100.64.0.0/10,fd7a:115c:a1e0::/48",
+		"tun-excluded-routes = 192.168.0.0/16,100.64.0.0/10,fd7a:115c:a1e0::/48",
+		"",
+	}, modelSectionLines(t, model, "General"))
+	require.Equal(t, []string{
+		"example.com = 192.0.2.1",
+	}, modelSectionLines(t, model, "Host"))
+	require.Equal(t, []string{
+		"DOMAIN-SUFFIX,ts.net,DIRECT",
+		"IP-CIDR,100.64.0.0/10,DIRECT,no-resolve",
+		"IP-CIDR,fd7a:115c:a1e0::/48,DIRECT,no-resolve",
+		"DOMAIN,user.example,DIRECT",
+		"IP-CIDR,10.0.0.0/8,DIRECT,no-resolve",
+		"FINAL,Proxy",
+	}, modelSectionLines(t, model, "Rule"))
+	require.Contains(t, modelSectionLines(t, model, "General")[2], "100.64.0.0/10")
+	assertNoTailscaleSecretsOrExitNode(t, map[string]any{}, result.Content)
+}
+
 func TestServiceCommunityPresetOrderedNTPRejectsNoSafeAnchorWithoutPartial(t *testing.T) {
 	tests := []struct {
 		name      string

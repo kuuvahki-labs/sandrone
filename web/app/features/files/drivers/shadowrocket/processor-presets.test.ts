@@ -58,6 +58,7 @@ describe("Shadowrocket processor presets", () => {
       "ntp-direct",
       "github-rule-source-mirror",
       "tailscale-native",
+      "tailscale-external",
     ]);
     expect(defaultShadowrocketProcessors(en).map((processor) => processor.name)).toEqual([
       "Traditional NTP Direct",
@@ -89,21 +90,61 @@ describe("Shadowrocket processor presets", () => {
       category: "tailscale",
       defaultOn: false,
       dependencies: [],
-      conflicts: [],
+      conflicts: ["tailscale-external"],
     });
     expect(recognizedFileProcessorPresetID(shadowrocketProcessorPresets, processor))
       .toBe("tailscale-native");
   });
 
-  it("does not declare conflicts for native Tailscale", () => {
-    const tailscale = presetDescriptor("tailscale-native").build(en);
-    expect(presetDescriptor("tailscale-native").conflicts).toEqual([]);
+  it("builds and recognizes the exact external Tailscale script", () => {
+    const descriptor = presetDescriptor("tailscale-external");
+    const processor = descriptor.build(en);
+
+    expect(processor).toEqual({
+      name: "Tailscale coexistence",
+      type: "script",
+      stage: "file",
+      params: {
+        source: { type: "inline", content: expect.any(String) },
+      },
+    });
+    expect(descriptor).toMatchObject({
+      category: "tailscale",
+      defaultOn: false,
+      dependencies: [],
+      conflicts: ["tailscale-native"],
+    });
+    expect(recognizedFileProcessorPresetID(shadowrocketProcessorPresets, processor))
+      .toBe("tailscale-external");
+    expect(recognizedFileProcessorPresetID(shadowrocketProcessorPresets, {
+      ...processor,
+      params: { ...processor.params, args: {} },
+    })).toBeNull();
+  });
+
+  it("treats native and external Tailscale as mutually exclusive", () => {
+    const native = presetDescriptor("tailscale-native").build(en);
+    const external = presetDescriptor("tailscale-external").build(en);
+    expect(presetDescriptor("tailscale-native").conflicts).toEqual(["tailscale-external"]);
     expect(planFileProcessorPresetAddition(
       shadowrocketProcessorPresets,
       "tailscale-native",
-      [tailscale],
+      [native],
       en,
     ).additions).toEqual([]);
+    const plan = planFileProcessorPresetAddition(
+      shadowrocketProcessorPresets,
+      "tailscale-external",
+      [native],
+      en,
+    );
+    expect(plan.addedPresetIDs).toEqual(["tailscale-external"]);
+    expect(plan.removedPresetIDs).toEqual(["tailscale-native"]);
+    expect(plan.additions).toEqual([{
+      presetID: "tailscale-external",
+      processor: external,
+      beforeIndex: null,
+    }]);
   });
 
   it("exposes no Shadowrocket QUIC preset surface", () => {
