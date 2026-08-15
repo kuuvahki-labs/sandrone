@@ -361,6 +361,59 @@ describe("React Router app subscription workflows", () => {
     expect(router.state.location.pathname).toBe("/subscriptions");
   });
 
+  it("copies the complete subscription definition and opens the copied editor", async () => {
+    const user = userEvent.setup();
+    const sourceDefinition = {
+      ...remoteSubscriptionDefinition,
+      created_at: "2026-07-01T00:00:00Z",
+      updated_at: "2026-07-02T00:00:00Z",
+      cache: { ttl_seconds: 300 },
+      future_field: { keep: true },
+    };
+    let copiedDefinition: Record<string, unknown> | undefined;
+    const requests: Array<{ url: string; init?: RequestInit }> = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      requests.push({ url, init });
+      if (url.endsWith("/v1/subscriptions") && init?.method === "POST") {
+        copiedDefinition = JSON.parse(String(init.body)) as Record<string, unknown>;
+        return jsonResponse({ ok: true }, { status: 201 });
+      }
+      const currentResources = copiedDefinition ? {
+        ...resources,
+        subscriptions: [
+          ...resources.subscriptions,
+          { name: copiedDefinition.name, type: copiedDefinition.type, format: "base64" },
+        ],
+      } : resources;
+      const resourceResponse = resourceListResponse(url, currentResources, init);
+      if (resourceResponse) return resourceResponse;
+      if (url.includes("/v1/subscriptions/provider-copy")) return jsonResponse(copiedDefinition);
+      if (url.includes("/v1/subscriptions/provider")) return jsonResponse(sourceDefinition);
+      return jsonResponse({ ok: true });
+    }));
+    const { router } = renderApp("/subscriptions");
+
+    await screen.findByRole("heading", { name: "我的订阅" });
+    await user.click(screen.getByRole("button", { name: "provider 更多操作" }));
+    await user.click(screen.getByRole("menuitem", { name: "复制：provider" }));
+    const dialog = await screen.findByRole("dialog", { name: "复制订阅" });
+    await user.type(within(dialog).getByRole("textbox", { name: /名称/ }), "provider-copy");
+    await user.click(within(dialog).getByRole("button", { name: "复制" }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe("/subscriptions/remote/provider-copy/edit"));
+    expect(copiedDefinition).toMatchObject({
+      ...sourceDefinition,
+      name: "provider-copy",
+      created_at: expect.any(String),
+      updated_at: expect.any(String),
+    });
+    expect(copiedDefinition?.created_at).toBe(copiedDefinition?.updated_at);
+    expect(copiedDefinition?.created_at).not.toBe(sourceDefinition.created_at);
+    expect(requests.some((request) => request.url.endsWith("/v1/subscriptions") && request.init?.method === "GET")).toBe(true);
+    expect(await screen.findByRole("heading", { name: "编辑订阅" })).toBeInTheDocument();
+  });
+
   it("does not preview unsaved subscription edits", async () => {
     const { router } = renderApp("/subscriptions/remote/provider/edit");
 

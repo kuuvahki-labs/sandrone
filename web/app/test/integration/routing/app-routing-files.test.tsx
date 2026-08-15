@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   filePreview,
@@ -12,8 +12,18 @@ import {
   resources,
 } from "./app-routing.test-data";
 
+const originalClipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+
 describe("React Router app file workflows", () => {
   beforeEach(installDefaultFetchMock);
+
+  afterEach(() => {
+    if (originalClipboard) {
+      Object.defineProperty(navigator, "clipboard", originalClipboard);
+    } else {
+      Reflect.deleteProperty(navigator, "clipboard");
+    }
+  });
 
   it("shows files as a generic file workbench and creates remote file specs", async () => {
     const user = userEvent.setup();
@@ -201,6 +211,67 @@ describe("React Router app file workflows", () => {
     await user.click(screen.getByRole("button", { name: "返回" }));
     expect(await screen.findByRole("heading", { name: "我的文件" })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/files");
+  });
+
+  it("imports a complete file definition from the clipboard and opens its editor", async () => {
+    const user = userEvent.setup();
+    const importedSource = {
+      name: "imported.yaml",
+      kind: "static",
+      source: {
+        type: "remote",
+        remote: {
+          url: "https://example.com/imported.yaml",
+          timeout_ms: 2500,
+          cache_ttl_seconds: 60,
+        },
+      },
+      processors: fileSpec.processors,
+      meta: { description: "imported config", owner: "ops" },
+      created_at: "2026-07-03T00:00:00Z",
+      updated_at: "2026-07-04T00:00:00Z",
+      future_field: { keep: true },
+    };
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        readText: vi.fn().mockResolvedValue(JSON.stringify({
+          resource_type: "file",
+          resource: importedSource,
+        })),
+      },
+    });
+    let savedDefinition: Record<string, unknown> | undefined;
+    const requests: Array<{ url: string; init?: RequestInit }> = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      requests.push({ url, init });
+      if (url.endsWith("/v1/files") && init?.method === "POST") {
+        savedDefinition = JSON.parse(String(init.body)) as Record<string, unknown>;
+        return jsonResponse({ ok: true }, { status: 201 });
+      }
+      const currentResources = savedDefinition ? {
+        ...resources,
+        files: [...resources.files, { name: savedDefinition.name, type: "remote", target: "static" }],
+      } : resources;
+      const resourceResponse = resourceListResponse(url, currentResources, init);
+      if (resourceResponse) return resourceResponse;
+      if (url.includes("/v1/files/imported.yaml?mode=spec")) return jsonResponse(savedDefinition);
+      return jsonResponse({ ok: true });
+    }));
+    const { router } = renderApp("/files");
+
+    await screen.findByRole("heading", { name: "我的文件" });
+    await user.click(screen.getByRole("button", { name: "新建文件" }));
+    await user.click(await screen.findByRole("menuitem", { name: "导入文件" }));
+    const dialog = await screen.findByRole("dialog", { name: "导入文件" });
+    expect(within(dialog).getByDisplayValue("imported.yaml")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "导入" }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe("/files/imported.yaml/edit"));
+    expect(savedDefinition).toEqual(importedSource);
+    expect(requests.some((request) => request.url.endsWith("/v1/files") && request.init?.method === "GET")).toBe(true);
+    expect(await screen.findByRole("heading", { name: "编辑文件" })).toBeInTheDocument();
   });
 
   it("does not preview unsaved file edits", async () => {

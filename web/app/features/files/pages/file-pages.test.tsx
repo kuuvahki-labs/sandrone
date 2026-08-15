@@ -155,14 +155,18 @@ describe("FilesPage", () => {
     const onCreateRemote = vi.fn();
     const onDelete = vi.fn();
     const onEdit = vi.fn();
+    const onCopy = vi.fn();
+    const onExport = vi.fn();
     const onPreview = vi.fn();
     const onShare = vi.fn();
     render(
       <FilesPage
         createActions={[createAction("本地", noop), createAction("远程", onCreateRemote)]}
         items={items}
+        onCopy={onCopy}
         onDelete={onDelete}
         onEdit={onEdit}
+        onExport={onExport}
         onPreview={onPreview}
         onShare={onShare}
       />,
@@ -181,11 +185,15 @@ describe("FilesPage", () => {
     await user.click(screen.getByRole("button", { name: "编辑：移动端配置 (default.yaml)" }));
     await user.click(screen.getByRole("button", { name: "移动端配置 (default.yaml) 更多操作" }));
     expect(within(screen.getByRole("menu")).getAllByRole("menuitem").map((item) => item.textContent))
-      .toEqual(["预览", "分享", "删除"]);
+      .toEqual(["预览", "分享", "复制", "导出", "删除"]);
     expect(screen.queryByRole("menuitem", { name: "编辑" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("menuitem", { name: "预览文件" }));
     await user.click(screen.getByRole("button", { name: "移动端配置 (default.yaml) 更多操作" }));
     await user.click(screen.getByRole("menuitem", { name: "分享文件" }));
+    await user.click(screen.getByRole("button", { name: "移动端配置 (default.yaml) 更多操作" }));
+    await user.click(screen.getByRole("menuitem", { name: "复制：移动端配置 (default.yaml)" }));
+    await user.click(screen.getByRole("button", { name: "移动端配置 (default.yaml) 更多操作" }));
+    await user.click(screen.getByRole("menuitem", { name: "导出：移动端配置 (default.yaml)" }));
     await user.click(screen.getByRole("button", { name: "移动端配置 (default.yaml) 更多操作" }));
     await user.click(screen.getByRole("menuitem", { name: "删除" }));
 
@@ -194,6 +202,8 @@ describe("FilesPage", () => {
     expect(onEdit).toHaveBeenCalledWith(items[0]);
     expect(onPreview).toHaveBeenCalledWith(items[0]);
     expect(onShare).toHaveBeenCalledWith(items[0]);
+    expect(onCopy).toHaveBeenCalledWith(items[0]);
+    expect(onExport).toHaveBeenCalledWith(items[0]);
     expect(onDelete).toHaveBeenCalledWith(items[0]);
   });
 });

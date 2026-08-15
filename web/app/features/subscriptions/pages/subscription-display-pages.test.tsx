@@ -339,6 +339,8 @@ describe("SubscriptionsPage", () => {
       subscriptions[2],
     ];
     const onEdit = vi.fn();
+    const onCopy = vi.fn();
+    const onExport = vi.fn();
     const onPreview = vi.fn();
     render(
       <SubscriptionsPage
@@ -348,8 +350,10 @@ describe("SubscriptionsPage", () => {
           createAction("组合", noop, "新建组合订阅"),
         ]}
         items={items}
+        onCopy={onCopy}
         onDelete={noop}
         onEdit={onEdit}
+        onExport={onExport}
         onPreview={onPreview}
         onShare={noop}
       />,
@@ -374,13 +378,19 @@ describe("SubscriptionsPage", () => {
     await user.click(screen.getByRole("button", { name: "编辑：default" }));
     await user.click(screen.getByRole("button", { name: "default 更多操作" }));
     expect(within(screen.getByRole("menu")).getAllByRole("menuitem").map((item) => item.textContent))
-      .toEqual(["预览", "分享", "删除"]);
+      .toEqual(["预览", "分享", "复制", "导出", "删除"]);
     expect(screen.queryByRole("menuitem", { name: "编辑" })).not.toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "刷新" })).not.toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "诊断" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("menuitem", { name: "预览订阅" }));
+    await user.click(screen.getByRole("button", { name: "default 更多操作" }));
+    await user.click(screen.getByRole("menuitem", { name: "复制：default" }));
+    await user.click(screen.getByRole("button", { name: "default 更多操作" }));
+    await user.click(screen.getByRole("menuitem", { name: "导出：default" }));
     expect(onEdit).toHaveBeenCalledWith(items[3]);
     expect(onPreview).toHaveBeenCalledWith(items[3]);
+    expect(onCopy).toHaveBeenCalledWith(items[3]);
+    expect(onExport).toHaveBeenCalledWith(items[3]);
   });
   it("renders subscription traffic and keeps its service portal ordered", async () => {
     const user = userEvent.setup();
@@ -407,8 +417,10 @@ describe("SubscriptionsPage", () => {
         getTrafficKey={(item) => `${item.kind}:${item.name}`}
         items={subscriptions}
         trafficByKey={{ "remote:provider": trafficWithUsage }}
+        onCopy={noop}
         onDelete={noop}
         onEdit={noop}
+        onExport={noop}
         onPreview={noop}
         onShare={noop}
       />,
@@ -423,6 +435,6 @@ describe("SubscriptionsPage", () => {
     expect(within(list).getByRole("button", { name: "provider 更多操作" })).toBeInTheDocument();
     await user.click(within(list).getByRole("button", { name: "provider 更多操作" }));
     expect(within(screen.getByRole("menu")).getAllByRole("menuitem").map((item) => item.textContent))
-      .toEqual(["预览", "服务面板", "分享", "删除"]);
+      .toEqual(["预览", "服务面板", "分享", "复制", "导出", "删除"]);
   });
 });

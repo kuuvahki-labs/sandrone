@@ -7,8 +7,10 @@ import { FILE_DRIVER_REGISTRY } from "~/features/files/drivers/registry";
 import { FileDriverIcon } from "~/features/files/editor/file-driver-icon";
 import { FilesPage } from "~/features/files/pages/files-page";
 import { useShareDialog } from "~/features/shares/components/share-dialog-context";
+import type { FileSpecInput } from "~/shared/api/client";
 import { useI18n } from "~/shared/i18n/context";
 import { fileEditPath, fileNewPath, filePreviewPath } from "~/shared/routing/paths";
+import { ResourceImportIcon, useResourceTransferController } from "~/shared/ui/resource-transfer-controller";
 
 export default function FilesRoute() {
   const navigate = useNavigate();
@@ -16,28 +18,51 @@ export default function FilesRoute() {
   const shareDialog = useShareDialog();
   const { t } = useI18n();
   const files = useFileResources({ client: app.client, showNotice: app.showNotice, t });
+  const transfer = useResourceTransferController({
+    existingNames: files.items.map((item) => item.name),
+    loadResource: (name) => app.client.getFileSpec(name),
+    onSaved: async (resource) => {
+      await files.reload();
+      navigate(fileEditPath(String(resource.name)));
+    },
+    resourceType: "file",
+    saveResource: (resource) => app.client.createFile(resource as unknown as FileSpecInput),
+    showNotice: app.showNotice,
+    t,
+  });
 
   if (files.loading) return <LoadingScreen />;
 
   return (
-    <FilesPage
-      createActions={[
-        ...FILE_DRIVER_REGISTRY.createPresets.map((preset) => {
-          const driver = FILE_DRIVER_REGISTRY.get(preset.kind)!;
-          return {
-            ariaLabel: t(preset.accessibleLabelKey ?? driver.presentation.labelKey),
-            icon: <FileDriverIcon icon={preset.icon ?? driver.presentation.icon} />,
-            label: t(preset.labelKey ?? driver.presentation.labelKey),
-            onSelect: () => navigate(fileNewPath(preset.source)),
-          };
-        }),
-      ]}
-      items={files.items}
-      loaded={files.loaded}
-      onDelete={(item) => app.requestDelete({ kind: "files", name: item.name, label: t("nav.files"), onDeleted: files.reload })}
-      onEdit={(item) => navigate(fileEditPath(item.name))}
-      onPreview={(item) => navigate(filePreviewPath(item.name, "list"))}
-      onShare={(item) => shareDialog.open({ kind: "file", name: item.name })}
-    />
+    <>
+      <FilesPage
+        createActions={[
+          ...FILE_DRIVER_REGISTRY.createPresets.map((preset) => {
+            const driver = FILE_DRIVER_REGISTRY.get(preset.kind)!;
+            return {
+              ariaLabel: t(preset.accessibleLabelKey ?? driver.presentation.labelKey),
+              icon: <FileDriverIcon icon={preset.icon ?? driver.presentation.icon} />,
+              label: t(preset.labelKey ?? driver.presentation.labelKey),
+              onSelect: () => navigate(fileNewPath(preset.source)),
+            };
+          }),
+          {
+            ariaLabel: t("resourceTransfer.importFile"),
+            icon: <ResourceImportIcon />,
+            label: t("actions.import"),
+            onSelect: () => { void transfer.importResource(); },
+          },
+        ]}
+        items={files.items}
+        loaded={files.loaded}
+        onCopy={(item) => transfer.copyResource(item.name)}
+        onDelete={(item) => app.requestDelete({ kind: "files", name: item.name, label: t("nav.files"), onDeleted: files.reload })}
+        onEdit={(item) => navigate(fileEditPath(item.name))}
+        onExport={(item) => { void transfer.exportResource(item.name); }}
+        onPreview={(item) => navigate(filePreviewPath(item.name, "list"))}
+        onShare={(item) => shareDialog.open({ kind: "file", name: item.name })}
+      />
+      {transfer.dialogs}
+    </>
   );
 }

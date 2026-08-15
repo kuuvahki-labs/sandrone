@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
 import AccountTreeOutlinedIcon from "@mui/icons-material/AccountTreeOutlined";
 import CloudDownloadOutlinedIcon from "@mui/icons-material/CloudDownloadOutlined";
+import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
+import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import LinkOutlinedIcon from "@mui/icons-material/LinkOutlined";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import SearchIcon from "@mui/icons-material/Search";
@@ -33,8 +35,10 @@ export interface SubscriptionsPageProps {
   items: SubscriptionItem[];
   loaded?: boolean;
   trafficByKey?: Record<string, SubscriptionTraffic | null>;
+  onCopy: (item: SubscriptionItem) => void;
   onDelete: (item: SubscriptionItem) => void;
   onEdit: (item: SubscriptionItem) => void;
+  onExport: (item: SubscriptionItem) => void;
   onPreview: (item: SubscriptionItem) => void;
   onShare: (item: SubscriptionItem) => void;
 }
@@ -45,8 +49,10 @@ export function SubscriptionsPage({
   items,
   loaded = true,
   trafficByKey,
+  onCopy,
   onDelete,
   onEdit,
+  onExport,
   onPreview,
   onShare,
 }: SubscriptionsPageProps) {
@@ -114,7 +120,7 @@ export function SubscriptionsPage({
             const traffic = trafficByKey?.[trafficKey] ?? null;
             return (
               <DestinationListItem
-                actions={subscriptionActions(item, traffic, { onDelete, onPreview, onShare }, t)}
+                actions={subscriptionActions(item, traffic, { onCopy, onDelete, onExport, onPreview, onShare }, t)}
                 actionTitle={resourceOptionText(item)}
                 icon={subscriptionIcon(item.kind)}
                 key={`${item.kind}:${item.name}`}
@@ -170,7 +176,9 @@ function subscriptionActions(
   item: SubscriptionItem,
   traffic: SubscriptionTraffic | null,
   handlers: {
+    onCopy: (item: SubscriptionItem) => void;
     onDelete: (item: SubscriptionItem) => void;
+    onExport: (item: SubscriptionItem) => void;
     onPreview: (item: SubscriptionItem) => void;
     onShare: (item: SubscriptionItem) => void;
   },
@@ -194,6 +202,18 @@ function subscriptionActions(
       icon: <ShareOutlinedIcon aria-hidden fontSize="small" />,
       label: t("nav.shares"),
       onSelect: () => handlers.onShare(item),
+    },
+    {
+      accessibleLabel: `${t("actions.copy")}：${resourceOptionText(item)}`,
+      icon: <ContentCopyOutlinedIcon aria-hidden fontSize="small" />,
+      label: t("actions.copy"),
+      onSelect: () => handlers.onCopy(item),
+    },
+    {
+      accessibleLabel: `${t("actions.export")}：${resourceOptionText(item)}`,
+      icon: <DownloadOutlinedIcon aria-hidden fontSize="small" />,
+      label: t("actions.export"),
+      onSelect: () => handlers.onExport(item),
     },
     {
       icon: <DeleteOutlinedIcon aria-hidden fontSize="small" />,

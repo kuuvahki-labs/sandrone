@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
+import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
+import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import SearchIcon from "@mui/icons-material/Search";
 import ShareOutlinedIcon from "@mui/icons-material/ShareOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
@@ -26,13 +28,15 @@ export interface FilesPageProps {
   createActions: CreateSpeedDialAction[];
   items: FileItem[];
   loaded?: boolean;
+  onCopy: (item: FileItem) => void;
   onDelete: (item: FileItem) => void;
   onEdit: (item: FileItem) => void;
+  onExport: (item: FileItem) => void;
   onPreview: (item: FileItem) => void;
   onShare: (item: FileItem) => void;
 }
 
-export function FilesPage({ createActions, items, loaded = true, onDelete, onEdit, onPreview, onShare }: FilesPageProps) {
+export function FilesPage({ createActions, items, loaded = true, onCopy, onDelete, onEdit, onExport, onPreview, onShare }: FilesPageProps) {
   const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [queryFocused, setQueryFocused] = useState(false);
@@ -109,7 +113,7 @@ export function FilesPage({ createActions, items, loaded = true, onDelete, onEdi
             ) : undefined;
             return (
               <DestinationListItem
-                actions={fileActions(item, { onDelete, onPreview, onShare }, t)}
+                actions={fileActions(item, { onCopy, onDelete, onExport, onPreview, onShare }, t)}
                 actionTitle={resourceOptionText(item)}
                 icon={fileIcon(item)}
                 key={item.name}
@@ -160,7 +164,9 @@ function isConfigFile(item: FileItem): boolean {
 function fileActions(
   item: FileItem,
   handlers: {
+    onCopy: (item: FileItem) => void;
     onDelete: (item: FileItem) => void;
+    onExport: (item: FileItem) => void;
     onPreview: (item: FileItem) => void;
     onShare: (item: FileItem) => void;
   },
@@ -178,6 +184,18 @@ function fileActions(
       icon: <ShareOutlinedIcon aria-hidden fontSize="small" />,
       label: t("nav.shares"),
       onSelect: () => handlers.onShare(item),
+    },
+    {
+      accessibleLabel: `${t("actions.copy")}：${resourceOptionText(item)}`,
+      icon: <ContentCopyOutlinedIcon aria-hidden fontSize="small" />,
+      label: t("actions.copy"),
+      onSelect: () => handlers.onCopy(item),
+    },
+    {
+      accessibleLabel: `${t("actions.export")}：${resourceOptionText(item)}`,
+      icon: <DownloadOutlinedIcon aria-hidden fontSize="small" />,
+      label: t("actions.export"),
+      onSelect: () => handlers.onExport(item),
     },
     {
       icon: <DeleteOutlinedIcon aria-hidden fontSize="small" />,
