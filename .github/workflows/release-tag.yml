@@ -1,0 +1,70 @@
+name: Create Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: write
+
+concurrency:
+  group: create-release-tag
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  release-tag:
+    name: Create release tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require main branch
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" != "refs/heads/main" ]]; then
+            echo "Create Release must run from main" >&2
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Resolve next release
+        id: release
+        shell: bash
+        run: |
+          git fetch --force --tags origin
+          version="$(sh ./scripts/next-release-version.sh)"
+          tag="v${version}"
+          if git show-ref --verify --quiet "refs/tags/${tag}"; then
+            echo "release tag ${tag} already exists" >&2
+            exit 1
+          fi
+          printf '%s\n' "${version}" > internal/buildinfo/VERSION
+          GITHUB_REF_NAME="${tag}" sh ./scripts/validate-release-tag.sh
+          {
+            echo "version=${version}"
+            echo "tag=${tag}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Commit version and push tag
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add internal/buildinfo/VERSION
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(release): bump version to ${RELEASE_VERSION}"
+          fi
+          git tag -a "${RELEASE_TAG}" -m "Release ${RELEASE_TAG}"
+          git push --atomic origin HEAD:refs/heads/main "refs/tags/${RELEASE_TAG}"
+
+      - name: Run release CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: gh workflow run ci.yml --ref "${RELEASE_TAG}"

@@ -665,10 +665,11 @@ func TestBuildMetadataContracts(t *testing.T) {
 		"linux/arm64",
 		"发布版本不允许加号",
 		"最多 127 个字符",
-		"只有推送与规范版本匹配的 `v<version>` Git tag 才会发布",
+		"`main` 上手动运行 `Create Release`",
+		"自动递增 patch",
 		"稳定版本才同时更新 `latest`",
 		"预发布 tag 只发布自己的同名 tag",
-		"pull request、`main` 和手动 CI 只验证 `linux/amd64`",
+		"pull request、`main` 和以分支 ref 手动运行的 CI 只验证 `linux/amd64`",
 		"`v<version>` tag 构建并发布",
 		"`linux/amd64` 和 `linux/arm64` 的 GHCR manifest",
 		"`$BUILDPLATFORM`",
@@ -780,7 +781,7 @@ func TestBuildMetadataContracts(t *testing.T) {
 		t.Errorf("container check build step =\n%s\nwant:\n%s", got, want)
 	}
 	for _, want := range []string{
-		`if: github.event_name != 'push' || github.ref_type != 'tag'`,
+		`if: github.ref_type != 'tag'`,
 		`uses: docker/setup-buildx-action@v4`,
 	} {
 		if !strings.Contains(containerCheckJob, want) {
@@ -844,7 +845,7 @@ func TestBuildMetadataContracts(t *testing.T) {
 		}
 	}
 	for _, want := range []string{
-		`if: github.event_name == 'push' && github.ref_type == 'tag'`,
+		`if: github.ref_type == 'tag'`,
 		`uses: docker/setup-buildx-action@v4`,
 		`needs:`,
 		`- go`,
@@ -861,8 +862,12 @@ func TestBuildMetadataContracts(t *testing.T) {
 	}
 
 	releaseJob := workflowNamedJob(t, workflowText, "release")
+	if got, want := workflowNamedStep(t, releaseJob, "Validate release tag"), `      - name: Validate release tag
+        run: sh ./scripts/validate-release-tag.sh`; got != want {
+		t.Errorf("Validate release tag step =\n%s\nwant:\n%s", got, want)
+	}
 	for _, want := range []string{
-		`if: github.event_name == 'push' && github.ref_type == 'tag'`,
+		`if: github.ref_type == 'tag'`,
 		"concurrency:\n      group: github-release-publish\n      cancel-in-progress: false\n      queue: max",
 		"needs:\n      - go\n      - web",
 		"permissions:\n      contents: write",
@@ -896,6 +901,109 @@ func TestBuildMetadataContracts(t *testing.T) {
 	if strings.Contains(releaseJob, "container-publish") {
 		t.Error("GitHub Release must run in parallel with container publication after the shared Go/Web gates")
 	}
+}
+
+func TestManualReleaseWorkflowIncrementsPatchAndDispatchesTagCI(t *testing.T) {
+	workflow, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "release-tag.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	workflowText := string(workflow)
+	for _, want := range []string{
+		"name: Create Release",
+		"workflow_dispatch:",
+		"actions: write",
+		"contents: write",
+		"group: create-release-tag",
+		`if [[ "${GITHUB_REF}" != "refs/heads/main" ]]`,
+		"fetch-depth: 0",
+		`version="$(sh ./scripts/next-release-version.sh)"`,
+		`git show-ref --verify --quiet "refs/tags/${tag}"`,
+		`printf '%s\n' "${version}" > internal/buildinfo/VERSION`,
+		`GITHUB_REF_NAME="${tag}" sh ./scripts/validate-release-tag.sh`,
+		`git commit -m "chore(release): bump version to ${RELEASE_VERSION}"`,
+		`git tag -a "${RELEASE_TAG}" -m "Release ${RELEASE_TAG}"`,
+		`git push --atomic origin HEAD:refs/heads/main "refs/tags/${RELEASE_TAG}"`,
+		`GH_TOKEN: ${{ github.token }}`,
+		`gh workflow run ci.yml --ref "${RELEASE_TAG}"`,
+	} {
+		if !strings.Contains(workflowText, want) {
+			t.Errorf("manual release workflow does not contain %q", want)
+		}
+	}
+	for _, forbidden := range []string{"inputs:", "PERSONAL_ACCESS_TOKEN", "PAT"} {
+		if strings.Contains(workflowText, forbidden) {
+			t.Errorf("manual release workflow must not contain %q", forbidden)
+		}
+	}
+}
+
+func TestNextReleaseVersionIncrementsLatestStablePatch(t *testing.T) {
+	script, err := filepath.Abs(filepath.Join("..", "..", "scripts", "next-release-version.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("latest stable tag", func(t *testing.T) {
+		repo, _ := newGitRepo(t)
+		for _, tag := range []string{"v0.9.9", "v1.2.9", "v1.3.0-rc.1", "not-a-version"} {
+			runCommandOK(t, repo, "git", "tag", tag)
+		}
+		output := runCommandOK(t, repo, "sh", script)
+		if got, want := string(output), "1.2.10\n"; got != want {
+			t.Fatalf("next release version = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("no stable tag", func(t *testing.T) {
+		repo, _ := newGitRepo(t)
+		runCommandOK(t, repo, "git", "tag", "v1.0.0-rc.1")
+		output, err := runCommand(repo, "sh", script)
+		if err == nil {
+			t.Fatalf("missing stable release tag was accepted:\n%s", output)
+		}
+		if want := "no stable release tag found"; !strings.Contains(string(output), want) {
+			t.Fatalf("missing stable tag error = %q, want it to contain %q", output, want)
+		}
+	})
+}
+
+func TestValidateReleaseTagMatchesVersionFile(t *testing.T) {
+	script, err := filepath.Abs(filepath.Join("..", "..", "scripts", "validate-release-tag.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	versionFile := filepath.Join(t.TempDir(), "VERSION")
+	run := func(t *testing.T, version, refName string) ([]byte, error) {
+		t.Helper()
+		if err := os.WriteFile(versionFile, []byte(version+"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return runCommandEnv(".", []string{
+			"GITHUB_REF_NAME=" + refName,
+			"VERSION_FILE=" + versionFile,
+		}, "sh", script)
+	}
+
+	t.Run("matching tag", func(t *testing.T) {
+		output, err := run(t, "0.1.3", "v0.1.3")
+		if err != nil {
+			t.Fatalf("matching release tag failed: %v\n%s", err, output)
+		}
+		if got := string(output); got != "" {
+			t.Fatalf("matching release tag output = %q, want empty", got)
+		}
+	})
+
+	t.Run("mismatched tag", func(t *testing.T) {
+		output, err := run(t, "0.1.2", "v0.1.3")
+		if err == nil {
+			t.Fatalf("mismatched release tag was accepted:\n%s", output)
+		}
+		if want := "release tag v0.1.3 does not match VERSION v0.1.2"; !strings.Contains(string(output), want) {
+			t.Fatalf("release tag error = %q, want it to contain %q", output, want)
+		}
+	})
 }
 
 func TestMakeImageInjectsCanonicalVersionAndRevision(t *testing.T) {
@@ -1012,6 +1120,21 @@ func TestContainerImageTagsFollowReleasePolicy(t *testing.T) {
 		}, "\n")
 		if got := string(output); got != want {
 			t.Fatalf("newest release tags = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("tag workflow dispatch publishes version and latest", func(t *testing.T) {
+		output, err := run(t, "workflow_dispatch", "tag", "v0.2.0", "0.2.0")
+		if err != nil {
+			t.Fatalf("plan manually dispatched release tags: %v\n%s", err, output)
+		}
+		want := strings.Join([]string{
+			"example.test/sandrone:v0.2.0",
+			"example.test/sandrone:latest",
+			"",
+		}, "\n")
+		if got := string(output); got != want {
+			t.Fatalf("manually dispatched release tags = %q, want %q", got, want)
 		}
 	})
 

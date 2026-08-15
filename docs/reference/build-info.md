@@ -57,9 +57,12 @@ make image SANDRONE_IMAGE=ghcr.io/kuuvahki-labs/sandrone:v0.1.0
 
 ## GitHub Release
 
-只有推送与规范版本匹配的 `v<version>` Git tag 才会发布。例如
-`internal/buildinfo/VERSION` 为 `0.1.0` 时，发布 tag 必须是 `v0.1.0`。分支 push、
-pull request 和手动 CI 都不会创建 GitHub Release，也不会上传发布附件。
+发布可以通过两种方式触发：直接推送与规范版本匹配的 `v<version>` Git tag，或在
+`main` 上手动运行 `Create Release`。手动流程从最新稳定 `vMAJOR.MINOR.PATCH` tag
+自动递增 patch，更新并提交 `internal/buildinfo/VERSION`，创建 annotated tag，再以
+该 tag 显式运行 CI。例如最新稳定 tag 为 `v0.1.0` 时，下一次手动发布会创建
+`v0.1.1`。普通分支 push、pull request 和以分支 ref 手动运行的 CI 不会创建
+GitHub Release，也不会上传发布附件。
 
 发布版本采用比本地构建身份更严格的规则：只允许 ASCII 字母、数字、点和连字符，
 发布版本不允许加号，并且最多 127 个字符。CI 会添加 `v` 前缀，因此完整 OCI tag
@@ -114,14 +117,14 @@ docker run --rm sandrone:dev --version
 ```
 
 需要本地可追溯镜像时，在干净 worktree 中执行 `make image`。CI 使用 Buildx；
-pull request、`main` 和手动 CI 只验证 `linux/amd64` 容器；`v<version>` tag 构建并发布
-`linux/amd64` 和 `linux/arm64` 的 GHCR manifest。Docker pull 或 run 会按宿主机架构
-自动选择对应镜像：
+pull request、`main` 和以分支 ref 手动运行的 CI 只验证 `linux/amd64` 容器；
+`v<version>` tag 构建并发布 `linux/amd64` 和 `linux/arm64` 的 GHCR manifest。
+Docker pull 或 run 会按宿主机架构自动选择对应镜像：
 
-- pull request、`main` 和手动 CI 通过独立任务验证 `:ci` 镜像，并与 Go/Web
-  检查并行，不推送到 GHCR；
-- 只有 `v<version>` Git tag push 才推送双架构镜像，并保留 `v` 的同名镜像 tag，
-  例如 `ghcr.io/kuuvahki-labs/sandrone:v0.1.0`；
+- pull request、`main` 和以分支 ref 手动运行的 CI 通过独立任务验证 `:ci` 镜像，
+  并与 Go/Web 检查并行，不推送到 GHCR；
+- `v<version>` Git tag push 或以该 tag ref 手动调度的 CI 才推送双架构镜像，并保留
+  `v` 的同名镜像 tag，例如 `ghcr.io/kuuvahki-labs/sandrone:v0.1.0`；
 - 只有版本顺序最高、格式为 `vMAJOR.MINOR.PATCH` 的稳定版本才同时更新 `latest`；
 - 预发布 tag 只发布自己的同名 tag；
 - CI 不创建或发布 `sha-*` 镜像 tag，需要精确复现时使用镜像 digest。
