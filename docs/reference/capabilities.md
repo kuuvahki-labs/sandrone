@@ -139,6 +139,9 @@ URI parser 接受常用别名，例如 `hy://`、`hy2://`、`socks5://`；Mieru
 
 ## 字段状态语义
 
+字段能否进入 canonical `NodeIR` 不由 warning 数量、字段名称或单一目标支持决定；
+准入证据和处置流程见[节点管线](../architecture/node-pipeline.md#字段接纳与-warning-处置)。
+
 ### `supported`
 
 parser 能将该源字段提升到稳定 `NodeIR` 字段，或 renderer 能按目标 schema

@@ -16,6 +16,14 @@
 - 修改任一 adapter 的解析或渲染时，不能只验证当前格式；必须以 canonical
   `NodeIR` 语义为边界，按[贡献指南](CONTRIBUTING.md#选择验证范围)全局检查其它输入、
   输出、校验、能力声明和跨格式测试。
+- warning 不等于兼容需求。新增 `NodeIR` 字段、扩大值域或为来源私有值增加映射前，
+  必须按[字段接纳流程](docs/architecture/node-pipeline.md#字段接纳与-warning-处置)
+  区分协议语义与实现配置；未知连接关键值应隔离节点，不在 probe 或 renderer 中猜测、
+  截断或按前缀兼容。
+- 协议 canonical 语义变化要检查该协议的全部输入和客户端输出；客户端共享 adapter
+  变化要检查该客户端支持的全部协议；domain、service normalization/validation 或
+  shared helper 变化要按[影响矩阵](CONTRIBUTING.md#跨协议与客户端影响矩阵)检查全部
+  调用者。每项都要有已修改、测试证明无需修改或不适用的结论。
 - 先跑相关窄测；交付前运行与范围匹配的门禁，默认全仓门禁为 `make check`。
 - 一个事实只在 canonical 文档完整说明；其他位置只链接。
 - 删除功能时同步删除专属实现、测试、fixture、示例和文档，并用 `rg` 确认旧标识

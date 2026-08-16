@@ -84,12 +84,42 @@ make test PKGS=./internal/service TESTFLAGS='-run ^TestName$'
   renderer、`nodevalidation`、capability catalog，以及 raw/lossy/skip warning。
   字段同名不代表语义相同；共享 IR 语义发生变化时，除当前 adapter 的
   parse/render 单元测试、能力断言和必要的 golden fixture 外，至少补一条跨格式
-  转换测试。
+  转换测试。新增 `NodeIR` 字段或扩大既有字段值域前，必须按
+  [字段接纳与 warning 处置](docs/architecture/node-pipeline.md#字段接纳与-warning-处置)
+  记录来源证据、协议语义与实现私有配置的边界、未知值策略以及所有目标的
+  supported/lossy/skip 结论。warning 本身不构成兼容需求，不允许用 probe 或
+  单一 renderer 特判绕过该流程。
 - processor、service、store、entrypoint：在最接近公开或层间契约的位置测试；文件流不要只依赖 renderer golden。
 - probe：默认门禁覆盖 sing-box；修改 Mihomo backend 时额外运行
   `go test -mod=readonly -tags probe_mihomo ./internal/probe ./internal/service`。
 - 用户可见 API、CLI、文件模型或 processor 行为：同时核对 canonical reference 和相关 tutorial/how-to。
 - 删除功能：用 `rg` 扫描旧标识，除明确的兼容说明外应为零命中。
+
+### 跨协议与客户端影响矩阵
+
+“全局考虑”要求审查完整影响面，不要求无差别修改所有实现。每个必查项都必须得出
+`已修改`、`已有测试证明无需修改` 或 `不适用（附原因）` 之一；不能因为当前 fixture、
+目标客户端或报错路径只出现一个协议，就省略其它相关项。
+
+最小审查范围按改动性质确定：协议 canonical 语义变化覆盖该协议的全部输入和客户端
+输出；客户端共享 adapter 变化覆盖该客户端支持的全部协议；domain、service
+normalization/validation 或 shared helper 变化覆盖全部调用者、受影响协议和客户端。
+
+| 修改触点 | 必须审查的代码与契约 |
+| --- | --- |
+| `internal/domain/node*.go`、协议 option、枚举或 canonical 常量 | 所有 parser/renderer、`nodevalidation`、capability catalog、JSON Nodes、script envelope、`pkg/sandrone` 公共别名，以及节点 clone、preview identity、cache/hash/比较逻辑 |
+| `internal/adapter/shared` 的 helper、字段表或 source ref | 用 `rg` 找出全部调用者；检查每个调用协议、输入格式和目标客户端，不能只测新增分支 |
+| 任一 parser 或来源别名/默认值 | 同协议的其它 parser、全部 renderer、Raw/unknown warning、validation、capability parse 声明和至少一条跨格式转换 |
+| 任一 renderer 或客户端字段映射 | 该客户端支持的全部协议分支、skip/lossy warning、capability render 声明和代表性跨协议测试；若改变 canonical 解释，同时检查其它 renderer |
+| `internal/service` 的节点 normalize/validate/输入编排，或 nodes-stage processor/script 节点结构 | 显式/自动/remote/local/ref/inline 输入、processor 前后 validation、直接 render、subscription/file flow、script envelope/schema 和 probe 前校验 |
+| capability catalog、warning/error code、report 聚合或上游 revision | 对应 parser/renderer、supported/lossy/raw_only 互斥关系、source ref、阶段与顶层 report、HTTP/CLI/MCP 展示、聚合脱敏和测试计数 |
+| probe payload、core backend 或探测前 renderer | sing-box 与 Mihomo 等已注册 core、节点级隔离、raw CLI 路径与保存订阅 processor 链；probe 不得补做 canonical 修复 |
+| 删除协议、字段、客户端能力或兼容分支 | parser、renderer、validation、capability、processor/script/API、fixture、文档和旧标识全仓扫描 |
+
+审查时先用 `rg` 确认定义、读写点和 switch/capability 分支，再选择测试。共享 IR 或
+共享语义变化至少需要一条“一个来源 → `NodeIR` → 两个语义不同的目标”跨格式测试；
+客户端共享代码变化至少覆盖两个受影响协议。若实际只支持一个目标或协议，应在 PR
+中明确写出该事实，而不是省略影响分析。
 
 Web 改动按风险运行：
 
@@ -140,6 +170,7 @@ PR 描述应包含行为变化、相关 issue、验证命令、文档更新和�
 
 - [ ] 改动遵守架构与依赖边界。
 - [ ] adapter 变更已评估所有输入、输出、IR 校验、能力声明和跨格式影响。
+- [ ] 新增字段或扩大值域已给出字段接纳证据、未知值策略和私有配置边界；不涉及则已确认。
 - [ ] 测试覆盖最接近的行为契约。
 - [ ] 已运行 `make check`，或在 PR 中说明未运行原因。
 - [ ] Web、probe 或集成改动已运行对应专项检查。

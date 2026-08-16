@@ -192,6 +192,9 @@ endpoint 级限制以 [HTTP API 参考](http-api/README.md)为准。
   `uri_profile_unsupported`。
 - 节点验证与输入：`node_validation_dropped`、`node_input_not_found`、
   `node_input_unsupported`。
+- 标准化：`node_normalized_incompatible_flow`。标准化只处理已有 canonical 语义；
+  未知连接关键值由 validation 隔离，完整决策流程见
+  [字段接纳与 warning 处置](../architecture/node-pipeline.md#字段接纳与-warning-处置)。
 - 快捷设置：`quick_settings_vmess_aead_legacy_unavailable`、
   `quick_settings_snell_reuse_unavailable`。
 - 脚本：`script_ext_field`、缺省的 `script_warning`；脚本 `api.warn`
