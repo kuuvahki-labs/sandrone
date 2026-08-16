@@ -63,6 +63,19 @@ func TestNormalizeNodesDefaultsRealityClientFingerprintsWithoutMutatingInput(t *
 	require.Empty(t, nodes[2].Transport.XHTTP.DownloadSettings.TLS.ClientFingerprint)
 }
 
+func TestNormalizeNodesCanonicalizesOnlySupportedVLESSFlowWithoutMutatingInput(t *testing.T) {
+	nodes := []domain.NodeIR{
+		{Name: "vision", Type: domain.NodeTypeVLESS, Flow: " XTLS-RPRX-VISION "},
+		{Name: "unknown", Type: domain.NodeTypeVLESS, Flow: "xtls-rprx-vision-private"},
+	}
+
+	normalized := normalizeNodes(nodes)
+
+	require.Equal(t, domain.VLESSFlowVision, normalized[0].Flow)
+	require.Equal(t, "xtls-rprx-vision-private", normalized[1].Flow)
+	require.Equal(t, " XTLS-RPRX-VISION ", nodes[0].Flow)
+}
+
 func TestValidateNodeBatchSilentlyCanonicalizesVMessAndVLESSUserIDs(t *testing.T) {
 	nodes := []domain.NodeIR{
 		{Name: "vmess", Type: domain.NodeTypeVMess, Server: "vmess.example", Port: 443, UUID: "123456", Cipher: "auto"},

@@ -107,6 +107,9 @@ func validateNode(node domain.NodeIR, index int, stage Stage, target string) []d
 		if !validUUID(node.UUID) {
 			add("node_validation_invalid", "uuid", "uuid must be a valid UUID")
 		}
+		if node.Type == domain.NodeTypeVLESS {
+			validateVLESS(node, add)
+		}
 	case domain.NodeTypeTrojan:
 		required("password", node.Password)
 	case domain.NodeTypeHysteria, domain.NodeTypeHysteria2:
@@ -165,6 +168,14 @@ func validateNode(node domain.NodeIR, index int, stage Stage, target string) []d
 	validateTLS(node.TLS, "tls", add)
 	validateTransport(node.Transport, add)
 	return issues
+}
+
+func validateVLESS(node domain.NodeIR, add func(string, string, string)) {
+	switch node.Flow {
+	case "", domain.VLESSFlowVision:
+	default:
+		add("node_validation_invalid", "flow", "VLESS flow is not supported")
+	}
 }
 
 func validateTLS(options *domain.TLSOptions, prefix string, add func(string, string, string)) {

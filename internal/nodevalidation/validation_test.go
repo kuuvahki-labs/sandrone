@@ -88,6 +88,43 @@ func TestValidateRejectsProtocolSpecificRequiredFields(t *testing.T) {
 	}
 }
 
+func TestValidateVLESSFlow(t *testing.T) {
+	t.Parallel()
+	base := domain.NodeIR{
+		Name: "vless", Type: domain.NodeTypeVLESS, Server: "example.com", Port: 443,
+		UUID: "11111111-1111-1111-1111-111111111111",
+	}
+	tests := []struct {
+		name  string
+		node  domain.NodeIR
+		valid bool
+		field string
+	}{
+		{name: "vision", node: func() domain.NodeIR {
+			node := base
+			node.Flow = domain.VLESSFlowVision
+			return node
+		}(), valid: true},
+		{name: "unknown flow", node: func() domain.NodeIR {
+			node := base
+			node.Flow = "future-flow"
+			return node
+		}(), field: "flow"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := nodevalidation.Validate([]domain.NodeIR{tt.node}, nodevalidation.StageNormalized, "")
+			if tt.valid {
+				require.Equal(t, 1, result.Counts.Valid)
+				return
+			}
+			require.Zero(t, result.Counts.Valid)
+			require.Contains(t, issueFields(result.Issues), tt.field)
+		})
+	}
+}
+
 func TestValidateTUICRequiresEnabledTLS(t *testing.T) {
 	t.Parallel()
 

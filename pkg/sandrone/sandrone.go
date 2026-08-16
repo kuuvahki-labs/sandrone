@@ -163,6 +163,8 @@ const (
 	NodeTypeWireGuard    = domain.NodeTypeWireGuard
 	NodeTypeSnell        = domain.NodeTypeSnell
 	NodeTypeAnyTLS       = domain.NodeTypeAnyTLS
+
+	VLESSFlowVision = domain.VLESSFlowVision
 )
 
 // New returns a new Engine with all built-in adapters and processors

@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -105,6 +106,48 @@ func TestServiceSingBoxURLTestAcceptsDisabledVLESSPacketEncoding(t *testing.T) {
 	case <-accepted:
 	case <-time.After(time.Second):
 		t.Fatal("sing-box did not initialize the VLESS outbound")
+	}
+}
+
+func TestServiceSingBoxURLTestIsolatesUnsupportedVLESSFlow(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer listener.Close()
+	accepted := make(chan struct{})
+	go func() {
+		defer close(accepted)
+		conn, acceptErr := listener.Accept()
+		if acceptErr != nil {
+			return
+		}
+		_ = conn.Close()
+	}()
+	host, port := splitSingBoxHostPort(t, listener.Addr().String())
+
+	result, err := service.New().Probe(context.Background(), domain.ProbeRequest{
+		Input: domain.NodeInput{
+			Type:   "inline",
+			Format: "uri-list",
+			Content: strings.Join([]string{
+				fmt.Sprintf("vless://11111111-1111-1111-1111-111111111111@%s:%d?encryption=none#valid", host, port),
+				"vless://22222222-2222-2222-2222-222222222222@example.com:443?encryption=none&flow=xtls-rprx-vision-udp443#unsupported",
+			}, "\n"),
+		},
+		Method: domain.ProbeURLTest, Core: "sing-box", URL: "http://127.0.0.1:1", TimeoutMS: 1000,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.Results, 1)
+	require.NotEqual(t, string(domain.CodeProbeCoreStartFailed), result.Results[0].ErrorCode)
+	foundWarning := false
+	for _, warning := range result.Report.Warnings {
+		foundWarning = foundWarning || (warning.Code == "node_validation_dropped" && warning.Field == "flow")
+	}
+	require.True(t, foundWarning, "missing unsupported flow isolation warning: %#v", result.Report.Warnings)
+	select {
+	case <-accepted:
+	case <-time.After(time.Second):
+		t.Fatal("sing-box did not initialize the remaining valid VLESS outbound")
 	}
 }
 

@@ -1,5 +1,7 @@
 package domain
 
+const VLESSFlowVision = "xtls-rprx-vision"
+
 type TLSOptions struct {
 	Enabled            bool            `json:"enabled" yaml:"enabled"`
 	ServerName         string          `json:"server_name,omitempty" yaml:"server_name,omitempty"`

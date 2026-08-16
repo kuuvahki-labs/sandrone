@@ -9,16 +9,25 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
 
-const vlessVisionFlow = "xtls-rprx-vision"
 const defaultRealityClientFingerprint = "chrome"
 
 func normalizeNodes(nodes []domain.NodeIR) []domain.NodeIR {
 	out := append([]domain.NodeIR{}, nodes...)
 	for index := range out {
 		normalizeNodeUUID(&out[index])
+		normalizeNodeVLESSFlow(&out[index])
 		normalizeNodeRealityClientFingerprints(&out[index])
 	}
 	return out
+}
+
+func normalizeNodeVLESSFlow(node *domain.NodeIR) {
+	if node == nil || node.Type != domain.NodeTypeVLESS {
+		return
+	}
+	if strings.EqualFold(strings.TrimSpace(node.Flow), domain.VLESSFlowVision) {
+		node.Flow = domain.VLESSFlowVision
+	}
 }
 
 func normalizeNodeUUID(node *domain.NodeIR) {
@@ -76,8 +85,9 @@ func normalizeParsedNodes(parsed *parseInputResult) {
 	}
 	for index := range parsed.Nodes {
 		node := &parsed.Nodes[index]
+		normalizeNodeVLESSFlow(node)
 		if node.Type != domain.NodeTypeVLESS ||
-			!strings.EqualFold(strings.TrimSpace(node.Flow), vlessVisionFlow) ||
+			!strings.EqualFold(strings.TrimSpace(node.Flow), domain.VLESSFlowVision) ||
 			vlessVisionTransportCompatible(node.Transport) {
 			continue
 		}

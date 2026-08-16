@@ -873,6 +873,23 @@ proxies:
 	}
 }
 
+func TestServiceParseDropsUnsupportedVLESSFlowWithoutDowngrade(t *testing.T) {
+	result, err := service.New().Parse(context.Background(), domain.ParseRequest{
+		Format: "uri-list",
+		Content: []byte(strings.Join([]string{
+			"vless://11111111-1111-1111-1111-111111111111@example.com:443?encryption=none#valid",
+			"vless://22222222-2222-2222-2222-222222222222@example.com:443?encryption=none&flow=xtls-rprx-vision-udp443#unsupported",
+		}, "\n")),
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.Nodes, 1)
+	require.Equal(t, "valid", result.Nodes[0].Name)
+	require.Len(t, result.Report.Warnings, 1)
+	require.Equal(t, "node_validation_dropped", result.Report.Warnings[0].Code)
+	require.Equal(t, "flow", result.Report.Warnings[0].Field)
+}
+
 func TestServiceParseKeepsVLESSVisionFlowForStreamTransports(t *testing.T) {
 	svc := service.New()
 	for _, transport := range []string{"", "tcp", "raw"} {

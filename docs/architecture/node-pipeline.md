@@ -50,6 +50,37 @@ parser 不访问 Store、不执行节点探测，也不根据最终客户端策�
 
 normalize 是 adapter 把外部别名、默认语义和目标结构统一成 `NodeIR` 的边界。service 随后用共享的 node validation 检查协议必填项与结构约束。
 
+### 字段接纳与 warning 处置
+
+warning 是需要分类的诊断，不是新增兼容逻辑或 `NodeIR` 字段的充分理由。来源字段
+只有同时满足以下条件，才能提升为新的 canonical 语义或扩大既有字段值域：
+
+1. 有可引用的协议规范、上游主实现或多个独立实现作为证据，并已区分线上协议语义
+   与单一客户端的本地配置开关、别名和默认策略。
+2. 能给出与来源格式无关的稳定定义，包括值域、默认值、冲突关系以及未知未来值的
+   处理方式；字段同名、共享前缀或单一样本可用都不能证明语义等价。
+3. 已明确所有输入和输出的行为：哪些 parser 能提升、哪些 renderer 能等价表达、
+   哪些目标有损或必须跳过。canonical 字段不要求所有目标都能输出，但不能把目标
+   私有结构直接搬进共享 IR。
+4. 能在共享 validation、capability catalog 和跨格式测试中验证上述契约，而不是只在
+   probe、某个 renderer 或单个 fixture 中形成特判。
+
+字段完成归属和语义判断后，按以下顺序处置：
+
+| 判断 | 处理 | 诊断 |
+| --- | --- | --- |
+| 来源别名或默认值与既有 IR 语义可证明完全等价 | 规范化到既有字段；无信息损失时可静默消费 | 只有采用了可能影响理解的假设时才产生专用 warning |
+| 来源私有或未知的可选扩展，保留原值有明确诊断价值 | 保存在带来源前缀的 `Raw`；不得作为跨目标透传通道 | `parse_unknown_field` |
+| 已知 canonical 字段出现未知、冲突或非法值 | 保留该值直到共享 validation；不得猜测、截断或按前缀映射 | `node_validation_dropped`；全批无有效节点时失败 |
+| 可选 canonical 字段无法由目标等价表达，且移除不改变连接、安全或路由成立条件 | 保留 IR，目标省略该字段 | `render_lossy_field` |
+| 目标缺失会改变认证、TLS identity、transport、协议变体或其它连接关键语义 | 跳过该节点，不做降级输出 | `render_node_skipped` |
+
+“可清空后保留节点”必须能证明清空只移除无操作默认值或非语义 metadata。无法证明
+时按连接关键字段处理并隔离节点。warning 的调查流程固定为：先在未运行 processor
+的原始 parse 路径复现，再确认字段属于协议还是来源实现，随后选择上表动作，最后
+检查所有 parser、renderer、validation、capability、warning、跨格式测试和文档。
+probe 只消费已经规范化且验证通过的 `NodeIR`，不承担字段修复。
+
 VMess、VLESS 和 Trojan URI 的 TCP `headerType=http` 规范化为
 `transport.type=tcp` 与 `transport.header_type=http`，不能改写成表示 H2 的
 `transport.type=http`。空 `vmess.vcn`、`headerType=none`、gRPC `mode=gun`、
@@ -61,8 +92,13 @@ URI adapter 会把 WebSocket path 中独占的 `?ed=<正整数>` 约定转换为
 VLESS 和 Trojan WebSocket URI 的顶层查询参数 `ed=<正整数>` 与可选非空 `eh`
 也映射到这两个字段；缺少 `eh` 时使用相同默认值。非法、非 WebSocket 或与 path
 语义冲突的查询参数继续保留到 `raw` 并告警，包含其他 query 参数或无效 `ed` 的
-path 保持原样。各 parser 返回后，service 会统一移除
-非 TCP/raw transport 上的 VLESS `xtls-rprx-vision` flow，并产生
+path 保持原样。
+
+canonical VLESS flow 只接受空值和 `xtls-rprx-vision`。其它值不会按前缀或来源
+实现的私有约定转换；共享 validation 会隔离该节点并产生
+`node_validation_dropped`，因此未知 flow 不会进入目标 renderer 或 probe core。
+
+service 还会统一移除非 TCP/raw transport 上的 VLESS Vision flow，并产生
 `node_normalized_incompatible_flow` warning。这个兼容修正与目标 renderer
 无关，不允许在 sing-box 或 Mihomo 输出层静默形成不同语义。
 
