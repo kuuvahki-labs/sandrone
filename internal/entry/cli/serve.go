@@ -14,6 +14,7 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/entry/httpapi"
 	"github.com/kuuvahki-labs/sandrone/internal/entry/mcpapi"
 	"github.com/kuuvahki-labs/sandrone/internal/entry/webui"
+	"github.com/kuuvahki-labs/sandrone/internal/envconfig"
 )
 
 type serveOptions struct {
@@ -26,11 +27,11 @@ type serveOptions struct {
 
 func newServeCommand(cfg *config) *cobra.Command {
 	opts := serveOptions{
-		listen:    firstNonEmpty(cfg.env[EnvListen], app.DefaultListen),
-		token:     cfg.env[EnvToken],
-		path:      firstNonEmpty(cfg.env[EnvMCPPath], app.DefaultMCPPath),
+		listen:    firstNonEmpty(cfg.env[envconfig.Listen], app.DefaultListen),
+		token:     cfg.env[envconfig.Token],
+		path:      firstNonEmpty(cfg.env[envconfig.MCPPath], app.DefaultMCPPath),
 		maxOutput: 1 << 20,
-		logLevel:  firstNonEmpty(cfg.env[EnvLogLevel], "info"),
+		logLevel:  firstNonEmpty(cfg.env[envconfig.LogLevel], "info"),
 	}
 	cmd := &cobra.Command{
 		Use:   "serve",
@@ -67,7 +68,7 @@ func addMCPFlags(cmd *cobra.Command, opts *serveOptions) {
 
 func newServeRuntime(cmd *cobra.Command, cfg *config, opts serveOptions) (*app.Runtime, error) {
 	if !flagChanged(cmd, "max-output-bytes") {
-		value, err := environmentInt(cfg.env, EnvMCPMaxOutputBytes, opts.maxOutput)
+		value, err := environmentInt(cfg.env, envconfig.MCPMaxOutputBytes, opts.maxOutput)
 		if err != nil {
 			return nil, err
 		}
@@ -111,10 +112,10 @@ func startupOverrideSources(cmd *cobra.Command, env map[string]string) map[strin
 		envKey string
 		flag   string
 	}{
-		{path: "http.listen", envKey: EnvListen, flag: "listen"},
-		{path: "mcp.path", envKey: EnvMCPPath, flag: "path"},
-		{path: "mcp.max_output_bytes", envKey: EnvMCPMaxOutputBytes, flag: "max-output-bytes"},
-		{path: "log.level", envKey: EnvLogLevel, flag: "log-level"},
+		{path: "http.listen", envKey: envconfig.Listen, flag: "listen"},
+		{path: "mcp.path", envKey: envconfig.MCPPath, flag: "path"},
+		{path: "mcp.max_output_bytes", envKey: envconfig.MCPMaxOutputBytes, flag: "max-output-bytes"},
+		{path: "log.level", envKey: envconfig.LogLevel, flag: "log-level"},
 	} {
 		if env[item.envKey] != "" {
 			sources[item.path] = "environment"

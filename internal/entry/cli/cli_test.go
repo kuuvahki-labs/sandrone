@@ -19,6 +19,7 @@ import (
 
 	"github.com/kuuvahki-labs/sandrone/internal/app"
 	"github.com/kuuvahki-labs/sandrone/internal/buildinfo"
+	"github.com/kuuvahki-labs/sandrone/internal/envconfig"
 	"github.com/kuuvahki-labs/sandrone/pkg/sandrone"
 )
 
@@ -697,12 +698,12 @@ func TestDoctorReportsFormatsAndDataDir(t *testing.T) {
 
 func TestCLIRejectsInvalidStorageBackend(t *testing.T) {
 	code, stdout, stderr := runCLI(t, []string{"inspect"}, "", WithEnv(map[string]string{
-		app.EnvStorageBackend: "r2",
+		envconfig.StorageBackend: "r2",
 	}))
 
 	require.Equal(t, 1, code)
 	require.Empty(t, stdout)
-	require.Contains(t, stderr, app.EnvStorageBackend)
+	require.Contains(t, stderr, envconfig.StorageBackend)
 }
 
 func TestServeCommandRunsWithoutSubcommands(t *testing.T) {
@@ -778,7 +779,7 @@ func TestServeUsesTokenEnv(t *testing.T) {
 	code, _, stderr := runCLI(t,
 		[]string{"--data-dir", dataDir, "serve"},
 		"",
-		WithEnv(map[string]string{EnvToken: "env-secret"}),
+		WithEnv(map[string]string{envconfig.Token: "env-secret"}),
 		WithRuntimeFactory(func(cfg app.Config) (*app.Runtime, error) {
 			got = cfg
 			return nil, stopErr
@@ -850,8 +851,8 @@ func TestServeMarksEnvironmentAndExplicitFlagOverrideSources(t *testing.T) {
 		[]string{"--data-dir", dataDir, "serve", "--listen", "127.0.0.1:3237"},
 		"",
 		WithEnv(map[string]string{
-			EnvListen:   "127.0.0.1:2237",
-			EnvLogLevel: "warn",
+			envconfig.Listen:   "127.0.0.1:2237",
+			envconfig.LogLevel: "warn",
 		}),
 		WithRuntimeFactory(func(cfg app.Config) (*app.Runtime, error) {
 			got = cfg
@@ -877,9 +878,9 @@ func TestServeReadsIntegerStartupEnvironmentOverride(t *testing.T) {
 		[]string{"--data-dir", dataDir, "serve"},
 		"",
 		WithEnv(map[string]string{
-			EnvToken:             "env-secret",
-			EnvMCPPath:           "/agent",
-			EnvMCPMaxOutputBytes: "2048",
+			envconfig.Token:             "env-secret",
+			envconfig.MCPPath:           "/agent",
+			envconfig.MCPMaxOutputBytes: "2048",
 		}),
 		WithRuntimeFactory(func(cfg app.Config) (*app.Runtime, error) {
 			got = cfg
@@ -918,12 +919,12 @@ func TestServePassesS3StorageToRuntime(t *testing.T) {
 	stopErr := errors.New("stop after runtime")
 	var got app.Config
 	env := map[string]string{
-		app.EnvStorageBackend:    "s3",
-		app.EnvS3Endpoint:        "https://account.example.invalid",
-		app.EnvS3Region:          "auto",
-		app.EnvS3Bucket:          "bucket",
-		app.EnvS3AccessKeyID:     "access-marker",
-		app.EnvS3SecretAccessKey: "secret-marker",
+		envconfig.StorageBackend:    "s3",
+		envconfig.S3Endpoint:        "https://account.example.invalid",
+		envconfig.S3Region:          "auto",
+		envconfig.S3Bucket:          "bucket",
+		envconfig.S3AccessKeyID:     "access-marker",
+		envconfig.S3SecretAccessKey: "secret-marker",
 	}
 
 	code, _, stderr := runCLI(t, []string{"serve"}, "",

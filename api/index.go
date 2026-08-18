@@ -17,6 +17,7 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/entry/httpapi"
 	"github.com/kuuvahki-labs/sandrone/internal/entry/mcpapi"
 	"github.com/kuuvahki-labs/sandrone/internal/entry/webui"
+	"github.com/kuuvahki-labs/sandrone/internal/envconfig"
 	"github.com/kuuvahki-labs/sandrone/internal/probe"
 )
 
@@ -41,9 +42,9 @@ func newProductionHandler() (http.Handler, error) {
 }
 
 func buildHandler(ctx context.Context, getenv func(string) string, factory runtimeFactory) (http.Handler, error) {
-	token := strings.TrimSpace(getenv("SANDRONE_TOKEN"))
+	token := strings.TrimSpace(getenv(envconfig.Token))
 	if token == "" {
-		return nil, errors.New("SANDRONE_TOKEN is required")
+		return nil, errors.New(envconfig.Token + " is required")
 	}
 	if factory == nil {
 		return nil, errors.New("runtime factory is required")
@@ -54,17 +55,17 @@ func buildHandler(ctx context.Context, getenv func(string) string, factory runti
 		return nil, err
 	}
 	if storageConfig.Backend != app.StorageS3 {
-		return nil, errors.New("vercel runtime requires SANDRONE_STORAGE_BACKEND=s3")
+		return nil, errors.New("vercel runtime requires " + envconfig.StorageBackend + "=s3")
 	}
-	maxOutput, err := environmentInt(getenv("SANDRONE_MCP_MAX_OUTPUT_BYTES"), 1<<20)
+	maxOutput, err := environmentInt(getenv(envconfig.MCPMaxOutputBytes), 1<<20)
 	if err != nil || maxOutput < 0 {
-		return nil, errors.New("SANDRONE_MCP_MAX_OUTPUT_BYTES must be a non-negative integer")
+		return nil, errors.New(envconfig.MCPMaxOutputBytes + " must be a non-negative integer")
 	}
-	mcpPath := strings.TrimSpace(getenv("SANDRONE_MCP_PATH"))
+	mcpPath := strings.TrimSpace(getenv(envconfig.MCPPath))
 	if mcpPath == "" {
 		mcpPath = app.DefaultMCPPath
 	}
-	logLevel := strings.TrimSpace(getenv("SANDRONE_LOG_LEVEL"))
+	logLevel := strings.TrimSpace(getenv(envconfig.LogLevel))
 	if logLevel == "" {
 		logLevel = "info"
 	}
@@ -99,15 +100,15 @@ func buildHandler(ctx context.Context, getenv func(string) string, factory runti
 
 func storageEnvironment(getenv func(string) string) map[string]string {
 	keys := []string{
-		app.EnvStorageBackend,
-		app.EnvS3Endpoint,
-		app.EnvS3Region,
-		app.EnvS3Bucket,
-		app.EnvS3Prefix,
-		app.EnvS3ForcePathStyle,
-		app.EnvS3AccessKeyID,
-		app.EnvS3SecretAccessKey,
-		app.EnvS3SessionToken,
+		envconfig.StorageBackend,
+		envconfig.S3Endpoint,
+		envconfig.S3Region,
+		envconfig.S3Bucket,
+		envconfig.S3Prefix,
+		envconfig.S3ForcePathStyle,
+		envconfig.S3AccessKeyID,
+		envconfig.S3SecretAccessKey,
+		envconfig.S3SessionToken,
 	}
 	env := make(map[string]string, len(keys))
 	for _, key := range keys {

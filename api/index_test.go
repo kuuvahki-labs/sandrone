@@ -16,18 +16,19 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/kuuvahki-labs/sandrone/internal/app"
+	"github.com/kuuvahki-labs/sandrone/internal/envconfig"
 )
 
 func vercelTestEnv() map[string]string {
 	return map[string]string{
-		"SANDRONE_TOKEN":         "test-token",
-		app.EnvStorageBackend:    "s3",
-		app.EnvS3Endpoint:        "https://account.example.invalid",
-		app.EnvS3Region:          "auto",
-		app.EnvS3Bucket:          "bucket",
-		app.EnvS3Prefix:          "preview/",
-		app.EnvS3AccessKeyID:     "access-marker",
-		app.EnvS3SecretAccessKey: "secret-marker",
+		envconfig.Token:             "test-token",
+		envconfig.StorageBackend:    "s3",
+		envconfig.S3Endpoint:        "https://account.example.invalid",
+		envconfig.S3Region:          "auto",
+		envconfig.S3Bucket:          "bucket",
+		envconfig.S3Prefix:          "preview/",
+		envconfig.S3AccessKeyID:     "access-marker",
+		envconfig.S3SecretAccessKey: "secret-marker",
 	}
 }
 
@@ -48,18 +49,18 @@ func filesystemRuntimeFactory(t *testing.T, captured *app.Config) runtimeFactory
 
 func TestBuildHandlerRequiresToken(t *testing.T) {
 	env := vercelTestEnv()
-	delete(env, "SANDRONE_TOKEN")
+	delete(env, envconfig.Token)
 	_, err := buildHandler(context.Background(), envLookup(env), nil)
-	require.ErrorContains(t, err, "SANDRONE_TOKEN")
+	require.ErrorContains(t, err, envconfig.Token)
 }
 
 func TestBuildHandlerRequiresS3Backend(t *testing.T) {
 	env := vercelTestEnv()
-	env[app.EnvStorageBackend] = "filesystem"
+	env[envconfig.StorageBackend] = "filesystem"
 	_, err := buildHandler(context.Background(), envLookup(env), func(context.Context, app.Config, *slog.Logger, ...app.RuntimeOption) (*app.Runtime, error) {
 		return nil, errors.New("must not run")
 	})
-	require.ErrorContains(t, err, "requires SANDRONE_STORAGE_BACKEND=s3")
+	require.ErrorContains(t, err, "requires "+envconfig.StorageBackend+"=s3")
 }
 
 func TestBuildHandlerServesVersionAndDisabledCapabilities(t *testing.T) {

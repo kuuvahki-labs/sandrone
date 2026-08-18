@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+
+	"github.com/kuuvahki-labs/sandrone/internal/envconfig"
 )
 
 type S3Config struct {
@@ -22,12 +24,12 @@ func NormalizeS3Config(cfg S3Config) (S3Config, error) {
 		name  string
 		value string
 	}{
-		{name: "SANDRONE_S3_ENDPOINT", value: cfg.Endpoint},
-		{name: "SANDRONE_S3_REGION", value: cfg.Region},
-		{name: "SANDRONE_S3_BUCKET", value: cfg.Bucket},
-		{name: "SANDRONE_S3_PREFIX", value: cfg.Prefix},
-		{name: "SANDRONE_S3_ACCESS_KEY_ID", value: cfg.AccessKeyID},
-		{name: "SANDRONE_S3_SECRET_ACCESS_KEY", value: cfg.SecretAccessKey},
+		{name: envconfig.S3Endpoint, value: cfg.Endpoint},
+		{name: envconfig.S3Region, value: cfg.Region},
+		{name: envconfig.S3Bucket, value: cfg.Bucket},
+		{name: envconfig.S3Prefix, value: cfg.Prefix},
+		{name: envconfig.S3AccessKeyID, value: cfg.AccessKeyID},
+		{name: envconfig.S3SecretAccessKey, value: cfg.SecretAccessKey},
 	}
 	for _, field := range required {
 		if strings.TrimSpace(field.value) == "" {
@@ -37,19 +39,19 @@ func NormalizeS3Config(cfg S3Config) (S3Config, error) {
 
 	endpoint, err := url.Parse(cfg.Endpoint)
 	if err != nil || endpoint.Scheme == "" || endpoint.Host == "" {
-		return S3Config{}, fmt.Errorf("SANDRONE_S3_ENDPOINT must be an absolute HTTP(S) URL")
+		return S3Config{}, fmt.Errorf("%s must be an absolute HTTP(S) URL", envconfig.S3Endpoint)
 	}
 	if endpoint.Scheme != "http" && endpoint.Scheme != "https" {
-		return S3Config{}, fmt.Errorf("SANDRONE_S3_ENDPOINT must use HTTP or HTTPS")
+		return S3Config{}, fmt.Errorf("%s must use HTTP or HTTPS", envconfig.S3Endpoint)
 	}
 	if endpoint.User != nil || endpoint.RawQuery != "" || endpoint.Fragment != "" {
-		return S3Config{}, fmt.Errorf("SANDRONE_S3_ENDPOINT must not contain user info, query, or fragment")
+		return S3Config{}, fmt.Errorf("%s must not contain user info, query, or fragment", envconfig.S3Endpoint)
 	}
 
 	prefix := strings.TrimRight(cfg.Prefix, "/")
 	clean, err := CleanKey(prefix)
 	if err != nil || clean != prefix {
-		return S3Config{}, fmt.Errorf("SANDRONE_S3_PREFIX must be a safe relative namespace")
+		return S3Config{}, fmt.Errorf("%s must be a safe relative namespace", envconfig.S3Prefix)
 	}
 
 	cfg.Endpoint = endpoint.String()

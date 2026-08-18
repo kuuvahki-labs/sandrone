@@ -11,6 +11,7 @@ import (
 
 	"github.com/kuuvahki-labs/sandrone/internal/app"
 	"github.com/kuuvahki-labs/sandrone/internal/buildinfo"
+	"github.com/kuuvahki-labs/sandrone/internal/envconfig"
 	"github.com/kuuvahki-labs/sandrone/internal/service"
 	"github.com/kuuvahki-labs/sandrone/internal/store"
 	"github.com/kuuvahki-labs/sandrone/pkg/sandrone"
@@ -150,7 +151,7 @@ func newConfig(opts ...Option) *config {
 	for _, opt := range opts {
 		opt(cfg)
 	}
-	cfg.dataDir = firstNonEmpty(cfg.env[EnvDataDir], defaultDataDir)
+	cfg.dataDir = firstNonEmpty(cfg.env[envconfig.DataDir], defaultDataDir)
 	return cfg
 }
 

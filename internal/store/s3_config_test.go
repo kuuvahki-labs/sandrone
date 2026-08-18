@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/kuuvahki-labs/sandrone/internal/envconfig"
 )
 
 func validS3Config() S3Config {
@@ -35,12 +37,12 @@ func TestNormalizeS3ConfigRejectsMissingRequiredField(t *testing.T) {
 		mutate func(*S3Config)
 		field  string
 	}{
-		{name: "endpoint", mutate: func(c *S3Config) { c.Endpoint = "" }, field: "SANDRONE_S3_ENDPOINT"},
-		{name: "region", mutate: func(c *S3Config) { c.Region = "" }, field: "SANDRONE_S3_REGION"},
-		{name: "bucket", mutate: func(c *S3Config) { c.Bucket = "" }, field: "SANDRONE_S3_BUCKET"},
-		{name: "prefix", mutate: func(c *S3Config) { c.Prefix = "" }, field: "SANDRONE_S3_PREFIX"},
-		{name: "access", mutate: func(c *S3Config) { c.AccessKeyID = "" }, field: "SANDRONE_S3_ACCESS_KEY_ID"},
-		{name: "secret", mutate: func(c *S3Config) { c.SecretAccessKey = "" }, field: "SANDRONE_S3_SECRET_ACCESS_KEY"},
+		{name: "endpoint", mutate: func(c *S3Config) { c.Endpoint = "" }, field: envconfig.S3Endpoint},
+		{name: "region", mutate: func(c *S3Config) { c.Region = "" }, field: envconfig.S3Region},
+		{name: "bucket", mutate: func(c *S3Config) { c.Bucket = "" }, field: envconfig.S3Bucket},
+		{name: "prefix", mutate: func(c *S3Config) { c.Prefix = "" }, field: envconfig.S3Prefix},
+		{name: "access", mutate: func(c *S3Config) { c.AccessKeyID = "" }, field: envconfig.S3AccessKeyID},
+		{name: "secret", mutate: func(c *S3Config) { c.SecretAccessKey = "" }, field: envconfig.S3SecretAccessKey},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -64,7 +66,7 @@ func TestNormalizeS3ConfigRejectsUnsafeEndpoint(t *testing.T) {
 			cfg := validS3Config()
 			cfg.Endpoint = endpoint
 			_, err := NormalizeS3Config(cfg)
-			require.ErrorContains(t, err, "SANDRONE_S3_ENDPOINT")
+			require.ErrorContains(t, err, envconfig.S3Endpoint)
 		})
 	}
 }
@@ -75,7 +77,7 @@ func TestNormalizeS3ConfigRejectsUnsafePrefix(t *testing.T) {
 			cfg := validS3Config()
 			cfg.Prefix = prefix
 			_, err := NormalizeS3Config(cfg)
-			require.ErrorContains(t, err, "SANDRONE_S3_PREFIX")
+			require.ErrorContains(t, err, envconfig.S3Prefix)
 		})
 	}
 }
