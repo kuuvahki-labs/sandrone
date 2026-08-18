@@ -50,12 +50,17 @@ const ADAPTIVE_TYPE_OPTIONS = [
 const RULE_BASE = "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket";
 const METACUBEX_RULE_BASE = "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite";
 const METACUBEX_RULE_IDS = new Set([
-  "apple-cn",
-  "category-companies@cn",
+  "aws",
+  "azure",
+  "category-ai-chat-!cn",
   "category-doh",
-  "category-games@cn",
-  "douyin",
-  "microsoft@cn",
+  "coursera",
+  "edx",
+  "khanacademy",
+  "netlify",
+  "udemy",
+  "wise",
+  "wsj",
 ]);
 
 const relations = shadowrocketRelations();
@@ -414,7 +419,7 @@ const ARTIFACT_NAMES: Readonly<Record<string, string>> = {
   pinterest: "Pinterest", tumblr: "Tumblr", netflix: "Netflix", disney: "Disney", hbo: "HBO", hulu: "Hulu",
   primevideo: "AmazonPrimeVideo", "apple-tvplus": "AppleTV", spotify: "Spotify", twitch: "Twitch", dazn: "DAZN",
   bahamut: "Bahamut", bilibili: "BiliBili", biliintl: "BiliBiliIntl", niconico: "Niconico", abema: "Abema", viu: "ViuTV", kktv: "KKTV",
-  steam: "Steam", "steam@cn": "SteamCN", epicgames: "Epic", ea: "EA", ubisoft: "Ubisoft", blizzard: "Blizzard", gog: "Gog", riot: "Riot",
+  steam: "Steam", epicgames: "Epic", ea: "EA", ubisoft: "Ubisoft", blizzard: "Blizzard", gog: "Gog", riot: "Riot",
   playstation: "PlayStation", xbox: "Xbox", nintendo: "Nintendo", cloudflare: "Cloudflare", digitalocean: "DigitalOcean",
   vercel: "Vercel", docker: "Docker", npmjs: "Npmjs", jetbrains: "Jetbrains", stackexchange: "Stackexchange",
   dropbox: "Dropbox", notion: "Notion", paypal: "PayPal", stripe: "Stripe", binance: "Binance",
@@ -423,11 +428,9 @@ const ARTIFACT_NAMES: Readonly<Record<string, string>> = {
 };
 
 const RULE_ALIASES: Readonly<Record<string, string>> = {
-  "private-ip": "private", "cn-ip": "cn", "category-ai-chat-!cn": "openai", "google-ip": "google",
+  "private-ip": "private", "cn-ip": "cn", "google-ip": "google",
   "telegram-ip": "telegram", "twitter-ip": "twitter", "facebook-ip": "facebook", "netflix-ip": "netflix",
-  "cloudflare-ip": "cloudflare", aws: "amazon", azure: "microsoft", netlify: "vercel", wise: "paypal",
-  coursera: "category-scholar-!cn", udemy: "category-scholar-!cn", edx: "category-scholar-!cn",
-  khanacademy: "category-scholar-!cn", wsj: "bloomberg",
+  "cloudflare-ip": "cloudflare",
 };
 
 function canonicalRuleID(ruleID: string): string {

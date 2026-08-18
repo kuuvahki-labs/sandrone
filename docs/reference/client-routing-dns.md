@@ -28,17 +28,22 @@ DNS 路径与 IP 兜底语义的现行契约。它描述默认生成结果，不
 生成模板按下列层次匹配：
 
 1. 目标端口 `853` 和 `category-doh` 进入主代理策略；
-2. 广告、私有域名，以及中国服务例外；
-3. 其余服务域名、`cn` 域名和 `geolocation-!cn` 域名；
-4. 解析边界；
-5. 专用服务 IP、私有 IP；
-6. 中国 IP 兜底；
-7. 最终策略。
+2. 广告和私有域名；
+3. 服务域名按具体子服务优先、宽泛父服务在后的顺序匹配；
+4. `cn` 域名和 `geolocation-!cn` 域名；
+5. 解析边界；
+6. 专用服务 IP、私有 IP；
+7. 中国 IP 兜底；
+8. 最终策略。
 
-中国服务例外包括 `category-companies@cn`，并在对应宽泛服务规则之前按已启用
-模块加入 `microsoft@cn`、`apple-cn`、`steam@cn`、`category-games@cn` 和
-`douyin`。这样可先纠正常见国内域名被宽泛 Apple、Microsoft、Steam、游戏或
-TikTok 规则送入代理的问题。
+服务策略组完整拥有其命名服务的路由控制权。模板不在服务规则之前加入绕过策略组
+的国内直连例外；需要直连时由对应服务策略组选择 `DIRECT`。Microsoft 和 Apple
+策略组默认以 `DIRECT` 为首选项，因此默认路径仍然直连，但用户切换策略后会作用于
+完整服务。
+
+存在包含关系时，具体子服务必须先于宽泛父列表。例如 OneDrive 和 Xbox 先于
+Microsoft，iCloud 和 Apple TV+ 先于 Apple，Hulu 先于 Disney，npm 先于
+GitHub。这样各子服务策略组不会被父列表提前截流。
 
 Mihomo 和 sing-box 分别使用 MetaCubeX 的 `cn-ip` MRS/SRS 规则集；
 Shadowrocket 使用 `GEOIP,CN`。三者都是域名规则之后的**解析型兜底**：它们能

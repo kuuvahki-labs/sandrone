@@ -13,12 +13,17 @@ const TEMPLATE_IDS = ["minimal", "standard", "full"] as const satisfies readonly
 const SHADOWROCKET_RULE_BASE = "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket";
 const SHADOWROCKET_METACUBEX_RULE_BASE = "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite";
 const SHADOWROCKET_METACUBEX_RULE_IDS = new Set([
-  "apple-cn",
-  "category-companies@cn",
+  "aws",
+  "azure",
+  "category-ai-chat-!cn",
   "category-doh",
-  "category-games@cn",
-  "douyin",
-  "microsoft@cn",
+  "coursera",
+  "edx",
+  "khanacademy",
+  "netlify",
+  "udemy",
+  "wise",
+  "wsj",
 ]);
 const SHADOWROCKET_TEMPLATE_ARTIFACTS = new Set([
   "Abema", "Amazon", "AmazonPrimeVideo", "Anthropic", "Apple", "AppleTV", "Atlassian", "BBC",
@@ -27,7 +32,7 @@ const SHADOWROCKET_TEMPLATE_ARTIFACTS = new Set([
   "GitLab", "Global", "Gog", "Google", "HBO", "Hulu", "Instagram", "Jetbrains", "KKTV", "Lan", "Line",
   "LinkedIn", "Microsoft", "NYTimes", "Netflix", "Niconico", "Nintendo", "Notion", "Npmjs", "OneDrive",
   "OpenAI", "PayPal", "Pinterest", "PlayStation", "Reddit", "Riot", "Scholar", "Snap", "Spotify",
-  "Stackexchange", "Steam", "SteamCN", "Stripe", "Telegram", "TikTok", "Tumblr", "Twitch", "Twitter", "Ubisoft", "Vercel",
+  "Stackexchange", "Steam", "Stripe", "Telegram", "TikTok", "Tumblr", "Twitch", "Twitter", "Ubisoft", "Vercel",
   "ViuTV", "Whatsapp", "Wikimedia", "Xbox", "YouTube", "eBay", "iCloud",
 ]);
 
@@ -279,7 +284,7 @@ describe("config templates", () => {
     }
   });
 
-  it.each(CONFIG_KINDS)("places canonical DNS and domestic service exceptions before broad %s service rules", (kind) => {
+  it.each(CONFIG_KINDS)("keeps only the canonical DNS prelude before broad %s service rules", (kind) => {
     const standard = createConfigFromTemplate(kind, "standard");
     const full = createConfigFromTemplate(kind, "full");
     const ruleSetID = (rule: unknown): string => {
@@ -287,22 +292,46 @@ describe("config templates", () => {
       const value = (rule as Record<string, unknown>).rule_set;
       return String(Array.isArray(value) ? value[0] : "");
     };
+    const policy = (rule: unknown): string => kind === "sing-box"
+      ? String((rule as Record<string, unknown>).outbound ?? "")
+      : String(rule).split(",")[2] ?? "";
     const indexOf = (config: FileConfigDraft, id: string): number =>
       (config.rules ?? []).findIndex((rule) => ruleSetID(rule) === id);
 
     if (kind !== "shadowrocket") {
       expect(indexOf(standard, "category-ads-all")).toBeLessThan(indexOf(standard, "category-doh"));
     }
-    expect(indexOf(standard, "category-doh")).toBeLessThan(indexOf(standard, "category-companies@cn"));
-    expect(indexOf(standard, "private")).toBeLessThan(indexOf(standard, "microsoft@cn"));
-    expect(indexOf(standard, "microsoft@cn")).toBeLessThan(indexOf(standard, "microsoft"));
-    expect(indexOf(standard, "apple-cn")).toBeLessThan(indexOf(standard, "apple"));
-    expect(indexOf(standard, "category-companies@cn")).toBeLessThan(indexOf(standard, "microsoft"));
-    expect(indexOf(standard, "steam@cn")).toBe(-1);
-    expect(indexOf(standard, "category-games@cn")).toBe(-1);
-    expect(indexOf(full, "steam@cn")).toBeLessThan(indexOf(full, "steam"));
-    expect(indexOf(full, "category-games@cn")).toBeLessThan(indexOf(full, "epicgames"));
-    expect(indexOf(full, "douyin")).toBeLessThan(indexOf(full, "tiktok"));
+    expect(indexOf(standard, "private")).toBeLessThan(indexOf(standard, "category-doh"));
+    expect(indexOf(standard, "category-doh")).toBeLessThan(indexOf(standard, "microsoft"));
+    for (const config of [standard, full]) {
+      const chinaDomain = indexOf(config, kind === "shadowrocket" ? "cn-domain" : "cn");
+      expect(chinaDomain).toBeGreaterThanOrEqual(0);
+      expect((config.rules ?? []).slice(0, chinaDomain).some((rule) => policy(rule) === "China"))
+        .toBe(false);
+    }
+  });
+
+  it.each(CONFIG_KINDS)("orders specific %s service rules before the broad lists that include them", (kind) => {
+    const config = createConfigFromTemplate(kind, "full");
+    const ruleSetID = (rule: unknown): string => {
+      if (kind !== "sing-box") return String(rule).split(",")[1] ?? "";
+      const value = (rule as Record<string, unknown>).rule_set;
+      return String(Array.isArray(value) ? value[0] : "");
+    };
+    const indexOf = (id: string): number =>
+      (config.rules ?? []).findIndex((rule) => ruleSetID(rule) === id);
+
+    for (const [specific, broad] of [
+      ["onedrive", "microsoft"],
+      ["xbox", "microsoft"],
+      ["icloud", "apple"],
+      ["apple-tvplus", "apple"],
+      ["hulu", "disney"],
+      ["npmjs", "github"],
+    ] as const) {
+      expect(indexOf(specific)).toBeGreaterThanOrEqual(0);
+      expect(indexOf(specific)).toBeLessThan(indexOf(broad));
+    }
   });
 
   it.each(CONFIG_KINDS)("routes application-owned encrypted DNS through the main %s proxy policy", (kind) => {
@@ -324,21 +353,33 @@ describe("config templates", () => {
       : expect.stringContaining(`,${policy}`));
   });
 
-  it("uses the available SteamCN exception before Steam in the full Shadowrocket template", () => {
+  it("materializes Shadowrocket service rules under their declared policies", () => {
     const config = createConfigFromTemplate("shadowrocket", "full");
-    const rules = config.rules as string[];
-    const steamCN = rules.indexOf("RULE-SET,steam@cn,China");
-    const steam = rules.indexOf("RULE-SET,steam,Steam");
+    const policies = new Map((config.rules as string[]).flatMap((rule) => {
+      const [type, id, policy] = rule.split(",");
+      return type === "RULE-SET" || type === "DOMAIN-SET" ? [[id, policy]] : [];
+    }));
+    const expectedPolicies = new Map([
+      ["category-ai-chat-!cn", "AI"],
+      ["aws", "Cloud Services"],
+      ["azure", "Cloud Services"],
+      ["netlify", "Cloud Services"],
+      ["wise", "Payments"],
+      ["coursera", "Education"],
+      ["udemy", "Education"],
+      ["edx", "Education"],
+      ["khanacademy", "Education"],
+      ["wsj", "News"],
+    ]);
 
-    expect(config.rule_sets).toEqual(expect.arrayContaining([
-      {
-        name: "steam@cn",
-        type: "rule-set",
-        url: `${SHADOWROCKET_RULE_BASE}/SteamCN/SteamCN.list`,
-      },
-    ]));
-    expect(steamCN).toBeGreaterThanOrEqual(0);
-    expect(steamCN).toBeLessThan(steam);
+    for (const [id, policy] of expectedPolicies) {
+      expect(policies.get(id)).toBe(policy);
+      expect(config.rule_sets).toContainEqual({
+        name: id,
+        type: "domain-set",
+        url: `${SHADOWROCKET_METACUBEX_RULE_BASE}/${id}.list`,
+      });
+    }
   });
 
   it.each(TEMPLATE_IDS)("uses live Blackmatrix and canonical MetaCubeX lists for the %s Shadowrocket template", (templateID) => {
