@@ -90,9 +90,7 @@ func TestFileLifecycle(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := context.Background()
-			session := connect(t, ctx, mcpapi.SDKServer(testRuntime(t, app.Config{
-				MCP: app.MCPConfig{AllowManagementTools: true},
-			})))
+			session := connect(t, ctx, mcpapi.SDKServer(testRuntime(t, app.Config{})))
 			defer session.Close()
 
 			kind := test.name

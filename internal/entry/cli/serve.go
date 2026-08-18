@@ -17,12 +17,11 @@ import (
 )
 
 type serveOptions struct {
-	listen     string
-	token      string
-	path       string
-	management bool
-	maxOutput  int
-	logLevel   string
+	listen    string
+	token     string
+	path      string
+	maxOutput int
+	logLevel  string
 }
 
 func newServeCommand(cfg *config) *cobra.Command {
@@ -63,18 +62,10 @@ func newServeServer(rt *app.Runtime) *httpapi.Server {
 
 func addMCPFlags(cmd *cobra.Command, opts *serveOptions) {
 	cmd.Flags().StringVar(&opts.path, "path", opts.path, "MCP HTTP path")
-	cmd.Flags().BoolVar(&opts.management, "allow-management-tools", opts.management, "register MCP management tools")
 	cmd.Flags().IntVar(&opts.maxOutput, "max-output-bytes", opts.maxOutput, "maximum MCP inline output bytes")
 }
 
 func newServeRuntime(cmd *cobra.Command, cfg *config, opts serveOptions) (*app.Runtime, error) {
-	if !flagChanged(cmd, "allow-management-tools") {
-		value, err := environmentBool(cfg.env, EnvMCPAllowManagementTools, opts.management)
-		if err != nil {
-			return nil, err
-		}
-		opts.management = value
-	}
 	if !flagChanged(cmd, "max-output-bytes") {
 		value, err := environmentInt(cfg.env, EnvMCPMaxOutputBytes, opts.maxOutput)
 		if err != nil {
@@ -96,9 +87,8 @@ func newServeRuntime(cmd *cobra.Command, cfg *config, opts serveOptions) (*app.R
 			Token:  opts.token,
 		},
 		MCP: app.MCPConfig{
-			Path:                 opts.path,
-			AllowManagementTools: opts.management,
-			MaxOutputBytes:       opts.maxOutput,
+			Path:           opts.path,
+			MaxOutputBytes: opts.maxOutput,
 		},
 		Log: app.LogConfig{
 			Level: opts.logLevel,
@@ -123,7 +113,6 @@ func startupOverrideSources(cmd *cobra.Command, env map[string]string) map[strin
 	}{
 		{path: "http.listen", envKey: EnvListen, flag: "listen"},
 		{path: "mcp.path", envKey: EnvMCPPath, flag: "path"},
-		{path: "mcp.allow_management_tools", envKey: EnvMCPAllowManagementTools, flag: "allow-management-tools"},
 		{path: "mcp.max_output_bytes", envKey: EnvMCPMaxOutputBytes, flag: "max-output-bytes"},
 		{path: "log.level", envKey: EnvLogLevel, flag: "log-level"},
 	} {
@@ -140,18 +129,6 @@ func startupOverrideSources(cmd *cobra.Command, env map[string]string) map[strin
 func flagChanged(cmd *cobra.Command, name string) bool {
 	flag := cmd.Flags().Lookup(name)
 	return flag != nil && flag.Changed
-}
-
-func environmentBool(env map[string]string, key string, fallback bool) (bool, error) {
-	raw := strings.TrimSpace(env[key])
-	if raw == "" {
-		return fallback, nil
-	}
-	value, err := strconv.ParseBool(raw)
-	if err != nil {
-		return false, fmt.Errorf("%s must be a boolean: %w", key, err)
-	}
-	return value, nil
 }
 
 func environmentInt(env map[string]string, key string, fallback int) (int, error) {

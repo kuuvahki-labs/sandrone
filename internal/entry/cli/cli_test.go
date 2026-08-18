@@ -717,7 +717,6 @@ func TestServeHelpDocumentsUnifiedEntrypointFlags(t *testing.T) {
 	help := runHelp(t, "serve")
 
 	require.Contains(t, help, "--path")
-	require.Contains(t, help, "--allow-management-tools")
 	require.Contains(t, help, "--max-output-bytes")
 }
 
@@ -726,6 +725,7 @@ func TestServeHelpOmitsRemovedAuthenticationAndTransportFlags(t *testing.T) {
 
 	require.NotContains(t, help, "--token-required")
 	require.NotContains(t, help, "--transport")
+	require.NotContains(t, help, "--allow-management-tools")
 }
 
 func TestServePassesFlagsToRuntime(t *testing.T) {
@@ -740,7 +740,6 @@ func TestServePassesFlagsToRuntime(t *testing.T) {
 			"--listen", "127.0.0.1:0",
 			"--token", "secret",
 			"--path", "/agent",
-			"--allow-management-tools",
 			"--max-output-bytes", "2048",
 		},
 		"",
@@ -756,11 +755,19 @@ func TestServePassesFlagsToRuntime(t *testing.T) {
 	require.Equal(t, "127.0.0.1:0", got.HTTP.Listen)
 	require.Equal(t, "secret", got.HTTP.Token)
 	require.Equal(t, "/agent", got.MCP.Path)
-	require.True(t, got.MCP.AllowManagementTools)
 	require.Equal(t, 2048, got.MCP.MaxOutputBytes)
 	require.Equal(t, "flag", got.OverrideSources["mcp.path"])
-	require.Equal(t, "flag", got.OverrideSources["mcp.allow_management_tools"])
 	require.Equal(t, "flag", got.OverrideSources["mcp.max_output_bytes"])
+}
+
+func TestServeRejectsRemovedManagementToolsFlag(t *testing.T) {
+	code, _, stderr := runCLI(t,
+		[]string{"serve", "--allow-management-tools"},
+		"",
+	)
+
+	require.Equal(t, 1, code)
+	require.Contains(t, stderr, "unknown flag: --allow-management-tools")
 }
 
 func TestServeUsesTokenEnv(t *testing.T) {
@@ -861,7 +868,7 @@ func TestServeMarksEnvironmentAndExplicitFlagOverrideSources(t *testing.T) {
 	require.NotContains(t, got.OverrideSources, "mcp.path")
 }
 
-func TestServeReadsBooleanAndIntegerStartupEnvironmentOverrides(t *testing.T) {
+func TestServeReadsIntegerStartupEnvironmentOverride(t *testing.T) {
 	dataDir := t.TempDir()
 	stopErr := errors.New("stop after runtime")
 	var got app.Config
@@ -870,10 +877,9 @@ func TestServeReadsBooleanAndIntegerStartupEnvironmentOverrides(t *testing.T) {
 		[]string{"--data-dir", dataDir, "serve"},
 		"",
 		WithEnv(map[string]string{
-			EnvToken:                   "env-secret",
-			EnvMCPPath:                 "/agent",
-			EnvMCPAllowManagementTools: "true",
-			EnvMCPMaxOutputBytes:       "2048",
+			EnvToken:             "env-secret",
+			EnvMCPPath:           "/agent",
+			EnvMCPMaxOutputBytes: "2048",
 		}),
 		WithRuntimeFactory(func(cfg app.Config) (*app.Runtime, error) {
 			got = cfg
@@ -884,10 +890,8 @@ func TestServeReadsBooleanAndIntegerStartupEnvironmentOverrides(t *testing.T) {
 	require.Equal(t, 1, code)
 	require.Contains(t, stderr, stopErr.Error())
 	require.Equal(t, "/agent", got.MCP.Path)
-	require.True(t, got.MCP.AllowManagementTools)
 	require.Equal(t, 2048, got.MCP.MaxOutputBytes)
 	require.Equal(t, "environment", got.OverrideSources["mcp.path"])
-	require.Equal(t, "environment", got.OverrideSources["mcp.allow_management_tools"])
 	require.Equal(t, "environment", got.OverrideSources["mcp.max_output_bytes"])
 }
 

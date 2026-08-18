@@ -75,7 +75,6 @@ export const settingsZhCN = {
   "settings.startup.httpListen": "监听地址",
   "settings.startup.logLevel": "日志级别",
   "settings.startup.mcpGroup": "MCP",
-  "settings.startup.mcpManagement": "允许 MCP 管理工具",
   "settings.startup.mcpMaxOutput": "MCP 最大输出字节数",
   "settings.startup.mcpPath": "MCP 路径",
   "settings.startup.overridden": "当前由 {source} 覆盖",

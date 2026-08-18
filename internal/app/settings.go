@@ -39,9 +39,8 @@ func ResolveSettings(ctx context.Context, cfg Config, repository *store.Settings
 		Token:  startupToken,
 	}
 	cfg.MCP = MCPConfig{
-		Path:                 normalized.MCP.Path,
-		AllowManagementTools: normalized.MCP.AllowManagementTools,
-		MaxOutputBytes:       normalized.MCP.MaxOutputBytes,
+		Path:           normalized.MCP.Path,
+		MaxOutputBytes: normalized.MCP.MaxOutputBytes,
 	}
 	cfg.Log = LogConfig{Level: normalized.Log.Level}
 	if cfg.OverrideSources == nil {
@@ -56,9 +55,6 @@ func applyStartupOverrides(value *domain.Settings, cfg Config, sources map[strin
 	}
 	if _, ok := sources["mcp.path"]; ok {
 		value.MCP.Path = cfg.MCP.Path
-	}
-	if _, ok := sources["mcp.allow_management_tools"]; ok {
-		value.MCP.AllowManagementTools = cfg.MCP.AllowManagementTools
 	}
 	if _, ok := sources["mcp.max_output_bytes"]; ok {
 		value.MCP.MaxOutputBytes = cfg.MCP.MaxOutputBytes
@@ -81,7 +77,6 @@ func withProgrammaticOverrideSources(cfg Config) Config {
 	}
 	mark("http.listen", cfg.HTTP.Listen != "")
 	mark("mcp.path", cfg.MCP.Path != "")
-	mark("mcp.allow_management_tools", cfg.MCP.AllowManagementTools)
 	mark("mcp.max_output_bytes", cfg.MCP.MaxOutputBytes != 0)
 	mark("log.level", cfg.Log.Level != "")
 	return cfg

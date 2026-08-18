@@ -39,9 +39,8 @@ type HTTPConfig struct {
 }
 
 type MCPConfig struct {
-	Path                 string
-	AllowManagementTools bool
-	MaxOutputBytes       int
+	Path           string
+	MaxOutputBytes int
 }
 
 type LogConfig struct {

@@ -56,10 +56,6 @@ func buildHandler(ctx context.Context, getenv func(string) string, factory runti
 	if storageConfig.Backend != app.StorageS3 {
 		return nil, errors.New("vercel runtime requires SANDRONE_STORAGE_BACKEND=s3")
 	}
-	allowManagement, err := environmentBool(getenv("SANDRONE_MCP_ALLOW_MANAGEMENT_TOOLS"), false)
-	if err != nil {
-		return nil, errors.New("SANDRONE_MCP_ALLOW_MANAGEMENT_TOOLS must be a boolean")
-	}
 	maxOutput, err := environmentInt(getenv("SANDRONE_MCP_MAX_OUTPUT_BYTES"), 1<<20)
 	if err != nil || maxOutput < 0 {
 		return nil, errors.New("SANDRONE_MCP_MAX_OUTPUT_BYTES must be a non-negative integer")
@@ -84,9 +80,8 @@ func buildHandler(ctx context.Context, getenv func(string) string, factory runti
 			Token:  token,
 		},
 		MCP: app.MCPConfig{
-			Path:                 mcpPath,
-			AllowManagementTools: allowManagement,
-			MaxOutputBytes:       maxOutput,
+			Path:           mcpPath,
+			MaxOutputBytes: maxOutput,
 		},
 		Log: app.LogConfig{Level: logLevel},
 	}, logger, app.WithProbeEngine(probe.NewDisabled()), app.WithSchedulerEnabled(false))
@@ -119,13 +114,6 @@ func storageEnvironment(getenv func(string) string) map[string]string {
 		env[key] = getenv(key)
 	}
 	return env
-}
-
-func environmentBool(raw string, fallback bool) (bool, error) {
-	if strings.TrimSpace(raw) == "" {
-		return fallback, nil
-	}
-	return strconv.ParseBool(strings.TrimSpace(raw))
 }
 
 func environmentInt(raw string, fallback int) (int, error) {

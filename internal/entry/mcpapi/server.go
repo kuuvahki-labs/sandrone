@@ -162,9 +162,7 @@ func registerTools(server *mcp.Server, rt *app.Runtime) {
 		}
 		return nil, probeOutput{Results: result.Results, Report: result.Report}, nil
 	})
-	if rt.Config.MCP.AllowManagementTools {
-		registerManagementTools(server, rt)
-	}
+	registerManagementTools(server, rt)
 }
 
 func validateOptionalPublicResourceName(label string, name string) error {

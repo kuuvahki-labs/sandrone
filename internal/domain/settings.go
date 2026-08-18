@@ -82,9 +82,8 @@ type HTTPSettings struct {
 }
 
 type MCPSettings struct {
-	Path                 string `json:"path"`
-	AllowManagementTools bool   `json:"allow_management_tools"`
-	MaxOutputBytes       int    `json:"max_output_bytes"`
+	Path           string `json:"path"`
+	MaxOutputBytes int    `json:"max_output_bytes"`
 }
 
 type LogSettings struct {

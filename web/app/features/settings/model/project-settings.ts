@@ -14,7 +14,6 @@ export const defaultProjectSettings: SettingsView = {
   },
   mcp: {
     path: "/mcp",
-    allow_management_tools: false,
     max_output_bytes: 1 << 20,
   },
   log: {

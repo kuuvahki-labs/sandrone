@@ -224,12 +224,11 @@ API 和 MCP，但 Web 路径返回 `404`，前端由独立 Vite 开发服务器�
 | flag | 环境变量 | 内建缺省值 | 含义 |
 | --- | --- | --- | --- |
 | `--path` | `SANDRONE_MCP_PATH` | `/mcp` | streamable HTTP 路径，必须以 `/` 开头且不能覆盖公开 route |
-| `--allow-management-tools` | `SANDRONE_MCP_ALLOW_MANAGEMENT_TOOLS` | `false` | 注册可覆盖或立即删除定义的管理 tools；只应在可信本机 Agent 场景启用 |
 | `--max-output-bytes` | `SANDRONE_MCP_MAX_OUTPUT_BYTES` | `1048576` | MCP 内联输出上限；不能为负数 |
 
-MCP 的 tool/resource/prompt catalog、单一管理开关的行为和正文省略规则见
-[MCP 参考](mcp.md)。管理 tools 缺省不注册；启用后 `put` 可覆盖同名定义，
-`delete` 立即生效。
+MCP 的 tool/resource/prompt catalog、管理边界和正文省略规则见
+[MCP 参考](mcp.md)。管理 tools 始终注册；`put` 可覆盖同名定义，`delete`
+立即生效。
 Web 开发与嵌入构建见 [Web UI 快速说明](../../web/README.md)，HTTP endpoint
 契约见 [HTTP API 通用约定](http-api/README.md)。
 MCP path 不能是 `/`、`/healthz`、`/version`、`/convert`、`/s` 或 `/s/*`，

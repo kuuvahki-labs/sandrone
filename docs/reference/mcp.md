@@ -95,11 +95,11 @@ script，以 `SANDRONE_URL` 指向 Sandrone server，并通过可选
 
 ## Tool 注册与管理边界
 
-缺省注册下列九个常驻 tool。四个管理 tool 只由单一开关
-`--allow-management-tools` 控制，缺省关闭；没有第二个 readonly 开关。
+固定注册下列十三个 tool，其中九个只读或执行现有定义，四个可以修改保存的定义。
 
-管理模式面向可信本机 Agent，不是多租户授权边界。启用后，任何能连接该 MCP
-server 的客户端都可以写入当前 data dir：`put` 会立即保存并覆盖同名定义，
+MCP 面向可信 Agent，不是多租户授权边界。任何能连接该 server 的客户端（配置
+token 时需通过 bearer 鉴权）都可以写入当前 data dir：`put` 会立即保存并覆盖
+同名定义，
 `delete` 会立即删除，不提供确认、回收站或预览式写入。调用方应先读取当前
 resource，并只在用户明确要求持久化或删除时调用管理 tool。
 `sandrone_delete_file` 只删除保存完整 FileSpec 的单个 JSON record；如需备份，
@@ -138,7 +138,7 @@ file flow 见 [FileSpec](file-spec.md)和[文件管线](../architecture/file-pip
 cursor；后续页必须沿用生成该 cursor 时相同的 `kind`。列表按 kind/name 稳定
 排序；资源在翻页期间变化时，后续页反映调用时的当前存储状态。
 
-### 仅管理模式注册
+### 管理 tools
 
 | tool | 输入用途 | 输出用途 |
 | --- | --- | --- |
@@ -262,9 +262,9 @@ inspect → read capability/schema index → list → read exact definition/sche
 `sandrone://capabilities/formats`、`sandrone://schemas` 及 exact detail，再用
 `sandrone_list_resources` 发现已存定义；通过标准 MCP resource 读取定义及其
 processor、file-kind 或 script schema。只有需要起草或解释时才调用 prompt。
-随后用 convert/preview/validate 做无持久化检查。管理开关已启用且用户明确要求
-时才 put 或 delete；最后按目标 render、get file 或 probe，并检查 structured
-output 中的 report/warnings。
+随后用 convert/preview/validate 做无持久化检查。只有用户明确要求时才 put 或
+delete；最后按目标 render、get file 或 probe，并检查 structured output 中的
+report/warnings。
 
 Preview/validate 是推荐检查，不是 put 的服务端前置条件。反过来，
 subscription preview/render 只接受已存定义，所以新 subscription 通常要在用户

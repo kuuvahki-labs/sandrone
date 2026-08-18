@@ -45,9 +45,8 @@ func DecodeStored(body []byte) (domain.Settings, bool, error) {
 		SchemaVersion: stored.SchemaVersion,
 		HTTP:          domain.HTTPSettings{Listen: stored.HTTP.Listen},
 		MCP: domain.MCPSettings{
-			Path:                 stored.MCP.Path,
-			AllowManagementTools: stored.MCP.AllowManagementTools,
-			MaxOutputBytes:       stored.MCP.MaxOutputBytes,
+			Path:           stored.MCP.Path,
+			MaxOutputBytes: stored.MCP.MaxOutputBytes,
 		},
 		Log:              stored.Log,
 		RemoteDefaults:   stored.RemoteDefaults,
@@ -66,6 +65,7 @@ func DecodeStored(body []byte) (domain.Settings, bool, error) {
 	removedFields := stored.HTTP.LegacyToken != nil ||
 		stored.HTTP.LegacyTokenRequired != nil ||
 		stored.MCP.LegacyTransport != nil ||
+		stored.MCP.LegacyAllowManagementTools != nil ||
 		stored.LegacyWebUI != nil
 	return normalized, removedFields, nil
 }
@@ -91,10 +91,10 @@ type storedHTTPSettings struct {
 }
 
 type storedMCPSettings struct {
-	LegacyTransport      *string `json:"transport,omitempty"`
-	Path                 string  `json:"path"`
-	AllowManagementTools bool    `json:"allow_management_tools"`
-	MaxOutputBytes       int     `json:"max_output_bytes"`
+	LegacyTransport            *string `json:"transport,omitempty"`
+	LegacyAllowManagementTools *bool   `json:"allow_management_tools,omitempty"`
+	Path                       string  `json:"path"`
+	MaxOutputBytes             int     `json:"max_output_bytes"`
 }
 
 type storedWebUISettings struct {
@@ -156,7 +156,6 @@ func Normalize(value domain.Settings) (domain.Settings, error) {
 	}
 
 	out.MCP.Path = firstNonEmpty(strings.TrimSpace(value.MCP.Path), defaults.MCP.Path)
-	out.MCP.AllowManagementTools = value.MCP.AllowManagementTools
 	out.MCP.MaxOutputBytes = value.MCP.MaxOutputBytes
 	if out.MCP.MaxOutputBytes == 0 {
 		out.MCP.MaxOutputBytes = defaults.MCP.MaxOutputBytes

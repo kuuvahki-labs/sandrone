@@ -75,7 +75,6 @@ export const settingsEnUS = {
   "settings.startup.httpListen": "Listen address",
   "settings.startup.logLevel": "Log level",
   "settings.startup.mcpGroup": "MCP",
-  "settings.startup.mcpManagement": "Allow MCP management tools",
   "settings.startup.mcpMaxOutput": "MCP maximum output bytes",
   "settings.startup.mcpPath": "MCP path",
   "settings.startup.overridden": "Currently overridden by {source}",

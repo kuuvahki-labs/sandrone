@@ -1,11 +1,9 @@
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import FormControl from "@mui/material/FormControl";
-import FormControlLabel from "@mui/material/FormControlLabel";
 import InputLabel from "@mui/material/InputLabel";
 import MenuItem from "@mui/material/MenuItem";
 import Select from "@mui/material/Select";
-import Switch from "@mui/material/Switch";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 
@@ -75,10 +73,6 @@ export function StartupSettingsSection({
               type="number"
               value={value.mcp.max_output_bytes}
               onChange={(event) => onChange({ ...value, mcp: { ...value.mcp, max_output_bytes: Number(event.target.value) || 0 } })}
-            />
-            <FormControlLabel
-              control={<Switch checked={value.mcp.allow_management_tools} onChange={(event) => onChange({ ...value, mcp: { ...value.mcp, allow_management_tools: event.target.checked } })} />}
-              label={t("settings.startup.mcpManagement")}
             />
           </section>
         </div>

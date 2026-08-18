@@ -3,11 +3,10 @@ package cli
 // CLI environment variables recognized by Sandrone. Keep new CLI env defaults
 // here so they are easy to find and audit.
 const (
-	EnvDataDir                 = "SANDRONE_DATA_DIR"
-	EnvListen                  = "SANDRONE_LISTEN"
-	EnvToken                   = "SANDRONE_TOKEN"
-	EnvLogLevel                = "SANDRONE_LOG_LEVEL"
-	EnvMCPPath                 = "SANDRONE_MCP_PATH"
-	EnvMCPAllowManagementTools = "SANDRONE_MCP_ALLOW_MANAGEMENT_TOOLS"
-	EnvMCPMaxOutputBytes       = "SANDRONE_MCP_MAX_OUTPUT_BYTES"
+	EnvDataDir           = "SANDRONE_DATA_DIR"
+	EnvListen            = "SANDRONE_LISTEN"
+	EnvToken             = "SANDRONE_TOKEN"
+	EnvLogLevel          = "SANDRONE_LOG_LEVEL"
+	EnvMCPPath           = "SANDRONE_MCP_PATH"
+	EnvMCPMaxOutputBytes = "SANDRONE_MCP_MAX_OUTPUT_BYTES"
 )

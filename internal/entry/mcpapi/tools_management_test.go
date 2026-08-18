@@ -14,9 +14,7 @@ import (
 
 func TestSubscriptionLifecycle(t *testing.T) {
 	ctx := context.Background()
-	session := connect(t, ctx, mcpapi.SDKServer(testRuntime(t, app.Config{
-		MCP: app.MCPConfig{AllowManagementTools: true},
-	})))
+	session := connect(t, ctx, mcpapi.SDKServer(testRuntime(t, app.Config{})))
 	defer session.Close()
 
 	put := callToolSuccess(t, ctx, session, "sandrone_put_subscription", map[string]any{
@@ -73,9 +71,7 @@ func TestSubscriptionLifecycle(t *testing.T) {
 
 func TestToolAnnotations(t *testing.T) {
 	ctx := context.Background()
-	session := connect(t, ctx, mcpapi.SDKServer(testRuntime(t, app.Config{
-		MCP: app.MCPConfig{AllowManagementTools: true},
-	})))
+	session := connect(t, ctx, mcpapi.SDKServer(testRuntime(t, app.Config{})))
 	defer session.Close()
 
 	result, err := session.ListTools(ctx, nil)

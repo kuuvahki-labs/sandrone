@@ -54,7 +54,7 @@ Use canonical subscription type %q and input source %q.
 Read sandrone://capabilities/formats and sandrone://schemas/processors before drafting. Available node-stage processors:
 %s
 
-%s Draft the definition using the tool schema. sandrone_preview_subscription is a recommended check after the definition is stored, not a write gate. If the user asks to persist it and management tools are enabled, call sandrone_put_subscription. Then use sandrone_preview_subscription or sandrone_render_subscription and inspect the returned report.`,
+%s Draft the definition using the tool schema. sandrone_preview_subscription is a recommended check after the definition is stored, not a write gate. If the user asks to persist it, call sandrone_put_subscription. Then use sandrone_preview_subscription or sandrone_render_subscription and inspect the returned report.`,
 			target, subscriptionType, inputSource, processorCatalogGuidance(rt, domain.StageNodes), processorGuidance,
 		), nil
 	})
@@ -91,7 +91,7 @@ Read sandrone://capabilities/formats and sandrone://schemas/processors before dr
 Read %s for the authoritative typed settings and source rules. Available file-stage processors:
 %s
 
-%s Draft source, typed config, and processors in declared execution order. Call sandrone_validate_file as a recommended check; validation is not a prerequisite for calling sandrone_put_file when the user requests persistence and management tools are enabled. Execute with sandrone_get_file and inspect its report.`,
+%s Draft source, typed config, and processors in declared execution order. Call sandrone_validate_file as a recommended check; validation is not a prerequisite for calling sandrone_put_file when the user requests persistence. Execute with sandrone_get_file and inspect its report.`,
 			kind, target, references, kindURI, processorCatalogGuidance(rt, domain.StageFile), scriptGuidance,
 		), nil
 	})

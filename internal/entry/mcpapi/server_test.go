@@ -17,7 +17,7 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/entry/mcpapi"
 )
 
-func TestReadonlyToolsAndResourceRead(t *testing.T) {
+func TestToolsAndResourceRead(t *testing.T) {
 	ctx := context.Background()
 	rt := testRuntime(t, app.Config{})
 	require.NoError(t, rt.Service.PutSubscription(ctx, domain.Subscription{Name: "sub", Type: domain.SubscriptionTypeLocal, Format: "uri-list"}))
@@ -38,7 +38,7 @@ func TestReadonlyToolsAndResourceRead(t *testing.T) {
 	require.True(t, names["sandrone_convert"])
 	require.True(t, names["sandrone_get_file"])
 	require.True(t, names["sandrone_inspect"])
-	require.False(t, names["sandrone_put_subscription"])
+	require.True(t, names["sandrone_put_subscription"])
 	require.NotNil(t, convertTool)
 	require.NotNil(t, convertTool.Annotations)
 	require.NotNil(t, convertTool.Annotations.OpenWorldHint)
@@ -89,46 +89,31 @@ func TestConvertToolAcceptsRemoteInput(t *testing.T) {
 	require.Contains(t, string(body), subServer.URL)
 }
 
-func TestManagementToolRegistrationFollowsSingleSwitch(t *testing.T) {
+func TestManagementToolsAreAlwaysRegistered(t *testing.T) {
 	want := []string{
 		"sandrone_put_subscription",
 		"sandrone_delete_subscription",
 		"sandrone_put_file",
 		"sandrone_delete_file",
 	}
-	for _, tt := range []struct {
-		name    string
-		enabled bool
-	}{
-		{name: "disabled", enabled: false},
-		{name: "enabled", enabled: true},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
-			rt := testRuntime(t, app.Config{
-				MCP: app.MCPConfig{AllowManagementTools: tt.enabled},
-			})
-			session := connect(t, ctx, mcpapi.SDKServer(rt))
-			defer session.Close()
+	ctx := context.Background()
+	session := connect(t, ctx, mcpapi.SDKServer(testRuntime(t, app.Config{})))
+	defer session.Close()
 
-			tools, err := session.ListTools(ctx, nil)
-			require.NoError(t, err)
-			names := map[string]bool{}
-			for _, tool := range tools.Tools {
-				names[tool.Name] = true
-			}
-			for _, name := range want {
-				require.Equal(t, tt.enabled, names[name], name)
-			}
-		})
+	tools, err := session.ListTools(ctx, nil)
+	require.NoError(t, err)
+	names := map[string]bool{}
+	for _, tool := range tools.Tools {
+		names[tool.Name] = true
+	}
+	for _, name := range want {
+		require.True(t, names[name], name)
 	}
 }
 
 func TestMCPPublicResourceNamesRejectSlash(t *testing.T) {
 	ctx := context.Background()
-	rt := testRuntime(t, app.Config{
-		MCP: app.MCPConfig{AllowManagementTools: true},
-	})
+	rt := testRuntime(t, app.Config{})
 	session := connect(t, ctx, mcpapi.SDKServer(rt))
 	defer session.Close()
 
@@ -183,9 +168,7 @@ func TestMCPPublicResourceNamesRejectSlash(t *testing.T) {
 
 func TestMCPPutFileRejectsNonCanonicalKindAndLegacyConfigWire(t *testing.T) {
 	ctx := context.Background()
-	rt := testRuntime(t, app.Config{
-		MCP: app.MCPConfig{AllowManagementTools: true},
-	})
+	rt := testRuntime(t, app.Config{})
 	session := connect(t, ctx, mcpapi.SDKServer(rt))
 	defer session.Close()
 
@@ -230,9 +213,7 @@ func TestMCPPutFileRejectsNonCanonicalKindAndLegacyConfigWire(t *testing.T) {
 
 func TestGetFileSourceModeReturnsUncompiledSource(t *testing.T) {
 	ctx := context.Background()
-	rt := testRuntime(t, app.Config{
-		MCP: app.MCPConfig{AllowManagementTools: true},
-	})
+	rt := testRuntime(t, app.Config{})
 	require.NoError(t, rt.Service.PutFile(ctx, domain.FileSpec{
 		Name:   "source.yaml",
 		Kind:   domain.FileKindStatic,

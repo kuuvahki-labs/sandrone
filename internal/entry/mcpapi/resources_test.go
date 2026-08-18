@@ -187,9 +187,7 @@ func TestFormatCapabilityResourcesExposeIndexAndExactDetail(t *testing.T) {
 
 func TestHTTPAndMCPPublishEquivalentSchemaDocuments(t *testing.T) {
 	ctx := context.Background()
-	rt := testRuntime(t, app.Config{
-		MCP: app.MCPConfig{AllowManagementTools: true},
-	})
+	rt := testRuntime(t, app.Config{})
 	session := connect(t, ctx, mcpapi.SDKServer(rt))
 	defer session.Close()
 	httpHandler := httpapi.New(rt).Handler()

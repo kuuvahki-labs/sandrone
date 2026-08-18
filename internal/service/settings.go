@@ -104,7 +104,6 @@ func restartRequiredPaths(stored, effective domain.Settings, overrides map[strin
 	}
 	add("http.listen", stored.HTTP.Listen != effective.HTTP.Listen)
 	add("mcp.path", stored.MCP.Path != effective.MCP.Path)
-	add("mcp.allow_management_tools", stored.MCP.AllowManagementTools != effective.MCP.AllowManagementTools)
 	add("mcp.max_output_bytes", stored.MCP.MaxOutputBytes != effective.MCP.MaxOutputBytes)
 	add("log.level", stored.Log.Level != effective.Log.Level)
 	sort.Strings(paths)

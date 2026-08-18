@@ -20,9 +20,7 @@ const scriptContractNode = "ss://aes-128-gcm:secret@example.com:8388#node-a"
 
 func TestScriptContractInlineNodesAndFileStages(t *testing.T) {
 	ctx := context.Background()
-	session := connect(t, ctx, mcpapi.SDKServer(testRuntime(t, app.Config{
-		MCP: app.MCPConfig{AllowManagementTools: true},
-	})))
+	session := connect(t, ctx, mcpapi.SDKServer(testRuntime(t, app.Config{})))
 	defer session.Close()
 
 	nodes := callToolSuccess(t, ctx, session, "sandrone_convert", map[string]any{
@@ -60,9 +58,7 @@ func TestScriptContractInlineNodesAndFileStages(t *testing.T) {
 
 func TestScriptContractControlledStoredAndRemoteSources(t *testing.T) {
 	ctx := context.Background()
-	session := connect(t, ctx, mcpapi.SDKServer(testRuntime(t, app.Config{
-		MCP: app.MCPConfig{AllowManagementTools: true},
-	})))
+	session := connect(t, ctx, mcpapi.SDKServer(testRuntime(t, app.Config{})))
 	defer session.Close()
 
 	callToolSuccess(t, ctx, session, "sandrone_put_file", map[string]any{

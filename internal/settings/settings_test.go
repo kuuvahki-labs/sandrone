@@ -44,6 +44,7 @@ func TestStoredAndPublicSettingsOmitRemovedStartupFields(t *testing.T) {
 		require.NotContains(t, string(body), `"token_required"`)
 		require.NotContains(t, string(body), `"token_configured"`)
 		require.NotContains(t, string(body), `"transport"`)
+		require.NotContains(t, string(body), `"allow_management_tools"`)
 		require.NotContains(t, string(body), `"webui"`)
 	}
 }
@@ -99,13 +100,13 @@ func TestDecodeMigratesLegacyStartupAuthenticationAndMCPTransport(t *testing.T) 
 	require.NoError(t, err)
 	require.Equal(t, "127.0.0.1:2237", value.HTTP.Listen)
 	require.Equal(t, "/agent", value.MCP.Path)
-	require.True(t, value.MCP.AllowManagementTools)
 
 	body, err := json.Marshal(value)
 	require.NoError(t, err)
 	require.NotContains(t, string(body), "legacy-secret")
 	require.NotContains(t, string(body), `"token_required"`)
 	require.NotContains(t, string(body), `"transport"`)
+	require.NotContains(t, string(body), `"allow_management_tools"`)
 	require.NotContains(t, string(body), `"webui"`)
 }
 

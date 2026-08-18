@@ -82,6 +82,7 @@ func TestSettingsStoreRewritesRemovedStartupFieldsOnRead(t *testing.T) {
 	require.NotContains(t, string(body), "legacy-secret")
 	require.NotContains(t, string(body), `"token_required"`)
 	require.NotContains(t, string(body), `"transport"`)
+	require.NotContains(t, string(body), `"allow_management_tools"`)
 	require.NotContains(t, string(body), `"webui"`)
 }
 

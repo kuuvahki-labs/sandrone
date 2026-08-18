@@ -108,7 +108,6 @@ export interface SettingsView {
   };
   mcp: {
     path: string;
-    allow_management_tools: boolean;
     max_output_bytes: number;
   };
   log: {

@@ -14,9 +14,7 @@ import (
 
 func TestToolSchemasExposeObjectValuesAndBoundaryValidation(t *testing.T) {
 	ctx := context.Background()
-	rt := testRuntime(t, app.Config{
-		MCP: app.MCPConfig{AllowManagementTools: true},
-	})
+	rt := testRuntime(t, app.Config{})
 	session := connect(t, ctx, mcpapi.SDKServer(rt))
 	defer session.Close()
 
@@ -91,9 +89,7 @@ func TestToolSchemasExposeObjectValuesAndBoundaryValidation(t *testing.T) {
 
 func TestToolSchemaEnumsRejectUnknownValues(t *testing.T) {
 	ctx := context.Background()
-	rt := testRuntime(t, app.Config{
-		MCP: app.MCPConfig{AllowManagementTools: true},
-	})
+	rt := testRuntime(t, app.Config{})
 	session := connect(t, ctx, mcpapi.SDKServer(rt))
 	defer session.Close()
 

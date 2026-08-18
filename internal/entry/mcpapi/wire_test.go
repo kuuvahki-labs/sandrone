@@ -97,9 +97,7 @@ func TestProcessorParamsAcceptOrdinaryObjects(t *testing.T) {
 
 func TestTypedSettingsAcceptOrdinaryObjectBeforeDriverValidation(t *testing.T) {
 	ctx := context.Background()
-	rt := testRuntime(t, app.Config{
-		MCP: app.MCPConfig{AllowManagementTools: true},
-	})
+	rt := testRuntime(t, app.Config{})
 	session := connect(t, ctx, mcpapi.SDKServer(rt))
 	defer session.Close()
 
@@ -120,9 +118,7 @@ func TestTypedSettingsAcceptOrdinaryObjectBeforeDriverValidation(t *testing.T) {
 
 func TestTypedFileEmptySourceUsesBuiltinBaseForPutAndValidate(t *testing.T) {
 	ctx := context.Background()
-	rt := testRuntime(t, app.Config{
-		MCP: app.MCPConfig{AllowManagementTools: true},
-	})
+	rt := testRuntime(t, app.Config{})
 	session := connect(t, ctx, mcpapi.SDKServer(rt))
 	defer session.Close()
 
@@ -165,9 +161,7 @@ func TestTypedFileEmptySourceUsesBuiltinBaseForPutAndValidate(t *testing.T) {
 
 func TestPutFileRequiresNameAtMCPBoundary(t *testing.T) {
 	ctx := context.Background()
-	rt := testRuntime(t, app.Config{
-		MCP: app.MCPConfig{AllowManagementTools: true},
-	})
+	rt := testRuntime(t, app.Config{})
 	session := connect(t, ctx, mcpapi.SDKServer(rt))
 	defer session.Close()
 
@@ -181,9 +175,7 @@ func TestPutFileRequiresNameAtMCPBoundary(t *testing.T) {
 
 func TestSubscriptionAutoFormatRoundTripsThroughMCP(t *testing.T) {
 	ctx := context.Background()
-	rt := testRuntime(t, app.Config{
-		MCP: app.MCPConfig{AllowManagementTools: true},
-	})
+	rt := testRuntime(t, app.Config{})
 	session := connect(t, ctx, mcpapi.SDKServer(rt))
 	defer session.Close()
 
