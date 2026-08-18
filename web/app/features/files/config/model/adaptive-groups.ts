@@ -114,6 +114,12 @@ interface CanonicalGroupEntry {
   name: string;
 }
 
+interface AdaptiveReferenceGroup {
+  index: number;
+  members: string[];
+  anchor: boolean;
+}
+
 export const ADAPTIVE_REGION_IDS = ADAPTIVE_REGION_GROUPS.map((region) => region.id);
 export const DEFAULT_ADAPTIVE_REGION_IDS = ["hk", "tw", "jp", "us", "sg"] as const;
 
@@ -249,8 +255,8 @@ export function mergeAdaptiveGroups(
   }
 
   const currentGroups = config.groups ?? [];
-  const anchorIndex = currentGroups.findIndex((group) => isAnchorGroup(dialect, group));
-  const proxyTargets = dialect.groupMembers(currentGroups[anchorIndex]) ?? [];
+  const referenceGroups = adaptiveReferenceGroups(dialect, currentGroups);
+  const managedReferences = referenceGroups.flatMap((entry) => entry.members);
   const groupsByName = indexGroupsByName(dialect, currentGroups);
   const existingCanonical = canonicalGroupEntries(dialect, currentGroups);
   const canonicalByName = indexCanonicalEntries(existingCanonical);
@@ -297,7 +303,7 @@ export function mergeAdaptiveGroups(
       removedGroupNames.push(name);
       continue;
     }
-    if (hasExternalReferences(name, inboundReferences, proxyTargets)) {
+    if (hasExternalReferences(name, inboundReferences, managedReferences)) {
       preservedGroupNames.push(name);
       pushUniqueWarning(warnings, { code: "referenced_stale_group", groupName: name });
       continue;
@@ -307,18 +313,16 @@ export function mergeAdaptiveGroups(
   }
 
   for (const name of desiredNames) managedNames.add(name);
-  const rewrittenProxyTargets = proxyTargets.filter((target) => !managedNames.has(target));
   const generatedGroupNames = desiredGroups.map((group) => dialect.groupName(group));
-  const nodesIndex = rewrittenProxyTargets.findIndex((target) => target === "$nodes");
-  rewrittenProxyTargets.splice(
-    nodesIndex < 0 ? rewrittenProxyTargets.length : nodesIndex,
-    0,
-    ...generatedGroupNames,
-  );
+  const rewrittenReferences = new Map(referenceGroups.map((entry) => [
+    entry.index,
+    rewriteAdaptiveReferences(entry, managedNames, generatedGroupNames),
+  ]));
 
   const retainedGroups = currentGroups.flatMap((group, index) => {
     if (removableIndexes.has(index)) return [];
-    if (index === anchorIndex) return [dialect.replaceGroupMembers(group, rewrittenProxyTargets)];
+    const members = rewrittenReferences.get(index);
+    if (members) return [dialect.replaceGroupMembers(group, members)];
     return [group];
   });
   const nextGroups = [
@@ -351,8 +355,8 @@ export function stripCanonicalAdaptiveGroups(
     return unchangedStripResult(config);
   }
 
-  const anchorIndex = currentGroups.findIndex((group) => isAnchorGroup(dialect, group));
-  const proxyTargets = dialect.groupMembers(currentGroups[anchorIndex]) ?? [];
+  const referenceGroups = adaptiveReferenceGroups(dialect, currentGroups);
+  const managedReferences = referenceGroups.flatMap((entry) => entry.members);
   const inboundReferences = dialect.inboundReferences(config);
   const namesWithCustomReplacement = new Set<string>();
   for (const name of canonicalByName.keys()) {
@@ -363,7 +367,7 @@ export function stripCanonicalAdaptiveGroups(
       namesWithCustomReplacement.add(name);
       continue;
     }
-    if (hasExternalReferences(name, inboundReferences, proxyTargets)) {
+    if (hasExternalReferences(name, inboundReferences, managedReferences)) {
       return unchangedStripResult(config);
     }
   }
@@ -373,10 +377,14 @@ export function stripCanonicalAdaptiveGroups(
   const namesToRemoveFromProxy = new Set(
     strippedGroupNames.filter((name) => !namesWithCustomReplacement.has(name)),
   );
-  const nextProxyTargets = proxyTargets.filter((target) => !namesToRemoveFromProxy.has(target));
+  const strippedReferences = new Map(referenceGroups.map((entry) => [
+    entry.index,
+    entry.members.filter((target) => !namesToRemoveFromProxy.has(target)),
+  ]));
   const nextGroups = currentGroups.flatMap((group, index) => {
     if (canonicalIndexes.has(index)) return [];
-    if (index === anchorIndex) return [dialect.replaceGroupMembers(group, nextProxyTargets)];
+    const members = strippedReferences.get(index);
+    if (members) return [dialect.replaceGroupMembers(group, members)];
     return [group];
   });
   return {
@@ -461,13 +469,46 @@ function isAnchorGroup(
   return name === configAnchorName("en-US") || name === configAnchorName("zh-CN");
 }
 
+function adaptiveReferenceGroups(
+  dialect: Pick<ConfigAdaptiveDialect, "canonicalName" | "groupMembers" | "groupName">,
+  groups: readonly ConfigMap[],
+): AdaptiveReferenceGroup[] {
+  return groups.flatMap((group, index) => {
+    if (dialect.canonicalName(group) !== undefined) return [];
+    const members = dialect.groupMembers(group);
+    if (!members) return [];
+    const anchor = isAnchorGroup(dialect, group);
+    if (!anchor && !members.some(isAnchorReference)) return [];
+    return [{ anchor, index, members }];
+  });
+}
+
+function rewriteAdaptiveReferences(
+  group: Readonly<AdaptiveReferenceGroup>,
+  managedNames: ReadonlySet<string>,
+  generatedNames: readonly string[],
+): string[] {
+  const members = group.members.filter((target) => !managedNames.has(target));
+  const anchorIndex = group.anchor ? -1 : members.findIndex(isAnchorReference);
+  const nodesIndex = members.findIndex((target) => target === "$nodes");
+  const insertionIndex = anchorIndex >= 0
+    ? anchorIndex + 1
+    : nodesIndex >= 0 ? nodesIndex : members.length;
+  members.splice(insertionIndex, 0, ...generatedNames);
+  return members;
+}
+
+function isAnchorReference(value: string): boolean {
+  return value === configAnchorName("en-US") || value === configAnchorName("zh-CN");
+}
+
 function hasExternalReferences(
   name: string,
   inboundReferences: Readonly<Record<string, number>>,
-  proxyTargets: readonly string[],
+  managedReferences: readonly string[],
 ): boolean {
-  const proxyReferenceCount = proxyTargets.filter((target) => target === name).length;
-  return (inboundReferences[name] ?? 0) - proxyReferenceCount > 0;
+  const managedReferenceCount = managedReferences.filter((target) => target === name).length;
+  return (inboundReferences[name] ?? 0) - managedReferenceCount > 0;
 }
 
 function unchangedMergeResult(

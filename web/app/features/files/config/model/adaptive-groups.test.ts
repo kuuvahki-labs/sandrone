@@ -112,6 +112,42 @@ describe("localized adaptive group naming", () => {
     expect(adaptiveGroupAnchorProblem(base, target)).toBeNull();
  });
 
+  it.each(["mihomo", "sing-box", "shadowrocket"] as const)(
+    "adds generated regions to every %s template selector that routes through the anchor",
+    (target) => {
+      const base = createConfigFromTemplate(target, "standard");
+      const nameKey = target === "sing-box" ? "tag" : "name";
+      const memberKey = target === "sing-box" ? "outbounds" : "proxies";
+      const dependentNames = (base.groups ?? []).flatMap((group) => {
+        const members = group[memberKey];
+        return Array.isArray(members) && members.includes("Proxy")
+          ? [group[nameKey]]
+          : [];
+      });
+      const generation = generateAdaptiveGroups(
+        ["HK-01", "JP-01"],
+        {
+          type: target === "sing-box" ? "selector" : "select",
+          enabledRegionIds: ["hk", "jp"],
+        },
+        target,
+      );
+
+      const merged = mergeAdaptiveGroups(base, generation, target);
+
+      expect(dependentNames.length).toBeGreaterThan(0);
+      for (const name of ["Proxy", ...dependentNames]) {
+        const group = merged.config.groups?.find((item) => item[nameKey] === name);
+        expect(group?.[memberKey]).toEqual(expect.arrayContaining(["Hong Kong", "Japan"]));
+      }
+      expect(stripCanonicalAdaptiveGroups(merged.config, target)).toMatchObject({
+        changed: true,
+        config: base,
+        strippedGroupNames: ["Hong Kong", "Japan"],
+      });
+    },
+  );
+
   it("treats English and Chinese anchors together as an ambiguous duplicate", () => {
     const base = createConfigFromTemplate("sing-box", "minimal", "zh-CN");
     const config = {
