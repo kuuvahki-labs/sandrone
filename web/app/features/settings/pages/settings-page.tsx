@@ -26,7 +26,7 @@ export interface SettingsPageProps {
   themeMode: ThemeMode;
   version?: string;
   onOpenData: () => void;
-  onOpenRuntime: () => void;
+  onOpenService: () => void;
   onSaveBaseUrl: (value: string) => void;
   onSignOut: () => void;
   onLocaleMode: (mode: LocaleMode) => void;
@@ -40,7 +40,7 @@ export function SettingsPage({
   themeMode,
   version,
   onOpenData,
-  onOpenRuntime,
+  onOpenService,
   onSaveBaseUrl,
   onSignOut,
   onLocaleMode,
@@ -68,9 +68,9 @@ export function SettingsPage({
           onSaveBaseUrl={onSaveBaseUrl}
         />
         <Card component="article" variant="outlined">
-          <CardActionArea component="div" aria-label={t("settings.advanced.open")} onClick={onOpenRuntime}>
+          <CardActionArea component="div" aria-label={t("settings.service.open")} onClick={onOpenService}>
             <CardContent className="flex items-center justify-between gap-4">
-              <Typography component="h3" variant="h6">{t("settings.advanced.title")}</Typography>
+              <Typography component="h3" variant="h6">{t("settings.service.title")}</Typography>
               <ChevronRightIcon aria-hidden color="action" />
             </CardContent>
           </CardActionArea>

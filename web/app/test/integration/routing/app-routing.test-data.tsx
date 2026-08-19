@@ -12,7 +12,7 @@ import FilePreviewRoute from "~/routes/files.$name.preview";
 import FilesNewRoute from "~/routes/files.new";
 import SettingsRoute from "~/routes/settings";
 import SettingsDataRoute from "~/routes/settings.data";
-import SettingsRuntimeRoute from "~/routes/settings.runtime";
+import SettingsServiceRoute from "~/routes/settings.service";
 import SharesRoute from "~/routes/shares";
 import SubscriptionsRoute from "~/routes/subscriptions";
 import SubscriptionEditRoute from "~/routes/subscriptions.$kind.$name.edit";
@@ -42,7 +42,7 @@ export const integrationRouteEntries = [
   { id: "files-preview", path: "files/:name/preview", file: "routes/files.$name.preview.tsx", Component: FilePreviewRoute },
   { id: "shares", path: "shares", file: "routes/shares.tsx", Component: SharesRoute },
   { id: "settings", path: "settings", file: "routes/settings.tsx", Component: SettingsRoute },
-  { id: "settings-runtime", path: "settings/runtime", file: "routes/settings.runtime.tsx", Component: SettingsRuntimeRoute },
+  { id: "settings-service", path: "settings/service", file: "routes/settings.service.tsx", Component: SettingsServiceRoute },
   { id: "settings-data", path: "settings/data", file: "routes/settings.data.tsx", Component: SettingsDataRoute },
 ] satisfies readonly IntegrationRouteEntry[];
 

@@ -24,7 +24,7 @@ const expectedRoutes = [
   { id: "files-preview", index: false, path: "files/:name/preview", file: "routes/files.$name.preview.tsx" },
   { id: "shares", index: false, path: "shares", file: "routes/shares.tsx" },
   { id: "settings", index: false, path: "settings", file: "routes/settings.tsx" },
-  { id: "settings-runtime", index: false, path: "settings/runtime", file: "routes/settings.runtime.tsx" },
+  { id: "settings-service", index: false, path: "settings/service", file: "routes/settings.service.tsx" },
   { id: "settings-data", index: false, path: "settings/data", file: "routes/settings.data.tsx" },
 ] as const;
 

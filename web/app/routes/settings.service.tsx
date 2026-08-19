@@ -4,12 +4,12 @@ import { useSandrone } from "~/core/provider/context";
 import { useFileResources } from "~/features/files/data/use-file-resources";
 import { useScheduledRefreshStatus } from "~/features/settings/data/use-scheduled-refresh-status";
 import { useVersionInfo } from "~/features/settings/data/use-version-info";
-import { SettingsRuntimePage } from "~/features/settings/pages/settings-runtime-page";
+import { SettingsServicePage } from "~/features/settings/pages/settings-service-page";
 import { useSubscriptionResources } from "~/features/subscriptions/data/use-subscription-resources";
 import { useI18n } from "~/shared/i18n/context";
 import { resourceOptionText } from "~/shared/resources/labels";
 
-export default function SettingsRuntimeRoute() {
+export default function SettingsServiceRoute() {
   const app = useSandrone();
   const navigate = useNavigate();
   const { t } = useI18n();
@@ -25,7 +25,7 @@ export default function SettingsRuntimeRoute() {
   ];
 
   return (
-    <SettingsRuntimePage
+    <SettingsServicePage
       defaultUserAgent={defaultUserAgent}
       overrides={app.settingsOverrides}
       restartRequired={app.restartRequired}

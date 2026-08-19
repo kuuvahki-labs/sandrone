@@ -4,16 +4,15 @@ import Alert from "@mui/material/Alert";
 
 import { settingsUpdateFromView } from "~/features/settings/model/project-settings";
 import type { ScheduledRefreshResourceChoice } from "~/features/settings/model/scheduled-refresh-targets";
+import { ResourceAutomationSettingsSection } from "~/features/settings/sections/resource-automation-settings-section";
 import { RuntimeSettingsSection } from "~/features/settings/sections/runtime-settings-section";
-import { ScheduledRefreshSettingsSection } from "~/features/settings/sections/scheduled-refresh-settings-section";
 import { StartupSettingsSection } from "~/features/settings/sections/startup-settings-section";
-import { SubscriptionTrafficSettingsSection } from "~/features/settings/sections/subscription-traffic-settings-section";
 import type { ScheduledRefreshStatus, SettingsUpdate, SettingsView } from "~/shared/api/client";
 import { useUICapabilities } from "~/shared/capabilities/context";
 import { useI18n } from "~/shared/i18n/context";
 import { PageHeader } from "~/shared/ui/page";
 
-interface SettingsRuntimePageProps {
+interface SettingsServicePageProps {
   defaultUserAgent?: string;
   settings: SettingsView;
   overrides: Record<string, string>;
@@ -24,7 +23,7 @@ interface SettingsRuntimePageProps {
   onSave: (value: SettingsUpdate) => Promise<unknown> | unknown;
 }
 
-export function SettingsRuntimePage({
+export function SettingsServicePage({
   defaultUserAgent,
   settings,
   overrides,
@@ -33,7 +32,7 @@ export function SettingsRuntimePage({
   scheduledRefreshStatus,
   onBack,
   onSave,
-}: SettingsRuntimePageProps) {
+}: SettingsServicePageProps) {
   const { t } = useI18n();
   const { hasFeature } = useUICapabilities();
   const [draft, setDraft] = useState(settings);
@@ -55,35 +54,32 @@ export function SettingsRuntimePage({
           variant: "contained",
         }}
         sticky
-        title={t("settings.advanced.title")}
+        title={t("settings.service.title")}
       />
       {restartRequired.length > 0 ? (
         <Alert severity="warning">{t("settings.restartRequired", { fields: restartRequired.join(", ") })}</Alert>
-      ) : null}
-      <StartupSettingsSection
-        overrides={overrides}
-        value={draft}
-        onChange={setDraft}
-      />
-      <SubscriptionTrafficSettingsSection
-        value={draft.subscriptions.auto_load_traffic}
-        onChange={(enabled) => setDraft((current) => ({
-          ...current,
-          subscriptions: { auto_load_traffic: enabled },
-        }))}
-      />
-      {hasFeature("scheduler.enabled") ? (
-        <ScheduledRefreshSettingsSection
-          resources={scheduledRefreshResources}
-          status={scheduledRefreshStatus}
-          value={draft.scheduled_refresh}
-          onChange={(scheduledRefresh) => setDraft((current) => ({ ...current, scheduled_refresh: scheduledRefresh }))}
-        />
       ) : null}
       <RuntimeSettingsSection
         defaultUserAgent={defaultUserAgent}
         value={draft}
         onChange={(runtime) => setDraft((current) => ({ ...current, ...runtime }))}
+      />
+      <ResourceAutomationSettingsSection
+        scheduledRefreshEnabled={hasFeature("scheduler.enabled")}
+        scheduledRefreshResources={scheduledRefreshResources}
+        scheduledRefreshStatus={scheduledRefreshStatus}
+        scheduledRefreshValue={draft.scheduled_refresh}
+        subscriptionTrafficValue={draft.subscriptions.auto_load_traffic}
+        onScheduledRefreshChange={(scheduledRefresh) => setDraft((current) => ({ ...current, scheduled_refresh: scheduledRefresh }))}
+        onSubscriptionTrafficChange={(enabled) => setDraft((current) => ({
+          ...current,
+          subscriptions: { auto_load_traffic: enabled },
+        }))}
+      />
+      <StartupSettingsSection
+        overrides={overrides}
+        value={draft}
+        onChange={setDraft}
       />
     </section>
   );

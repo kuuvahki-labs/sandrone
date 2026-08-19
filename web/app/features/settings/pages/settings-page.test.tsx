@@ -19,7 +19,7 @@ describe("settings page", () => {
         publicBaseUrl="https://example.com"
         themeMode="system"
         onOpenData={noop}
-        onOpenRuntime={noop}
+        onOpenService={noop}
         onLocaleMode={noop}
         onSaveBaseUrl={onSaveBaseUrl}
         onSignOut={noop}
@@ -49,7 +49,7 @@ describe("settings page", () => {
           publicBaseUrl="https://example.com"
           themeMode="system"
           onOpenData={noop}
-          onOpenRuntime={noop}
+          onOpenService={noop}
           onLocaleMode={onLocaleMode}
           onSaveBaseUrl={noop}
           onSignOut={noop}
@@ -63,16 +63,16 @@ describe("settings page", () => {
 
     expect(onLocaleMode).toHaveBeenCalledWith("en-US");
   });
-  it("keeps the advanced heading outside native button content and supports keyboard activation", async () => {
+  it("keeps the service settings heading outside native button content and supports keyboard activation", async () => {
     const user = userEvent.setup();
-    const onOpenRuntime = vi.fn();
+    const onOpenService = vi.fn();
     render(
       <SettingsPage
         localeMode="auto"
         publicBaseUrl="https://example.com"
         themeMode="system"
         onOpenData={noop}
-        onOpenRuntime={onOpenRuntime}
+        onOpenService={onOpenService}
         onLocaleMode={noop}
         onSaveBaseUrl={noop}
         onSignOut={noop}
@@ -80,15 +80,15 @@ describe("settings page", () => {
       />,
     );
 
-    const advanced = screen.getByRole("button", { name: "打开高级设置" });
-    const heading = screen.getByRole("heading", { name: "高级设置", level: 3 });
+    const advanced = screen.getByRole("button", { name: "打开服务设置" });
+    const heading = screen.getByRole("heading", { name: "服务设置", level: 3 });
     expect(advanced.tagName).toBe("DIV");
     expect(heading.closest("button")).toBeNull();
 
     advanced.focus();
     await user.keyboard("{Enter}");
 
-    expect(onOpenRuntime).toHaveBeenCalledTimes(1);
+    expect(onOpenService).toHaveBeenCalledTimes(1);
   });
   it("cancels sign-out before confirming it exactly once", async () => {
     const user = userEvent.setup();
@@ -99,7 +99,7 @@ describe("settings page", () => {
         publicBaseUrl="https://example.com"
         themeMode="system"
         onOpenData={noop}
-        onOpenRuntime={noop}
+        onOpenService={noop}
         onLocaleMode={noop}
         onSaveBaseUrl={noop}
         onSignOut={onSignOut}

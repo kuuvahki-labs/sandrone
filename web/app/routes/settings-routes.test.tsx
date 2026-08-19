@@ -10,7 +10,7 @@ import { I18nProvider } from "~/shared/i18n/context";
 
 import SettingsRoute from "./settings";
 import SettingsDataRoute from "./settings.data";
-import SettingsRuntimeRoute from "./settings.runtime";
+import SettingsServiceRoute from "./settings.service";
 
 vi.mock("~/core/provider/context", () => ({
   useSandrone: vi.fn(),
@@ -31,7 +31,7 @@ describe("SettingsRoute", () => {
   });
 
   it.each([
-    ["打开高级设置", "/settings/runtime", "runtime destination"],
+    ["打开服务设置", "/settings/service", "service destination"],
     ["管理备份与恢复", "/settings/data", "data destination"],
   ])("navigates with %s", async (buttonName, destination, destinationText) => {
     const user = userEvent.setup();
@@ -83,12 +83,12 @@ describe("SettingsDataRoute", () => {
   });
 });
 
-describe("SettingsRuntimeRoute", () => {
-  it("saves unified settings on the advanced route", async () => {
+describe("SettingsServiceRoute", () => {
+  it("saves unified settings on the service settings route", async () => {
     const user = userEvent.setup();
-    const { client, updateSettings } = mockSettingsRuntimeApp();
+    const { client, updateSettings } = mockSettingsServiceApp();
 
-    renderSettingsRuntimeRoute();
+    renderSettingsServiceRoute();
 
     await waitFor(() => expect(client.getVersion).toHaveBeenCalledTimes(1));
     expect(screen.getByRole("textbox", { name: "User-Agent" })).toHaveAttribute("placeholder", "sandrone/0.2.0");
@@ -102,11 +102,11 @@ describe("SettingsRuntimeRoute", () => {
 
   it("returns to the settings overview", async () => {
     const user = userEvent.setup();
-    mockSettingsRuntimeApp();
+    mockSettingsServiceApp();
     const router = createMemoryRouter([
       { path: "/settings", element: <p>settings destination</p> },
-      { path: "/settings/runtime", element: <SettingsRuntimeRoute /> },
-    ], { initialEntries: ["/settings/runtime"] });
+      { path: "/settings/service", element: <SettingsServiceRoute /> },
+    ], { initialEntries: ["/settings/service"] });
     render(
       <I18nProvider>
         <RouterProvider router={router} />
@@ -142,10 +142,10 @@ function renderSettingsDataRoute() {
   );
 }
 
-function renderSettingsRuntimeRoute() {
+function renderSettingsServiceRoute() {
   const router = createMemoryRouter([
-    { path: "/settings/runtime", element: <SettingsRuntimeRoute /> },
-  ], { initialEntries: ["/settings/runtime"] });
+    { path: "/settings/service", element: <SettingsServiceRoute /> },
+  ], { initialEntries: ["/settings/service"] });
   return render(
     <I18nProvider>
       <RouterProvider router={router} />
@@ -190,7 +190,7 @@ function mockSettingsDataApp() {
   return client;
 }
 
-function mockSettingsRuntimeApp() {
+function mockSettingsServiceApp() {
   const client = {
     downloadBackup: vi.fn(),
     getScheduledRefreshStatus: vi.fn().mockResolvedValue({

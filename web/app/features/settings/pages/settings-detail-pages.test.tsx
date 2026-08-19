@@ -6,9 +6,9 @@ import { defaultProjectSettings } from "~/features/settings/model/project-settin
 import { UICapabilityProvider } from "~/shared/capabilities/context";
 
 import { SettingsDataPage } from "./settings-data-page";
-import { SettingsRuntimePage } from "./settings-runtime-page";
+import { SettingsServicePage } from "./settings-service-page";
 
-describe("settings runtime page", () => {
+describe("settings service page", () => {
 	it("hides probe defaults and scheduled refresh when capabilities are unavailable", () => {
 		render(
 			<UICapabilityProvider value={{
@@ -20,7 +20,7 @@ describe("settings runtime page", () => {
 				hasFeature: () => false,
 				getFeature: (key) => ({ key, enabled: false }),
 			}}>
-				<SettingsRuntimePage
+				<SettingsServicePage
 					overrides={{}}
 					restartRequired={[]}
 					scheduledRefreshResources={[]}
@@ -31,17 +31,17 @@ describe("settings runtime page", () => {
 			</UICapabilityProvider>,
 		);
 
-		expect(screen.queryByRole("button", { name: "测活" })).not.toBeInTheDocument();
+		expect(screen.queryByRole("heading", { name: "测活" })).not.toBeInTheDocument();
 		expect(screen.queryByRole("heading", { name: "定时更新" })).not.toBeInTheDocument();
 	});
 
-  it("edits the complete runtime page and saves every nested group before returning", async () => {
+  it("edits the complete service settings page and saves every group before returning", async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
     const onBack = vi.fn();
 
     renderRuntimePage(
-      <SettingsRuntimePage
+      <SettingsServicePage
         defaultUserAgent="sandrone/0.2.0"
         overrides={{ "http.listen": "environment" }}
         restartRequired={[]}
@@ -56,9 +56,9 @@ describe("settings runtime page", () => {
     expect(screen.getByRole("heading", { name: "运行默认值" })).toBeInTheDocument();
     const automaticTraffic = screen.getByRole("switch", { name: "在订阅列表显示" });
     expect(automaticTraffic).not.toBeChecked();
-    expect(screen.getByRole("button", { name: "远程请求" })).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("button", { name: "缓存" })).toHaveAttribute("aria-expanded", "false");
-    expect(screen.getByRole("button", { name: "测活" })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("heading", { name: "远程请求", level: 4 })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "测活", level: 4 })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "渲染与流量缓存", level: 4 })).toBeInTheDocument();
 
     expect(screen.getByRole("textbox", { name: "监听地址" })).toHaveValue("127.0.0.1:1137");
     expect(screen.queryByRole("textbox", { name: "Web UI 静态目录" })).not.toBeInTheDocument();
@@ -73,15 +73,32 @@ describe("settings runtime page", () => {
     fireEvent.change(within(remoteGroup).getByRole("textbox", { name: "User-Agent" }), {
       target: { value: "Sandrone Global" },
     });
-
-    await user.click(screen.getByRole("button", { name: "缓存" }));
-    const cacheGroup = screen.getByRole("region", { name: "缓存" });
-    fireEvent.change(within(cacheGroup).getByRole("spinbutton", { name: "远程请求缓存（秒）" }), {
+    fireEvent.change(within(remoteGroup).getByRole("spinbutton", { name: "远程请求缓存（秒）" }), {
       target: { value: "120" },
     });
-    fireEvent.change(within(cacheGroup).getByRole("spinbutton", { name: "测活结果缓存（秒）" }), {
+
+    const probeGroup = screen.getByRole("region", { name: "测活" });
+    expect(within(probeGroup).getAllByRole("combobox")).toHaveLength(2);
+    expect(within(probeGroup).getByRole("combobox", { name: "默认测活方式" })).toHaveTextContent("URL 测试");
+    fireEvent.change(within(probeGroup).getByRole("spinbutton", { name: "测活结果缓存（秒）" }), {
       target: { value: "300" },
     });
+    const probeURL = within(probeGroup).getByRole("combobox", { name: "URL" });
+    await user.click(probeURL);
+    await user.keyboard("{ArrowDown}");
+    await user.click(await screen.findByRole("option", {
+      name: "Cloudflare http://cp.cloudflare.com/generate_204",
+    }));
+    const probeMethod = within(probeGroup).getByRole("combobox", { name: "默认测活方式" });
+    await user.click(probeMethod);
+    await user.click(await screen.findByRole("option", { name: "UDP NTP" }));
+    expect(within(probeGroup).queryByRole("combobox", { name: "URL" })).not.toBeInTheDocument();
+    expect(within(probeGroup).getByRole("textbox", { name: "NTP 服务器" })).toBeInTheDocument();
+    await user.click(probeMethod);
+    await user.click(await screen.findByRole("option", { name: "URL 测试" }));
+    expect(within(probeGroup).getByRole("combobox", { name: "URL" })).toHaveValue("http://cp.cloudflare.com/generate_204");
+
+    const cacheGroup = screen.getByRole("region", { name: "渲染与流量缓存" });
     fireEvent.change(within(cacheGroup).getByRole("spinbutton", { name: "订阅流量缓存（秒）" }), {
       target: { value: "15" },
     });
@@ -92,17 +109,7 @@ describe("settings runtime page", () => {
       target: { value: "240" },
     });
 
-    await user.click(screen.getByRole("button", { name: "测活" }));
-    const probeGroup = screen.getByRole("region", { name: "测活" });
-    expect(within(probeGroup).getAllByRole("combobox")).toHaveLength(2);
-    expect(within(probeGroup).getByRole("combobox", { name: "默认测活方式" })).toHaveTextContent("url_test");
-    const probeURL = within(probeGroup).getByRole("combobox", { name: "URL" });
-    await user.click(probeURL);
-    await user.keyboard("{ArrowDown}");
-    await user.click(await screen.findByRole("option", {
-      name: "Cloudflare http://cp.cloudflare.com/generate_204",
-    }));
-    const pageHeader = screen.getByRole("heading", { name: "高级设置" }).closest("header");
+    const pageHeader = screen.getByRole("heading", { name: "服务设置" }).closest("header");
     expect(pageHeader).not.toBeNull();
     const saveRuntimeDefaults = within(pageHeader as HTMLElement).getByRole("button", { name: "保存设置" });
     await user.click(saveRuntimeDefaults);
@@ -143,18 +150,19 @@ describe("settings runtime page", () => {
       onSave,
     };
     const { rerender } = renderRuntimePage(
-      <SettingsRuntimePage
+      <SettingsServicePage
         {...baseProps}
         scheduledRefreshStatus={{ enabled: false, running: false, last_success_count: 0, last_failure_count: 0, skipped_count: 0 }}
       />,
     );
+    await user.click(screen.getByRole("switch", { name: "启用定时更新" }));
     const schedule = screen.getByRole("textbox", { name: "Cron 计划" });
     await user.clear(schedule);
     await user.type(schedule, "@daily");
 
     rerender(
       <UICapabilityProvider value={runtimeCapabilityValue}>
-        <SettingsRuntimePage
+        <SettingsServicePage
           {...baseProps}
           scheduledRefreshStatus={{ enabled: true, running: true, last_success_count: 2, last_failure_count: 1, skipped_count: 3 }}
         />
@@ -174,11 +182,12 @@ describe("settings runtime page", () => {
       ...defaultProjectSettings,
       scheduled_refresh: {
         ...defaultProjectSettings.scheduled_refresh,
+        enabled: true,
         targets: [{ kind: "subscription" as const, name: "missing-provider" }],
       },
     };
     renderRuntimePage(
-      <SettingsRuntimePage
+      <SettingsServicePage
         overrides={{}}
         restartRequired={[]}
         scheduledRefreshResources={[

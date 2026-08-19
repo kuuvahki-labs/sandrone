@@ -192,8 +192,25 @@ const routes = [
   { path: "/files/new?source=mihomo", heading: "新建文件", content: "节点来源", focus: true },
   { path: "/files/default.yaml/preview", heading: "文件预览", content: longPreviewNode, focus: true },
   { path: "/shares", heading: "分享", content: "还没有分享链接", focus: false },
-  { path: "/settings/runtime", heading: "高级设置", content: "远程请求", focus: false },
+  { path: "/settings/service", heading: "服务设置", content: "远程请求", focus: false },
 ];
+
+test("settings overview opens service settings", async ({ page }) => {
+  const consoleIssues: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error" || message.type() === "warning") {
+      consoleIssues.push(`${message.type()}: ${message.text()}`);
+    }
+  });
+  await page.goto("/settings");
+
+  await page.getByRole("button", { name: "打开服务设置" }).click();
+
+  await expect(page).toHaveURL(/\/settings\/service$/);
+  await expect(page.getByRole("heading", { exact: true, level: 2, name: "服务设置" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "远程请求" })).toBeVisible();
+  expect(consoleIssues).toEqual([]);
+});
 
 for (const route of routes) {
   test(`${route.path} renders without horizontal overflow`, async ({ page }, testInfo) => {
@@ -211,8 +228,8 @@ for (const route of routes) {
       ? page.getByRole("group", { name: route.content }).first()
       : route.path === "/files/default.yaml/preview"
         ? page.getByRole("region", { name: "最终文件内容" })
-        : route.path === "/settings/runtime"
-          ? page.getByRole("button", { name: route.content })
+        : route.path === "/settings/service"
+          ? page.getByRole("heading", { name: route.content })
           : page.getByText(route.content);
     await expect(routeContent).toBeVisible();
 

@@ -12,6 +12,6 @@ export default [
   route("files/:name/preview", "routes/files.$name.preview.tsx", { id: "files-preview" }),
   route("shares", "routes/shares.tsx", { id: "shares" }),
   route("settings", "routes/settings.tsx", { id: "settings" }),
-  route("settings/runtime", "routes/settings.runtime.tsx", { id: "settings-runtime" }),
+  route("settings/service", "routes/settings.service.tsx", { id: "settings-service" }),
   route("settings/data", "routes/settings.data.tsx", { id: "settings-data" }),
 ] satisfies RouteConfig;

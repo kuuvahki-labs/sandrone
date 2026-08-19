@@ -29,7 +29,10 @@ export function StartupSettingsSection({
   return (
     <Card component="article" variant="outlined">
       <CardContent className="grid gap-4">
-        <Typography component="h3" variant="h6">{t("settings.startup.title")}</Typography>
+        <div className="grid gap-1">
+          <Typography component="h3" variant="h6">{t("settings.startup.title")}</Typography>
+          <Typography color="text.secondary" variant="body2">{t("settings.startup.description")}</Typography>
+        </div>
         <div className="grid gap-5 lg:grid-cols-2">
           <section className="grid content-start gap-4" aria-labelledby="startup-service-heading">
             <Typography component="h4" id="startup-service-heading" variant="subtitle1">
