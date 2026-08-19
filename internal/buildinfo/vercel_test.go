@@ -85,8 +85,8 @@ func TestVercelWorkflowUsesPrebuiltAssetPipeline(t *testing.T) {
 		"npm install --global \"vercel@${VERCEL_CLI_VERSION}\"",
 		"./scripts/build-vercel-assets.sh",
 		"./scripts/verify-vercel-assets.sh",
-		"vercel build --prod",
-		"vercel build --token",
+		"vercel build --standalone --prod",
+		"vercel build --standalone --token",
 		"vercel deploy --prebuilt --prod",
 		"vercel deploy --prebuilt --archive=tgz",
 	} {
@@ -96,7 +96,7 @@ func TestVercelWorkflowUsesPrebuiltAssetPipeline(t *testing.T) {
 	}
 	buildAssetsAt := strings.Index(content, "./scripts/build-vercel-assets.sh")
 	verifyAssetsAt := strings.Index(content, "./scripts/verify-vercel-assets.sh")
-	vercelBuildAt := strings.Index(content, "vercel build --prod")
+	vercelBuildAt := strings.Index(content, "vercel build --standalone --prod")
 	vercelDeployAt := strings.Index(content, "vercel deploy --prebuilt --prod")
 	if buildAssetsAt < 0 || !(buildAssetsAt < verifyAssetsAt && verifyAssetsAt < vercelBuildAt && vercelBuildAt < vercelDeployAt) {
 		t.Error("Vercel workflow must generate, verify, build, and deploy in order")
@@ -106,6 +106,9 @@ func TestVercelWorkflowUsesPrebuiltAssetPipeline(t *testing.T) {
 	}
 	if strings.Contains(content, "github.ref == 'refs/heads/main' && 'production'") {
 		t.Error("Vercel workflow must reserve Production deployments for tags")
+	}
+	if strings.Contains(content, "vercel build --prod --token") || strings.Contains(content, "vercel build --token") {
+		t.Error("Vercel workflow must inline Go bootstrap output with standalone builds")
 	}
 }
 

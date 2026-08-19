@@ -132,9 +132,9 @@ jobs:
         shell: bash
         run: |
           if [[ "${VERCEL_ENVIRONMENT}" == production ]]; then
-            vercel build --prod --token="${VERCEL_TOKEN}"
+            vercel build --standalone --prod --token="${VERCEL_TOKEN}"
           else
-            vercel build --token="${VERCEL_TOKEN}"
+            vercel build --standalone --token="${VERCEL_TOKEN}"
           fi
 
       - name: Deploy Vercel output

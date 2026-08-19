@@ -39,7 +39,9 @@ VERCEL_PROJECT_ID=<Vercel project ID>
 部署 job 先运行 `scripts/build-vercel-assets.sh`，生成
 `internal/entry/webui/static/index.html` 和
 `internal/service/catalog_builtin/catalog.json.gz`，再运行契约检查、`vercel build`
-和 `vercel deploy --prebuilt`。这些生成物继续由 `.gitignore` 排除，不属于源码提交。
+和 `vercel deploy --prebuilt`。`vercel build --standalone` 会将 Go `bootstrap` 和全部
+依赖写入 Function 输出目录，避免预构建产物引用 CI runner 的临时路径。这些生成物
+继续由 `.gitignore` 排除，不属于源码提交。
 
 ## 配置 Vercel 环境变量
 
