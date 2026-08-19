@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -251,7 +252,7 @@ func TestServicePreservesURIWebSocketEarlyDataAcrossTargets(t *testing.T) {
 	}
 }
 
-func TestServicePreservesVMessTCPHTTPHeaderForSupportedTargets(t *testing.T) {
+func TestServicePreservesVMessTCPHTTPHeaderAndRejectsUnsupportedTarget(t *testing.T) {
 	svc := service.New()
 	doc := `{"v":"2","ps":"payload-name","add":"example.com","port":"443","id":"11111111-1111-1111-1111-111111111111","aid":"0","net":"tcp","type":"http","method":"GET","host":"cdn.example.com","path":"/api"}`
 	content := []byte("vmess://" + base64.StdEncoding.EncodeToString([]byte(doc)) + "#fragment-name")
@@ -278,9 +279,10 @@ func TestServicePreservesVMessTCPHTTPHeaderForSupportedTargets(t *testing.T) {
 		Format: "sing-box-outbounds",
 		Nodes:  parsed.Nodes,
 	})
-	require.NoError(t, err)
-	require.Len(t, singBoxResult.Report.Warnings, 1)
-	require.Equal(t, "transport.header_type", singBoxResult.Report.Warnings[0].Field)
+	require.Error(t, err)
+	require.Nil(t, singBoxResult)
+	require.True(t, domain.IsCode(err, domain.CodeRenderFailed), "unexpected error: %v", err)
+	require.Contains(t, err.Error(), "TCP HTTP header obfuscation")
 }
 
 func TestServiceConvertRunsParseAndRender(t *testing.T) {
@@ -701,6 +703,120 @@ func TestServiceParseRemoteExplicitFormatPreservesParserFormat(t *testing.T) {
 	require.Equal(t, server.URL, result.Source.SourceRefs[0].URL)
 }
 
+func TestServiceParseRemoteAutoUnwrapsBoundedSubscriptionEnvelopes(t *testing.T) {
+	tests := []struct {
+		name       string
+		body       string
+		wantFormat string
+		wantName   string
+	}{
+		{
+			name: "folded base64 uri list",
+			body: func() string {
+				encoded := base64.StdEncoding.EncodeToString([]byte("ss://aes-128-gcm:secret@example.com:8388#folded"))
+				return encoded[:20] + "\r\n" + encoded[20:]
+			}(),
+			wantFormat: "uri-list",
+			wantName:   "folded",
+		},
+		{
+			name:       "base64 mihomo document",
+			body:       base64.StdEncoding.EncodeToString([]byte("proxies:\n  - name: wrapped-mihomo\n    type: ss\n    server: example.com\n    port: 8388\n    cipher: aes-128-gcm\n    password: secret\n")),
+			wantFormat: "mihomo",
+			wantName:   "wrapped-mihomo",
+		},
+		{
+			name:       "raw url base64 sing-box document",
+			body:       base64.RawURLEncoding.EncodeToString([]byte(`{"outbounds":[{"type":"socks","tag":"wrapped-sing-box","server":"example.com","server_port":1080}]}`)),
+			wantFormat: "sing-box",
+			wantName:   "wrapped-sing-box",
+		},
+		{
+			name:       "whole body percent encoded",
+			body:       url.PathEscape("ss://aes-128-gcm:secret@example.com:8388#percent"),
+			wantFormat: "uri-list",
+			wantName:   "percent",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				_, _ = w.Write([]byte(tc.body))
+			}))
+			defer server.Close()
+
+			result, err := service.New().Parse(context.Background(), domain.ParseRequest{
+				Remote: &domain.RemoteInput{URL: server.URL},
+			})
+
+			require.NoError(t, err)
+			require.NotNil(t, result.Source)
+			require.Equal(t, tc.wantFormat, result.Source.Format)
+			require.Len(t, result.Nodes, 1)
+			require.Equal(t, tc.wantName, result.Nodes[0].Name)
+		})
+	}
+}
+
+func TestServiceParseRemoteAutoDoesNotRecursivelyDecodeOrExposeBody(t *testing.T) {
+	uri := "ss://aes-128-gcm:credential-must-not-leak@example.com:8388#private"
+	doubleWrapped := base64.StdEncoding.EncodeToString([]byte(base64.StdEncoding.EncodeToString([]byte(uri))))
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(doubleWrapped))
+	}))
+	defer server.Close()
+
+	_, err := service.New().Parse(context.Background(), domain.ParseRequest{
+		Remote: &domain.RemoteInput{URL: server.URL},
+	})
+
+	require.Error(t, err)
+	require.True(t, domain.IsCode(err, domain.CodeInvalidArgument))
+	require.NotContains(t, err.Error(), doubleWrapped)
+	require.NotContains(t, err.Error(), "credential-must-not-leak")
+}
+
+func TestServiceParseRemoteAutoRejectsNonCanonicalOrTrailingBase64(t *testing.T) {
+	uri := "ss://aes-128-gcm:secret@example.com:8388#strict"
+	canonical := base64.StdEncoding.EncodeToString([]byte(uri))
+	padding := strings.IndexByte(canonical, '=')
+	require.Positive(t, padding)
+	alphabet := "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+	last := strings.IndexByte(alphabet, canonical[padding-1])
+	require.NotEqual(t, -1, last)
+	nonCanonical := canonical[:padding-1] + string(alphabet[last+1]) + canonical[padding:]
+
+	for _, body := range []string{nonCanonical, canonical + "!junk"} {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte(body))
+		}))
+
+		_, err := service.New().Parse(context.Background(), domain.ParseRequest{
+			Remote: &domain.RemoteInput{URL: server.URL},
+		})
+		server.Close()
+
+		require.Error(t, err)
+		require.True(t, domain.IsCode(err, domain.CodeInvalidArgument))
+	}
+}
+
+func TestServiceParseRemoteExplicitFormatDoesNotUnwrapStructuredEnvelope(t *testing.T) {
+	body := base64.StdEncoding.EncodeToString([]byte("proxies:\n  - name: wrapped-mihomo\n    type: ss\n    server: example.com\n    port: 8388\n    cipher: aes-128-gcm\n    password: secret\n"))
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(body))
+	}))
+	defer server.Close()
+
+	_, err := service.New().Parse(context.Background(), domain.ParseRequest{
+		Format: "mihomo",
+		Remote: &domain.RemoteInput{URL: server.URL},
+	})
+
+	require.Error(t, err)
+}
+
 func TestServiceParseRemoteAutoDetectAggregatesCandidateErrors(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("not a subscription"))
@@ -715,8 +831,6 @@ func TestServiceParseRemoteAutoDetectAggregatesCandidateErrors(t *testing.T) {
 	require.Error(t, err)
 	require.True(t, domain.IsCode(err, domain.CodeInvalidArgument))
 	require.Contains(t, err.Error(), "could not detect subscription format")
-	require.Contains(t, err.Error(), "base64:")
-	require.Contains(t, err.Error(), "uri-list:")
 	require.Contains(t, err.Error(), "mihomo:")
 	require.Contains(t, err.Error(), "sing-box:")
 }

@@ -22,13 +22,13 @@ func mihomoKnownFields(nodeType domain.NodeType) map[string]bool {
 	case domain.NodeTypeShadowsocks, domain.NodeTypeSOCKS:
 		add("udp")
 	case domain.NodeTypeShadowsocksR:
-		add("udp", "protocol", "protocol-param", "obfs", "obfs-param")
+		add("udp", "protocol", "protocol-param", "protocolparam", "obfs", "obfs-param", "obfsparam")
 	case domain.NodeTypeSnell:
 		add("udp", "psk", "version", "reuse", "client-fingerprint", "obfs-opts")
 	case domain.NodeTypeAnyTLS:
 		add("idle-session-check-interval", "idle-session-timeout", "min-idle-session")
 	case domain.NodeTypeVMess:
-		add("alterId", "udp", "xudp", "packet-addr", "network", "ws-opts", "grpc-opts", "h2-opts", "http-opts")
+		add("alterId", "udp", "xudp", "packet-addr", "network", "ws-opts", "fast-open", "grpc-opts", "h2-opts", "http-opts")
 	case domain.NodeTypeVLESS:
 		add("udp", "xudp", "packet-addr", "network", "ws-opts", "grpc-opts", "h2-opts", "http-opts", "xhttp-opts")
 	case domain.NodeTypeTrojan:

@@ -75,9 +75,12 @@ v1.13.14；Shadowrocket 字段引用固定的上游 revision。调用方需要�
 | `sing-box` | 带 `outbounds`、`endpoints` 的 JSON，或单个带 `type` 的对象 | 否 |
 | `json-nodes` | `NodeIR` JSON 数组或 `{ "nodes": [...] }` | 是 |
 
-远程输入省略格式时，只在 `base64`、`uri-list`、`mihomo`、`sing-box`
-之间自动检测；`uri` 和 `json-nodes` 不属于自动检测候选。结构化顶层键会让
-`sing-box` 或 `mihomo` 优先，其余候选依次尝试，必须实际解析出至少一个节点。
+远程输入省略格式时，只在内层 `uri-list`、`mihomo`、`sing-box` 之间自动检测；
+`uri` 和 `json-nodes` 不属于自动检测候选。检测前允许一次有界 envelope 解包：
+原文、整体 `PathUnescape`、忽略 ASCII 空白后的 strict Base64，以及
+PathUnescape 后的 strict Base64。不会递归或双重解码，也不会用会把 `+` 改为空格
+的 query unescape。结构化顶层键会让 `sing-box` 或 `mihomo` 优先，每个候选必须
+实际解析出至少一个节点；source format 记录解包后的内层格式。
 
 显式 `uri-list`/`base64` 解析会对每行先尝试 URI，并兼容单行 JSON/YAML
 节点；远程自动检测使用严格 URI-list，不接受该单行结构化回退。
@@ -86,6 +89,12 @@ VMess URI 输入同时接受 legacy `vmess://Base64(JSON)` 与 Discussion #716
 风格的 `vmess://UUID@host:port?...` URL；URL 输入只提升当前 `NodeIR` 可表达
 的字段，未支持参数保留为 Raw 并产生 warning。VMess URI 输出仍为 legacy
 Base64 JSON，不承诺对 #716 的完整或无损往返。
+
+URI parser 还以严格完整匹配接受 Shadowrocket 的 VMess/VLESS Base64 authority
+方言，并把 `vmess1://` 作为 VMess scheme alias。VMess `aid`/`alterId` 冲突、
+无法唯一拆分的 legacy v1 `host;/path`、非法 authority 或未知历史组合都会拒绝，
+不会用宽松正则猜测。URI `packetEncoding=packet` 与 Mihomo
+`packet-encoding: packet` 都规范化为 canonical `packetaddr`。
 
 VMess 与 VLESS 的非空用户 ID 遵循上游核心兼容语义：能解析为 UUID 时规范化为
 canonical UUID 字符串，否则静默映射为以 nil UUID 为 namespace、原字符串为 name
@@ -109,8 +118,8 @@ Reality TLS 的有效 client fingerprint 也在共享 service 边界规范化：
 | `shadowrocket-proxies` | 完整的 Shadowrocket `[Proxy]` section |
 | `uri-list` | 未做 Base64 包装的逐行分享 URI |
 
-`shadowrocket-proxies` 没有同名或其它 Shadowrocket parser；它是纯输出
-adapter，不参与输入解析或自动检测。
+`shadowrocket-proxies` 是纯输出 adapter，不参与自动检测；上述 Shadowrocket
+分享链接由通用 URI parser 严格识别，不新增独立输入 format。
 
 ## 协议矩阵
 
@@ -134,8 +143,8 @@ adapter，不参与输入解析或自动检测。
 | `snell` | 否 | 是 | 否 | 是 | 是 |
 | `anytls` | 是 | 是 | 是 | 是 | 否 |
 
-URI parser 接受常用别名，例如 `hy://`、`hy2://`、`socks5://`；Mieru
-使用 `mierus://`。这些语法别名最终都规范化为表中的 canonical type。
+URI parser 接受常用别名，例如 `hy://`、`hy2://`、`socks5://`、`vmess1://`；
+Mieru 使用 `mierus://`。这些语法别名最终都规范化为表中的 canonical type。
 
 ## 字段状态语义
 
@@ -180,6 +189,14 @@ raw 字段会产生 `render_lossy_field`。`json-nodes` 会原样承载 `raw`，
   `dialer-proxy` 仍保留到 `raw` 并告警；
 - sing-box SOCKS 仅接受字符串或数值 `version: 5`；`4`、`4a` 和其它值仍
   保留到 `raw` 并告警。
+- URI `splithttp` 规范化为 `xhttp`；Hysteria/Hysteria2 `mport` 映射到
+  `server_ports`；TUIC 的 hyphen aliases 只在严格值域内映射到既有字段。
+- legacy `socks://Base64(user:pass)` 只在 strict Base64、UTF-8 和非空凭据
+  同时成立时提升；`socks5://` 不套用。Trojan presence-only `udp`/`tfo`/`ws`
+  只在无冲突 transport 时映射到既有 dialer/WebSocket 字段。
+- Shadowsocks URI 的 `uot`/`tfo` 与 AnyTLS 的 `udp` 只接受严格布尔值；未知值
+  保留到 `raw`。SS/SSR 已知 cipher alias 由 URI 与 Mihomo parser 共享规范化，
+  未知 cipher 保留原值交后续 validation/core 判定。
 
 这些边界只表示当前输入与既有 IR 语义等价，不新增 IR 字段，也不代表 parser
 支持同名上游能力的其它取值。
@@ -209,8 +226,11 @@ renderer 跳过整个节点并产生 `render_node_skipped`。
 - VMess、VLESS 和 Trojan URI 的 TCP `headerType=http` 使用
   `NodeIR.transport.header_type=http` 表达 HTTP header obfs，与
   `transport.type=http` 所表示的 H2 transport 分离；Mihomo 可以为
-  VMess/VLESS 渲染该语义，sing-box 无等价 transport 时产生
-  `transport.header_type` 有损告警。
+  VMess/VLESS 渲染该语义；目标没有等价 transport 时跳过节点，不删除 header
+  obfs 后生成另一个连接配置。
+- `transport.type=raw` 与无附加参数的 `tcp` 一样按默认 stream transport 处理；
+  type 为空却带 path/host/header/xHTTP 等连接参数时，Mihomo 与 sing-box 都跳过
+  节点，不静默删除参数。
 - WebSocket early-data、gRPC、xHTTP、Reality、ECH、multiplex、UDP-over-TCP
   都是独立字段族；某个 renderer 支持 transport 基础字段，并不表示它支持该族
   的所有扩展。
@@ -272,9 +292,14 @@ Mbps 界限或其它无效 canonical 速率时只跳过该节点，不会使仍�
   未建模的实现私有子字段留在 `raw`。
 - `ss`、`vmess`、`vless`、`trojan`、`mieru`、`socks` 和 WireGuard
   可表达 `dialer.udp_relay`；其它协议不能据此推断有等价开关。
-- 已声明的典型有损项包括 ECH DNS/force-query 扩展、multiplex、目标不支持的
-  transport type、Hysteria/Hysteria2 QUIC 调优、Hysteria2 Mbps 字段、
+- 已声明的典型有损项包括 ECH DNS/force-query 扩展、multiplex、
+  Hysteria/Hysteria2 QUIC 调优、Hysteria2 Mbps 字段、
   TUIC zero-RTT/heartbeat，以及 HTTP path。
+- VMess、VLESS 和 Trojan 的非默认 transport 若无法由 Mihomo 等价表达，或
+  transport 附加连接参数缺少 type，会跳过节点并产生 `render_node_skipped`。
+- SS `v2ray-plugin` 只在 SIP002 options 能完整解析为 Mihomo 的
+  `mode`/`host`/`path`/`tls`/`mux` 时输出；未知、非法、重复冲突参数会跳过节点，
+  不删除连接参数后继续转换或 Probe。
 
 ### `sing-box-outbounds`
 
@@ -284,9 +309,13 @@ Mbps 界限或其它无效 canonical 速率时只跳过该节点，不会使仍�
   UDP-over-TCP 等协议适用字段。
 - 没有通用 `dialer.udp_relay` 等价项；该字段不能用 `network` 代替。
 - 已声明的典型有损项包括证书 fingerprint、ECH DNS/force-query 扩展、
-  VLESS `encryption`、目标不支持的 transport type、Hysteria `protocol`
-  与 QUIC 调优、Hysteria2 字符串速率及 `bbr_profile`/`realm`/`cwnd`/
+  Hysteria `protocol` 与 QUIC 调优、Hysteria2 字符串速率及 `bbr_profile`/`realm`/`cwnd`/
   `udp_mtu`、TUIC token/reduce-RTT/UDP-over-stream version、SOCKS TLS。
+- VMess、VLESS 和 Trojan 的非默认 transport 若无法由 sing-box 等价表达（包括
+  xHTTP 与 TCP HTTP header obfs），以及非 `none` 的 VLESS `encryption`，会跳过
+  节点并产生 `render_node_skipped`，不会删除连接关键字段后输出或进入 probe。
+- Hysteria/Hysteria2 `hop_interval` 只有在目标 sing-box duration schema 能接受时
+  才会输出；端口跳跃区间等不能由该字段表达的值会跳过节点。
 
 ### `uri-list`
 

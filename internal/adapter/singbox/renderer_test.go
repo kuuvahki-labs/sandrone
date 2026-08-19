@@ -371,26 +371,28 @@ func TestRenderSingBoxSSSIP002SimpleObfsPlugin(t *testing.T) {
 	}
 }
 
-func TestRenderSingBoxVLESSLossyEncryption(t *testing.T) {
+func TestRenderSingBoxSkipsUnsupportedVLESSEncryption(t *testing.T) {
 	r := singbox.NewRenderer()
-	nodes := []domain.NodeIR{{
-		Name:       "vless",
-		Type:       domain.NodeTypeVLESS,
-		Server:     "example.com",
-		Port:       443,
-		UUID:       "11111111-1111-1111-1111-111111111111",
-		Encryption: "custom",
-	}}
+	nodes := []domain.NodeIR{
+		{
+			Name:       "vless",
+			Type:       domain.NodeTypeVLESS,
+			Server:     "example.com",
+			Port:       443,
+			UUID:       "11111111-1111-1111-1111-111111111111",
+			Encryption: "custom",
+		},
+		{Name: "valid", Type: domain.NodeTypeHTTP, Server: "valid.example", Port: 8080},
+	}
 	out, report, err := r.RenderWithReport(context.Background(), nodes, domain.RenderOptions{Format: "sing-box-outbounds"})
-	if err != nil {
-		t.Fatalf("render: %v", err)
-	}
-	if len(report.Warnings) == 0 {
-		t.Fatalf("expected lossy warning: %#v", report)
-	}
-	if !strings.Contains(string(out), "vless") {
-		t.Fatalf("unexpected output: %s", out)
-	}
+	require.NoError(t, err)
+	require.Equal(t, 1, report.SuccessCount)
+	require.Len(t, report.Warnings, 1)
+	require.Equal(t, "render_node_skipped", report.Warnings[0].Code)
+	require.Equal(t, "vless", report.Warnings[0].Node)
+	require.Contains(t, report.Warnings[0].Message, "non-default encryption")
+	require.NotContains(t, string(out), `"type": "vless"`)
+	require.Contains(t, string(out), `"tag": "valid"`)
 }
 
 func TestRenderSingBoxLossWarningsCoveredByCapability(t *testing.T) {
@@ -889,9 +891,11 @@ func TestRenderSingBoxTransportVariantsAndPluginOptions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("render: %v", err)
 	}
-	if len(report.Warnings) != 1 || report.Warnings[0].Field != "transport.type" {
-		t.Fatalf("expected unsupported transport warning: %#v", report.Warnings)
+	if report.SuccessCount != 5 || len(report.Warnings) != 1 || report.Warnings[0].Code != "render_node_skipped" {
+		t.Fatalf("expected unsupported transport skip: %#v", report)
 	}
+	require.Equal(t, "custom", report.Warnings[0].Node)
+	require.Contains(t, report.Warnings[0].Message, `does not support "splithttp" transport`)
 	var doc map[string]any
 	if err := json.Unmarshal(out, &doc); err != nil {
 		t.Fatalf("json: %v", err)
@@ -927,37 +931,104 @@ func TestRenderSingBoxTransportVariantsAndPluginOptions(t *testing.T) {
 	if tcp["transport"] != nil {
 		t.Fatalf("unexpected default tcp transport: %#v", tcp)
 	}
-	custom := outbounds[5].(map[string]any)
-	if custom["transport"] != nil {
-		t.Fatalf("unexpected unsupported custom transport: %#v", custom)
-	}
+	require.Len(t, outbounds, 5)
 }
 
-func TestRenderSingBoxWarnsForVMessTCPHTTPHeader(t *testing.T) {
+func TestRenderSingBoxSkipsVMessTCPHTTPHeader(t *testing.T) {
 	r := singbox.NewRenderer()
-	nodes := []domain.NodeIR{{
-		Name:   "vmess-http-header",
-		Type:   domain.NodeTypeVMess,
-		Server: "example.com",
-		Port:   443,
-		UUID:   "11111111-1111-1111-1111-111111111111",
-		Transport: &domain.TransportOptions{
-			Type:       "tcp",
-			HeaderType: "http",
-			Path:       "/api",
-			Host:       "cdn.example.com",
+	nodes := []domain.NodeIR{
+		{
+			Name:   "vmess-http-header",
+			Type:   domain.NodeTypeVMess,
+			Server: "example.com",
+			Port:   443,
+			UUID:   "11111111-1111-1111-1111-111111111111",
+			Transport: &domain.TransportOptions{
+				Type:       "tcp",
+				HeaderType: "http",
+				Path:       "/api",
+				Host:       "cdn.example.com",
+			},
 		},
-	}}
+		{Name: "valid", Type: domain.NodeTypeHTTP, Server: "valid.example", Port: 8080},
+	}
 
 	out, report, err := r.RenderWithReport(context.Background(), nodes, domain.RenderOptions{Format: "sing-box-outbounds"})
 	require.NoError(t, err)
 	require.Len(t, report.Warnings, 1)
-	require.Equal(t, "transport.header_type", report.Warnings[0].Field)
+	require.Equal(t, "render_node_skipped", report.Warnings[0].Code)
+	require.Equal(t, "vmess-http-header", report.Warnings[0].Node)
+	require.Contains(t, report.Warnings[0].Message, "TCP HTTP header obfuscation")
 
 	var doc map[string]any
 	require.NoError(t, json.Unmarshal(out, &doc))
 	outbound := doc["outbounds"].([]any)[0].(map[string]any)
-	require.NotContains(t, outbound, "transport")
+	require.Equal(t, "valid", outbound["tag"])
+}
+
+func TestRenderSingBoxSkipsUnsupportedV2RayTransportForEverySupportedProtocol(t *testing.T) {
+	xhttp := func() *domain.TransportOptions {
+		return &domain.TransportOptions{Type: "xhttp", Path: "/xhttp", XHTTP: &domain.XHTTPTransportOptions{Mode: "auto"}}
+	}
+	nodes := []domain.NodeIR{
+		{
+			Name: "vmess-xhttp", Type: domain.NodeTypeVMess, Server: "vmess.example", Port: 443,
+			UUID: "11111111-1111-1111-1111-111111111111", Transport: xhttp(),
+		},
+		{
+			Name: "vless-xhttp", Type: domain.NodeTypeVLESS, Server: "vless.example", Port: 443,
+			UUID: "22222222-2222-2222-2222-222222222222", Encryption: "none", Transport: xhttp(),
+		},
+		{
+			Name: "trojan-xhttp", Type: domain.NodeTypeTrojan, Server: "trojan.example", Port: 443,
+			Password: "secret", Transport: xhttp(),
+		},
+		{Name: "valid", Type: domain.NodeTypeHTTP, Server: "valid.example", Port: 8080},
+	}
+
+	out, report, err := singbox.NewRenderer().RenderWithReport(context.Background(), nodes, domain.RenderOptions{Format: "sing-box-outbounds"})
+
+	require.NoError(t, err)
+	require.Equal(t, 1, report.SuccessCount)
+	require.Len(t, report.Warnings, 3)
+	for i, name := range []string{"vmess-xhttp", "vless-xhttp", "trojan-xhttp"} {
+		require.Equal(t, "render_node_skipped", report.Warnings[i].Code)
+		require.Equal(t, name, report.Warnings[i].Node)
+		require.Contains(t, report.Warnings[i].Message, `does not support "xhttp" transport`)
+	}
+	require.NotContains(t, string(out), "xhttp")
+	require.Contains(t, string(out), `"tag": "valid"`)
+}
+
+func TestRenderSingBoxSkipsInvalidHysteriaHopInterval(t *testing.T) {
+	nodes := []domain.NodeIR{
+		{
+			Name: "hysteria-range", Type: domain.NodeTypeHysteria, Server: "hy.example", Port: 443,
+			TLS: &domain.TLSOptions{Enabled: true}, Hysteria: &domain.HysteriaOptions{HopInterval: "15-30", UpMbps: 20, DownMbps: 100},
+		},
+		{
+			Name: "hysteria2-range", Type: domain.NodeTypeHysteria2, Server: "hy2.example", Port: 443,
+			Password: "secret", TLS: &domain.TLSOptions{Enabled: true}, Hysteria: &domain.HysteriaOptions{HopInterval: "15-30"},
+		},
+		{
+			Name: "hysteria2-valid", Type: domain.NodeTypeHysteria2, Server: "hy2-valid.example", Port: 443,
+			Password: "secret", TLS: &domain.TLSOptions{Enabled: true}, Hysteria: &domain.HysteriaOptions{HopInterval: "30s"},
+		},
+		{Name: "valid", Type: domain.NodeTypeHTTP, Server: "valid.example", Port: 8080},
+	}
+
+	out, report, err := singbox.NewRenderer().RenderWithReport(context.Background(), nodes, domain.RenderOptions{Format: "sing-box-outbounds"})
+
+	require.NoError(t, err)
+	require.Equal(t, 2, report.SuccessCount)
+	require.Len(t, report.Warnings, 2)
+	require.Equal(t, "hysteria-range", report.Warnings[0].Node)
+	require.Contains(t, report.Warnings[0].Message, "invalid sing-box hysteria hop_interval")
+	require.Equal(t, "hysteria2-range", report.Warnings[1].Node)
+	require.Contains(t, report.Warnings[1].Message, "invalid sing-box hysteria2 hop_interval")
+	require.NotContains(t, string(out), "15-30")
+	require.Contains(t, string(out), `"hop_interval": "30s"`)
+	require.Contains(t, string(out), `"tag": "valid"`)
 }
 
 func TestRenderSingBoxWireGuardAddressAndPeerFallbacks(t *testing.T) {

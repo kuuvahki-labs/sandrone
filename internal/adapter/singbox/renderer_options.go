@@ -1,6 +1,7 @@
 package singbox
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
@@ -89,12 +90,27 @@ func applyTLS(out map[string]any, node domain.NodeIR) {
 	out["tls"] = tls
 }
 
-func applyTransport(out map[string]any, node domain.NodeIR) {
-	if node.Transport == nil || node.Transport.Type == "" {
-		return
+func applyTransport(out map[string]any, node domain.NodeIR) error {
+	if node.Transport == nil {
+		return nil
+	}
+	if strings.TrimSpace(node.Transport.Type) == "" {
+		if transportHasDetails(node.Transport) {
+			return domain.NewError(domain.CodeRenderFailed, "sing-box V2Ray transport has connection parameters but no transport type")
+		}
+		return nil
+	}
+	if isDefaultTCPTransport(node.Transport) {
+		return nil
+	}
+	if isHTTPHeaderTransport(node.Transport) {
+		return domain.NewError(domain.CodeRenderFailed, "sing-box V2Ray transport schema does not support TCP HTTP header obfuscation")
 	}
 	if !singBoxSupportsTransport(node.Transport.Type) {
-		return
+		return domain.NewError(
+			domain.CodeRenderFailed,
+			fmt.Sprintf("sing-box V2Ray transport schema does not support %q transport", node.Transport.Type),
+		)
 	}
 	transport := map[string]any{}
 	switch node.Transport.Type {
@@ -163,6 +179,7 @@ func applyTransport(out map[string]any, node domain.NodeIR) {
 		}
 	}
 	out["transport"] = transport
+	return nil
 }
 
 func headersWithoutHost(headers map[string]string) map[string]string {
@@ -192,21 +209,29 @@ func singBoxSupportsTransport(transportType string) bool {
 }
 
 func isDefaultTCPTransport(transport *domain.TransportOptions) bool {
-	if transport == nil || strings.TrimSpace(strings.ToLower(transport.Type)) != "tcp" {
+	if transport == nil {
 		return false
 	}
-	return transport.HeaderType == "" &&
-		transport.Method == "" &&
-		transport.Path == "" &&
-		transport.Host == "" &&
-		len(transport.Hosts) == 0 &&
-		len(transport.Headers) == 0 &&
-		transport.ServiceName == "" &&
-		transport.MaxEarlyData == 0 &&
-		transport.EarlyDataHeaderName == "" &&
-		!transport.V2RayHTTPUpgrade &&
-		!transport.V2RayHTTPUpgradeFastOpen &&
-		transport.XHTTP == nil
+	typeName := strings.TrimSpace(strings.ToLower(transport.Type))
+	if typeName != "tcp" && typeName != "raw" {
+		return false
+	}
+	return !transportHasDetails(transport)
+}
+
+func transportHasDetails(transport *domain.TransportOptions) bool {
+	return transport != nil && (transport.HeaderType != "" ||
+		transport.Method != "" ||
+		transport.Path != "" ||
+		transport.Host != "" ||
+		len(transport.Hosts) > 0 ||
+		len(transport.Headers) > 0 ||
+		transport.ServiceName != "" ||
+		transport.MaxEarlyData != 0 ||
+		transport.EarlyDataHeaderName != "" ||
+		transport.V2RayHTTPUpgrade ||
+		transport.V2RayHTTPUpgradeFastOpen ||
+		transport.XHTTP != nil)
 }
 
 func applyMux(out map[string]any, node domain.NodeIR) {

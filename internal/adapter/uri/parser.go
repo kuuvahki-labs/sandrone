@@ -34,7 +34,8 @@ func NewParser() *Parser {
 	p.register("ss", parseSS)
 	p.register("ssr", parseSSR)
 	p.register("vmess", parseVMess)
-	p.register("vless", parseVLESS)
+	p.register("vmess1", parseVMess1)
+	p.register("vless", parseVLESSCompat)
 	p.register("trojan", parseTrojan)
 	p.register("hysteria", parseHysteria)
 	p.register("hy", parseHysteria)
@@ -130,7 +131,7 @@ func (p *Parser) parseListLine(line string, lineNumber int, strict bool) ([]doma
 		if source == nil {
 			source = &domain.SourceInfo{Format: "uri-list"}
 		}
-		err := domain.NewError(domain.CodeParseFailed, fmt.Sprintf("line %q; URI: %v; JSON/YAML node lines are not allowed in strict uri-list", line, uriErr))
+		err := domain.NewError(domain.CodeParseFailed, fmt.Sprintf("line %d (%s): %s; JSON/YAML node lines are not allowed in strict uri-list", lineNumber, safeListLineScheme(line), safeListLineCause(uriErr)))
 		source.Warnings = append(source.Warnings, failedListLineWarning(line, lineNumber, err))
 		return nil, source
 	}
@@ -145,9 +146,42 @@ func (p *Parser) parseListLine(line string, lineNumber int, strict bool) ([]doma
 	if source == nil {
 		source = &domain.SourceInfo{Format: "uri-list"}
 	}
-	err := domain.NewError(domain.CodeParseFailed, fmt.Sprintf("line %q; URI: %v; JSON: %v; YAML: %v", line, uriErr, jsonErr, yamlErr))
+	err := domain.NewError(domain.CodeParseFailed, fmt.Sprintf("line %d (%s): %s; JSON/YAML node fallback also failed", lineNumber, safeListLineScheme(line), safeListLineCause(uriErr)))
 	source.Warnings = append(source.Warnings, failedListLineWarning(line, lineNumber, err))
 	return nil, source
+}
+
+func safeListLineScheme(line string) string {
+	scheme, _, ok := strings.Cut(line, "://")
+	if !ok || scheme == "" || len(scheme) > 32 {
+		return "unknown scheme"
+	}
+	for _, value := range scheme {
+		if (value >= 'a' && value <= 'z') || (value >= 'A' && value <= 'Z') ||
+			(value >= '0' && value <= '9') || value == '+' || value == '-' || value == '.' {
+			continue
+		}
+		return "unknown scheme"
+	}
+	return "scheme " + strings.ToLower(scheme)
+}
+
+func safeListLineCause(err error) string {
+	var appErr *domain.AppError
+	if !errors.As(err, &appErr) || strings.TrimSpace(appErr.Message) == "" {
+		return "URI parse failed"
+	}
+	message := strings.Map(func(value rune) rune {
+		if value < ' ' || value == '\u007f' {
+			return ' '
+		}
+		return value
+	}, strings.TrimSpace(appErr.Message))
+	const maxCauseLength = 160
+	if len(message) > maxCauseLength {
+		message = message[:maxCauseLength] + "..."
+	}
+	return message
 }
 
 func skipListLineError(err error) bool {

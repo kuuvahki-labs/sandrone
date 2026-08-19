@@ -1,11 +1,13 @@
 package uri
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/url"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/shared"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
@@ -103,6 +105,7 @@ func parseTrojan(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 		node.TLS.Enabled = true
 	}
 	applyTransportQuery(&node, values)
+	legacy := applyTrojanPresenceFlags(&node, values)
 	node.Raw = map[string]json.RawMessage{}
 	known := map[string]bool{
 		"security": true, "tls": true, "sni": true, "servername": true, "serverName": true, "peer": true,
@@ -112,6 +115,14 @@ func parseTrojan(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 		"type": true, "net": true, "transport": true, "host": true, "authority": true,
 		"path": true, "wspath": true, "obfs-uri": true, "serviceName": true, "service_name": true,
 		"wsHost": true, "ws-host": true, "wsPath": true, "ws-path": true,
+	}
+	for key := range legacy {
+		known[key] = true
+	}
+	if _, hasLegacyWS := values["ws"]; hasLegacyWS && !legacy["ws"] && node.Transport == nil {
+		for _, key := range []string{"wspath", "wsPath", "ws-path"} {
+			delete(known, key)
+		}
 	}
 	if queryValuesAreNoopHeaderType(values) {
 		known["headerType"] = true
@@ -144,6 +155,7 @@ func parseHysteria(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 	node.Server = host
 	node.Port = port
 	values := u.Query()
+	serverPorts, mportKnown := parseHysteriaMPort(values)
 	node.Hysteria = &domain.HysteriaOptions{
 		Protocol:     values.Get("protocol"),
 		Auth:         values.Get("auth"),
@@ -151,6 +163,7 @@ func parseHysteria(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 		Obfs:         values.Get("obfs"),
 		ObfsPassword: shared.QueryFirst(values, "obfsParam", "obfs-param", "obfs-password", "obfs_password"),
 		HopInterval:  shared.QueryFirst(values, "hop_interval", "hop-interval"),
+		ServerPorts:  serverPorts,
 	}
 	knownRates := shared.NormalizeURIHysteriaBandwidth(&node, source, values)
 	applyTLSQuery(&node, values)
@@ -172,6 +185,9 @@ func parseHysteria(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 	}
 	for key, value := range knownRates {
 		known[key] = value
+	}
+	if mportKnown {
+		known["mport"] = true
 	}
 	preserveURIQuery(&node, values, known)
 	return node, source, nil
@@ -204,6 +220,15 @@ func parseHysteria2(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 		HopInterval:  shared.QueryFirst(values, "hop_interval", "hop-interval"),
 		ServerPorts:  serverPorts,
 	}
+	mportKnown := false
+	if mport, ok := parseHysteriaMPort(values); ok {
+		if len(node.Hysteria.ServerPorts) == 0 {
+			node.Hysteria.ServerPorts = mport
+			mportKnown = true
+		} else if equalStringLists(node.Hysteria.ServerPorts, mport) {
+			mportKnown = true
+		}
+	}
 	applyTLSQuery(&node, values)
 	applyHysteria2ParseQueryTLS(&node, values)
 	if node.TLS == nil {
@@ -219,93 +244,14 @@ func parseHysteria2(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 		"allowInsecure": true, "allowinsecure": true, "allow_insecure": true, "allow-insecure": true, "skip-cert-verify": true, "insecure": true, "disable_sni": true,
 		"fp": true, "fingerprint": true, "pinSHA256": true, "pcs": true,
 	}
+	if mportKnown {
+		known["mport"] = true
+	}
 	if peer := values.Get("peer"); peer != "" && node.TLS != nil && node.TLS.ServerName == peer {
 		known["peer"] = true
 	}
 	preserveURIQuery(&node, values, known)
 	return node, source, nil
-}
-
-func splitURI(raw string, schemes ...string) (authority string, query string, fragment string, err error) {
-	scheme, body, ok := strings.Cut(raw, "://")
-	if !ok {
-		return "", "", "", domain.NewError(domain.CodeParseFailed, "missing URI scheme")
-	}
-	matched := false
-	for _, allowed := range schemes {
-		if strings.EqualFold(scheme, allowed) {
-			matched = true
-			break
-		}
-	}
-	if !matched {
-		return "", "", "", domain.NewError(domain.CodeParseFailed, "unsupported URI scheme")
-	}
-	body, fragment, _ = strings.Cut(body, "#")
-	body, query, _ = strings.Cut(body, "?")
-	authority, _, _ = strings.Cut(body, "/")
-	if authority == "" {
-		return "", "", "", domain.NewError(domain.CodeParseFailed, "missing URI authority")
-	}
-	return authority, query, fragment, nil
-}
-
-func splitUserInfo(authority string) (string, string) {
-	at := strings.LastIndex(authority, "@")
-	if at < 0 {
-		return "", authority
-	}
-	return authority[:at], authority[at+1:]
-}
-
-func parseHysteria2Authority(authority string) (string, uint16, []string, error) {
-	host, portSpec, err := splitHysteria2Authority(authority)
-	if err != nil {
-		return "", 0, nil, err
-	}
-	if host == "" {
-		return "", 0, nil, fmt.Errorf("missing host")
-	}
-	if portSpec == "" {
-		return host, 443, nil, nil
-	}
-	ports := splitList(portSpec)
-	firstPort := ports[0]
-	if start, _, ok := strings.Cut(firstPort, "-"); ok {
-		firstPort = start
-	}
-	port, err := strconv.Atoi(firstPort)
-	if err != nil || port <= 0 || port > 65535 {
-		return "", 0, nil, fmt.Errorf("invalid port")
-	}
-	if len(ports) == 1 && ports[0] == strconv.Itoa(port) {
-		return host, uint16(port), nil, nil
-	}
-	return host, uint16(port), ports, nil
-}
-
-func splitHysteria2Authority(authority string) (string, string, error) {
-	if strings.HasPrefix(authority, "[") {
-		end := strings.Index(authority, "]")
-		if end < 0 {
-			return "", "", fmt.Errorf("invalid ipv6 host")
-		}
-		host := authority[1:end]
-		if len(authority) == end+1 {
-			return host, "", nil
-		}
-		if authority[end+1] != ':' {
-			return "", "", fmt.Errorf("invalid host port separator")
-		}
-		return host, authority[end+2:], nil
-	}
-	if host, portSpec, ok := shared.SplitBareIPv6HostPort(authority); ok {
-		return host, portSpec, nil
-	}
-	if host, portSpec, ok := strings.Cut(authority, ":"); ok {
-		return host, portSpec, nil
-	}
-	return authority, "", nil
 }
 
 func parseTUIC(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
@@ -327,29 +273,42 @@ func parseTUIC(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 		node.Password, _ = url.QueryUnescape(password)
 	}
 	values := u.Query()
+	congestionControl, congestionKnown := preferredQueryString(values, "congestion_control", "congestion-controller", "congestion-control")
+	reduceRTT, reduceKnown := preferredQueryBool(values, "reduce_rtt", "reduce-rtt")
+	disableSNI, disableSNIKnown := preferredQueryBool(values, "disable_sni", "disable-sni")
 	node.Token = values.Get("token")
 	node.TUIC = &domain.TUICOptions{
-		CongestionControl: shared.QueryFirst(values, "congestion_control", "congestion-controller"),
+		CongestionControl: congestionControl,
 		UDPRelayMode:      shared.QueryFirst(values, "udp_relay_mode", "udp-relay-mode"),
 		ZeroRTTHandshake:  shared.BoolValue(values.Get("zero_rtt_handshake")),
-		ReduceRTT:         shared.BoolValue(values.Get("reduce_rtt")),
+		ReduceRTT:         reduceRTT,
 		Heartbeat:         values.Get("heartbeat"),
 	}
 	applyTLSQuery(&node, values)
+	if len(disableSNIKnown) > 0 {
+		if node.TLS == nil {
+			node.TLS = &domain.TLSOptions{}
+		}
+		node.TLS.DisableSNI = disableSNI
+	}
 	if node.TLS == nil {
 		node.TLS = &domain.TLSOptions{Enabled: true}
 	} else {
 		node.TLS.Enabled = true
 	}
 	node.Raw = map[string]json.RawMessage{}
-	preserveURIQuery(&node, values, map[string]bool{
-		"token": true, "congestion_control": true, "congestion-controller": true,
+	known := map[string]bool{
+		"token":          true,
 		"udp_relay_mode": true, "udp-relay-mode": true, "zero_rtt_handshake": true,
-		"reduce_rtt": true, "heartbeat": true, "security": true, "sni": true,
+		"heartbeat": true, "security": true, "sni": true,
 		"alpn": true, "allowInsecure": true, "allowinsecure": true, "allow_insecure": true, "allow-insecure": true,
-		"skip-cert-verify": true, "insecure": true, "disable_sni": true,
+		"skip-cert-verify": true, "insecure": true,
 		"fp": true, "fingerprint": true, "pinSHA256": true, "pcs": true,
-	})
+	}
+	mergeKnownQueryKeys(known, congestionKnown)
+	mergeKnownQueryKeys(known, reduceKnown)
+	mergeKnownQueryKeys(known, disableSNIKnown)
+	preserveURIQuery(&node, values, known)
 	return node, source, nil
 }
 
@@ -437,11 +396,77 @@ func parseSOCKS(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 	node.Username = u.User.Username()
 	if password, ok := u.User.Password(); ok {
 		node.Password, _ = url.QueryUnescape(password)
+	} else if strings.EqualFold(u.Scheme, "socks") {
+		username, password, ok := decodeLegacySOCKSUserinfo(node.Username)
+		if ok {
+			node.Username = username
+			node.Password = password
+		}
 	}
 	node.Raw = map[string]json.RawMessage{}
 	values := u.Query()
 	preserveURIQuery(&node, values, map[string]bool{})
 	return node, source, nil
+}
+
+func decodeLegacySOCKSUserinfo(encoded string) (string, string, bool) {
+	for _, decoder := range []*base64.Encoding{
+		base64.StdEncoding.Strict(),
+		base64.RawStdEncoding.Strict(),
+	} {
+		decoded, err := decoder.DecodeString(encoded)
+		if err != nil || !utf8.Valid(decoded) {
+			continue
+		}
+		username, password, ok := strings.Cut(string(decoded), ":")
+		if ok && username != "" && password != "" {
+			return username, password, true
+		}
+	}
+	return "", "", false
+}
+
+func applyTrojanPresenceFlags(node *domain.NodeIR, values url.Values) map[string]bool {
+	known := map[string]bool{}
+	if queryValueIsSingleEmpty(values, "udp") {
+		udp := true
+		ensureDialer(node).UDPRelay = &udp
+		known["udp"] = true
+	}
+	if queryValueIsSingleEmpty(values, "tfo") {
+		ensureDialer(node).TFO = true
+		known["tfo"] = true
+	}
+	if !queryValueIsSingleEmpty(values, "ws") || hasExplicitTransportQuery(values) {
+		return known
+	}
+	node.Transport = &domain.TransportOptions{
+		Type: "websocket",
+		Path: shared.QueryFirst(values, "wspath", "wsPath", "ws-path"),
+	}
+	known["ws"] = true
+	return known
+}
+
+func queryValueIsSingleEmpty(values url.Values, key string) bool {
+	raw, ok := values[key]
+	return ok && len(raw) == 1 && raw[0] == ""
+}
+
+func hasExplicitTransportQuery(values url.Values) bool {
+	for _, key := range []string{"type", "net", "transport"} {
+		if _, ok := values[key]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func ensureDialer(node *domain.NodeIR) *domain.DialerOptions {
+	if node.Dialer == nil {
+		node.Dialer = &domain.DialerOptions{}
+	}
+	return node.Dialer
 }
 
 func parseTelegramProxy(raw string) (domain.NodeIR, *domain.SourceInfo, error) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"strings"
 	"time"
 
@@ -92,9 +93,15 @@ func parseMihomoProxy(proxy map[string]any, nodeIndex int) (domain.NodeIR, []dom
 	node.Password = shared.StringValue(proxy["password"])
 	node.UUID = shared.StringValue(proxy["uuid"])
 	node.Cipher = firstNonEmpty(shared.StringValue(proxy["cipher"]), shared.StringValue(proxy["method"]))
+	switch node.Type {
+	case domain.NodeTypeShadowsocks:
+		node.Cipher = shared.NormalizeShadowsocksCipher(node.Cipher)
+	case domain.NodeTypeShadowsocksR:
+		node.Cipher = shared.NormalizeShadowsocksRCipher(node.Cipher)
+	}
 	node.Flow = shared.StringValue(proxy["flow"])
 	node.Encryption = shared.StringValue(proxy["encryption"])
-	node.PacketEncoding = shared.StringValue(proxy["packet-encoding"])
+	node.PacketEncoding = shared.NormalizePacketEncoding(shared.StringValue(proxy["packet-encoding"]))
 	if node.PacketEncoding == "" && (node.Type == domain.NodeTypeVMess || node.Type == domain.NodeTypeVLESS) {
 		switch {
 		case shared.BoolValue(proxy["xudp"]):
@@ -106,14 +113,14 @@ func parseMihomoProxy(proxy map[string]any, nodeIndex int) (domain.NodeIR, []dom
 	node.Plugin = shared.StringValue(proxy["plugin"])
 	node.PluginOptions = shared.AnyMapValue(proxy["plugin-opts"])
 	node.Headers = shared.StringMapValue(proxy["headers"])
-	parseMihomoDialer(&node, proxy)
+	warnings := parseMihomoDialer(&node, proxy, nodeIndex)
 	parseMihomoTLS(&node, proxy)
-	parseMihomoTransport(&node, proxy)
+	warnings = append(warnings, parseMihomoTransport(&node, proxy, nodeIndex)...)
 	parseMihomoMux(&node, proxy)
 	parseMihomoUDPOverTCP(&node, proxy)
 	switch node.Type {
 	case domain.NodeTypeShadowsocksR:
-		parseMihomoShadowsocksR(&node, proxy)
+		warnings = append(warnings, parseMihomoShadowsocksR(&node, proxy, nodeIndex)...)
 	case domain.NodeTypeSnell:
 		parseMihomoSnell(&node, proxy)
 	case domain.NodeTypeAnyTLS:
@@ -134,11 +141,14 @@ func parseMihomoProxy(proxy map[string]any, nodeIndex int) (domain.NodeIR, []dom
 		parseMihomoWireGuard(&node, proxy)
 	}
 	known := mihomoKnownFields(node.Type)
+	if node.Type == domain.NodeTypeVMess && node.Transport != nil && node.Transport.Type == "websocket" {
+		shared.AddKnownFields(known, "ws-path", "ws-headers")
+	}
 	if node.Type == domain.NodeTypeHysteria2 && isExplicitTrue(proxy["udp"]) {
 		known["udp"] = true
 	}
 	shared.AddUnknownRaw(node.Raw, "mihomo.", proxy, known)
-	warnings := unknownWarnings(node, node.Raw, "mihomo", nodeIndex, mihomoWarningNodeContext(node, proxy))
+	warnings = append(warnings, unknownWarnings(node, node.Raw, "mihomo", nodeIndex, mihomoWarningNodeContext(node, proxy))...)
 	if len(node.Raw) == 0 {
 		node.Raw = nil
 	}
@@ -221,44 +231,46 @@ func parseMihomoTLS(node *domain.NodeIR, proxy map[string]any) {
 	}
 }
 
-func parseMihomoDialer(node *domain.NodeIR, proxy map[string]any) {
-	if _, ok := proxy["udp"]; ok && mihomoSupportsUDPRelay(node.Type) {
-		if node.Dialer == nil {
-			node.Dialer = &domain.DialerOptions{}
-		}
-		udp := shared.BoolValue(proxy["udp"])
-		node.Dialer.UDPRelay = &udp
-	}
-	fastOpen := node.Type == domain.NodeTypeHysteria || node.Type == domain.NodeTypeTUIC
-	if shared.BoolValue(proxy["tfo"]) || (fastOpen && shared.BoolValue(proxy["fast-open"])) {
-		if node.Dialer == nil {
-			node.Dialer = &domain.DialerOptions{}
-		}
-		node.Dialer.TFO = true
-	}
-}
-
-func parseMihomoTransport(node *domain.NodeIR, proxy map[string]any) {
+func parseMihomoTransport(node *domain.NodeIR, proxy map[string]any, nodeIndex int) []domain.Warning {
+	warnings := []domain.Warning{}
 	network := strings.ToLower(shared.StringValue(proxy["network"]))
 	if network == "" {
-		return
+		return warnings
 	}
 	if !mihomoNodeUsesV2RayTransport(node.Type) {
 		shared.AddRaw(node.Raw, "mihomo.network", proxy["network"])
-		return
+		return warnings
 	}
 	if !mihomoSupportsSourceTransport(node.Type, network) {
 		shared.AddRaw(node.Raw, "mihomo.network", proxy["network"])
 		node.Transport = &domain.TransportOptions{Type: "tcp"}
-		return
+		return warnings
 	}
 	node.Transport = &domain.TransportOptions{Type: network}
 	switch network {
 	case "ws":
 		node.Transport.Type = "websocket"
 		opts := shared.AnyMapValue(proxy["ws-opts"])
-		node.Transport.Path = shared.StringValue(opts["path"])
-		node.Transport.Headers = shared.StringMapValue(opts["headers"])
+		modernPath, hasModernPath := opts["path"]
+		legacyPath, hasLegacyPath := proxy["ws-path"]
+		if hasModernPath {
+			node.Transport.Path = shared.StringValue(modernPath)
+			if hasLegacyPath && shared.StringValue(legacyPath) != node.Transport.Path {
+				warnings = append(warnings, mihomoAliasConflictWarning(*node, proxy, nodeIndex, "ws-path", "ws-opts.path"))
+			}
+		} else if hasLegacyPath {
+			node.Transport.Path = shared.StringValue(legacyPath)
+		}
+		modernHeaders, hasModernHeaders := opts["headers"]
+		legacyHeaders, hasLegacyHeaders := proxy["ws-headers"]
+		if hasModernHeaders {
+			node.Transport.Headers = shared.StringMapValue(modernHeaders)
+			if hasLegacyHeaders && !maps.Equal(shared.StringMapValue(legacyHeaders), node.Transport.Headers) {
+				warnings = append(warnings, mihomoAliasConflictWarning(*node, proxy, nodeIndex, "ws-headers", "ws-opts.headers"))
+			}
+		} else if hasLegacyHeaders {
+			node.Transport.Headers = shared.StringMapValue(legacyHeaders)
+		}
 		if host := node.Transport.Headers["Host"]; host != "" {
 			node.Transport.Host = host
 		}
@@ -319,6 +331,7 @@ func parseMihomoTransport(node *domain.NodeIR, proxy map[string]any) {
 		shared.AddKnownFields(known, "path", "host", "headers")
 		preserveNestedMihomoRaw(node, "xhttp-opts", opts, known)
 	}
+	return warnings
 }
 
 func mihomoNodeUsesV2RayTransport(nodeType domain.NodeType) bool {
@@ -386,15 +399,6 @@ func parseMihomoUDPOverTCP(node *domain.NodeIR, proxy map[string]any) {
 	node.UDPOverTCP = &domain.UDPOverTCPOptions{Enabled: true}
 	if version, err := shared.IntValue(firstNonEmpty(shared.StringValue(proxy["udp-over-tcp-version"]), shared.StringValue(proxy["udp-over-stream-version"]))); err == nil {
 		node.UDPOverTCP.Version = version
-	}
-}
-
-func parseMihomoShadowsocksR(node *domain.NodeIR, proxy map[string]any) {
-	node.ShadowsocksR = &domain.ShadowsocksROptions{
-		Protocol:      shared.StringValue(proxy["protocol"]),
-		ProtocolParam: shared.StringValue(proxy["protocol-param"]),
-		Obfs:          shared.StringValue(proxy["obfs"]),
-		ObfsParam:     shared.StringValue(proxy["obfs-param"]),
 	}
 }
 

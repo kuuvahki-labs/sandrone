@@ -61,6 +61,14 @@ func parseSS(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 		if err != nil {
 			return node, source, domain.WrapError(domain.CodeParseFailed, "parse ss query", err)
 		}
+		uot, uotKnown := preferredQueryBool(values, "uot")
+		if len(uotKnown) > 0 {
+			node.UDPOverTCP = &domain.UDPOverTCPOptions{Enabled: uot}
+		}
+		tfo, tfoKnown := preferredQueryBool(values, "tfo")
+		if len(tfoKnown) > 0 && tfo {
+			ensureDialer(&node).TFO = true
+		}
 		for _, key := range sortedQueryKeys(values) {
 			switch key {
 			case "plugin":
@@ -70,6 +78,9 @@ func parseSS(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 					node.PluginOptions = map[string]any{"raw": values.Get(key)}
 				}
 			default:
+				if uotKnown[key] || tfoKnown[key] {
+					continue
+				}
 				node.Raw["uri.query."+key] = json.RawMessage(strconv.Quote(values.Get(key)))
 			}
 		}
@@ -105,7 +116,7 @@ func parseSSR(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 	}
 	node.Server = parts[0]
 	node.Port = uint16(port)
-	node.Cipher = normalizeSSCipher(parts[3])
+	node.Cipher = shared.NormalizeShadowsocksRCipher(parts[3])
 	node.Password = password
 	node.ShadowsocksR = &domain.ShadowsocksROptions{
 		Protocol: parts[2],
@@ -171,30 +182,7 @@ func decodeSSUserInfo(s string) (ssCredentials, error) {
 }
 
 func normalizeSSCipher(method string) string {
-	trimmed := strings.TrimSpace(method)
-	key := strings.ToLower(strings.ReplaceAll(trimmed, "_", "-"))
-	aliases := map[string]string{
-		"aead-chacha20-poly1305":  "chacha20-ietf-poly1305",
-		"chacha20-poly1305":       "chacha20-ietf-poly1305",
-		"chacha20-ietf-poly1305":  "chacha20-ietf-poly1305",
-		"xchacha20-ietf-poly1305": "xchacha20-ietf-poly1305",
-		"aead-aes-128-gcm":        "aes-128-gcm",
-		"aes-128-gcm":             "aes-128-gcm",
-		"aead-aes-192-gcm":        "aes-192-gcm",
-		"aes-192-gcm":             "aes-192-gcm",
-		"aead-aes-256-gcm":        "aes-256-gcm",
-		"aes-256-gcm":             "aes-256-gcm",
-		"aes-128-cfb":             "aes-128-cfb",
-		"aes-192-cfb":             "aes-192-cfb",
-		"aes-256-cfb":             "aes-256-cfb",
-		"chacha20-ietf":           "chacha20-ietf",
-		"plain":                   "plain",
-		"none":                    "none",
-	}
-	if normalized, ok := aliases[key]; ok {
-		return normalized
-	}
-	return key
+	return shared.NormalizeShadowsocksCipher(method)
 }
 
 func applySIP002Plugin(node *domain.NodeIR, plugin string) {

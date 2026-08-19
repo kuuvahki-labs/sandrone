@@ -583,6 +583,94 @@ func TestRenderMihomoSSSIP002SimpleObfsPlugin(t *testing.T) {
 	}
 }
 
+func TestRenderMihomoSSV2RayPluginSIP002Options(t *testing.T) {
+	r := mihomo.NewRenderer()
+	nodes := []domain.NodeIR{{
+		Name:          "ss-v2ray-plugin",
+		Type:          domain.NodeTypeShadowsocks,
+		Server:        "example.com",
+		Port:          8388,
+		Cipher:        "AEAD_AES_128_GCM",
+		Password:      "secret",
+		Plugin:        "v2ray-plugin",
+		PluginOptions: map[string]any{"raw": `mode=websocket;host=cdn\;edge.example.com;path=/ws\=v1;tls;mux=0`},
+	}}
+	out, report, err := r.RenderWithReport(context.Background(), nodes, domain.RenderOptions{Format: "mihomo-proxies"})
+	require.NoError(t, err)
+	require.Equal(t, 1, report.SuccessCount)
+	require.Zero(t, report.LostFields)
+	require.Empty(t, report.Warnings)
+
+	var doc map[string]any
+	require.NoError(t, yaml.Unmarshal(out, &doc))
+	proxy := doc["proxies"].([]any)[0].(map[string]any)
+	require.Equal(t, "aes-128-gcm", proxy["cipher"])
+	require.Equal(t, "v2ray-plugin", proxy["plugin"])
+	require.Equal(t, map[string]any{
+		"mode": "websocket",
+		"host": "cdn;edge.example.com",
+		"path": "/ws=v1",
+		"tls":  true,
+		"mux":  false,
+	}, proxy["plugin-opts"])
+}
+
+func TestRenderMihomoSkipsV2RayPluginWithUnknownOrConflictingOptions(t *testing.T) {
+	r := mihomo.NewRenderer()
+	nodes := []domain.NodeIR{
+		{
+			Name: "unknown", Type: domain.NodeTypeShadowsocks, Server: "unknown.example.com", Port: 8388,
+			Cipher: "aes-128-gcm", Password: "secret", Plugin: "v2ray-plugin",
+			PluginOptions: map[string]any{"raw": "mode=websocket;unknown=value"},
+		},
+		{
+			Name: "conflict", Type: domain.NodeTypeShadowsocks, Server: "conflict.example.com", Port: 8388,
+			Cipher: "aes-128-gcm", Password: "secret", Plugin: "v2ray-plugin",
+			PluginOptions: map[string]any{"raw": "mode=websocket", "mode": "quic"},
+		},
+		{
+			Name: "neighbor", Type: domain.NodeTypeShadowsocks, Server: "neighbor.example.com", Port: 8388,
+			Cipher: "aes-128-gcm", Password: "secret",
+		},
+	}
+
+	out, report, err := r.RenderWithReport(context.Background(), nodes, domain.RenderOptions{Format: "mihomo-proxies"})
+
+	require.NoError(t, err)
+	require.Equal(t, 1, report.SuccessCount)
+	require.Len(t, report.Warnings, 2)
+	for _, warning := range report.Warnings {
+		require.Equal(t, "render_node_skipped", warning.Code)
+		require.Contains(t, warning.Message, "v2ray-plugin options")
+	}
+	require.Contains(t, string(out), "neighbor")
+	require.NotContains(t, string(out), "unknown.example.com")
+	require.NotContains(t, string(out), "conflict.example.com")
+}
+
+func TestRenderMihomoSSRUsesTargetDummyCipher(t *testing.T) {
+	r := mihomo.NewRenderer()
+	nodes := []domain.NodeIR{{
+		Name:     "ssr-none",
+		Type:     domain.NodeTypeShadowsocksR,
+		Server:   "example.com",
+		Port:     8388,
+		Cipher:   "none",
+		Password: "secret",
+		ShadowsocksR: &domain.ShadowsocksROptions{
+			Protocol: "auth_sha1_v4",
+			Obfs:     "plain",
+		},
+	}}
+	out, report, err := r.RenderWithReport(context.Background(), nodes, domain.RenderOptions{Format: "mihomo-proxies"})
+	require.NoError(t, err)
+	require.Empty(t, report.Warnings)
+	var doc map[string]any
+	require.NoError(t, yaml.Unmarshal(out, &doc))
+	proxy := doc["proxies"].([]any)[0].(map[string]any)
+	require.Equal(t, "dummy", proxy["cipher"])
+}
+
 func TestRenderMihomoSSPluginAndHTTPTransport(t *testing.T) {
 	r := mihomo.NewRenderer()
 	nodes := []domain.NodeIR{{
@@ -655,36 +743,38 @@ func TestRenderMihomoOmitsDefaultTCPTransport(t *testing.T) {
 
 func TestRenderMihomoSkipsUnsupportedTrojanXHTTP(t *testing.T) {
 	r := mihomo.NewRenderer()
-	nodes := []domain.NodeIR{{
-		Name:     "trojan-xhttp",
-		Type:     domain.NodeTypeTrojan,
-		Server:   "example.com",
-		Port:     443,
-		Password: "secret",
-		TLS:      &domain.TLSOptions{Enabled: true, Reality: &domain.RealityOptions{PublicKey: "public", ShortID: "08"}},
-		Transport: &domain.TransportOptions{
-			Type: "xhttp",
-			Path: "/xhttp",
-			Host: "cdn.example.com",
+	nodes := []domain.NodeIR{
+		{
+			Name:     "trojan-xhttp",
+			Type:     domain.NodeTypeTrojan,
+			Server:   "example.com",
+			Port:     443,
+			Password: "secret",
+			TLS:      &domain.TLSOptions{Enabled: true, Reality: &domain.RealityOptions{PublicKey: "public", ShortID: "08"}},
+			Transport: &domain.TransportOptions{
+				Type: "xhttp",
+				Path: "/xhttp",
+				Host: "cdn.example.com",
+			},
 		},
-	}}
+		{Name: "neighbor", Type: domain.NodeTypeShadowsocks, Server: "neighbor.example.com", Port: 8388, Cipher: "aes-128-gcm", Password: "secret"},
+	}
 
 	out, report, err := r.RenderWithReport(context.Background(), nodes, domain.RenderOptions{Format: "mihomo-proxies"})
 	if err != nil {
 		t.Fatalf("render: %v", err)
 	}
-	if len(report.Warnings) != 1 || report.Warnings[0].Field != "transport.type" {
-		t.Fatalf("expected transport.type warning: %#v", report.Warnings)
-	}
+	require.Equal(t, 1, report.SuccessCount)
+	require.Len(t, report.Warnings, 1)
+	require.Equal(t, "render_node_skipped", report.Warnings[0].Code)
+	require.Equal(t, "trojan-xhttp", report.Warnings[0].Node)
 	body := string(out)
-	for _, unwanted := range []string{"network: xhttp", "xhttp-opts"} {
+	for _, unwanted := range []string{"network: xhttp", "xhttp-opts", "reality-opts"} {
 		if strings.Contains(body, unwanted) {
 			t.Fatalf("unexpected unsupported xhttp output %q in %s", unwanted, body)
 		}
 	}
-	if !strings.Contains(body, "reality-opts") {
-		t.Fatalf("expected supported reality opts: %s", body)
-	}
+	require.Contains(t, body, "neighbor")
 }
 
 func TestRenderMihomoVLESSXHTTPOptions(t *testing.T) {

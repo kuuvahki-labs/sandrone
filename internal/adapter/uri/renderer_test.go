@@ -3,6 +3,7 @@ package uri_test
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"net/url"
 	"strings"
 	"testing"
@@ -385,6 +386,72 @@ func TestRenderURIVLESSXHTTPRealityRoundtrip(t *testing.T) {
 	require.Equal(t, "cdn.example.com", got.Transport.Host)
 	require.NotNil(t, got.Transport.XHTTP)
 	require.Equal(t, "packet-up", got.Transport.XHTTP.Mode)
+}
+
+func TestParsedSplitHTTPRendersAsCanonicalMihomoXHTTP(t *testing.T) {
+	parsed, source, err := uri.NewParser().Parse(context.Background(), []byte(
+		"vless://11111111-1111-1111-1111-111111111111@example.com:443?encryption=none&type=splithttp&path=%2Fupload&host=cdn.example.com&mode=packet-up#split-http",
+	))
+	require.NoError(t, err)
+	require.Empty(t, source.Warnings)
+
+	body, report, err := mihomo.NewRenderer().RenderWithReport(context.Background(), parsed, domain.RenderOptions{})
+	require.NoError(t, err)
+	require.Equal(t, 1, report.SuccessCount)
+	require.Contains(t, string(body), "network: xhttp")
+	require.Contains(t, string(body), "xhttp-opts:")
+	require.Contains(t, string(body), "mode: packet-up")
+	require.Contains(t, string(body), "path: /upload")
+}
+
+func TestParsedTrojanPresenceFlagsRenderToMihomoAndSingBox(t *testing.T) {
+	parsed, source, err := uri.NewParser().Parse(context.Background(), []byte(
+		"trojan://secret@example.com:443?udp&tfo&ws&wspath=%2Fws#trojan",
+	))
+	require.NoError(t, err)
+	require.Empty(t, source.Warnings)
+
+	mihomoBody, mihomoReport, err := mihomo.NewRenderer().RenderWithReport(context.Background(), parsed, domain.RenderOptions{})
+	require.NoError(t, err)
+	require.Equal(t, 1, mihomoReport.SuccessCount)
+	require.Contains(t, string(mihomoBody), "network: ws")
+	require.Contains(t, string(mihomoBody), "udp: true")
+	require.Contains(t, string(mihomoBody), "tfo: true")
+	require.Contains(t, string(mihomoBody), "path: /ws")
+
+	singBoxBody, singBoxReport, err := singbox.NewRenderer().RenderWithReport(context.Background(), parsed, domain.RenderOptions{})
+	require.NoError(t, err)
+	require.Equal(t, 1, singBoxReport.SuccessCount)
+	var document struct {
+		Outbounds []map[string]any `json:"outbounds"`
+	}
+	require.NoError(t, json.Unmarshal(singBoxBody, &document))
+	require.Len(t, document.Outbounds, 1)
+	require.Equal(t, true, document.Outbounds[0]["tcp_fast_open"])
+	transport, ok := document.Outbounds[0]["transport"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "ws", transport["type"])
+	require.Equal(t, "/ws", transport["path"])
+}
+
+func TestParsedLegacyVMessCombinedHostPathRendersAcrossTargets(t *testing.T) {
+	doc := `{"v":"1","ps":"legacy-v1","add":"example.com","port":"443","id":"11111111-1111-1111-1111-111111111111","aid":"0","net":"ws","host":"cdn.example.com;/socket"}`
+	raw := "vmess://" + base64.RawStdEncoding.EncodeToString([]byte(doc))
+	parsed, source, err := uri.NewParser().Parse(context.Background(), []byte(raw))
+	require.NoError(t, err)
+	require.Empty(t, source.Warnings)
+
+	mihomoBody, mihomoReport, err := mihomo.NewRenderer().RenderWithReport(context.Background(), parsed, domain.RenderOptions{})
+	require.NoError(t, err)
+	require.Equal(t, 1, mihomoReport.SuccessCount)
+	require.Contains(t, string(mihomoBody), "Host: cdn.example.com")
+	require.Contains(t, string(mihomoBody), "path: /socket")
+
+	singBoxBody, singBoxReport, err := singbox.NewRenderer().RenderWithReport(context.Background(), parsed, domain.RenderOptions{})
+	require.NoError(t, err)
+	require.Equal(t, 1, singBoxReport.SuccessCount)
+	require.Contains(t, string(singBoxBody), `"path": "/socket"`)
+	require.Contains(t, string(singBoxBody), `"Host": "cdn.example.com"`)
 }
 
 func TestRenderURIRawQueryWarnings(t *testing.T) {

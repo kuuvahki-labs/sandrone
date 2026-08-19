@@ -92,19 +92,24 @@ func renderSS(node domain.NodeIR) (map[string]any, map[string]bool, []domain.War
 		return nil, nil, nil, domain.NewError(domain.CodeRenderFailed, "missing ss fields")
 	}
 	out := baseProxy(node, "ss")
-	out["cipher"] = node.Cipher
+	out["cipher"] = shared.NormalizeShadowsocksCipher(node.Cipher)
 	out["password"] = node.Password
-	plugin, pluginOptions := renderMihomoSSPlugin(node.Plugin, node.PluginOptions)
+	plugin, pluginOptions, warnings, err := renderMihomoSSPlugin(node)
+	if err != nil {
+		return nil, nil, nil, err
+	}
 	if plugin != "" {
 		out["plugin"] = plugin
 	}
 	if len(pluginOptions) > 0 {
 		out["plugin-opts"] = pluginOptions
 	}
-	applyMihomoTransport(out, node)
+	if err := applyMihomoTransport(out, node); err != nil {
+		return nil, nil, nil, err
+	}
 	applyMihomoTLS(out, node, "servername")
 	applyMihomoUDPOverTCP(out, node)
-	return out, nil, nil, nil
+	return out, nil, warnings, nil
 }
 
 func renderSSR(node domain.NodeIR) (map[string]any, map[string]bool, []domain.Warning, error) {
@@ -112,7 +117,11 @@ func renderSSR(node domain.NodeIR) (map[string]any, map[string]bool, []domain.Wa
 		return nil, nil, nil, domain.NewError(domain.CodeRenderFailed, "missing ssr fields")
 	}
 	out := baseProxy(node, "ssr")
-	out["cipher"] = node.Cipher
+	cipher := shared.NormalizeShadowsocksRCipher(node.Cipher)
+	if cipher == "none" {
+		cipher = "dummy"
+	}
+	out["cipher"] = cipher
 	out["password"] = node.Password
 	out["protocol"] = node.ShadowsocksR.Protocol
 	if node.ShadowsocksR.ProtocolParam != "" {
@@ -213,80 +222,6 @@ func wholeDurationSeconds(value string) (int64, error) {
 	return int64(duration / time.Second), nil
 }
 
-func renderMihomoSSPlugin(plugin string, options map[string]any) (string, map[string]any) {
-	outOptions := options
-	if isSimpleObfsPlugin(plugin) {
-		if normalized := mihomoSimpleObfsOptions(options); len(normalized) > 0 {
-			return "obfs", normalized
-		}
-		return "obfs", outOptions
-	}
-	return plugin, outOptions
-}
-
-func isSimpleObfsPlugin(plugin string) bool {
-	switch strings.ToLower(strings.TrimSpace(plugin)) {
-	case "obfs", "obfs-local", "simple-obfs":
-		return true
-	default:
-		return false
-	}
-}
-
-func mihomoSimpleObfsOptions(options map[string]any) map[string]any {
-	if len(options) == 0 {
-		return nil
-	}
-	if rawValue, ok := options["raw"]; ok {
-		return parseSIP002SimpleObfsOptions(fmt.Sprint(rawValue))
-	}
-	out := map[string]any{}
-	if mode, ok := firstNonEmptyOptionString(options, "mode", "obfs"); ok {
-		out["mode"] = mode
-	}
-	if host, ok := firstNonEmptyOptionString(options, "host", "obfs-host"); ok {
-		out["host"] = host
-	}
-	return out
-}
-
-func parseSIP002SimpleObfsOptions(raw string) map[string]any {
-	out := map[string]any{}
-	for _, part := range strings.Split(raw, ";") {
-		key, value, ok := strings.Cut(part, "=")
-		if !ok {
-			continue
-		}
-		key = strings.TrimSpace(key)
-		value = strings.TrimSpace(value)
-		switch key {
-		case "obfs", "mode":
-			if value != "" {
-				out["mode"] = value
-			}
-		case "obfs-host", "host":
-			if value != "" {
-				out["host"] = value
-			}
-		}
-	}
-	return out
-}
-
-func firstNonEmptyOptionString(options map[string]any, keys ...string) (string, bool) {
-	for _, key := range keys {
-		value, ok := options[key]
-		if !ok {
-			continue
-		}
-		text := strings.TrimSpace(fmt.Sprint(value))
-		if text != "" {
-			return text, true
-		}
-	}
-	return "", false
-}
-
 func renderVMess(node domain.NodeIR) (map[string]any, map[string]bool, []domain.Warning, error) {
 	if node.Server == "" || node.Port == 0 || node.UUID == "" {
 		return nil, nil, nil, domain.NewError(domain.CodeRenderFailed, "missing vmess fields")
@@ -297,7 +232,9 @@ func renderVMess(node domain.NodeIR) (map[string]any, map[string]bool, []domain.
 		out["cipher"] = node.Cipher
 	}
 	out["alterId"] = node.AlterID
-	applyMihomoTransport(out, node)
+	if err := applyMihomoTransport(out, node); err != nil {
+		return nil, nil, nil, err
+	}
 	applyMihomoTLS(out, node, "servername")
 	if node.PacketEncoding != "" {
 		out["packet-encoding"] = node.PacketEncoding
@@ -320,7 +257,9 @@ func renderVLESS(node domain.NodeIR) (map[string]any, map[string]bool, []domain.
 	if node.PacketEncoding != "" {
 		out["packet-encoding"] = node.PacketEncoding
 	}
-	applyMihomoTransport(out, node)
+	if err := applyMihomoTransport(out, node); err != nil {
+		return nil, nil, nil, err
+	}
 	applyMihomoTLS(out, node, "servername")
 	return out, nil, nil, nil
 }
@@ -331,7 +270,9 @@ func renderTrojan(node domain.NodeIR) (map[string]any, map[string]bool, []domain
 	}
 	out := baseProxy(node, "trojan")
 	out["password"] = node.Password
-	applyMihomoTransport(out, node)
+	if err := applyMihomoTransport(out, node); err != nil {
+		return nil, nil, nil, err
+	}
 	applyMihomoTLS(out, node, "sni")
 	return out, nil, nil, nil
 }

@@ -906,6 +906,115 @@ user: user-a
 	require.Equal(t, map[string]any{"mode": "tls"}, nodes[0].PluginOptions)
 }
 
+func TestParseMihomoShadowsocksCipherAliases(t *testing.T) {
+	parser := mihomo.NewParser()
+	nodes, source, err := parser.Parse(context.Background(), []byte(`
+proxies:
+  - name: ss-aead
+    type: ss
+    server: ss.example.com
+    port: 8388
+    cipher: AEAD_AES_128_GCM
+    password: secret
+  - name: ss-unknown
+    type: ss
+    server: unknown.example.com
+    port: 8388
+    cipher: Unknown_Cipher
+    password: secret
+  - name: ssr-dummy
+    type: ssr
+    server: ssr.example.com
+    port: 8388
+    cipher: dummy
+    password: secret
+    protocol: auth_sha1_v4
+    obfs: plain
+`))
+	require.NoError(t, err)
+	require.Empty(t, source.Warnings)
+	require.Len(t, nodes, 3)
+	require.Equal(t, "aes-128-gcm", nodes[0].Cipher)
+	require.Equal(t, "Unknown_Cipher", nodes[1].Cipher)
+	require.Equal(t, "none", nodes[2].Cipher)
+}
+
+func TestParseMihomoLegacyAliasesAndCanonicalPrecedence(t *testing.T) {
+	parser := mihomo.NewParser()
+	nodes, source, err := parser.Parse(context.Background(), []byte(`
+proxies:
+  - name: vmess-legacy
+    type: vmess
+    server: legacy.example.com
+    port: 443
+    uuid: 11111111-1111-1111-1111-111111111111
+    network: ws
+    ws-path: /legacy
+    ws-headers:
+      Host: legacy-cdn.example.com
+    fast-open: true
+  - name: vmess-conflict
+    type: vmess
+    server: conflict.example.com
+    port: 443
+    uuid: 11111111-1111-1111-1111-111111111112
+    network: ws
+    ws-opts:
+      path: /modern
+      headers:
+        Host: modern-cdn.example.com
+    ws-path: /legacy
+    ws-headers:
+      Host: legacy-cdn.example.com
+    tfo: false
+    fast-open: true
+  - name: ssr-legacy
+    type: ssr
+    server: ssr.example.com
+    port: 8388
+    cipher: aes-128-cfb
+    password: secret
+    protocol: auth_sha1_v4
+    protocolparam: legacy-protocol
+    obfs: http_simple
+    obfsparam: legacy-obfs
+  - name: ssr-conflict
+    type: ssr
+    server: conflict-ssr.example.com
+    port: 8388
+    cipher: aes-128-cfb
+    password: secret
+    protocol: auth_sha1_v4
+    protocol-param: modern-protocol
+    protocolparam: legacy-protocol
+    obfs: http_simple
+    obfs-param: modern-obfs
+    obfsparam: legacy-obfs
+`))
+	require.NoError(t, err)
+	require.Len(t, nodes, 4)
+	require.Equal(t, "/legacy", nodes[0].Transport.Path)
+	require.Equal(t, "legacy-cdn.example.com", nodes[0].Transport.Host)
+	require.NotNil(t, nodes[0].Dialer)
+	require.True(t, nodes[0].Dialer.TFO)
+	require.Equal(t, "/modern", nodes[1].Transport.Path)
+	require.Equal(t, "modern-cdn.example.com", nodes[1].Transport.Host)
+	require.Nil(t, nodes[1].Dialer)
+	require.Equal(t, "legacy-protocol", nodes[2].ShadowsocksR.ProtocolParam)
+	require.Equal(t, "legacy-obfs", nodes[2].ShadowsocksR.ObfsParam)
+	require.Equal(t, "modern-protocol", nodes[3].ShadowsocksR.ProtocolParam)
+	require.Equal(t, "modern-obfs", nodes[3].ShadowsocksR.ObfsParam)
+	require.Len(t, source.Warnings, 5)
+	for _, warning := range source.Warnings {
+		require.Equal(t, "parse_alias_conflict", warning.Code)
+	}
+	require.Equal(t, "mihomo.fast-open", source.Warnings[0].Field)
+	require.Equal(t, "mihomo.ws-path", source.Warnings[1].Field)
+	require.Equal(t, "mihomo.ws-headers", source.Warnings[2].Field)
+	require.Equal(t, "mihomo.protocolparam", source.Warnings[3].Field)
+	require.Equal(t, "mihomo.obfsparam", source.Warnings[4].Field)
+}
+
 func TestParseMihomoTLSFullOptions(t *testing.T) {
 	parser := mihomo.NewParser()
 	nodes, _, err := parser.Parse(context.Background(), []byte(`

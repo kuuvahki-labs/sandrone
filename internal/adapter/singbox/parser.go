@@ -102,7 +102,7 @@ func parseOutbound(outbound map[string]any, nodeIndex int) (domain.NodeIR, []dom
 	node.UUID = shared.StringValue(outbound["uuid"])
 	node.Cipher = firstNonEmpty(shared.StringValue(outbound["method"]), shared.StringValue(outbound["security"]))
 	node.Flow = shared.StringValue(outbound["flow"])
-	node.PacketEncoding = shared.StringValue(outbound["packet_encoding"])
+	node.PacketEncoding = shared.NormalizePacketEncoding(shared.StringValue(outbound["packet_encoding"]))
 	node.Plugin = shared.StringValue(outbound["plugin"])
 	if opts := shared.StringValue(outbound["plugin_opts"]); opts != "" {
 		node.PluginOptions = map[string]any{"raw": opts}

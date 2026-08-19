@@ -3,10 +3,13 @@ package service
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
+	"unicode/utf8"
 
 	"gopkg.in/yaml.v3"
 
@@ -14,7 +17,7 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/fetcher"
 )
 
-var autoSubscriptionFormats = []string{"base64", "uri-list", "mihomo", "sing-box"}
+var autoSubscriptionFormats = []string{"uri-list", "mihomo", "sing-box"}
 
 type publicRemoteFetchContextKey struct{}
 
@@ -127,25 +130,104 @@ func (s *Service) parseNodeContentExplicit(ctx context.Context, format string, c
 }
 
 func (s *Service) parseNodeContentAuto(ctx context.Context, content []byte, sourceRef *domain.SourceRef) (*parseInputResult, error) {
-	candidates := autoSubscriptionCandidateFormats(content)
-	candidateErrors := make([]string, 0, len(candidates))
-	for _, format := range candidates {
-		parsed, err := s.parseNodeContentAutoCandidate(ctx, format, content, sourceRef)
-		if err != nil {
-			candidateErrors = append(candidateErrors, fmt.Sprintf("%s: %v", format, err))
-			continue
+	contentCandidates := autoSubscriptionContentCandidates(content)
+	candidateErrors := make([]string, 0, len(contentCandidates)*len(autoSubscriptionFormats))
+	for _, contentCandidate := range contentCandidates {
+		formats := autoSubscriptionCandidateFormats(contentCandidate.content)
+		for _, format := range formats {
+			parsed, err := s.parseNodeContentAutoCandidate(ctx, format, contentCandidate.content, sourceRef)
+			if err != nil || parsed == nil || len(parsed.Nodes) == 0 {
+				candidateErrors = append(candidateErrors, fmt.Sprintf("%s/%s: rejected", contentCandidate.name, format))
+				continue
+			}
+			return parsed, nil
 		}
-		if parsed == nil {
-			candidateErrors = append(candidateErrors, fmt.Sprintf("%s: parser returned no result", format))
-			continue
-		}
-		if len(parsed.Nodes) == 0 {
-			candidateErrors = append(candidateErrors, fmt.Sprintf("%s: parsed zero nodes", format))
-			continue
-		}
-		return parsed, nil
 	}
 	return nil, domain.NewError(domain.CodeInvalidArgument, fmt.Sprintf("could not detect subscription format: %s", strings.Join(candidateErrors, "; ")))
+}
+
+type autoSubscriptionContentCandidate struct {
+	name    string
+	content []byte
+}
+
+func autoSubscriptionContentCandidates(content []byte) []autoSubscriptionContentCandidate {
+	candidates := make([]autoSubscriptionContentCandidate, 0, 4)
+	add := func(name string, candidate []byte) {
+		candidate = bytes.TrimSpace(candidate)
+		if len(candidate) == 0 || !utf8.Valid(candidate) {
+			return
+		}
+		for _, existing := range candidates {
+			if bytes.Equal(existing.content, candidate) {
+				return
+			}
+		}
+		candidates = append(candidates, autoSubscriptionContentCandidate{
+			name:    name,
+			content: append([]byte{}, candidate...),
+		})
+	}
+
+	add("raw", content)
+	unescaped, unescapeErr := url.PathUnescape(string(content))
+	if unescapeErr == nil {
+		add("percent", []byte(unescaped))
+	}
+	if decoded, ok := decodeAutoSubscriptionBase64(content); ok {
+		add("base64", decoded)
+	}
+	if unescapeErr == nil {
+		if decoded, ok := decodeAutoSubscriptionBase64([]byte(unescaped)); ok {
+			add("percent+base64", decoded)
+		}
+	}
+	return candidates
+}
+
+func decodeAutoSubscriptionBase64(content []byte) ([]byte, bool) {
+	compact := make([]byte, 0, len(content))
+	for _, value := range content {
+		switch value {
+		case ' ', '\t', '\r', '\n', '\v', '\f':
+			continue
+		default:
+			compact = append(compact, value)
+		}
+	}
+	if len(compact) == 0 {
+		return nil, false
+	}
+	for _, encoding := range []*base64.Encoding{
+		base64.StdEncoding.Strict(),
+		base64.RawStdEncoding.Strict(),
+		base64.URLEncoding.Strict(),
+		base64.RawURLEncoding.Strict(),
+	} {
+		decoded, err := encoding.DecodeString(string(compact))
+		if err == nil && len(decoded) > 0 && utf8.Valid(decoded) && looksLikeAutoSubscriptionContent(decoded) {
+			return decoded, true
+		}
+	}
+	return nil, false
+}
+
+func looksLikeAutoSubscriptionContent(content []byte) bool {
+	if len(detectStructuredSubscriptionFormats(content)) > 0 {
+		return true
+	}
+	return looksLikeAutoURIList(content)
+}
+
+func looksLikeAutoURIList(content []byte) bool {
+	for line := range strings.SplitSeq(string(content), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		return strings.Contains(line, "://")
+	}
+	return false
 }
 
 func (s *Service) parseNodeContentAutoCandidate(ctx context.Context, format string, content []byte, sourceRef *domain.SourceRef) (*parseInputResult, error) {
@@ -179,6 +261,9 @@ func autoSubscriptionCandidateFormats(content []byte) []string {
 		add(format)
 	}
 	for _, format := range autoSubscriptionFormats {
+		if format == "uri-list" && !looksLikeAutoURIList(content) {
+			continue
+		}
 		add(format)
 	}
 	return candidates

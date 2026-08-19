@@ -36,3 +36,17 @@ func skippedMihomoProxyContext(item any, proxy map[string]any) domain.WarningNod
 		Raw:    proxy,
 	}
 }
+
+func mihomoAliasConflictWarning(node domain.NodeIR, proxy map[string]any, nodeIndex int, alias, canonical string) domain.Warning {
+	index := nodeIndex
+	context := mihomoWarningNodeContext(node, proxy)
+	return domain.Warning{
+		Code:        "parse_alias_conflict",
+		Message:     "legacy alias conflicts with " + canonical + "; canonical field takes precedence",
+		Node:        node.Name,
+		Source:      "mihomo",
+		Field:       "mihomo." + alias,
+		NodeIndex:   &index,
+		NodeContext: &context,
+	}
+}

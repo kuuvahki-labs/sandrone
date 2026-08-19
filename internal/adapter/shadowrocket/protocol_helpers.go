@@ -119,7 +119,7 @@ func documentedTransport(transport *domain.TransportOptions, websocketAllowed bo
 		len(transport.Hosts) > 0 || len(transport.Headers) > 0 || transport.ServiceName != "" ||
 		transport.MaxEarlyData != 0 || transport.EarlyDataHeaderName != "" ||
 		transport.V2RayHTTPUpgrade || transport.V2RayHTTPUpgradeFastOpen || transport.XHTTP != nil
-	if typeName == "" || typeName == "tcp" {
+	if typeName == "" || typeName == "tcp" || typeName == "raw" {
 		if hasDetails {
 			return false, domain.NewError(domain.CodeRenderFailed, "transport details cannot be represented by the documented Shadowrocket local proxy syntax")
 		}
@@ -136,7 +136,7 @@ func isDefaultTCPTransport(transport *domain.TransportOptions) bool {
 		return false
 	}
 	typeName := strings.ToLower(strings.TrimSpace(transport.Type))
-	return typeName == "" || typeName == "tcp"
+	return typeName == "" || typeName == "tcp" || typeName == "raw"
 }
 
 func markTransportEmitted(emitted emittedFields, transport *domain.TransportOptions, websocket bool) {

@@ -14,6 +14,9 @@ import (
 var errVMessZeroPort = errors.New("zero vmess port")
 
 func parseVMess(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
+	if node, source, matched, err := parseShadowrocketVMess(raw); matched {
+		return node, source, err
+	}
 	payload := strings.TrimPrefix(raw, "vmess://")
 	payload, _, _ = strings.Cut(payload, "#")
 	if strings.Contains(payload, "@") {
@@ -60,7 +63,7 @@ func parseVMessAEAD(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 	node.Port = port
 	node.UUID = u.User.Username()
 	node.Cipher = firstNonEmpty(values.Get("encryption"), "auto")
-	node.PacketEncoding = shared.QueryFirst(values, "packetEncoding", "packet-encoding")
+	node.PacketEncoding = shared.NormalizePacketEncoding(shared.QueryFirst(values, "packetEncoding", "packet-encoding"))
 	applyTLSQuery(&node, values)
 	xhttpExtraComplete := applyTransportQuery(&node, values)
 	node.Raw = map[string]json.RawMessage{}
@@ -75,7 +78,7 @@ func vmessAEADKnownQueryFields(node domain.NodeIR, values url.Values, xhttpExtra
 	if values.Get("encryption") != "" {
 		known["encryption"] = true
 	}
-	if key, value := vmessAEADFirstQueryField(values, "packetEncoding", "packet-encoding"); value != "" && node.PacketEncoding == value {
+	if key, value := vmessAEADFirstQueryField(values, "packetEncoding", "packet-encoding"); value != "" && node.PacketEncoding == shared.NormalizePacketEncoding(value) {
 		known[key] = true
 	}
 	if tls := node.TLS; tls != nil {
@@ -219,9 +222,9 @@ func parseLegacyVMess(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 	if alterID, err := shared.IntValue(firstNonEmpty(shared.StringValue(doc["aid"]), shared.StringValue(doc["alterId"]), shared.StringValue(doc["alter_id"]))); err == nil {
 		node.AlterID = alterID
 	}
-	node.PacketEncoding = shared.StringValue(doc["packetEncoding"])
+	node.PacketEncoding = shared.NormalizePacketEncoding(shared.StringValue(doc["packetEncoding"]))
 	if node.PacketEncoding == "" {
-		node.PacketEncoding = shared.StringValue(doc["packet-encoding"])
+		node.PacketEncoding = shared.NormalizePacketEncoding(shared.StringValue(doc["packet-encoding"]))
 	}
 	node.TLS = &domain.TLSOptions{}
 	if tlsVal := firstNonEmpty(shared.StringValue(doc["tls"]), shared.StringValue(doc["streamSecurity"])); tlsVal != "" && tlsVal != "none" {
@@ -269,6 +272,10 @@ func parseLegacyVMess(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 		shared.StringValue(doc["ws-path"]),
 		shared.StringValue(doc["obfs-uri"]),
 	)
+	host, path, err = splitLegacyVMessHostPath(doc, host, path)
+	if err != nil {
+		return node, source, err
+	}
 	serviceName := firstNonEmpty(shared.StringValue(doc["serviceName"]), shared.StringValue(doc["service_name"]))
 	headerType := legacyVMessHTTPHeaderType(doc, network)
 	if headerType == "http" && network == "" {
@@ -326,6 +333,21 @@ func parseLegacyVMess(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 	}
 	shared.AddUnknownRaw(node.Raw, "vmess.", doc, knownFields)
 	return node, source, nil
+}
+
+func splitLegacyVMessHostPath(doc map[string]any, host, path string) (string, string, error) {
+	version := strings.TrimSpace(shared.StringValue(doc["v"]))
+	if version != "" && version != "1" || !strings.Contains(host, ";") {
+		return host, path, nil
+	}
+	if path != "" || strings.Count(host, ";") != 1 {
+		return "", "", domain.NewError(domain.CodeParseFailed, "invalid legacy vmess host/path field")
+	}
+	legacyHost, legacyPath, _ := strings.Cut(host, ";")
+	if legacyHost == "" || !strings.HasPrefix(legacyPath, "/") {
+		return "", "", domain.NewError(domain.CodeParseFailed, "invalid legacy vmess host/path field")
+	}
+	return legacyHost, legacyPath, nil
 }
 
 func parseLegacyVMessALPN(value any) ([]string, bool) {

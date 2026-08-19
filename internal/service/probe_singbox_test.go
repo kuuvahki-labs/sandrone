@@ -294,6 +294,80 @@ func TestServiceSingBoxProbeIsolatesInvalidHysteriaBandwidth(t *testing.T) {
 	}
 }
 
+func TestServiceSingBoxProbeDoesNotStartSemanticallyDowngradedOutbounds(t *testing.T) {
+	targetHit := make(chan struct{}, 1)
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodHead, r.Method)
+		select {
+		case targetHit <- struct{}{}:
+		default:
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer target.Close()
+
+	proxyAddr, closeProxy := startSingBoxConnectProxy(t, target.Listener.Addr().String())
+	defer closeProxy()
+	proxyHost, proxyPort := splitSingBoxHostPort(t, proxyAddr)
+
+	result, err := service.New().Probe(context.Background(), domain.ProbeRequest{
+		Input: domain.NodeInput{
+			Type: "inline_nodes",
+			Nodes: []domain.NodeIR{
+				{
+					Name: "vless-xhttp", Type: domain.NodeTypeVLESS, Server: "invalid.example", Port: 443,
+					UUID: "11111111-1111-1111-1111-111111111111", Encryption: "none",
+					Transport: &domain.TransportOptions{Type: "xhttp", Path: "/xhttp", XHTTP: &domain.XHTTPTransportOptions{Mode: "auto"}},
+				},
+				{
+					Name: "vless-encryption", Type: domain.NodeTypeVLESS, Server: "invalid.example", Port: 443,
+					UUID: "22222222-2222-2222-2222-222222222222", Encryption: "custom",
+				},
+				{
+					Name: "hysteria2-range", Type: domain.NodeTypeHysteria2, Server: "invalid.example", Port: 443,
+					Password: "secret", TLS: &domain.TLSOptions{Enabled: true}, Hysteria: &domain.HysteriaOptions{HopInterval: "15-30"},
+				},
+				{
+					Name: "hysteria-range", Type: domain.NodeTypeHysteria, Server: "invalid.example", Port: 443,
+					TLS: &domain.TLSOptions{Enabled: true}, Hysteria: &domain.HysteriaOptions{HopInterval: "15-30", UpMbps: 10, DownMbps: 10},
+				},
+				{
+					Name: "vless-missing-transport-type", Type: domain.NodeTypeVLESS, Server: "invalid.example", Port: 443,
+					UUID: "33333333-3333-3333-3333-333333333333", Encryption: "none", Transport: &domain.TransportOptions{Path: "/must-not-drop"},
+				},
+				{Name: "valid-http", Type: domain.NodeTypeHTTP, Server: proxyHost, Port: proxyPort},
+			},
+		},
+		Method:         domain.ProbeURLTest,
+		Core:           "sing-box",
+		URL:            target.URL,
+		ExpectedStatus: "200-299",
+		TimeoutMS:      2000,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.Results, 6)
+	for i, name := range []string{"vless-xhttp", "vless-encryption", "hysteria2-range", "hysteria-range", "vless-missing-transport-type"} {
+		require.Equal(t, name, result.Results[i].NodeName)
+		require.False(t, result.Results[i].Alive)
+		require.Equal(t, string(domain.CodeProbeInvalidTarget), result.Results[i].ErrorCode)
+	}
+	require.Equal(t, "valid-http", result.Results[5].NodeName)
+	require.True(t, result.Results[5].Alive)
+	renderSkips := 0
+	for _, warning := range result.Report.Warnings {
+		if warning.Code == "render_node_skipped" {
+			renderSkips++
+		}
+	}
+	require.Equal(t, 5, renderSkips)
+	select {
+	case <-targetHit:
+	case <-time.After(time.Second):
+		t.Fatal("sing-box did not probe the remaining valid HTTP node")
+	}
+}
+
 func TestServiceSingBoxURLTestRejectsInvalidExpectedStatus(t *testing.T) {
 	targetHit := make(chan struct{}, 1)
 	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

@@ -81,7 +81,9 @@ func TestCapabilityUsesTargetSchemaSourcesAndLossyCatalog(t *testing.T) {
 	require.Contains(t, gotFields, "hysteria.up_mbps")
 	require.Contains(t, gotFields, "tuic.udp_over_stream")
 	require.NotContains(t, gotFields, "encryption")
-	require.Contains(t, irFields(capability.Lossy), "encryption")
+	require.NotContains(t, irFields(capability.Lossy), "encryption")
+	require.NotContains(t, irFields(capability.Lossy), "transport.type")
+	require.NotContains(t, irFields(capability.Lossy), "transport.header_type")
 	require.Contains(t, irFields(capability.Lossy), "hysteria.realm")
 	require.Contains(t, irFields(capability.Lossy), "tuic.reduce_rtt")
 
@@ -95,6 +97,16 @@ func TestCapabilityUsesTargetSchemaSourcesAndLossyCatalog(t *testing.T) {
 	for _, field := range capability.Lossy {
 		require.Equal(t, shared.FieldStatusLossy, field.Status)
 		require.NotEmpty(t, field.SourceRef.Path)
+	}
+}
+
+func TestMihomoCapabilityDoesNotDeclareConnectionCriticalTransportLossy(t *testing.T) {
+	t.Parallel()
+
+	for _, nodeType := range []domain.NodeType{domain.NodeTypeVMess, domain.NodeTypeVLESS, domain.NodeTypeTrojan} {
+		capability := shared.CapabilityFor("mihomo-proxies", shared.DirectionRender, []domain.NodeType{nodeType}, false)
+		require.NotContains(t, irFields(capability.Lossy), "transport.type")
+		require.NotContains(t, irFields(capability.Lossy), "transport.header_type")
 	}
 }
 

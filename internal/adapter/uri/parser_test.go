@@ -1259,7 +1259,7 @@ func TestParseShadowsocksCipherAliases(t *testing.T) {
 		{name: "upper chacha", method: "CHACHA20-IETF-POLY1305", wantCipher: "chacha20-ietf-poly1305"},
 		{name: "underscore aes", method: "AES_256_GCM", wantCipher: "aes-256-gcm"},
 		{name: "legacy aead", method: "AEAD_AES_128_GCM", wantCipher: "aes-128-gcm"},
-		{name: "unknown", method: " Unknown_Cipher ", wantCipher: "unknown-cipher"},
+		{name: "unknown", method: " Unknown_Cipher ", wantCipher: "Unknown_Cipher"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1597,6 +1597,9 @@ func TestParseStrictListAcceptsURIOnlyLines(t *testing.T) {
 	require.Len(t, source.Warnings, 1)
 	require.Equal(t, "parse_line_failed", source.Warnings[0].Code)
 	require.Contains(t, source.Warnings[0].Message, "JSON/YAML node lines are not allowed")
+	require.NotContains(t, source.Warnings[0].Message, "json-socks")
+	require.NotNil(t, source.Warnings[0].NodeContext)
+	require.Contains(t, source.Warnings[0].NodeContext.RawLine, "json-socks")
 }
 
 func TestParseStrictListRejectsOnlyJSONAndYAMLLines(t *testing.T) {
@@ -1750,10 +1753,8 @@ func TestParseListLineErrorsBecomeWarningsWhenNodesRemain(t *testing.T) {
 	warning := source.Warnings[0]
 	require.Equal(t, "parse_line_failed", warning.Code)
 	require.Equal(t, "uri-list", warning.Source)
-	require.Contains(t, warning.Message, `line "not a node"`)
-	require.Contains(t, warning.Message, "URI:")
-	require.Contains(t, warning.Message, "JSON:")
-	require.Contains(t, warning.Message, "YAML:")
+	require.Contains(t, warning.Message, "line 2 (unknown scheme)")
+	require.NotContains(t, warning.Message, "not a node")
 	require.NotNil(t, warning.NodeContext)
 	require.Equal(t, "uri-list", warning.NodeContext.Format)
 	require.Equal(t, "not a node", warning.NodeContext.RawLine)
@@ -2617,4 +2618,181 @@ func TestParseURIQueryECHIsTypedAndUnknownStaysRaw(t *testing.T) {
 		require.Equal(t, raw, warning.NodeContext.RawLine)
 		require.Zero(t, warning.NodeContext.Line)
 	}
+}
+
+func TestParseSplitHTTPTransportCanonicalizesToXHTTP(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+	}{
+		{
+			name: "vless",
+			raw:  "vless://11111111-1111-1111-1111-111111111111@example.com:443?encryption=none&type=splithttp&path=%2Fupload&host=cdn.example.com&mode=packet-up",
+		},
+		{
+			name: "vmess aead",
+			raw:  "vmess://11111111-1111-1111-1111-111111111111@example.com:443?encryption=auto&type=SplitHTTP&path=%2Fupload&host=cdn.example.com&mode=packet-up",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			nodes, source, err := uri.NewParser().Parse(context.Background(), []byte(tc.raw))
+			require.NoError(t, err)
+			require.Len(t, nodes, 1)
+			require.NotNil(t, nodes[0].Transport)
+			require.Equal(t, "xhttp", nodes[0].Transport.Type)
+			require.Equal(t, "/upload", nodes[0].Transport.Path)
+			require.Equal(t, "cdn.example.com", nodes[0].Transport.Host)
+			require.NotNil(t, nodes[0].Transport.XHTTP)
+			require.Equal(t, "packet-up", nodes[0].Transport.XHTTP.Mode)
+			require.Empty(t, nodes[0].Raw)
+			require.Empty(t, source.Warnings)
+		})
+	}
+}
+
+func TestParseLegacySOCKSBase64Credentials(t *testing.T) {
+	nodes, source, err := uri.NewParser().Parse(context.Background(), []byte(
+		"socks://Ym9iOnNlY3JldA%3D%3D@socks.example.com:1080#SOCKS",
+	))
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	require.Equal(t, "bob", nodes[0].Username)
+	require.Equal(t, "secret", nodes[0].Password)
+	require.Empty(t, nodes[0].Raw)
+	require.Empty(t, source.Warnings)
+}
+
+func TestParseLegacySOCKSBase64CredentialsDoesNotBroadenSOCKS5(t *testing.T) {
+	tests := []struct {
+		name         string
+		raw          string
+		wantUsername string
+	}{
+		{
+			name:         "socks5 remains ordinary userinfo",
+			raw:          "socks5://Ym9iOnNlY3JldA%3D%3D@socks.example.com:1080",
+			wantUsername: "Ym9iOnNlY3JldA==",
+		},
+		{
+			name:         "invalid base64 remains ordinary userinfo",
+			raw:          "socks://not-base64@socks.example.com:1080",
+			wantUsername: "not-base64",
+		},
+		{
+			name:         "decoded value without separator remains ordinary userinfo",
+			raw:          "socks://Ym9i@socks.example.com:1080",
+			wantUsername: "Ym9i",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			nodes, _, err := uri.NewParser().Parse(context.Background(), []byte(tc.raw))
+			require.NoError(t, err)
+			require.Equal(t, tc.wantUsername, nodes[0].Username)
+			require.Empty(t, nodes[0].Password)
+		})
+	}
+}
+
+func TestParseTrojanPresenceOnlyFlags(t *testing.T) {
+	raw := "trojan://trojan-pass@[2001:db8::1]:443?udp&tfo&ws&wspath=%2Fws#Trojan%20IPv6"
+	nodes, source, err := uri.NewParser().Parse(context.Background(), []byte(raw))
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	got := nodes[0]
+	require.NotNil(t, got.Dialer)
+	require.NotNil(t, got.Dialer.UDPRelay)
+	require.True(t, *got.Dialer.UDPRelay)
+	require.True(t, got.Dialer.TFO)
+	require.NotNil(t, got.Transport)
+	require.Equal(t, "websocket", got.Transport.Type)
+	require.Equal(t, "/ws", got.Transport.Path)
+	require.Empty(t, got.Raw)
+	require.Empty(t, source.Warnings)
+}
+
+func TestParseTrojanPresenceOnlyFlagsRejectsAmbiguousForms(t *testing.T) {
+	tests := []struct {
+		name       string
+		query      string
+		wantRaw    []string
+		wantType   string
+		wantDialer bool
+	}{
+		{name: "valued flags", query: "udp=1&tfo=true&ws=1&wspath=%2Fws", wantRaw: []string{"uri.query.tfo", "uri.query.udp", "uri.query.ws", "uri.query.wspath"}},
+		{name: "duplicate flags", query: "udp&udp&tfo&tfo", wantRaw: []string{"uri.query.tfo", "uri.query.udp"}},
+		{name: "explicit transport wins", query: "ws&type=grpc&serviceName=svc", wantRaw: []string{"uri.query.ws"}, wantType: "grpc"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := "trojan://secret@example.com:443?" + tc.query
+			nodes, source, err := uri.NewParser().Parse(context.Background(), []byte(raw))
+			require.NoError(t, err)
+			got := nodes[0]
+			if tc.wantType == "" {
+				require.Nil(t, got.Transport)
+			} else {
+				require.Equal(t, tc.wantType, got.Transport.Type)
+			}
+			require.Equal(t, tc.wantDialer, got.Dialer != nil)
+			require.ElementsMatch(t, tc.wantRaw, rawKeys(got.Raw))
+			require.ElementsMatch(t, tc.wantRaw, warningFields(source.Warnings))
+		})
+	}
+}
+
+func TestParseLegacyVMessV1CombinedHostPath(t *testing.T) {
+	tests := []struct {
+		name     string
+		version  string
+		host     string
+		path     string
+		wantHost string
+		wantPath string
+		wantErr  bool
+	}{
+		{name: "missing version", host: "cdn.example.com;/socket", wantHost: "cdn.example.com", wantPath: "/socket"},
+		{name: "version one", version: "1", host: "cdn.example.com;/socket", wantHost: "cdn.example.com", wantPath: "/socket"},
+		{name: "version two is not legacy", version: "2", host: "cdn.example.com;/socket", wantHost: "cdn.example.com;/socket"},
+		{name: "explicit path conflicts", version: "1", host: "cdn.example.com;/legacy", path: "/explicit", wantErr: true},
+		{name: "multiple separators rejected", version: "1", host: "cdn.example.com;/one;/two", wantErr: true},
+		{name: "non path suffix rejected", version: "1", host: "cdn.example.com;socket", wantErr: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			doc := map[string]any{
+				"ps": tc.name, "add": "example.com", "port": "443",
+				"id": "11111111-1111-1111-1111-111111111111", "aid": "0", "net": "ws",
+				"host": tc.host, "path": tc.path,
+			}
+			if tc.version != "" {
+				doc["v"] = tc.version
+			}
+			encoded, err := json.Marshal(doc)
+			require.NoError(t, err)
+			raw := "vmess://" + base64.RawStdEncoding.EncodeToString(encoded)
+			nodes, source, err := uri.NewParser().Parse(context.Background(), []byte(raw))
+			if tc.wantErr {
+				require.Error(t, err)
+				require.Nil(t, nodes)
+				return
+			}
+			require.NoError(t, err)
+			require.Len(t, nodes, 1)
+			require.NotNil(t, nodes[0].Transport)
+			require.Equal(t, tc.wantHost, nodes[0].Transport.Host)
+			require.Equal(t, tc.wantPath, nodes[0].Transport.Path)
+			require.Empty(t, nodes[0].Raw)
+			require.Empty(t, source.Warnings)
+		})
+	}
+}
+
+func rawKeys(raw map[string]json.RawMessage) []string {
+	keys := make([]string, 0, len(raw))
+	for key := range raw {
+		keys = append(keys, key)
+	}
+	return keys
 }

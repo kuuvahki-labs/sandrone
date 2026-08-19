@@ -161,6 +161,8 @@ func normalizeTransport(transport *domain.TransportOptions) {
 		transport.Type = "websocket"
 	case "h2":
 		transport.Type = "http"
+	case "splithttp":
+		transport.Type = "xhttp"
 	}
 }
 
@@ -295,6 +297,69 @@ func queryValuesEqualFold(values url.Values, key, want string) bool {
 		}
 	}
 	return true
+}
+
+func preferredQueryString(values url.Values, keys ...string) (string, map[string]bool) {
+	known := map[string]bool{}
+	selected := ""
+	for _, key := range keys {
+		raw, ok := singleQueryValue(values, key)
+		if !ok || strings.TrimSpace(raw) == "" {
+			continue
+		}
+		if selected == "" {
+			selected = raw
+			known[key] = true
+			continue
+		}
+		if raw == selected {
+			known[key] = true
+		}
+	}
+	return selected, known
+}
+
+func preferredQueryBool(values url.Values, keys ...string) (bool, map[string]bool) {
+	known := map[string]bool{}
+	selected := false
+	hasSelected := false
+	for _, key := range keys {
+		raw, ok := singleQueryValue(values, key)
+		if !ok {
+			continue
+		}
+		value, ok := strictQueryBool(raw)
+		if !ok {
+			continue
+		}
+		if !hasSelected {
+			selected = value
+			hasSelected = true
+			known[key] = true
+			continue
+		}
+		if value == selected {
+			known[key] = true
+		}
+	}
+	return selected, known
+}
+
+func strictQueryBool(value string) (bool, bool) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "1", "true", "yes", "y", "on":
+		return true, true
+	case "0", "false", "no", "n", "off":
+		return false, true
+	default:
+		return false, false
+	}
+}
+
+func mergeKnownQueryKeys(known map[string]bool, additions map[string]bool) {
+	for key := range additions {
+		known[key] = true
+	}
 }
 
 func splitList(s string) []string {

@@ -29,6 +29,7 @@ func parseAnyTLS(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 	node.Port = port
 	node.Password = password
 	values := u.Query()
+	udpRelay, udpKnown := preferredQueryBool(values, "udp")
 	minIdle, _ := strconv.Atoi(values.Get("min-idle-session"))
 	node.AnyTLS = &domain.AnyTLSOptions{
 		IdleSessionCheckInterval: values.Get("idle-session-check-interval"),
@@ -36,6 +37,9 @@ func parseAnyTLS(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 		MinIdleSession:           minIdle,
 	}
 	applyTLSQuery(&node, values)
+	if len(udpKnown) > 0 {
+		ensureDialer(&node).UDPRelay = &udpRelay
+	}
 	if node.TLS == nil {
 		node.TLS = &domain.TLSOptions{Enabled: true}
 	} else {
@@ -49,6 +53,7 @@ func parseAnyTLS(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 		"allowInsecure": true, "allowinsecure": true, "allow_insecure": true, "allow-insecure": true, "skip-cert-verify": true, "insecure": true, "disable_sni": true,
 		"pbk": true, "public-key": true, "sid": true, "short-id": true,
 	}
+	mergeKnownQueryKeys(known, udpKnown)
 	if queryValuesEqualFold(values, "type", "tcp") {
 		known["type"] = true
 	}

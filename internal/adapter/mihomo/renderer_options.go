@@ -91,9 +91,18 @@ func applyMihomoTLS(out map[string]any, node domain.NodeIR, sniKey string) {
 	}
 }
 
-func applyMihomoTransport(out map[string]any, node domain.NodeIR) {
-	if node.Transport == nil || node.Transport.Type == "" {
-		return
+func applyMihomoTransport(out map[string]any, node domain.NodeIR) error {
+	if node.Transport == nil {
+		return nil
+	}
+	if strings.TrimSpace(node.Transport.Type) == "" {
+		if mihomoTransportHasDetails(node.Transport) {
+			return domain.NewError(domain.CodeRenderFailed, "mihomo transport has connection parameters but no transport type")
+		}
+		return nil
+	}
+	if isDefaultTCPTransport(node.Transport) {
+		return nil
 	}
 	if mihomoSupportsHTTPHeaderTransport(node.Type, node.Transport) {
 		out["network"] = "http"
@@ -113,10 +122,13 @@ func applyMihomoTransport(out map[string]any, node domain.NodeIR) {
 			opts["headers"] = mapStringToStringList(headers)
 		}
 		out["http-opts"] = opts
-		return
+		return nil
 	}
 	if !mihomoSupportsTransport(node.Type, node.Transport.Type) {
-		return
+		if mihomoNodeUsesV2RayTransport(node.Type) {
+			return domain.NewError(domain.CodeRenderFailed, "mihomo proxy schema does not support connection-critical "+node.Transport.Type+" transport")
+		}
+		return nil
 	}
 	switch node.Transport.Type {
 	case "websocket", "ws":
@@ -215,6 +227,7 @@ func applyMihomoTransport(out map[string]any, node domain.NodeIR) {
 	default:
 		out["network"] = node.Transport.Type
 	}
+	return nil
 }
 
 func mihomoSupportsTransport(nodeType domain.NodeType, transportType string) bool {
@@ -239,21 +252,29 @@ func mihomoSupportsTransport(nodeType domain.NodeType, transportType string) boo
 }
 
 func isDefaultTCPTransport(transport *domain.TransportOptions) bool {
-	if transport == nil || strings.TrimSpace(strings.ToLower(transport.Type)) != "tcp" {
+	if transport == nil {
 		return false
 	}
-	return transport.HeaderType == "" &&
-		transport.Method == "" &&
-		transport.Path == "" &&
-		transport.Host == "" &&
-		len(transport.Hosts) == 0 &&
-		len(transport.Headers) == 0 &&
-		transport.ServiceName == "" &&
-		transport.MaxEarlyData == 0 &&
-		transport.EarlyDataHeaderName == "" &&
-		!transport.V2RayHTTPUpgrade &&
-		!transport.V2RayHTTPUpgradeFastOpen &&
-		transport.XHTTP == nil
+	typeName := strings.TrimSpace(strings.ToLower(transport.Type))
+	if typeName != "tcp" && typeName != "raw" {
+		return false
+	}
+	return !mihomoTransportHasDetails(transport)
+}
+
+func mihomoTransportHasDetails(transport *domain.TransportOptions) bool {
+	return transport != nil && (transport.HeaderType != "" ||
+		transport.Method != "" ||
+		transport.Path != "" ||
+		transport.Host != "" ||
+		len(transport.Hosts) > 0 ||
+		len(transport.Headers) > 0 ||
+		transport.ServiceName != "" ||
+		transport.MaxEarlyData != 0 ||
+		transport.EarlyDataHeaderName != "" ||
+		transport.V2RayHTTPUpgrade ||
+		transport.V2RayHTTPUpgradeFastOpen ||
+		transport.XHTTP != nil)
 }
 
 func mihomoSupportsHTTPHeaderTransport(nodeType domain.NodeType, transport *domain.TransportOptions) bool {

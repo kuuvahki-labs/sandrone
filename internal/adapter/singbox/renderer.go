@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/sagernet/sing/common/json/badoption"
+
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/shared"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
@@ -127,7 +129,9 @@ func renderVMess(node domain.NodeIR) (map[string]any, bool, map[string]bool, []d
 		return nil, false, nil, nil, err
 	}
 	applyTLS(out, node)
-	applyTransport(out, node)
+	if err := applyTransport(out, node); err != nil {
+		return nil, false, nil, nil, err
+	}
 	applyMux(out, node)
 	return out, false, map[string]bool{"vmess.alter_id": true}, nil, nil
 }
@@ -135,6 +139,9 @@ func renderVMess(node domain.NodeIR) (map[string]any, bool, map[string]bool, []d
 func renderVLESS(node domain.NodeIR) (map[string]any, bool, map[string]bool, []domain.Warning, error) {
 	if node.Server == "" || node.Port == 0 || node.UUID == "" {
 		return nil, false, nil, nil, domain.NewError(domain.CodeRenderFailed, "missing vless fields")
+	}
+	if node.Encryption != "" && node.Encryption != "none" {
+		return nil, false, nil, nil, domain.NewError(domain.CodeRenderFailed, "sing-box vless outbound schema does not support non-default encryption")
 	}
 	out := baseOutbound(node, "vless")
 	out["uuid"] = node.UUID
@@ -145,13 +152,11 @@ func renderVLESS(node domain.NodeIR) (map[string]any, bool, map[string]bool, []d
 		return nil, false, nil, nil, err
 	}
 	applyTLS(out, node)
-	applyTransport(out, node)
-	applyMux(out, node)
-	warnings := []domain.Warning{}
-	if node.Encryption != "" && node.Encryption != "none" {
-		warnings = append(warnings, lossyWarning(node, "encryption", "sing-box vless outbound schema has no encryption field in the referenced version"))
+	if err := applyTransport(out, node); err != nil {
+		return nil, false, nil, nil, err
 	}
-	return out, false, nil, warnings, nil
+	applyMux(out, node)
+	return out, false, nil, nil, nil
 }
 
 func applyPacketEncoding(out map[string]any, value string) error {
@@ -182,7 +187,9 @@ func renderTrojan(node domain.NodeIR) (map[string]any, bool, map[string]bool, []
 	out := baseOutbound(node, "trojan")
 	out["password"] = node.Password
 	applyTLS(out, node)
-	applyTransport(out, node)
+	if err := applyTransport(out, node); err != nil {
+		return nil, false, nil, nil, err
+	}
 	applyMux(out, node)
 	return out, false, nil, nil, nil
 }
@@ -216,6 +223,9 @@ func renderHysteria(node domain.NodeIR) (map[string]any, bool, map[string]bool, 
 	}
 	if err := shared.ValidateCanonicalHysteriaBandwidth(hy); err != nil {
 		return nil, false, nil, nil, domain.WrapError(domain.CodeRenderFailed, "invalid hysteria bandwidth", err)
+	}
+	if err := validateSingBoxHopInterval(hy.HopInterval); err != nil {
+		return nil, false, nil, nil, domain.WrapError(domain.CodeRenderFailed, "invalid sing-box hysteria hop_interval", err)
 	}
 	up, err := singBoxRepresentableHysteriaRate(hy.Up)
 	if err != nil {
@@ -283,6 +293,14 @@ func singBoxRepresentableHysteriaRate(rate string) (string, error) {
 	return strconv.FormatUint(value/8, 10) + " Bps", nil
 }
 
+func validateSingBoxHopInterval(value string) error {
+	if value == "" {
+		return nil
+	}
+	var duration badoption.Duration
+	return duration.UnmarshalJSON([]byte(strconv.Quote(value)))
+}
+
 func renderHysteria2(node domain.NodeIR) (map[string]any, bool, map[string]bool, []domain.Warning, error) {
 	if node.Server == "" || node.Port == 0 || node.TLS == nil || !node.TLS.Enabled {
 		return nil, false, nil, nil, domain.NewError(domain.CodeRenderFailed, "missing hysteria2 fields")
@@ -294,6 +312,9 @@ func renderHysteria2(node domain.NodeIR) (map[string]any, bool, map[string]bool,
 	hy := node.Hysteria
 	if hy == nil {
 		hy = &domain.HysteriaOptions{}
+	}
+	if err := validateSingBoxHopInterval(hy.HopInterval); err != nil {
+		return nil, false, nil, nil, domain.WrapError(domain.CodeRenderFailed, "invalid sing-box hysteria2 hop_interval", err)
 	}
 	if len(hy.ServerPorts) > 0 {
 		out["server_ports"] = hy.ServerPorts

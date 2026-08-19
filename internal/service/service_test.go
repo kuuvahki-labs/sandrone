@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"encoding/base64"
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -69,7 +70,17 @@ func TestInspectReturnsLightweightRegisteredCapabilities(t *testing.T) {
 	require.Equal(t, []string{"base64", "json-nodes", "mihomo-proxies", "shadowrocket-proxies", "sing-box-outbounds", "uri-list"}, result.Formats.Render)
 	require.NotContains(t, result.Processors.File, "inject_nodes")
 	require.Equal(t, []domain.FileKind{domain.FileKindStatic, domain.FileKindMihomo, domain.FileKindSingBox, domain.FileKindShadowrocket}, result.FileKinds)
-	require.Equal(t, []domain.ProbeMethod{domain.ProbeTCPConnect, domain.ProbeUDPNTP, domain.ProbeURLTest}, result.Probe.Methods)
+	require.Contains(t, result.Probe.Methods, domain.ProbeTCPConnect)
+	backendMethods := make([]domain.ProbeMethod, 0, len(result.Probe.Backends))
+	seenMethods := map[domain.ProbeMethod]bool{}
+	for _, backend := range result.Probe.Backends {
+		if !seenMethods[backend.Method] {
+			seenMethods[backend.Method] = true
+			backendMethods = append(backendMethods, backend.Method)
+		}
+	}
+	sort.Slice(backendMethods, func(i, j int) bool { return backendMethods[i] < backendMethods[j] })
+	require.Equal(t, backendMethods, result.Probe.Methods)
 	require.False(t, result.Store.Configured)
 	require.Nil(t, result.Store.Subscriptions)
 	require.Nil(t, result.Store.Files)
