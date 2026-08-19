@@ -94,7 +94,7 @@ func renderSS(node domain.NodeIR) (map[string]any, map[string]bool, []domain.War
 	out := baseProxy(node, "ss")
 	out["cipher"] = shared.NormalizeShadowsocksCipher(node.Cipher)
 	out["password"] = node.Password
-	plugin, pluginOptions, warnings, err := renderMihomoSSPlugin(node)
+	plugin, pluginOptions, err := renderMihomoSSPlugin(node)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -109,7 +109,7 @@ func renderSS(node domain.NodeIR) (map[string]any, map[string]bool, []domain.War
 	}
 	applyMihomoTLS(out, node, "servername")
 	applyMihomoUDPOverTCP(out, node)
-	return out, nil, warnings, nil
+	return out, nil, nil, nil
 }
 
 func renderSSR(node domain.NodeIR) (map[string]any, map[string]bool, []domain.Warning, error) {

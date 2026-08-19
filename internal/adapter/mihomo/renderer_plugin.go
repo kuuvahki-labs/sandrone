@@ -8,27 +8,27 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
 
-func renderMihomoSSPlugin(node domain.NodeIR) (string, map[string]any, []domain.Warning, error) {
+func renderMihomoSSPlugin(node domain.NodeIR) (string, map[string]any, error) {
 	plugin := node.Plugin
 	options := node.PluginOptions
 	outOptions := options
 	if isSimpleObfsPlugin(plugin) {
 		if normalized := mihomoSimpleObfsOptions(options); len(normalized) > 0 {
-			return "obfs", normalized, nil, nil
+			return "obfs", normalized, nil
 		}
-		return "obfs", outOptions, nil, nil
+		return "obfs", outOptions, nil
 	}
 	if strings.EqualFold(strings.TrimSpace(plugin), "v2ray-plugin") {
 		normalized, issues := mihomoV2RayPluginOptions(options)
 		if len(issues) > 0 {
-			return "", nil, nil, domain.NewError(
+			return "", nil, domain.NewError(
 				domain.CodeRenderFailed,
 				"mihomo v2ray-plugin options contain unsupported, invalid, or conflicting connection parameters: "+strings.Join(issues, ", "),
 			)
 		}
-		return "v2ray-plugin", normalized, nil, nil
+		return "v2ray-plugin", normalized, nil
 	}
-	return plugin, outOptions, nil, nil
+	return plugin, outOptions, nil
 }
 
 func isSimpleObfsPlugin(plugin string) bool {
