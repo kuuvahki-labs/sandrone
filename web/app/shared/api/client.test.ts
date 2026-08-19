@@ -457,10 +457,21 @@ describe("ApiClient", () => {
       resolveResponse = resolve;
     });
     const calls: Array<{ input: FetchInput; init?: FetchOptions }> = [];
+    const capabilityList = {
+      items: [{
+        direction: "render",
+        field_counts: { lossy: 0, raw_only: 0, supported: 1 },
+        format: "base64",
+        href: "/v1/capabilities/formats/render/base64",
+        node_types: ["ss"],
+        reversible: false,
+        revisions: [],
+      }],
+    } as const;
     const fetcher = vi.fn(async (input: FetchInput, init?: FetchOptions) => {
       calls.push({ input, init });
       await responseReady;
-      return new Response(JSON.stringify({ items: [] }), {
+      return new Response(JSON.stringify(capabilityList), {
         headers: { "content-type": "application/json" },
       });
     });
@@ -469,9 +480,11 @@ describe("ApiClient", () => {
     const first = client.listFormatCapabilities();
     const second = client.listFormatCapabilities();
     resolveResponse?.();
-    await Promise.all([first, second]);
+    const [firstResult, secondResult] = await Promise.all([first, second]);
 
     expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(firstResult).toEqual(capabilityList);
+    expect(secondResult).toBe(firstResult);
     expect(String(calls[0]?.input)).toBe("/v1/capabilities/formats");
     expect(calls[0]?.init?.headers).toEqual({ Authorization: "Bearer secret" });
   });

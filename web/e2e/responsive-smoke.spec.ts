@@ -53,15 +53,35 @@ const filePreview = {
   warnings: [],
 };
 const formatCapabilities = {
-  items: [{
-    direction: "render",
-    format: "mihomo-proxies",
-    node_types: ["ss"],
-    reversible: false,
-    field_counts: { supported: 1, lossy: 0, raw_only: 0 },
-    revisions: ["v1.19.25"],
-    href: "/v1/capabilities/formats/render/mihomo-proxies",
-  }],
+  items: [
+    {
+      direction: "parse",
+      format: "uri-list",
+      node_types: ["ss"],
+      reversible: false,
+      field_counts: { supported: 1, lossy: 0, raw_only: 0 },
+      revisions: [],
+      href: "/v1/capabilities/formats/parse/uri-list",
+    },
+    {
+      direction: "render",
+      format: "base64",
+      node_types: ["ss"],
+      reversible: false,
+      field_counts: { supported: 1, lossy: 0, raw_only: 0 },
+      revisions: [],
+      href: "/v1/capabilities/formats/render/base64",
+    },
+    {
+      direction: "render",
+      format: "mihomo-proxies",
+      node_types: ["ss"],
+      reversible: false,
+      field_counts: { supported: 1, lossy: 0, raw_only: 0 },
+      revisions: ["v1.19.25"],
+      href: "/v1/capabilities/formats/render/mihomo-proxies",
+    },
+  ],
 };
 const uiCapabilities = {
   features: [
@@ -121,6 +141,9 @@ test.beforeEach(async ({ page }) => {
   await page.route("**/v1/files", async (route) => {
     await route.fulfill({ json: { items: manifest.files } });
   });
+  await page.route("**/v1/shares", async (route) => {
+    await route.fulfill({ json: { shares: [] } });
+  });
   await page.route("**/v1/capabilities/formats", async (route) => {
     await route.fulfill({ json: formatCapabilities });
   });
@@ -168,6 +191,7 @@ const routes = [
   { path: "/files", heading: "我的文件", content: "default.yaml", focus: false },
   { path: "/files/new?source=mihomo", heading: "新建文件", content: "节点来源", focus: true },
   { path: "/files/default.yaml/preview", heading: "文件预览", content: longPreviewNode, focus: true },
+  { path: "/shares", heading: "分享", content: "还没有分享链接", focus: false },
   { path: "/settings/runtime", heading: "高级设置", content: "远程请求", focus: false },
 ];
 
@@ -182,7 +206,7 @@ for (const route of routes) {
 
     await page.goto(route.path);
 
-    await expect(page.getByRole("heading", { name: route.heading, level: 2 })).toBeVisible();
+    await expect(page.getByRole("heading", { exact: true, name: route.heading, level: 2 })).toBeVisible();
     const routeContent = route.path === "/files/new?source=mihomo"
       ? page.getByRole("group", { name: route.content }).first()
       : route.path === "/files/default.yaml/preview"
@@ -258,3 +282,41 @@ for (const route of routes) {
     expect(consoleIssues).toEqual([]);
   });
 }
+
+test("the convert link dialog stays usable and does not execute the generated URL", async ({ page }) => {
+  const convertRequests: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.pathname === "/convert") convertRequests.push(request.url());
+  });
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText(value: string) {
+          sessionStorage.setItem("copied-convert-link", value);
+          return Promise.resolve();
+        },
+      },
+    });
+  });
+  await page.goto("/shares");
+  await page.getByRole("button", { name: "生成转换链接" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "生成转换链接" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("combobox", { name: "输出格式" })).toHaveValue("base64");
+  const sourceURL = "https://subscription.example/nodes?token=a+b&name=HK#primary";
+  await dialog.getByRole("textbox", { name: "远程订阅 URL" }).fill(sourceURL);
+  const expected = "https://example.com/convert?url=https%3A%2F%2Fsubscription.example%2Fnodes%3Ftoken%3Da%2Bb%26name%3DHK%23primary&to_format=base64";
+  await expect(dialog.getByText(expected)).toBeVisible();
+  await dialog.getByRole("button", { name: "复制完整链接" }).click();
+
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem("copied-convert-link"))).toBe(expected);
+  expect(convertRequests).toEqual([]);
+  const pageMetrics = await page.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+  }));
+  expect(pageMetrics.scrollWidth).toBeLessThanOrEqual(pageMetrics.clientWidth + 1);
+});

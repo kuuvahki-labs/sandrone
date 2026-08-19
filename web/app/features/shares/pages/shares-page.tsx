@@ -2,6 +2,7 @@ import { useState } from "react";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import LinkIcon from "@mui/icons-material/Link";
+import TransformOutlinedIcon from "@mui/icons-material/TransformOutlined";
 import Chip from "@mui/material/Chip";
 import List from "@mui/material/List";
 import Typography from "@mui/material/Typography";
@@ -26,9 +27,10 @@ export interface SharesPageProps {
   onCopy: (item: ShareItem, format?: ShareCopyFormat) => Promise<CopyShareResult>;
   onCopyUrl: (url: string) => Promise<CopyShareResult>;
   onDelete: (item: ShareItem) => void;
+  onGenerateConvertLink: () => void;
 }
 
-export function SharesPage({ items, loaded = true, onCopy, onCopyUrl, onDelete }: SharesPageProps) {
+export function SharesPage({ items, loaded = true, onCopy, onCopyUrl, onDelete, onGenerateConvertLink }: SharesPageProps) {
   const { t } = useI18n();
   const [manualCopyUrl, setManualCopyUrl] = useState<string | null>(null);
   const [selectedShare, setSelectedShare] = useState<ShareItem | null>(null);
@@ -39,6 +41,13 @@ export function SharesPage({ items, loaded = true, onCopy, onCopyUrl, onDelete }
     <section className="grid gap-6">
       <PageHeader
         label=""
+        secondaryActions={[{
+          accessibleLabel: t("shares.convert.action"),
+          icon: <TransformOutlinedIcon aria-hidden fontSize="small" />,
+          label: t("shares.convert.action"),
+          mobileVisible: true,
+          onSelect: onGenerateConvertLink,
+        }]}
         title={t("shares.title")}
         metrics={(
           <div aria-label={t("shares.summary")} className="grid grid-cols-2 gap-4 md:grid-cols-3">

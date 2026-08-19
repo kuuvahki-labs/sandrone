@@ -27,7 +27,7 @@ describe("shares page", () => {
     const user = userEvent.setup();
     const onCopy = vi.fn().mockResolvedValue({ copied: true });
     const onDelete = vi.fn();
-    render(<SharesPage items={shares} onCopy={onCopy} onCopyUrl={vi.fn()} onDelete={onDelete} />);
+    render(<SharesPage items={shares} onCopy={onCopy} onCopyUrl={vi.fn()} onDelete={onDelete} onGenerateConvertLink={vi.fn()} />);
 
     expect(screen.getByRole("heading", { name: "分享" })).toBeInTheDocument();
     expect(screen.getByText("https://example.com/s/sh_123")).toBeInTheDocument();
@@ -58,7 +58,7 @@ describe("shares page", () => {
   it("selects the public URL without triggering the card copy action", async () => {
     const user = userEvent.setup();
     const onCopy = vi.fn().mockResolvedValue({ copied: true });
-    render(<SharesPage items={shares} onCopy={onCopy} onCopyUrl={vi.fn()} onDelete={vi.fn()} />);
+    render(<SharesPage items={shares} onCopy={onCopy} onCopyUrl={vi.fn()} onDelete={vi.fn()} onGenerateConvertLink={vi.fn()} />);
 
     await user.click(screen.getByText(shares[0].publicUrl));
 
@@ -67,7 +67,7 @@ describe("shares page", () => {
   });
 
   it("preserves a partial public URL selection made by dragging", () => {
-    render(<SharesPage items={shares} onCopy={vi.fn().mockResolvedValue({ copied: true })} onCopyUrl={vi.fn()} onDelete={vi.fn()} />);
+    render(<SharesPage items={shares} onCopy={vi.fn().mockResolvedValue({ copied: true })} onCopyUrl={vi.fn()} onDelete={vi.fn()} onGenerateConvertLink={vi.fn()} />);
     const publicUrl = screen.getByText(shares[0].publicUrl);
     const text = publicUrl.firstChild;
     const selection = window.getSelection();
@@ -85,7 +85,7 @@ describe("shares page", () => {
   it("selects the public URL in details when copying cannot use the clipboard", async () => {
     const user = userEvent.setup();
     const onCopy = vi.fn().mockResolvedValue({ copied: false, url: shares[0].publicUrl });
-    render(<SharesPage items={shares} onCopy={onCopy} onCopyUrl={vi.fn()} onDelete={vi.fn()} />);
+    render(<SharesPage items={shares} onCopy={onCopy} onCopyUrl={vi.fn()} onDelete={vi.fn()} onGenerateConvertLink={vi.fn()} />);
 
     await user.click(screen.getByRole("button", { name: "查看详情：mobile" }));
     const dialog = screen.getByRole("dialog", { name: "分享详情" });
@@ -107,7 +107,7 @@ describe("shares page", () => {
       targetName: "provider",
       title: "nodes",
     };
-    render(<SharesPage items={[item]} onCopy={onCopy} onCopyUrl={vi.fn()} onDelete={vi.fn()} />);
+    render(<SharesPage items={[item]} onCopy={onCopy} onCopyUrl={vi.fn()} onDelete={vi.fn()} onGenerateConvertLink={vi.fn()} />);
 
     const more = screen.getByRole("button", { name: "nodes 更多操作" });
     const cases = [
@@ -147,6 +147,7 @@ describe("shares page", () => {
         onCopy={onCopy}
         onCopyUrl={vi.fn().mockResolvedValue({ copied: true })}
         onDelete={vi.fn()}
+        onGenerateConvertLink={vi.fn()}
       />,
     );
 
@@ -156,6 +157,25 @@ describe("shares page", () => {
     const dialog = await screen.findByRole("dialog", { name: "请手动复制链接" });
     expect(within(dialog).getByText(attemptedUrl)).toBeInTheDocument();
     await waitFor(() => expect(window.getSelection()?.toString()).toBe(attemptedUrl));
+  });
+
+  it("offers the convert link generator even when there are no stored shares", async () => {
+    const user = userEvent.setup();
+    const onGenerateConvertLink = vi.fn();
+    render(
+      <SharesPage
+        items={[]}
+        onCopy={vi.fn().mockResolvedValue({ copied: true })}
+        onCopyUrl={vi.fn()}
+        onDelete={vi.fn()}
+        onGenerateConvertLink={onGenerateConvertLink}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "生成转换链接" }));
+
+    expect(onGenerateConvertLink).toHaveBeenCalledOnce();
+    expect(screen.getByText("还没有分享链接")).toBeInTheDocument();
   });
 
 });

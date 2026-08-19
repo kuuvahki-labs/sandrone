@@ -1,5 +1,8 @@
+import { useState } from "react";
+
 import { LoadingScreen } from "~/core/components/loading-screen";
 import { useSandrone } from "~/core/provider/context";
+import { ConvertLinkDialog } from "~/features/shares/components/convert-link-dialog";
 import { createShareActions } from "~/features/shares/data/create-share-actions";
 import { useSharesResource } from "~/features/shares/data/use-shares-resource";
 import { SharesPage } from "~/features/shares/pages/shares-page";
@@ -8,6 +11,7 @@ import { useI18n } from "~/shared/i18n/context";
 export default function SharesRoute() {
   const app = useSandrone();
   const { t } = useI18n();
+  const [convertLinkOpen, setConvertLinkOpen] = useState(false);
   const shares = useSharesResource({
     client: app.client,
     publicBaseUrl: app.publicBaseUrl,
@@ -24,12 +28,23 @@ export default function SharesRoute() {
   if (shares.loading) return <LoadingScreen />;
 
   return (
-    <SharesPage
-      items={shares.items}
-      loaded={shares.loaded}
-      onCopy={shareActions.copyShare}
-      onCopyUrl={shareActions.copyShareUrl}
-      onDelete={(item) => app.requestDelete({ kind: "shares", name: item.id, label: t("shares.resourceLabel"), onDeleted: shares.reload })}
-    />
+    <>
+      <SharesPage
+        items={shares.items}
+        loaded={shares.loaded}
+        onCopy={shareActions.copyShare}
+        onCopyUrl={shareActions.copyShareUrl}
+        onDelete={(item) => app.requestDelete({ kind: "shares", name: item.id, label: t("shares.resourceLabel"), onDeleted: shares.reload })}
+        onGenerateConvertLink={() => setConvertLinkOpen(true)}
+      />
+      {convertLinkOpen ? (
+        <ConvertLinkDialog
+          client={app.client}
+          publicBaseUrl={app.publicBaseUrl}
+          onClose={() => setConvertLinkOpen(false)}
+          onCopyUrl={shareActions.copyShareUrl}
+        />
+      ) : null}
+    </>
   );
 }

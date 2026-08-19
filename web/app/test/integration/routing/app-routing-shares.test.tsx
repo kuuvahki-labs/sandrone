@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -61,6 +61,36 @@ describe("React Router app share and delete workflows", () => {
     await user.click(within(details).getByRole("button", { name: "复制链接" }));
 
     expect(writeText).toHaveBeenCalledWith(fullUrl);
+  });
+
+  it("generates and copies a fully encoded convert URL without executing it", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn(async () => undefined);
+    originalClipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    renderApp("/shares");
+
+    await screen.findByRole("heading", { level: 2, name: "分享" });
+    await user.click(screen.getByRole("button", { name: "生成转换链接" }));
+    const dialog = screen.getByRole("dialog", { name: "生成转换链接" });
+    const sourceURL = "https://subscription.example/nodes?token=a+b&name=HK#primary";
+    await user.type(within(dialog).getByRole("textbox", { name: "远程订阅 URL" }), sourceURL);
+    const copyButton = within(dialog).getByRole("button", { name: "复制完整链接" });
+    await waitFor(() => expect(copyButton).toBeEnabled());
+    await user.click(copyButton);
+
+    const expected = `${window.location.origin}/convert?url=https%3A%2F%2Fsubscription.example%2Fnodes%3Ftoken%3Da%2Bb%26name%3DHK%23primary&to_format=base64`;
+    expect(writeText).toHaveBeenCalledWith(expected);
+    const requests = vi.mocked(fetch).mock.calls.map(([input]) => String(input));
+    expect(requests).toContain("/v1/capabilities/formats");
+    expect(requests.some((url) => url.startsWith("/convert?"))).toBe(false);
+
+    await user.click(within(dialog).getByRole("button", { name: "取消" }));
+    await user.click(screen.getByRole("button", { name: "生成转换链接" }));
+    expect(screen.getByRole("textbox", { name: "远程订阅 URL" })).toHaveValue("");
   });
 
   it("creates a subscription share after navigating from the list to its editor", async () => {

@@ -93,16 +93,18 @@ func TestPublicConvertJSONEnvelopeIncludesWarnings(t *testing.T) {
 }
 
 func TestPublicConvertSupportsEveryRenderer(t *testing.T) {
-	formats := []string{
-		"mihomo-proxies",
-		"shadowrocket-proxies",
-		"sing-box-outbounds",
-		"json-nodes",
-		"uri-list",
+	rt := testRuntime(t, app.Config{})
+	capabilities, err := rt.Service.ListFormatCapabilities(t.Context())
+	require.NoError(t, err)
+	formats := []string{}
+	for _, capability := range capabilities.Items {
+		if capability.Direction == domain.CapabilityDirectionRender {
+			formats = append(formats, capability.Format)
+		}
 	}
+	require.NotEmpty(t, formats)
 	for _, format := range formats {
 		t.Run(format, func(t *testing.T) {
-			rt := testRuntime(t, app.Config{})
 			server := httpapi.New(rt)
 			query := url.Values{
 				"content":   {publicConvertNode},

@@ -163,6 +163,26 @@ export interface UICapabilityList {
   features: UICapability[];
 }
 
+export type FormatCapabilityDirection = "parse" | "render";
+
+export interface FormatCapabilitySummary {
+  direction: FormatCapabilityDirection;
+  field_counts: {
+    supported: number;
+    lossy: number;
+    raw_only: number;
+  };
+  format: string;
+  href: string;
+  node_types: string[];
+  reversible: boolean;
+  revisions: string[];
+}
+
+export interface FormatCapabilityList {
+  items: FormatCapabilitySummary[];
+}
+
 export interface ScheduledRefreshStatus {
   enabled: boolean;
   running: boolean;
@@ -216,7 +236,7 @@ export class ApiClient {
     return this.dedupedRequest("GET", "/v1/inspect");
   }
 
-  listFormatCapabilities(): Promise<unknown> {
+  listFormatCapabilities(): Promise<FormatCapabilityList> {
     return this.dedupedRequest("GET", "/v1/capabilities/formats");
   }
 

@@ -132,6 +132,38 @@ export const uiCapabilities = {
   ],
 };
 
+export const formatCapabilities = {
+  items: [
+    {
+      direction: "parse",
+      format: "uri-list",
+      node_types: ["ss"],
+      reversible: false,
+      field_counts: { supported: 1, lossy: 0, raw_only: 0 },
+      revisions: [],
+      href: "/v1/capabilities/formats/parse/uri-list",
+    },
+    {
+      direction: "render",
+      format: "base64",
+      node_types: ["ss"],
+      reversible: false,
+      field_counts: { supported: 1, lossy: 0, raw_only: 0 },
+      revisions: [],
+      href: "/v1/capabilities/formats/render/base64",
+    },
+    {
+      direction: "render",
+      format: "json-nodes",
+      node_types: ["ss"],
+      reversible: true,
+      field_counts: { supported: 1, lossy: 0, raw_only: 0 },
+      revisions: [],
+      href: "/v1/capabilities/formats/render/json-nodes",
+    },
+  ],
+};
+
 export function installDefaultFetchMock() {
   localStorage.clear();
   vi.restoreAllMocks();
@@ -144,6 +176,9 @@ export function installDefaultFetchMock() {
     }
     if (url === "/v1/capabilities/ui") {
       return jsonResponse(uiCapabilities);
+    }
+    if (url === "/v1/capabilities/formats") {
+      return jsonResponse(formatCapabilities);
     }
     if (url.includes("/v1/subscriptions/provider")) {
       if (url.includes("/preview")) {
