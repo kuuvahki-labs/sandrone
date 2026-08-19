@@ -16,12 +16,6 @@ Sandrone 管理本地与远程订阅，通过统一的 `NodeIR` 执行有序处�
 Mihomo、sing-box、Shadowrocket 配置或分享链接。同一套转换语义同时服务于
 Web UI、CLI、HTTP API、MCP 与可嵌入 Go API。
 
-如果你需要的不是一次性的格式转换，而是一套可以长期维护的自托管配置工作流，
-Sandrone 就是为此而做。觉得它有用，欢迎点一个 Star，让更多同类用户找到它。
-
-<p align="center">
-  <img src="docs/assets/web-ui-preview.png" alt="Sandrone Web UI 中的 Mihomo 文件预览">
-</p>
 
 ## 为什么是 Sandrone
 
