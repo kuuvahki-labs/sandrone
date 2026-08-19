@@ -29,6 +29,33 @@ func TestRenderMihomoRenderWrapper(t *testing.T) {
 	}
 }
 
+func TestRenderMihomoVMessCipherDefaultsAndPreservesExplicitValue(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		cipher     string
+		wantCipher string
+	}{
+		{name: "default", wantCipher: "auto"},
+		{name: "explicit", cipher: "zero", wantCipher: "zero"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			out, report, err := mihomo.NewRenderer().RenderWithReport(context.Background(), []domain.NodeIR{{
+				Name: "vmess", Type: domain.NodeTypeVMess, Server: "vmess.example.com", Port: 443,
+				UUID: "11111111-1111-1111-1111-111111111111", Cipher: tc.cipher,
+			}}, domain.RenderOptions{})
+
+			require.NoError(t, err)
+			require.Equal(t, 1, report.SuccessCount)
+			var doc struct {
+				Proxies []map[string]any `yaml:"proxies"`
+			}
+			require.NoError(t, yaml.Unmarshal(out, &doc))
+			require.Len(t, doc.Proxies, 1)
+			require.Equal(t, tc.wantCipher, doc.Proxies[0]["cipher"])
+		})
+	}
+}
+
 func TestRenderMihomoHysteriaBandwidthFromOfficialURIUsesNativeRates(t *testing.T) {
 	nodes, _, err := uriadapter.NewParser().Parse(context.Background(), []byte(
 		"hysteria://hy.example.com:8443?protocol=wechat-video&auth=secret&upmbps=100&downmbps=200&obfs=xplus&obfsParam=obfs-pass#hy",

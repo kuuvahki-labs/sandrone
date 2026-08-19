@@ -228,9 +228,7 @@ func renderVMess(node domain.NodeIR) (map[string]any, map[string]bool, []domain.
 	}
 	out := baseProxy(node, "vmess")
 	out["uuid"] = node.UUID
-	if node.Cipher != "" {
-		out["cipher"] = node.Cipher
-	}
+	out["cipher"] = firstNonEmpty(node.Cipher, "auto")
 	out["alterId"] = node.AlterID
 	if err := applyMihomoTransport(out, node); err != nil {
 		return nil, nil, nil, err

@@ -57,6 +57,35 @@ func TestServiceMihomoURLTestWithLocalProxy(t *testing.T) {
 	require.Equal(t, "mihomo_url_test", result.Report.Probe.Backend)
 }
 
+func TestServiceMihomoURLTestVMessDefaultsEmptyCipherBeforeCoreParse(t *testing.T) {
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer target.Close()
+
+	result, err := service.New().Probe(context.Background(), domain.ProbeRequest{
+		Input: domain.NodeInput{
+			Type: "inline_nodes",
+			Nodes: []domain.NodeIR{{
+				Name: "vmess-default", Type: domain.NodeTypeVMess, Server: "127.0.0.1", Port: 1,
+				UUID: "11111111-1111-1111-1111-111111111111",
+			}},
+		},
+		Method:         domain.ProbeURLTest,
+		Core:           "mihomo",
+		URL:            target.URL,
+		ExpectedStatus: "200-299",
+		TimeoutMS:      250,
+		Attempts:       1,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.Results, 1)
+	require.False(t, result.Results[0].Alive)
+	require.NotEqual(t, string(domain.CodeProbeInvalidTarget), result.Results[0].ErrorCode)
+	require.NotContains(t, result.Results[0].Error, "unset fields: cipher")
+}
+
 func TestServiceMihomoURLTestRejectsUnexpectedStatus(t *testing.T) {
 	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)

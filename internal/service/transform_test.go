@@ -319,6 +319,56 @@ func TestServiceConvertRunsParseAndRender(t *testing.T) {
 	require.NotEmpty(t, result.Report.SourceRefs)
 }
 
+func TestServiceConvertVMessWithoutCipherUsesClientDefaults(t *testing.T) {
+	svc := service.New()
+	content := []byte(`[{
+  "name": "vmess-default",
+  "type": "vmess",
+  "server": "vmess.example.com",
+  "port": 443,
+  "uuid": "11111111-1111-1111-1111-111111111111"
+}]`)
+
+	for _, format := range []string{
+		"mihomo-proxies",
+		"sing-box-outbounds",
+		"shadowrocket-proxies",
+		"uri-list",
+		"base64",
+	} {
+		t.Run(format, func(t *testing.T) {
+			result, err := svc.Convert(context.Background(), domain.ConvertRequest{
+				FromFormat: "json-nodes",
+				ToFormat:   format,
+				Content:    content,
+			})
+			require.NoError(t, err)
+
+			switch format {
+			case "mihomo-proxies":
+				require.Contains(t, string(result.Body), "cipher: auto")
+			case "sing-box-outbounds":
+				var doc struct {
+					Outbounds []map[string]any `json:"outbounds"`
+				}
+				require.NoError(t, json.Unmarshal(result.Body, &doc))
+				require.Len(t, doc.Outbounds, 1)
+				require.Equal(t, "auto", doc.Outbounds[0]["security"])
+			case "shadowrocket-proxies":
+				require.Contains(t, string(result.Body), "method=auto")
+			case "uri-list", "base64":
+				parsed, err := svc.Parse(context.Background(), domain.ParseRequest{
+					Format:  format,
+					Content: result.Body,
+				})
+				require.NoError(t, err)
+				require.Len(t, parsed.Nodes, 1)
+				require.Equal(t, "auto", parsed.Nodes[0].Cipher)
+			}
+		})
+	}
+}
+
 func TestServiceConvertVLESSSecurityNoneToSingBoxOmitsTLS(t *testing.T) {
 	svc := service.New()
 
