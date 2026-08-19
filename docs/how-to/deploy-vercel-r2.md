@@ -14,6 +14,33 @@ Store-backed cache。
 Preview 与 Production 必须使用不同 bucket，或至少使用不同 prefix。不要让
 开发预览和正式服务同时写入同一个 namespace。
 
+## 配置 GitHub Actions 部署
+
+Vercel 原生 Git 部署不会在 Go Function 编译前生成被忽略的 Web UI 和 rule-set
+catalog。仓库因此通过 [`git.deploymentEnabled`](https://vercel.com/docs/project-configuration/git-configuration)
+关闭原生 Git 自动部署，统一由 `.github/workflows/ci.yml` 按
+[Vercel 的 GitHub Actions 预构建部署流程](https://vercel.com/docs/git/vercel-for-github)
+在 Go 与 Web 门禁通过后部署：pull request 不部署，push `main` 部署 Preview，push
+`v*` tag 部署 Production。这样正式 Vercel 部署与容器镜像和 GitHub Release 使用
+同一个 tag 发布信号。
+
+在 GitHub repository 的 Actions secrets 中配置：
+
+```text
+VERCEL_TOKEN=<Vercel access token>
+VERCEL_ORG_ID=<Vercel account or team ID>
+VERCEL_PROJECT_ID=<Vercel project ID>
+```
+
+`VERCEL_TOKEN` 从 Vercel Account Settings 的 Tokens 页面创建。项目连接后，本地
+执行 `vercel link` 生成的 `.vercel/project.json` 包含 `orgId` 和 `projectId`；不要
+提交 `.vercel/` 或把这些值硬编码进 workflow。
+
+部署 job 先运行 `scripts/build-vercel-assets.sh`，生成
+`internal/entry/webui/static/index.html` 和
+`internal/service/catalog_builtin/catalog.json.gz`，再运行契约检查、`vercel build`
+和 `vercel deploy --prebuilt`。这些生成物继续由 `.gitignore` 排除，不属于源码提交。
+
 ## 配置 Vercel 环境变量
 
 Vercel 项目的 Root Directory 必须是仓库根目录。仓库中的 `vercel.json` 已将
@@ -42,7 +69,8 @@ Vercel profile 强制要求非空 `SANDRONE_TOKEN` 和 S3 后端。配置缺失�
 
 ## 部署与检查
 
-连接仓库并创建 Preview Deployment。部署成功后依次检查：
+push `main` 后检查 Preview；push `v*` tag 后检查 Production。等待 CI 中的
+`Vercel deployment` job 完成后依次检查：
 
 1. `GET /version` 和 Web 首页可以加载。
 2. 未携带 bearer token 的 `/v1/*` 与 MCP 请求被拒绝。

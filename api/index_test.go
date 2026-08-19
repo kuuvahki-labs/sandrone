@@ -32,7 +32,10 @@ func TestVercelConfigContract(t *testing.T) {
 	require.NoError(t, err)
 	var cfg struct {
 		Framework json.RawMessage `json:"framework"`
-		Build     struct {
+		Git       struct {
+			DeploymentEnabled bool `json:"deploymentEnabled"`
+		} `json:"git"`
+		Build struct {
 			Env map[string]string `json:"env"`
 		} `json:"build"`
 		Functions map[string]struct {
@@ -45,6 +48,7 @@ func TestVercelConfigContract(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(body, &cfg))
 	require.JSONEq(t, "null", string(cfg.Framework))
+	require.False(t, cfg.Git.DeploymentEnabled)
 	require.Equal(t, "-ldflags '-s -w'", cfg.Build.Env["GO_BUILD_FLAGS"])
 	require.Len(t, cfg.Functions, 1)
 	require.Equal(t, 60, cfg.Functions["api/index.go"].MaxDuration)
