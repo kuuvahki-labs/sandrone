@@ -80,7 +80,7 @@ jobs:
 
   vercel:
     name: Vercel deployment
-    if: github.event_name == 'push'
+    if: github.ref_type == 'tag' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     needs:
       - go

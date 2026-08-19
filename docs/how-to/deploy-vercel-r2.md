@@ -21,8 +21,8 @@ catalog。仓库因此通过 [`git.deploymentEnabled`](https://vercel.com/docs/p
 关闭原生 Git 自动部署，统一由 `.github/workflows/ci.yml` 按
 [Vercel 的 GitHub Actions 预构建部署流程](https://vercel.com/docs/git/vercel-for-github)
 在 Go 与 Web 门禁通过后部署：pull request 不部署，push `main` 部署 Preview，push
-`v*` tag 部署 Production。这样正式 Vercel 部署与容器镜像和 GitHub Release 使用
-同一个 tag 发布信号。
+`v*` tag 或手动选择 `v*` tag 运行 workflow 时部署 Production。这样正式 Vercel
+部署与容器镜像和 GitHub Release 使用同一个 tag 发布信号。
 
 在 GitHub repository 的 Actions secrets 中配置：
 
@@ -71,8 +71,8 @@ Vercel profile 强制要求非空 `SANDRONE_TOKEN` 和 S3 后端。配置缺失�
 
 ## 部署与检查
 
-push `main` 后检查 Preview；push `v*` tag 后检查 Production。等待 CI 中的
-`Vercel deployment` job 完成后依次检查：
+push `main` 后检查 Preview；push `v*` tag 或手动选择该 tag 运行 workflow 后检查
+Production。等待 CI 中的 `Vercel deployment` job 完成后依次检查：
 
 1. `GET /version` 和 Web 首页可以加载。
 2. 未携带 bearer token 的 `/v1/*` 与 MCP 请求被拒绝。

@@ -75,7 +75,7 @@ func TestVercelWorkflowUsesPrebuiltAssetPipeline(t *testing.T) {
 	for _, want := range []string{
 		"  vercel:\n",
 		"name: Vercel deployment",
-		"if: github.event_name == 'push'",
+		"if: github.ref_type == 'tag' || (github.event_name == 'push' && github.ref == 'refs/heads/main')",
 		"needs:\n      - go\n      - web",
 		"group: vercel-${{ github.ref }}",
 		"VERCEL_ENVIRONMENT: ${{ github.ref_type == 'tag' && 'production' || 'preview' }}",
