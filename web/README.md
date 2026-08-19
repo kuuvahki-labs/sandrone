@@ -34,7 +34,7 @@ pnpm dev
 ```
 
 页面默认位于 `http://localhost:5173`。开发服务器把 `/healthz`、
-`/version`、`/v1/*` 和 `/s/*` 请求代理到
+`/version`、`/convert`、`/v1/*` 和 `/s/*` 请求代理到
 `http://127.0.0.1:1137`；可按需覆盖后端地址：
 
 ```sh

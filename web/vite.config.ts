@@ -39,6 +39,10 @@ export default defineConfig({
         target: backendTarget,
         changeOrigin: true,
       },
+      "/convert": {
+        target: backendTarget,
+        changeOrigin: true,
+      },
       "/s/": {
         target: backendTarget,
         changeOrigin: true,

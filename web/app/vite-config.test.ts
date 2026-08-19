@@ -33,13 +33,14 @@ function findVitestProject(name: string): VitestProject | undefined {
 }
 
 describe("Vite development proxy", () => {
-  it("proxies the public version endpoint to the health-check backend", () => {
+  it("proxies public backend endpoints to the health-check backend", () => {
     const proxy = (viteConfig as {
       server?: { proxy?: Record<string, ProxyOptions> };
     }).server?.proxy;
 
     expect(proxy?.["/healthz"]).toBeDefined();
     expect(proxy?.["/version"]).toEqual(proxy?.["/healthz"]);
+    expect(proxy?.["/convert"]).toEqual(proxy?.["/healthz"]);
   });
 });
 
