@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
   "build": {
     "env": {
       "GO_BUILD_FLAGS": "-ldflags '-s -w'"

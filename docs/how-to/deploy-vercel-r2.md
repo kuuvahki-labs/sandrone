@@ -16,6 +16,10 @@ Preview 与 Production 必须使用不同 bucket，或至少使用不同 prefix�
 
 ## 配置 Vercel 环境变量
 
+Vercel 项目的 Root Directory 必须是仓库根目录。仓库中的 `vercel.json` 已将
+Framework Preset 固定为 `Other`；不要在项目设置中改成 `Go`。`Go` preset 寻找
+仓库根目录的 `index.go`，与本项目使用的 `api/index.go` Go Function 入口不兼容。
+
 在对应 Vercel Environment 中设置：
 
 ```text
