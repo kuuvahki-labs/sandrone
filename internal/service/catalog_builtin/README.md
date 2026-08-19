@@ -13,6 +13,12 @@ metadata therefore follows the active upstream branches and can change between
 builds. The generator sorts and deduplicates all targets before installing
 `catalog.json.gz` here.
 
+Local builds can route the source repository clones through a GitHub mirror by
+setting `RULESET_CATALOG_GITHUB_MIRROR` to the mirror's GitHub base URL before
+running `make ruleset-catalog`. When the variable is unset, including in CI,
+the generator clones directly from `https://github.com`. This setting affects
+only the build-time clones; generated raw-content URLs remain canonical.
+
 The source projects and their contributors retain attribution for the upstream
 metadata. `blackmatrix7/ios_rule_script` declares GPL-2.0 for its repository and
 also aggregates rule data from separately attributed upstream sources; those

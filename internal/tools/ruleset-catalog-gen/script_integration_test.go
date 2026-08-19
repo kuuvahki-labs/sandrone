@@ -41,33 +41,53 @@ func TestGenerationScriptTracksBlackmatrixMaster(t *testing.T) {
 	runGit(t, "config", "--file", gitConfig,
 		"url.file://"+filepath.ToSlash(blackmatrixRepository)+".insteadOf",
 		"https://github.com/blackmatrix7/ios_rule_script.git")
+	mirror := "https://mirror.example/https://github.com"
+	runGit(t, "config", "--file", gitConfig, "--add",
+		"url.file://"+filepath.ToSlash(metaRepository)+".insteadOf",
+		mirror+"/MetaCubeX/meta-rules-dat.git")
+	runGit(t, "config", "--file", gitConfig, "--add",
+		"url.file://"+filepath.ToSlash(blackmatrixRepository)+".insteadOf",
+		mirror+"/blackmatrix7/ios_rule_script.git")
 
 	repositoryRoot, err := filepath.Abs("../../..")
 	require.NoError(t, err)
-	outputDirectory := filepath.Join(root, "output")
-	command := exec.Command(
-		"bash",
-		filepath.Join(repositoryRoot, "scripts/generate-ruleset-catalog.sh"),
-		outputDirectory,
-	)
-	command.Dir = repositoryRoot
-	command.Env = append(os.Environ(),
-		"GIT_CONFIG_GLOBAL="+gitConfig,
-		"GIT_CONFIG_NOSYSTEM=1",
-	)
-	output, err := command.CombinedOutput()
-	require.NoError(t, err, string(output))
+	for _, test := range []struct {
+		name   string
+		mirror string
+	}{
+		{name: "default GitHub"},
+		{name: "configured mirror", mirror: mirror + "/"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			outputDirectory := filepath.Join(root, "output-"+test.name)
+			command := exec.Command(
+				"bash",
+				filepath.Join(repositoryRoot, "scripts/generate-ruleset-catalog.sh"),
+				outputDirectory,
+			)
+			command.Dir = repositoryRoot
+			command.Env = append(os.Environ(),
+				"GIT_CONFIG_GLOBAL="+gitConfig,
+				"GIT_CONFIG_NOSYSTEM=1",
+			)
+			if test.mirror != "" {
+				command.Env = append(command.Env, "RULESET_CATALOG_GITHUB_MIRROR="+test.mirror)
+			}
+			output, err := command.CombinedOutput()
+			require.NoError(t, err, string(output))
 
-	body, err := os.ReadFile(filepath.Join(outputDirectory, "catalog.json.gz"))
-	require.NoError(t, err)
-	reader, err := gzip.NewReader(bytes.NewReader(body))
-	require.NoError(t, err)
-	decodedBody, err := io.ReadAll(reader)
-	require.NoError(t, err)
-	require.NoError(t, reader.Close())
-	var catalog catalogSnapshot
-	require.NoError(t, json.Unmarshal(decodedBody, &catalog))
-	require.Equal(t, []string{"Live/Live"}, itemNames(catalog.Shadowrocket))
+			body, err := os.ReadFile(filepath.Join(outputDirectory, "catalog.json.gz"))
+			require.NoError(t, err)
+			reader, err := gzip.NewReader(bytes.NewReader(body))
+			require.NoError(t, err)
+			decodedBody, err := io.ReadAll(reader)
+			require.NoError(t, err)
+			require.NoError(t, reader.Close())
+			var catalog catalogSnapshot
+			require.NoError(t, json.Unmarshal(decodedBody, &catalog))
+			require.Equal(t, []string{"Live/Live"}, itemNames(catalog.Shadowrocket))
+		})
+	}
 }
 
 func initGitRepository(t *testing.T, repository, branch string) {

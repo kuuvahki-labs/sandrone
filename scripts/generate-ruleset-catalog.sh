@@ -8,6 +8,9 @@ trap 'rm -rf "$work_dir"' EXIT
 
 export GIT_TERMINAL_PROMPT=0
 
+github_mirror="${RULESET_CATALOG_GITHUB_MIRROR:-https://github.com}"
+github_mirror="${github_mirror%/}"
+
 clone_tree_paths() {
   local repository="$1"
   local branch="$2"
@@ -47,15 +50,15 @@ checkout_repository_branch() {
 }
 
 clone_tree_paths \
-  https://github.com/MetaCubeX/meta-rules-dat.git \
+  "$github_mirror/MetaCubeX/meta-rules-dat.git" \
   meta \
   meta-rules-dat-meta
 clone_tree_paths \
-  https://github.com/MetaCubeX/meta-rules-dat.git \
+  "$github_mirror/MetaCubeX/meta-rules-dat.git" \
   sing \
   meta-rules-dat-sing
 checkout_repository_branch \
-  https://github.com/blackmatrix7/ios_rule_script.git \
+  "$github_mirror/blackmatrix7/ios_rule_script.git" \
   master \
   ios-rule-script
 
