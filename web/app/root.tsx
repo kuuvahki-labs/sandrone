@@ -20,7 +20,7 @@ import { I18nProvider, translate } from "./shared/i18n/context";
 import { getLocalePreference, muiThemeModeStorageKey, muiThemeSchemeStorageKey } from "./shared/storage/preferences";
 
 export const links: Route.LinksFunction = () => [
-  { rel: "icon", href: "/brand/favicon.ico", sizes: "any" },
+  { rel: "icon", href: "/favicon.ico", sizes: "any" },
   { rel: "icon", href: "/brand/sandrone-logo-32.png", sizes: "32x32", type: "image/png" },
   { rel: "icon", href: "/brand/sandrone-logo-48.png", sizes: "48x48", type: "image/png" },
 ];
