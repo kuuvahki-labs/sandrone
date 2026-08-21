@@ -118,15 +118,14 @@ func (c *storeCache) PutJSON(ctx context.Context, key string, ttl time.Duration,
 		return err
 	}
 	storedAt := c.now().UTC()
-	body, err := json.MarshalIndent(envelope{
+	body, err := json.Marshal(envelope{
 		StoredAt:  storedAt,
 		ExpiresAt: storedAt.Add(ttl),
 		Value:     valueBody,
-	}, "", "  ")
+	})
 	if err != nil {
 		return err
 	}
-	body = append(body, '\n')
 	return c.store.Write(ctx, key, body)
 }
 

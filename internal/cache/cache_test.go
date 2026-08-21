@@ -22,8 +22,14 @@ func TestCacheJSONHonorsTTLAndLayeredKeys(t *testing.T) {
 	c := cache.New(st, func() time.Time { return now })
 	key, err := cache.HashKey("probe", map[string]any{"node": "a"})
 	require.NoError(t, err)
+	require.Equal(t, "cache/probe/9ccceaef892eae566be2dd418e9bd0bcde57f11f5da24073defa1fba3c38ea98.json", key)
 
 	require.NoError(t, c.PutJSON(ctx, key, time.Minute, map[string]string{"value": "cached"}))
+	body, err := st.Read(ctx, key)
+	require.NoError(t, err)
+	require.NotContains(t, string(body), "\n")
+	require.NotContains(t, string(body), "  ")
+	require.True(t, json.Valid(body))
 
 	var got map[string]string
 	hit := c.GetJSON(ctx, key, &got)

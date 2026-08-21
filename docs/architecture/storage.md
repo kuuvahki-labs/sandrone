@@ -112,7 +112,8 @@ Sandrone 不调用 AWS 默认凭据链，不读取 shared profile 或 instance m
 
 service 分别持有权威 `Store` 与非权威 `Cache`，因此自定义 Cache 不需要充当
 资源 Store。当前仓库只内建 Store-backed 实现：它把 envelope 写到
-`cache/<layer>/`，读取过期 entry 时 best-effort 删除。没有运行时 backend
+`cache/<layer>/`，使用无缩进和尾随换行的紧凑 JSON；读取过期 entry 时
+best-effort 删除。没有运行时 backend
 registry、第三方 cache 依赖或缓存管理 HTTP API；以后更换为内存或远程实现时，
 应保持相同的 miss/failure 语义，而不是让 cache 可用性影响业务结果。
 
