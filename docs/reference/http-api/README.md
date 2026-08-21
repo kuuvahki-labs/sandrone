@@ -4,8 +4,7 @@
 
 本目录记录 Sandrone HTTP server 的公开契约。接口按资源拆分为以下专题：
 
-- [转换、校验与能力检查](conversion.md)
-- [节点探测](probing.md)
+- [转换与能力检查](conversion.md)
 - [运行时 schema catalog](schemas.md)
 - [订阅资源](subscriptions.md)
 - [文件资源](files.md)

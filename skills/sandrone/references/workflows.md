@@ -14,7 +14,6 @@ client may add a namespace prefix.
 | Exact format capability | `GET /v1/capabilities/formats/{direction}/{format}` | `sandrone://capabilities/formats/{direction}/{format}` |
 | List UI capabilities | `GET /v1/capabilities/ui` | — |
 | Full conversion | `POST /v1/convert` | `sandrone_convert` |
-| Probe nodes | `POST /v1/probe` | `sandrone_probe_nodes` |
 | List subscriptions | `GET /v1/subscriptions` | `sandrone_list_resources` |
 | Read subscription | `GET /v1/subscriptions/{name}` | `sandrone://subscriptions/{name}` |
 | Put subscription | `POST /v1/subscriptions` | `sandrone_put_subscription` |
@@ -23,7 +22,6 @@ client may add a namespace prefix.
 | Render subscription | `POST /v1/subscriptions/{name}/render` | `sandrone_render_subscription` |
 | List files | `GET /v1/files` | `sandrone_list_resources` |
 | Read FileSpec | `GET /v1/files/{name}?mode=spec` | `sandrone://files/{name}` |
-| Validate FileSpec | `POST /v1/validate` | `sandrone_validate_file` |
 | Put FileSpec | `POST /v1/files` | `sandrone_put_file` |
 | Delete FileSpec | `DELETE /v1/files/{name}` | `sandrone_delete_file` |
 | Render file | `GET /v1/files/{name}?mode=render&response=json` | `sandrone_get_file` |
@@ -98,12 +96,10 @@ unsaved subscription was previewed.
 4. Write concrete `groups`, `rule_sets`, and `rules` where applicable. Never
    create or modify `adaptive_groups`; preserve an existing value unchanged
    only when the accepted write shape permits a compatibility round-trip.
-5. Validate inline with `POST /v1/validate` or `sandrone_validate_file`.
-6. Resolve validation errors before persistence.
-7. Return a draft without mutation when only a draft was requested.
-8. For an authorized persistence request, use `POST /v1/files` or
+5. Return a draft without mutation when only a draft was requested.
+6. For an authorized persistence request, use `POST /v1/files` or
    `sandrone_put_file`.
-9. Render a saved file with
+7. Render a saved file with
    `GET /v1/files/{name}?mode=render&response=json` or `sandrone_get_file` in
    `render` mode. Use `spec` or `source` mode for those representations.
 
@@ -115,15 +111,6 @@ unsaved subscription was previewed.
 4. Report `deleted` exactly as returned. After an ambiguous transport failure,
    keep the same plane and reread the exact resource before retrying.
 
-## Probe Nodes
-
-1. Read probe capabilities.
-2. Resolve input, method, core, target, timeout, attempts, concurrency,
-   and cache behavior from the request and current schema.
-3. Use authenticated `POST /v1/probe` or `sandrone_probe_nodes`.
-4. Separate per-node results from aggregate warnings; probing is not a
-   configuration mutation.
-
 ## Author a Processor or Script
 
 1. Read the exact `/v1/schemas/processors/{stage}/{type}` endpoint or matching
@@ -132,8 +119,9 @@ unsaved subscription was previewed.
    `sandrone://schemas/script-api/v1`.
 3. Use `write_processor_script` only as an optional MCP drafting aid.
 4. Treat the script as embedded ECMAScript, not Node.js.
-5. Validate its containing Subscription or FileSpec through the applicable
-   preview or validation flow.
+5. Check its containing saved Subscription or FileSpec through the applicable
+   preview or render flow. For local draft diagnosis, use the CLI `diagnose`
+   command; HTTP and MCP do not expose diagnose directly.
 
 ## Explain Reports and Errors
 

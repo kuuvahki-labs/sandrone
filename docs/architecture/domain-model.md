@@ -122,6 +122,19 @@ warning 上下文允许 parser 携带原始行或结构化原值，其中可能�
 
 定义见 [`probe.go`](../../internal/domain/probe.go)，后端、缓存和报告边界见[节点探测](probing.md)。
 
+## `DiagnoseResult`
+
+`DiagnoseResult` 是 CLI 与公开 Go façade 的统一诊断结果。它包含输入分类与检测格式、
+真实执行顺序的 stages、issues/warnings/dependencies/source refs、最终完整节点或
+`FileDocument`，以及失败时不含 cause 的结构化 `AppError`。processor stage 另外
+记录 scope、全局执行序号、前后计数和内部产生的完整 `ProbeResult`；processor
+仍按各自处理链的声明顺序出现。
+
+状态只有 `ok`、`partial`、`failed`。诊断不会自行加入 probe；trace 只观测输入
+本来会执行的 processor/script 调用，不改变正常流水线输出。定义见
+[`diagnose.go`](../../internal/domain/diagnose.go)，CLI wire 与退出码见
+[CLI 参考](../reference/cli.md#diagnose)。
+
 ## 稳定不变量
 
 - 持久化定义不吸收一次请求的派生结果。

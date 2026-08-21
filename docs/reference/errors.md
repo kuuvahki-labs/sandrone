@@ -35,6 +35,8 @@ Sandrone 有四种不同的失败或诊断载体：
 | code | 含义 |
 | --- | --- |
 | `invalid_argument` | 请求字段、组合、格式名、路径或运行配置无效 |
+| `input_kind_ambiguous` | diagnose 输入同时满足多个强结构候选，必须显式覆盖 kind/format |
+| `input_kind_unrecognized` | diagnose 输入不满足任何支持的节点文档、Subscription 或 FileSpec 结构 |
 | `parse_failed` | 已选 parser 无法产生有效节点 |
 | `render_failed` | renderer 无法产生目标内容；非空批次没有可渲染节点也使用此码 |
 | `node_validation_failed` | 普通执行链中全部节点都未通过语义校验 |
@@ -48,7 +50,7 @@ Sandrone 有四种不同的失败或诊断载体：
 | `file_dependency_cycle` | 文件依赖解析遇到环 |
 | `file_merge_failed` | file-stage merge 的解码、运算或编码失败 |
 | `file_processor_failed` | file-stage processor 的通用失败 |
-| `file_validation_failed` | 文件验证失败的保留类型码；当前内建显式验证通常返回 `ValidateResult` 或更具体错误 |
+| `file_validation_failed` | 文件内部验证失败的保留类型码；公开 diagnose 通常返回更具体错误 |
 | `processor_unknown` | processor type 未注册到所需 stage |
 | `processor_config_invalid` | processor 参数或 stage 选择无效、缺失或有歧义 |
 | `node_processor_failed` | node-stage processor 的通用失败 |
@@ -130,11 +132,9 @@ endpoint 级限制以 [HTTP API 参考](http-api/README.md)为准。
 
 `ValidationIssue` 可带 `severity`、`stage`、`code`、`message`、
 `node_index`、`node_id`、`node_name`、`node_type`、`field` 和 `target`。
-验证流程能够完成时，即使 `ok` 为 `false`，HTTP 仍返回正常验证响应；输入无法
-解析、processor 失败等执行错误才返回 `AppError`。
-
-完整 `ValidateResult` wire、counts 和 endpoint 失败边界见
-[`POST /v1/validate`](http-api/conversion.md#post-v1validate)。
+公开 CLI 的 `diagnose` 会把这些 issue、counts、warnings 和结构化 `AppError`
+统一写入诊断结果。只要仍有有效最终结果，issue/warning 使状态成为 `partial`；
+输入无法解析、processor 失败或非空输入无最终结果时状态为 `failed`。
 
 在普通 parse/render/probe 流程中，部分无效节点会被丢弃并产生
 `node_validation_dropped` warning；若非空批次全部无效，则操作返回
@@ -218,7 +218,7 @@ endpoint 级限制以 [HTTP API 参考](http-api/README.md)为准。
 
 | 字段 | 含义 |
 | --- | --- |
-| `kind` | `convert`、`render`、`file`、`probe`、`validate_nodes` 等操作类型 |
+| `kind` | `convert`、`render`、`file`、`probe`、`diagnose` 等操作类型 |
 | `status` | 成功 report 缺省为 `ok` |
 | `created_at` | UTC 创建时间 |
 | `lossy` | 是否检测到有损或 unsupported 诊断 |

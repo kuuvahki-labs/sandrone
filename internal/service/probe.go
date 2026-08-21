@@ -10,10 +10,15 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/nodevalidation"
 	"github.com/kuuvahki-labs/sandrone/internal/probe"
+	"github.com/kuuvahki-labs/sandrone/internal/processor"
 )
 
 type probeAvailability interface {
 	ProbeAvailable() bool
+}
+
+type probeRequestAvailability interface {
+	CheckAvailability(domain.ProbeRequest) error
 }
 
 func (s *Service) Probe(ctx context.Context, req domain.ProbeRequest) (out *domain.ProbeResult, err error) {
@@ -47,6 +52,11 @@ func (s *Service) Probe(ctx context.Context, req domain.ProbeRequest) (out *doma
 	case domain.ProbeUDPNTP, domain.ProbeURLTest:
 	default:
 		return nil, domain.NewError(domain.CodeInvalidArgument, fmt.Sprintf("unsupported probe method %q", req.Method))
+	}
+	if availability, ok := s.prober.(probeRequestAvailability); ok {
+		if err := availability.CheckAvailability(req); err != nil {
+			return nil, err
+		}
 	}
 	nodeSet, err := s.resolveNodeInput(ctx, req.Input, domain.FileRequest{
 		Request: domain.RequestInfo{Meta: req.Meta},
@@ -83,6 +93,7 @@ func (s *Service) Probe(ctx context.Context, req domain.ProbeRequest) (out *doma
 			"warning_count", len(cached.Report.Warnings),
 			"duration_ms", elapsedMillis(start),
 		)
+		processor.RecordProbe(ctx, cached)
 		return cached, nil
 	}
 	payloads, renderWarnings, err := s.renderProbePayloads(ctx, &req, nodeSet.Nodes)
@@ -123,6 +134,7 @@ func (s *Service) Probe(ctx context.Context, req domain.ProbeRequest) (out *doma
 		}
 	}
 	result.Report = s.prepareReport("probe", result.Report)
+	processor.RecordProbe(ctx, result)
 	success, failure, cacheHits := probeCounts(result)
 	s.log(ctx, slog.LevelInfo, "service probe completed",
 		"operation", "probe",

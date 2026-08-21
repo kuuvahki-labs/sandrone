@@ -14,11 +14,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 
 	"github.com/kuuvahki-labs/sandrone/internal/app"
 	"github.com/kuuvahki-labs/sandrone/internal/buildinfo"
+	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/envconfig"
 	"github.com/kuuvahki-labs/sandrone/pkg/sandrone"
 )
@@ -52,23 +52,6 @@ func TestConvertHelpDocumentsFormatsAndExamples(t *testing.T) {
 	require.Contains(t, help, "target formats: base64")
 }
 
-func TestProbeHelpDocumentsHealthCheckMethods(t *testing.T) {
-	help := runHelp(t, "probe")
-
-	for _, want := range []string{
-		"tcp-connect",
-		"udp-ntp",
-		"url-test",
-		"--ntp-server",
-		"--expected-status",
-		"--cache-ttl",
-		"https://cp.cloudflare.com",
-		"200-299",
-	} {
-		require.Contains(t, help, want)
-	}
-}
-
 func TestCommandHelpDocumentsOperationalInputs(t *testing.T) {
 	tests := []struct {
 		name string
@@ -76,19 +59,9 @@ func TestCommandHelpDocumentsOperationalInputs(t *testing.T) {
 		want []string
 	}{
 		{
-			name: "validate",
-			args: []string{"validate"},
-			want: []string{"--file", "--format", ".yaml", ".json"},
-		},
-		{
-			name: "file",
-			args: []string{"file"},
-			want: []string{"mihomo", "sing-box", "Shadowrocket configuration", "shadowrocket-proxies"},
-		},
-		{
-			name: "file render",
-			args: []string{"file", "render"},
-			want: []string{"name-or-spec-path", "FileSpec", "--output"},
+			name: "diagnose",
+			args: []string{"diagnose"},
+			want: []string{"input", "url", "subscription", "file"},
 		},
 	}
 
@@ -100,6 +73,15 @@ func TestCommandHelpDocumentsOperationalInputs(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCLIHelpDoesNotExposeFileCommand(t *testing.T) {
+	help := runHelp(t)
+	require.NotContains(t, help, "\n  file ")
+
+	code, _, stderr := runCLI(t, []string{"file", "--help"}, "")
+	require.Equal(t, 1, code)
+	require.Contains(t, stderr, "unknown command")
 }
 
 func TestConvertMapsFlagsToEngineRequest(t *testing.T) {
@@ -186,120 +168,120 @@ func TestConvertURIListToJSONNodes(t *testing.T) {
 	require.Equal(t, "node-a", nodes[0].Name)
 }
 
-func TestProbeMapsFlagsToEngineRequest(t *testing.T) {
-	rec := &recordingEngine{
-		probeResult: &sandrone.ProbeResult{
-			Results: []sandrone.NodeProbeResult{{NodeName: "node-a", Method: "tcp_connect", Alive: true}},
-		},
+func TestDiagnoseCommandTreeReplacesProbeAndValidate(t *testing.T) {
+	root := NewRootCommand(WithEnv(map[string]string{}))
+	names := map[string]bool{}
+	for _, command := range root.Commands() {
+		names[command.Name()] = true
 	}
-	dataDir := t.TempDir()
+	require.True(t, names["diagnose"])
+	require.False(t, names["probe"])
+	require.False(t, names["validate"])
 
-	code, stdout, stderr := runCLI(t,
-		[]string{"--data-dir", dataDir, "probe", "--format", "uri-list", "--method", "tcp-connect", "--input", "-", "--timeout", "5s", "--attempts", "2", "--concurrency", "3"},
-		`{"name":"node-a","type":"ss","server":"example.com","port":443}`,
-		WithEngineFactory(func(gotDataDir string) engine {
-			require.Equal(t, dataDir, gotDataDir)
-			return rec
-		}),
-	)
-
-	require.Equal(t, 0, code)
-	require.NotEmpty(t, stdout)
-	require.Empty(t, stderr)
-	require.Len(t, rec.probeRequests, 1)
-	require.Equal(t, sandrone.ProbeTCPConnect, rec.probeRequests[0].Method)
-	require.Equal(t, "uri-list", rec.probeRequests[0].Input.Format)
-	require.Equal(t, 5000, rec.probeRequests[0].TimeoutMS)
-	require.Equal(t, 2, rec.probeRequests[0].Attempts)
-	require.Equal(t, 3, rec.probeRequests[0].Concurrency)
+	diagnose, _, err := root.Find([]string{"diagnose"})
+	require.NoError(t, err)
+	children := map[string]bool{}
+	for _, command := range diagnose.Commands() {
+		children[command.Name()] = true
+	}
+	require.Equal(t, map[string]bool{"file": true, "input": true, "subscription": true, "url": true}, children)
 }
 
-func TestProbeMapsInputURLToRemoteNodeInput(t *testing.T) {
-	rec := &recordingEngine{
-		probeResult: &sandrone.ProbeResult{
-			Results: []sandrone.NodeProbeResult{{NodeName: "node-a", Method: "url_test", Core: "sing-box", Alive: true}},
-		},
-	}
+func TestDiagnoseInputAndURLMapRequests(t *testing.T) {
+	dir := t.TempDir()
+	processorsPath := filepath.Join(dir, "processors.json")
+	require.NoError(t, os.WriteFile(processorsPath, []byte(`[{"type":"rename","stage":"nodes","params":{"mode":"prefix","value":"x-"}}]`), 0o600))
+	rec := &recordingEngine{diagnoseResult: &sandrone.DiagnoseResult{Status: sandrone.DiagnoseStatusOK}}
+
 	code, _, stderr := runCLI(t,
-		[]string{"probe", "--input-url", "https://example.com/sub", "--user-agent", "ua", "--proxy", "http://127.0.0.1:8080", "--remote-timeout", "7s", "--timeout", "5s"},
-		"stdin should not be read",
-		WithEngineFactory(func(string) engine { return rec }),
+		[]string{"diagnose", "input", "-", "--kind", "nodes", "--format", "uri-list", "--processors", processorsPath},
+		"node input", WithEngineFactory(func(string) engine { return rec }),
 	)
 	require.Equal(t, 0, code, stderr)
-	require.Len(t, rec.probeRequests, 1)
-	req := rec.probeRequests[0]
-	require.Equal(t, sandrone.ProbeURLTest, req.Method)
-	require.Equal(t, "sing-box", req.Core)
-	require.Equal(t, 5000, req.TimeoutMS)
-	require.Equal(t, "remote", req.Input.Type)
-	require.Empty(t, req.Input.Format)
-	require.Equal(t, "https://example.com/sub", req.Input.URL)
-	require.Equal(t, "ua", req.Input.UserAgent)
-	require.Equal(t, "http://127.0.0.1:8080", req.Input.Proxy)
-	require.Equal(t, 7000, req.Input.TimeoutMS)
-}
+	require.Len(t, rec.diagnoseRequests, 1)
+	require.Equal(t, sandrone.DiagnoseInputNodes, rec.diagnoseRequests[0].Kind)
+	require.Equal(t, "uri-list", rec.diagnoseRequests[0].Format)
+	require.Equal(t, "node input", string(rec.diagnoseRequests[0].Content))
+	require.Len(t, rec.diagnoseRequests[0].Processors, 1)
 
-func TestInputURLRejectsMutuallyExclusiveProbeAndValidateFlags(t *testing.T) {
-	tests := []struct {
-		name string
-		args []string
-	}{
-		{
-			name: "probe path input with input-url",
-			args: []string{"probe", "--format", "uri-list", "--input", "nodes.txt", "--input-url", "https://example.com/sub"},
-		},
-		{
-			name: "probe explicit stdin with input-url",
-			args: []string{"probe", "--format", "uri-list", "--input", "-", "--input-url", "https://example.com/sub"},
-		},
-		{
-			name: "validate path input with input-url",
-			args: []string{"validate", "--format", "uri-list", "--input", "nodes.txt", "--input-url", "https://example.com/sub"},
-		},
-		{
-			name: "validate explicit stdin with input-url",
-			args: []string{"validate", "--format", "uri-list", "--input", "-", "--input-url", "https://example.com/sub"},
-		},
-		{
-			name: "validate file with input-url",
-			args: []string{"validate", "--file", "something.yaml", "--input-url", "https://example.com/sub"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			code, stdout, stderr := runCLI(t, tt.args, "")
-			require.Equal(t, 1, code)
-			require.Empty(t, stdout)
-			if strings.Contains(strings.Join(tt.args, " "), "--file") {
-				require.Contains(t, stderr, "--file and --input-url are mutually exclusive")
-				return
-			}
-			require.Contains(t, stderr, "--input and --input-url are mutually exclusive")
-		})
-	}
-}
-
-func TestProbeURIListOutputsProbeResult(t *testing.T) {
-	code, stdout, stderr := runCLI(t,
-		[]string{"probe", "--format", "uri-list", "--method", "tcp-connect", "--input", "-"},
-		`{"name":"invalid","type":"ss"}`,
+	code, _, stderr = runCLI(t,
+		[]string{"diagnose", "url", "https://example.com/sub", "--user-agent", "ua", "--proxy", "http://127.0.0.1:8080", "--remote-timeout", "7s"},
+		"", WithEngineFactory(func(string) engine { return rec }),
 	)
-
-	require.Equal(t, 1, code, stderr)
-	require.Empty(t, stdout)
-	require.Contains(t, stderr, "node_validation_failed")
+	require.Equal(t, 0, code, stderr)
+	require.Len(t, rec.diagnoseRequests, 2)
+	remote := rec.diagnoseRequests[1].Remote
+	require.NotNil(t, remote)
+	require.Equal(t, "https://example.com/sub", remote.URL)
+	require.Equal(t, "ua", remote.UserAgent)
+	require.Equal(t, "http://127.0.0.1:8080", remote.Proxy)
+	require.Equal(t, 7000, remote.TimeoutMS)
 }
 
-func TestProbeJSONNodesOutputsProbeResult(t *testing.T) {
-	code, stdout, stderr := runCLI(t,
-		[]string{"probe", "--format", "json-nodes", "--method", "tcp-connect", "--input", "-"},
-		`[{"name":"invalid","type":"ss","server":"example.com"}]`,
-	)
+func TestDiagnoseSubscriptionAndFileMapStoredAndLocalInputs(t *testing.T) {
+	rec := &recordingEngine{diagnoseResult: &sandrone.DiagnoseResult{Status: sandrone.DiagnoseStatusOK}}
+	factory := WithEngineFactory(func(string) engine { return rec })
 
-	require.Equal(t, 1, code, stderr)
+	code, _, stderr := runCLI(t, []string{"diagnose", "subscription", "provider"}, "", factory)
+	require.Equal(t, 0, code, stderr)
+	require.Equal(t, "provider", rec.diagnoseRequests[0].SubscriptionName)
+
+	code, _, stderr = runCLI(t, []string{"diagnose", "file", "default.yaml"}, "", factory)
+	require.Equal(t, 0, code, stderr)
+	require.Equal(t, "default.yaml", rec.diagnoseRequests[1].File.Name)
+
+	specPath := filepath.Join(t.TempDir(), "local.json")
+	require.NoError(t, os.WriteFile(specPath, []byte(`{"kind":"static","source":{"type":"inline","content":"hello"}}`), 0o600))
+	code, _, stderr = runCLI(t, []string{"diagnose", "file", specPath}, "", factory)
+	require.Equal(t, 0, code, stderr)
+	require.NotNil(t, rec.diagnoseRequests[2].File.Spec)
+	require.Equal(t, sandrone.FileKindStatic, rec.diagnoseRequests[2].File.Spec.Kind)
+}
+
+func TestCLIResourceDefinitionFilesUseJSON(t *testing.T) {
+	dir := t.TempDir()
+	jsonPath := filepath.Join(dir, "file.json")
+	require.NoError(t, os.WriteFile(jsonPath, []byte(`{"kind":"static","source":{"type":"inline","content":"hello"}}`), 0o600))
+	spec, err := readFileSpec(jsonPath)
+	require.NoError(t, err)
+	require.Equal(t, sandrone.FileKindStatic, spec.Kind)
+
+	yamlPath := filepath.Join(dir, "file.yml")
+	require.NoError(t, os.WriteFile(yamlPath, []byte("kind: static\nsource:\n  type: inline\n  content: hello\n"), 0o600))
+	_, err = readFileSpec(yamlPath)
+	require.ErrorContains(t, err, "must be .json")
+
+	processorYAMLPath := filepath.Join(dir, "processors.yaml")
+	require.NoError(t, os.WriteFile(processorYAMLPath, []byte("- type: rename\n"), 0o600))
+	_, err = readProcessorSpecs(processorYAMLPath, strings.NewReader(""))
+	require.ErrorContains(t, err, "must be .json")
+
+	processors, err := readProcessorSpecs("-", strings.NewReader(`[{"type":"rename"}]`))
+	require.NoError(t, err)
+	require.Len(t, processors, 1)
+}
+
+func TestDiagnoseFailedWritesJSONBeforeExitAndArgumentErrorsDoNot(t *testing.T) {
+	rec := &recordingEngine{diagnoseResult: &sandrone.DiagnoseResult{
+		Status: sandrone.DiagnoseStatusFailed,
+		Error:  &domain.AppError{Code: "input_kind_unrecognized", Message: "unknown"},
+	}}
+	code, stdout, stderr := runCLI(t,
+		[]string{"diagnose", "input", "-"}, "unknown",
+		WithEngineFactory(func(string) engine { return rec }),
+	)
+	require.Equal(t, 1, code)
+	require.JSONEq(t, `{"status":"failed","input":{"kind":""},"stages":null,"counts":{"input":0,"valid":0,"invalid":0,"error":0,"warning":0},"report":{"created_at":"0001-01-01T00:00:00Z","render":{"success_count":0,"lost_fields":0}},"error":{"code":"input_kind_unrecognized","message":"unknown"}}`, stdout)
+	require.Contains(t, stderr, "diagnosis failed")
+
+	code, stdout, stderr = runCLI(t,
+		[]string{"diagnose", "input", "-", "--processors", "-"}, "anything",
+		WithEngineFactory(func(string) engine { return rec }),
+	)
+	require.Equal(t, 1, code)
 	require.Empty(t, stdout)
-	require.Contains(t, stderr, "node_validation_failed")
+	require.Contains(t, stderr, "cannot both read from stdin")
+	require.Len(t, rec.diagnoseRequests, 1)
 }
 
 func TestConvertWritesOutputFile(t *testing.T) {
@@ -330,18 +312,11 @@ func TestFiniteJSONCommandsWriteOutputFile(t *testing.T) {
 		rec  *recordingEngine
 	}{
 		{
-			name: "probe",
+			name: "diagnose",
 			args: func(_ string, output string) []string {
-				return []string{"probe", "--format", "uri-list", "--input", "-", "--output", output}
+				return []string{"diagnose", "input", "-", "--kind", "nodes", "--format", "uri-list", "--output", output}
 			},
-			rec: &recordingEngine{probeResult: &sandrone.ProbeResult{Report: sandrone.Report{Kind: "probe"}}},
-		},
-		{
-			name: "validate",
-			args: func(_ string, output string) []string {
-				return []string{"validate", "--format", "uri-list", "--input", "-", "--output", output}
-			},
-			rec: &recordingEngine{validateResult: &sandrone.ValidateResult{OK: true}},
+			rec: &recordingEngine{diagnoseResult: &sandrone.DiagnoseResult{Status: sandrone.DiagnoseStatusOK}},
 		},
 		{
 			name: "inspect",
@@ -366,6 +341,11 @@ func TestFiniteJSONCommandsWriteOutputFile(t *testing.T) {
 			require.NoError(t, err)
 			require.True(t, json.Valid(body))
 			require.Equal(t, byte('\n'), body[len(body)-1])
+			if tt.name == "diagnose" {
+				info, err := os.Stat(outputPath)
+				require.NoError(t, err)
+				require.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+			}
 		})
 	}
 }
@@ -409,25 +389,6 @@ func TestConvertWritesMainAndReportOutputFiles(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, string(reportBody), `"kind": "convert"`)
 	require.Contains(t, string(reportBody), "\n  \"status\"")
-	require.Equal(t, byte('\n'), reportBody[len(reportBody)-1])
-}
-
-func TestFileRenderWritesReportOutputFile(t *testing.T) {
-	dir := t.TempDir()
-	specPath := filepath.Join(dir, "file.yaml")
-	require.NoError(t, os.WriteFile(specPath, []byte("name: out.txt\nkind: static\nsource:\n  type: inline\n  content: body\n"), 0o644))
-	reportPath := filepath.Join(dir, "nested", "report.json")
-
-	code, stdout, stderr := runCLI(t,
-		[]string{"--data-dir", filepath.Join(dir, "data"), "file", "render", specPath, "--report-output", reportPath},
-		"",
-	)
-
-	require.Equal(t, 0, code, stderr)
-	require.Equal(t, "body", stdout)
-	reportBody, err := os.ReadFile(reportPath)
-	require.NoError(t, err)
-	require.Contains(t, string(reportBody), `"kind": "file"`)
 	require.Equal(t, byte('\n'), reportBody[len(reportBody)-1])
 }
 
@@ -527,95 +488,6 @@ func TestOutputFileIsOverwritten(t *testing.T) {
 	body, err := os.ReadFile(outputPath)
 	require.NoError(t, err)
 	require.Equal(t, "new", string(body))
-}
-
-func TestFileRenderLocalSpec(t *testing.T) {
-	dir := t.TempDir()
-	specPath := filepath.Join(dir, "file.yaml")
-	require.NoError(t, os.WriteFile(specPath, []byte(`
-name: local.yaml
-kind: static
-source:
-  type: inline
-  content: |
-    key: value
-`), 0o644))
-
-	code, stdout, stderr := runCLI(t,
-		[]string{"--data-dir", filepath.Join(dir, "data"), "file", "render", specPath},
-		"",
-	)
-
-	require.Equal(t, 0, code, stderr)
-	require.Contains(t, stdout, "key: value")
-	require.Empty(t, stderr)
-}
-
-func TestFileRenderLocalSpecRequiresCanonicalKindAndNewConfigWire(t *testing.T) {
-	tests := []struct {
-		name string
-		body string
-		want string
-	}{
-		{name: "missing kind", body: "name: bad.yaml\nsource: {type: inline, content: body}\n", want: "file kind is required"},
-		{name: "case variant", body: "name: bad.yaml\nkind: Mihomo\nsource: {}\n", want: `file kind "Mihomo"`},
-		{name: "legacy config", body: "name: bad.yaml\nkind: mihomo\nsource: {}\nconfig:\n  groups: []\n", want: "config.groups"},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			dir := t.TempDir()
-			specPath := filepath.Join(dir, "file.yaml")
-			require.NoError(t, os.WriteFile(specPath, []byte(test.body), 0o644))
-
-			code, _, stderr := runCLI(t,
-				[]string{"--data-dir", filepath.Join(dir, "data"), "file", "render", specPath},
-				"",
-			)
-
-			require.Equal(t, 1, code, stderr)
-			require.Contains(t, stderr, test.want)
-		})
-	}
-}
-
-func TestFileRenderStoredSpec(t *testing.T) {
-	dataDir := t.TempDir()
-	engine := sandrone.NewWithFS(afero.NewBasePathFs(afero.NewOsFs(), dataDir))
-	spec := sandrone.FileSpec{
-		Name:   "stored.yaml",
-		Kind:   sandrone.FileKindStatic,
-		Source: sandrone.FileSource{Type: "inline", Content: "stored: true\n"},
-	}
-	require.NoError(t, engine.PutFile(context.Background(), spec))
-
-	code, stdout, stderr := runCLI(t,
-		[]string{"--data-dir", dataDir, "file", "render", "stored.yaml"},
-		"",
-	)
-
-	require.Equal(t, 0, code, stderr)
-	require.Empty(t, stderr)
-	require.Contains(t, stdout, "stored: true")
-}
-
-func TestValidateMapsInputURLToRemoteParseRequest(t *testing.T) {
-	rec := &recordingEngine{validateResult: &sandrone.ValidateResult{OK: true}}
-	code, stdout, stderr := runCLI(t,
-		[]string{"validate", "--input-url", "https://example.com/sub", "--user-agent", "ua", "--proxy", "http://127.0.0.1:8080", "--remote-timeout", "7s"},
-		"stdin should not be read",
-		WithEngineFactory(func(string) engine { return rec }),
-	)
-	require.Equal(t, 0, code, stderr)
-	require.NotEmpty(t, stdout)
-	require.Len(t, rec.parseRequests, 1)
-	req := rec.parseRequests[0]
-	require.Empty(t, req.Format)
-	require.Empty(t, req.Content)
-	require.NotNil(t, req.Remote)
-	require.Equal(t, "https://example.com/sub", req.Remote.URL)
-	require.Equal(t, "ua", req.Remote.UserAgent)
-	require.Equal(t, "http://127.0.0.1:8080", req.Remote.Proxy)
-	require.Equal(t, 7000, req.Remote.TimeoutMS)
 }
 
 func TestInspectCommandOutputsRuntimeSummary(t *testing.T) {
@@ -1031,12 +903,11 @@ type recordingEngine struct {
 	parseRequests            []sandrone.ParseRequest
 	renderRequests           []sandrone.RenderRequest
 	convertRequests          []sandrone.ConvertRequest
-	probeRequests            []sandrone.ProbeRequest
+	diagnoseRequests         []sandrone.DiagnoseRequest
 	parseResult              *sandrone.ParseResult
 	renderResult             *sandrone.RenderResult
 	convertResult            *sandrone.RenderResult
-	probeResult              *sandrone.ProbeResult
-	validateResult           *sandrone.ValidateResult
+	diagnoseResult           *sandrone.DiagnoseResult
 	inspectResult            *sandrone.InspectResult
 	formatCapabilityList     *sandrone.FormatCapabilityListResult
 	formatCapability         *sandrone.FormatCapability
@@ -1058,25 +929,12 @@ func (e *recordingEngine) Convert(_ context.Context, req sandrone.ConvertRequest
 	return e.convertResult, nil
 }
 
-func (e *recordingEngine) Probe(_ context.Context, req sandrone.ProbeRequest) (*sandrone.ProbeResult, error) {
-	e.probeRequests = append(e.probeRequests, req)
-	return e.probeResult, nil
-}
-
-func (e *recordingEngine) GetFile(context.Context, sandrone.FileRequest) (*sandrone.FileResult, error) {
-	return nil, nil
-}
-
-func (e *recordingEngine) ValidateFile(context.Context, sandrone.FileRequest) (*sandrone.ValidateResult, error) {
-	return &sandrone.ValidateResult{OK: true}, nil
-}
-
-func (e *recordingEngine) ValidateNodes(_ context.Context, req sandrone.ParseRequest) (*sandrone.ValidateResult, error) {
-	e.parseRequests = append(e.parseRequests, req)
-	if e.validateResult != nil {
-		return e.validateResult, nil
+func (e *recordingEngine) Diagnose(_ context.Context, req sandrone.DiagnoseRequest) (*sandrone.DiagnoseResult, error) {
+	e.diagnoseRequests = append(e.diagnoseRequests, req)
+	if e.diagnoseResult != nil {
+		return e.diagnoseResult, nil
 	}
-	return &sandrone.ValidateResult{OK: true}, nil
+	return &sandrone.DiagnoseResult{Status: sandrone.DiagnoseStatusOK}, nil
 }
 
 func (e *recordingEngine) Inspect(context.Context) (*sandrone.InspectResult, error) {

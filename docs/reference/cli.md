@@ -9,8 +9,11 @@
 ```text
 sandrone
 ├── convert
-├── probe
-├── validate
+├── diagnose
+│   ├── input <path|->
+│   ├── url <url>
+│   ├── subscription <name>
+│   └── file <name-or-spec-path>
 ├── inspect
 ├── capability
 │   ├── formats
@@ -19,9 +22,6 @@ sandrone
 ├── file
 │   └── render
 └── serve
-    ├── http
-    ├── mcp
-    └── all
 ```
 
 所有命令都接受 `--help`。根命令的 `--version` 输出
@@ -62,7 +62,7 @@ revision 的来源和职责见[构建身份](build-info.md)。
 这些字段不会写入 `settings.json` 或备份。Sandrone 不使用 AWS 默认凭据链。
 R2 常规配置保持 `SANDRONE_S3_FORCE_PATH_STYLE=false`。
 
-`serve` 及其子命令继承以下 flags：
+`serve` 接受以下 flags：
 
 | flag | 环境变量 | 内建缺省值 | 含义 |
 | --- | --- | --- | --- |
@@ -93,9 +93,8 @@ API 保存了其它被覆盖字段时，当前进程继续使用覆盖值。`war
 - `json-nodes`：Sandrone 规范化节点 JSON。
 
 节点输出格式为 `json-nodes`、`mihomo-proxies`、
-`shadowrocket-proxies`、`sing-box-outbounds` 和 `uri-list`。这些是节点片段；
-需要完整客户端配置时使用 `file render`。各格式的协议和有损边界见
-[格式与能力参考](capabilities.md)。
+`shadowrocket-proxies`、`sing-box-outbounds` 和 `uri-list`。各格式的协议和
+有损边界见[格式与能力参考](capabilities.md)。
 
 ## `convert`
 
@@ -126,54 +125,40 @@ sandrone convert --to <format> \
 自动检测只用于远程输入；候选包括 `base64`、`uri-list`、`mihomo` 和
 `sing-box`。`json-nodes` 不在自动检测候选中。
 
-## `probe`
+## `diagnose`
 
 ```text
-sandrone probe [--format <format>] \
-  (--input <path|-> | --input-url <url>)
+sandrone diagnose input <path|-> [--kind auto|nodes|subscription|file]
+sandrone diagnose url <url>
+sandrone diagnose subscription <name>
+sandrone diagnose file <name-or-spec-path>
 ```
 
-`probe` 输出缩进 JSON `ProbeResult`。输入和远程抓取 flags 与 `convert`
-相同。对本地输入，`--format` 缺省为 `uri-list`；远程输入未显式设置
-`--format` 时执行自动检测。
+`diagnose` 是唯一公开诊断入口。它识别并执行节点文档、Sandrone Subscription
+或 FileSpec 声明的完整流水线，但不会自动加入 `probe`，也没有 `--live`。只有输入
+或一次性 processor 文件显式声明 `probe` processor（或脚本调用 `api.probe`）时
+才会测活。
 
-| flag | 缺省值 | 契约 |
-| --- | --- | --- |
-| `--method` | `url-test` | `tcp-connect`、`udp-ntp` 或 `url-test` |
-| `--core` | `sing-box` | `url-test` 或 `udp-ntp` 使用的核心名；`url-test` 也支持 `mihomo` |
-| `--url` | 空 | `url-test` 的 HTTP 目标 |
-| `--ntp-server` | 空 | `udp-ntp` 的 NTP 目标 |
-| `--expected-status` | 空 | `url-test` 的状态码或范围，例如 `204`、`200-299` |
-| `--timeout` | 服务缺省 | 每节点超时，Go duration |
-| `--attempts` | `0` | 每节点尝试次数；`0` 使用服务缺省 |
-| `--concurrency` | `0` | 最大并发；`0` 使用服务缺省 |
-| `--cache-ttl` | `0` | 缓存秒数；`0` 继承 `cache_defaults.probe_ttl_seconds`，两者都为 `0` 时禁用缓存 |
-| `--output` | 标准输出 | JSON 输出路径或 `-` |
+Subscription、FileSpec 和一次性 ProcessorSpec 文件使用 JSON 定义。节点文档
+仍按所选节点格式解析。
 
-`tcp-connect` 不使用核心；`udp-ntp` 当前使用 sing-box；`url-test` 支持
-sing-box 和 Mihomo。单节点不存活通常记录在结果与 report 中，不等于整条命令失败；
-整批无法启动或输入无效时才返回非零退出码。错误层次见
-[错误与诊断参考](errors.md)。
+- `input` 的 `--kind` 缺省为 `auto`；强结构同时命中多个类型时以
+  `input_kind_ambiguous` 失败，无法识别时以 `input_kind_unrecognized` 失败。
+- `--format` 只覆盖节点格式识别，不会让 Subscription 或 FileSpec 静默退化为节点。
+- `--processors <json-path|->` 只用于 nodes 输入；输入和 processors 不能
+  同时从标准输入读取。文件内容必须是顶层 `ProcessorSpec[]`。
+- `url` 只把远程正文解释为节点文档，并支持 `--user-agent`、`--proxy`、
+  `--remote-timeout`、`--format` 和 `--processors`。
+- `subscription` 从 Store 按名称读取并执行嵌套来源与已保存 processors。
+- `file` 对安全名称先查询 Store，本地 `.json` 路径作为 FileSpec 回退，并执行
+  完整 typed compile、订阅依赖和 file-stage processors。
+- 四个子命令都接受 `--output <path|->`。诊断 JSON 含完整节点、文件正文、report
+  与 probe trace，属于敏感数据；新建输出文件权限固定为 `0600`。
 
-## `validate`
-
-`validate` 有三种互斥输入模式：
-
-```text
-sandrone validate --format <format> --input <path|->
-sandrone validate [--format <format>] --input-url <url>
-sandrone validate --file <name-or-spec-path>
-```
-
-- 本地节点输入必须显式给出 `--format`。
-- 远程节点输入可省略 `--format` 并自动检测；远程 flags 与 `convert` 相同。
-- `--file` 接受已存储的文件名，或本地 `.json`、`.yaml`、`.yml`
-  `FileSpec` 路径；不得与 `--input-url` 同时使用。
-- 命令执行完整验证流程，但不渲染最终文件。
-- `--output <path|->` 缺省写标准输出；结果是缩进 JSON `ValidateResult`。
-
-`ValidateResult.ok` 表示契约校验是否通过；命令仅在调用本身返回 error 时退出
-`1`，不会根据 JSON 中的任意 warning 自行改变退出码。
+结果 `status` 为 `ok`、`partial` 或 `failed`。`ok`/`partial` 退出 `0`；
+`failed` 仍先输出结构化 JSON，再退出 `1`。Cobra 参数组合错误在 service 执行前
+失败，只写标准错误。每个 processor stage 记录 scope、声明顺序、前后计数、
+warnings，以及其内部产生的完整 probe results，即使 `annotate=false`。
 
 ## `inspect`、`capability` 与 `doctor`
 
@@ -195,22 +180,6 @@ probe 方法与运行时可用的 probe backend；不内嵌字段级 capability�
 结果为缩进 JSON，包含顶层 `ok`、`storage_backend`、`storage_ok`、可选数据目录
 状态以及逐格式检查。任一检查失败时，
 仍先输出结果，随后命令以 `1` 退出并在标准错误写入 `doctor checks failed`。
-
-## `file render`
-
-```text
-sandrone file render <name-or-spec-path>
-```
-
-参数可以是存储中的文件名，也可以是本地 `.json`、`.yaml`、`.yml`
-`FileSpec`。对于不含路径分隔符的安全名称，CLI 先查询存储；只有存储返回
-“不存在”且同名本地规范文件确实存在时，才回退到本地文件。本地路径和
-`FileSpec` 字段见 [FileSpec 参考](file-spec.md)。
-
-- `--output <path|->` 写最终文件内容；缺省或 `-` 写标准输出。
-- `--report-output <path>` 另写缩进 JSON report，约束与 `convert` 相同。
-- `FileSpec.kind` 必须显式使用 canonical 值；CLI 不推断缺失 kind，也不接受
-  大小写变体。
 
 ## `serve`
 
@@ -250,8 +219,8 @@ probe backend。Vercel serverless profile 的不同能力边界见
 ## 输出文件与退出约定
 
 - `--output` 为空或 `-` 时写标准输出；文件输出会创建父目录并覆盖已有文件。
-- `probe`、`validate`、`inspect`、`capability`、`doctor` 产生缩进 JSON，并以换行结尾。
-- `convert` 与 `file render` 的主输出是目标格式原文，不额外包装 JSON。
+- `diagnose`、`inspect`、`capability`、`doctor` 产生缩进 JSON，并以换行结尾。
+- `convert` 的主输出是目标格式原文，不额外包装 JSON。
 - `--report-output` 的 report 总是缩进 JSON 文件。主输出先写，report
   写入随后发生；若 report 写入失败，已经写出的主输出不会回滚。
 - 成功、`--help` 和 `--version` 返回退出码 `0`。

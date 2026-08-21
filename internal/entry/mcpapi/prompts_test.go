@@ -80,7 +80,7 @@ func TestParameterizedPromptsGuideSupportedWorkflows(t *testing.T) {
 			},
 			contains: []string{
 				"mihomo", "desktop routing", "base subscription",
-				"sandrone://schemas/file-kinds/mihomo", "sandrone_validate_file",
+				"sandrone://schemas/file-kinds/mihomo",
 				"sandrone_put_file", "sandrone_get_file",
 			},
 		},

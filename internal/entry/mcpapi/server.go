@@ -31,11 +31,6 @@ type renderOutput struct {
 	Cached         *bool             `json:"cached,omitempty"`
 }
 
-type probeOutput struct {
-	Results []domain.NodeProbeResult `json:"results"`
-	Report  domain.Report            `json:"report,omitempty"`
-}
-
 type inspectOutput struct {
 	domain.InspectResult
 	Catalogs inspectCatalogs `json:"catalogs"`
@@ -93,7 +88,6 @@ func newSDKServer(rt *app.Runtime) *mcp.Server {
 }
 
 func registerTools(server *mcp.Server, rt *app.Runtime) {
-	readonly := true
 	convertOpenWorld := true
 	registerDiscoveryTools(server, rt)
 	registerSubscriptionTools(server, rt)
@@ -135,41 +129,7 @@ func registerTools(server *mcp.Server, rt *app.Runtime) {
 		}
 		return nil, limitedRenderOutput(rt, out), nil
 	})
-	addTool(server, &mcp.Tool{
-		Name:        "sandrone_probe_nodes",
-		Description: "Probe node reachability from a NodeInput.",
-		InputSchema: probeInputSchema(),
-		Annotations: &mcp.ToolAnnotations{
-			ReadOnlyHint:  true,
-			OpenWorldHint: &readonly,
-		},
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in probeInput) (*mcp.CallToolResult, probeOutput, error) {
-		result, err := rt.Service.Probe(ctx, domain.ProbeRequest{
-			Input:           in.Input,
-			Method:          in.Method,
-			Core:            in.Core,
-			URL:             in.URL,
-			NTPServer:       in.NTPServer,
-			ExpectedStatus:  in.ExpectedStatus,
-			TimeoutMS:       in.TimeoutMS,
-			Attempts:        in.Attempts,
-			Concurrency:     in.Concurrency,
-			CacheTTLSeconds: in.CacheTTLSeconds,
-			Meta:            in.Meta,
-		})
-		if err != nil {
-			return nil, probeOutput{}, err
-		}
-		return nil, probeOutput{Results: result.Results, Report: result.Report}, nil
-	})
 	registerManagementTools(server, rt)
-}
-
-func validateOptionalPublicResourceName(label string, name string) error {
-	if strings.TrimSpace(name) == "" {
-		return nil
-	}
-	return validateRequiredPublicResourceName(label, name)
 }
 
 func validateRequiredPublicResourceName(label string, name string) error {

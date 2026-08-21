@@ -22,6 +22,8 @@ type (
 	NodeIR                      = domain.NodeIR
 	NodeType                    = domain.NodeType
 	Warning                     = domain.Warning
+	AppError                    = domain.AppError
+	ErrorCode                   = domain.ErrorCode
 	WarningNodeContext          = domain.WarningNodeContext
 	SourceRef                   = domain.SourceRef
 	SourceInfo                  = domain.SourceInfo
@@ -63,10 +65,14 @@ type (
 	ShareListResult             = domain.ShareListResult
 	ShareRenderRequest          = domain.ShareRenderRequest
 	ShareRenderResult           = domain.ShareRenderResult
-	ValidateRequest             = domain.ValidateRequest
-	ValidateResult              = domain.ValidateResult
 	ValidationCounts            = domain.ValidationCounts
 	ValidationIssue             = domain.ValidationIssue
+	DiagnoseStatus              = domain.DiagnoseStatus
+	DiagnoseInputKind           = domain.DiagnoseInputKind
+	DiagnoseInput               = domain.DiagnoseInput
+	DiagnoseStage               = domain.DiagnoseStage
+	DiagnoseRequest             = domain.DiagnoseRequest
+	DiagnoseResult              = domain.DiagnoseResult
 	InspectResult               = domain.InspectResult
 	InspectFormats              = domain.InspectFormats
 	InspectProcessors           = domain.InspectProcessors
@@ -99,8 +105,6 @@ type (
 	RenderRequest   = domain.RenderRequest
 	RenderResult    = domain.RenderResult
 	ConvertRequest  = domain.ConvertRequest
-	ProbeMethod     = domain.ProbeMethod
-	ProbeRequest    = domain.ProbeRequest
 	ProbeResult     = domain.ProbeResult
 	NodeProbeResult = domain.NodeProbeResult
 	FileRequest     = domain.FileRequest
@@ -129,14 +133,19 @@ const (
 	StageNodes = domain.StageNodes
 	StageFile  = domain.StageFile
 
+	DiagnoseStatusOK      = domain.DiagnoseStatusOK
+	DiagnoseStatusPartial = domain.DiagnoseStatusPartial
+	DiagnoseStatusFailed  = domain.DiagnoseStatusFailed
+
+	DiagnoseInputAuto         = domain.DiagnoseInputAuto
+	DiagnoseInputNodes        = domain.DiagnoseInputNodes
+	DiagnoseInputSubscription = domain.DiagnoseInputSubscription
+	DiagnoseInputFile         = domain.DiagnoseInputFile
+
 	FileKindStatic       = domain.FileKindStatic
 	FileKindMihomo       = domain.FileKindMihomo
 	FileKindSingBox      = domain.FileKindSingBox
 	FileKindShadowrocket = domain.FileKindShadowrocket
-
-	ProbeTCPConnect = domain.ProbeTCPConnect
-	ProbeUDPNTP     = domain.ProbeUDPNTP
-	ProbeURLTest    = domain.ProbeURLTest
 
 	CapabilityDirectionParse  = domain.CapabilityDirectionParse
 	CapabilityDirectionRender = domain.CapabilityDirectionRender
@@ -202,17 +211,8 @@ func (e *Engine) Convert(ctx context.Context, req ConvertRequest) (*RenderResult
 	return e.service.Convert(ctx, req)
 }
 
-// Probe runs runtime reachability checks over resolved node input.
-func (e *Engine) Probe(ctx context.Context, req ProbeRequest) (*ProbeResult, error) {
-	return e.service.Probe(ctx, req)
-}
-
-func (e *Engine) ValidateFile(ctx context.Context, req FileRequest) (*ValidateResult, error) {
-	return e.service.ValidateFile(ctx, req)
-}
-
-func (e *Engine) ValidateNodes(ctx context.Context, req ParseRequest) (*ValidateResult, error) {
-	return e.service.ValidateNodes(ctx, req)
+func (e *Engine) Diagnose(ctx context.Context, req DiagnoseRequest) (*DiagnoseResult, error) {
+	return e.service.Diagnose(ctx, req)
 }
 
 func (e *Engine) Inspect(ctx context.Context) (*InspectResult, error) {

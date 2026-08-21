@@ -91,7 +91,7 @@ Read sandrone://capabilities/formats and sandrone://schemas/processors before dr
 Read %s for the authoritative typed settings and source rules. Available file-stage processors:
 %s
 
-%s Draft source, typed config, and processors in declared execution order. Call sandrone_validate_file as a recommended check; validation is not a prerequisite for calling sandrone_put_file when the user requests persistence. Execute with sandrone_get_file and inspect its report.`,
+%s Draft source, typed config, and processors in declared execution order. Persist with sandrone_put_file only when the user requests it, then execute with sandrone_get_file and inspect its report.`,
 			kind, target, references, kindURI, processorCatalogGuidance(rt, domain.StageFile), scriptGuidance,
 		), nil
 	})
@@ -129,7 +129,7 @@ Read %s for the authoritative typed settings and source rules. Available file-st
 		}
 		nextTool := "sandrone_convert"
 		if stage == domain.StageFile {
-			nextTool = "sandrone_validate_file"
+			nextTool = "sandrone_get_file"
 		}
 		return fmt.Sprintf(`Write a sandboxed %q-stage processor script for target %q.
 Expected input: %q.

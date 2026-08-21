@@ -3,7 +3,6 @@ package httpapi_test
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -16,23 +15,12 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/entry/httpapi"
 )
 
-func TestValidateInspectAndFilesEndpoints(t *testing.T) {
+func TestInspectAndFilesEndpoints(t *testing.T) {
 	rt := testRuntime(t, app.Config{})
 	server := httpapi.New(rt)
 
-	validateReq := httptest.NewRequest(http.MethodPost, "/v1/validate", bytes.NewBufferString(`{
-		"format": "uri-list",
-		"content": "ss://aes-128-gcm:secret@example.com:8388#node-a"
-	}`))
-	w := httptest.NewRecorder()
-	server.Handler().ServeHTTP(w, validateReq)
-	require.Equal(t, http.StatusOK, w.Code)
-	var validateResult domain.ValidateResult
-	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &validateResult))
-	require.True(t, validateResult.OK)
-
 	inspectReq := httptest.NewRequest(http.MethodGet, "/v1/inspect", nil)
-	w = httptest.NewRecorder()
+	w := httptest.NewRecorder()
 	server.Handler().ServeHTTP(w, inspectReq)
 	require.Equal(t, http.StatusOK, w.Code)
 	require.Contains(t, w.Body.String(), `"formats"`)
@@ -92,6 +80,15 @@ func TestValidateInspectAndFilesEndpoints(t *testing.T) {
 
 }
 
+func TestRemovedProbeAndValidateRoutesReturnNotFound(t *testing.T) {
+	handler := httpapi.New(testRuntime(t, app.Config{})).Handler()
+	for _, path := range []string{"/v1/probe", "/v1/validate"} {
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, path, bytes.NewBufferString(`{}`)))
+		require.Equal(t, http.StatusNotFound, recorder.Code, path)
+	}
+}
+
 func TestFileEndpointExposesCacheStatusAndRefresh(t *testing.T) {
 	ctx := context.Background()
 	rt := testRuntime(t, app.Config{})
@@ -120,25 +117,4 @@ func TestFileEndpointExposesCacheStatusAndRefresh(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(get("/v1/files/cached.txt?response=json").Body.Bytes(), &response))
 	require.True(t, response.Cached)
-}
-
-func TestValidateEndpointAcceptsRemoteInput(t *testing.T) {
-	rt := testRuntime(t, app.Config{})
-	server := httpapi.New(rt)
-	sub := base64.StdEncoding.EncodeToString([]byte("ss://aes-128-gcm:secret@example.com:8388#remote-node"))
-	subServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(sub))
-	}))
-	defer subServer.Close()
-
-	validateReq := httptest.NewRequest(http.MethodPost, "/v1/validate", bytes.NewBufferString(`{
-		"remote": {"url": "`+subServer.URL+`"}
-	}`))
-	w := httptest.NewRecorder()
-	server.Handler().ServeHTTP(w, validateReq)
-
-	require.Equal(t, http.StatusOK, w.Code)
-	var result domain.ValidateResult
-	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &result))
-	require.True(t, result.OK)
 }

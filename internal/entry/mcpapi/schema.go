@@ -65,31 +65,6 @@ func subscriptionTrafficInputSchema() *jsonschema.Schema {
 	}, []string{"name"})
 }
 
-func validateFileInputSchema() *jsonschema.Schema {
-	return closedObject(map[string]*jsonschema.Schema{
-		"file":   stringSchema(),
-		"spec":   agentcatalog.FileSpecSchema(false),
-		"target": stringSchema(),
-		"args":   stringMapSchema(),
-	}, nil, exactlyOneOf("file", "spec")...)
-}
-
-func probeInputSchema() *jsonschema.Schema {
-	return closedObject(map[string]*jsonschema.Schema{
-		"input":             nodeInputSchema(),
-		"method":            enumSchema("tcp_connect", "udp_ntp", "url_test"),
-		"core":              enumSchema("mihomo", "sing-box"),
-		"url":               stringSchema(),
-		"ntp_server":        stringSchema(),
-		"expected_status":   stringSchema(),
-		"timeout_ms":        boundedIntegerSchema(0, nil),
-		"attempts":          boundedIntegerSchema(0, nil),
-		"concurrency":       boundedIntegerSchema(0, nil),
-		"cache_ttl_seconds": boundedIntegerSchema(0, nil),
-		"meta":              stringMapSchema(),
-	}, []string{"input"})
-}
-
 func putSubscriptionInputSchema() *jsonschema.Schema {
 	return agentcatalog.SubscriptionSchema()
 }
@@ -142,26 +117,6 @@ func remoteInputSchema() *jsonschema.Schema {
 	}, []string{"url"})
 }
 
-func nodeInputSchema() *jsonschema.Schema {
-	return closedObject(map[string]*jsonschema.Schema{
-		"name":              stringSchema(),
-		"type":              nodeInputTypeSchema(),
-		"ref":               openObjectSchema(),
-		"format":            parseFormatSchema(),
-		"target":            stringSchema(),
-		"nodes":             arraySchema(openObjectSchema()),
-		"content":           stringSchema(),
-		"path":              stringSchema(),
-		"url":               stringSchema(),
-		"user_agent":        stringSchema(),
-		"proxy":             stringSchema(),
-		"timeout_ms":        boundedIntegerSchema(0, nil),
-		"cache_ttl_seconds": boundedIntegerSchema(0, nil),
-		"required":          {Type: "boolean"},
-		"meta":              stringMapSchema(),
-	}, []string{"name", "type"})
-}
-
 func closedObject(properties map[string]*jsonschema.Schema, required []string, oneOf ...*jsonschema.Schema) *jsonschema.Schema {
 	return &jsonschema.Schema{
 		Type:                 "object",
@@ -207,22 +162,11 @@ func renderFormatSchema() *jsonschema.Schema {
 	return enumSchema("base64", "mihomo-proxies", "shadowrocket-proxies", "sing-box-outbounds", "json-nodes", "uri-list")
 }
 
-func nodeInputTypeSchema() *jsonschema.Schema {
-	return enumSchema("inline_nodes", "inline", "local", "remote", "ref", "subscription")
-}
-
 func boundedIntegerSchema(minimum float64, maximum *float64) *jsonschema.Schema {
 	return &jsonschema.Schema{
 		Type:    "integer",
 		Minimum: &minimum,
 		Maximum: maximum,
-	}
-}
-
-func exactlyOneOf(left, right string) []*jsonschema.Schema {
-	return []*jsonschema.Schema{
-		{Required: []string{left}, Not: &jsonschema.Schema{Required: []string{right}}},
-		{Required: []string{right}, Not: &jsonschema.Schema{Required: []string{left}}},
 	}
 }
 

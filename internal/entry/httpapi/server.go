@@ -167,8 +167,6 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /version", s.version)
 	s.mux.HandleFunc("GET /convert", s.publicConvert)
 	s.mux.HandleFunc("POST /v1/convert", s.agentConvert)
-	s.mux.HandleFunc("POST /v1/probe", s.agentProbe)
-	s.mux.HandleFunc("POST /v1/validate", s.validate)
 	s.mux.HandleFunc("GET /v1/inspect", s.inspect)
 	s.mux.HandleFunc("GET /v1/capabilities/formats", s.listFormatCapabilities)
 	s.mux.HandleFunc("GET /v1/capabilities/formats/{direction}/{format}", s.getFormatCapability)

@@ -26,16 +26,6 @@ type agentRenderResponse struct {
 	Cached      bool          `json:"cached"`
 }
 
-type validateRequest struct {
-	File       string                 `json:"file,omitempty"`
-	Spec       *domain.FileSpec       `json:"spec,omitempty"`
-	Format     string                 `json:"format,omitempty"`
-	Content    string                 `json:"content,omitempty"`
-	Remote     *domain.RemoteInput    `json:"remote,omitempty"`
-	Target     string                 `json:"target,omitempty"`
-	Processors []domain.ProcessorSpec `json:"processors,omitempty"`
-}
-
 type subscriptionTrafficRequest struct {
 	Refresh bool `json:"refresh,omitempty"`
 }
@@ -56,13 +46,6 @@ type renderResponse struct {
 type sourceResponse struct {
 	ContentType string `json:"content_type,omitempty"`
 	Body        string `json:"body"`
-}
-
-type validateResponse struct {
-	OK       bool                     `json:"ok"`
-	Counts   domain.ValidationCounts  `json:"counts"`
-	Issues   []domain.ValidationIssue `json:"issues"`
-	Warnings []domain.Warning         `json:"warnings"`
 }
 
 type inspectResponse struct {

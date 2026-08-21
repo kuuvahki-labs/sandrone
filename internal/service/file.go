@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
+	"github.com/kuuvahki-labs/sandrone/internal/processor"
 )
 
 func (s *Service) ValidateFile(ctx context.Context, req domain.FileRequest) (*domain.ValidateResult, error) {
@@ -69,6 +70,7 @@ func (s *Service) getFile(ctx context.Context, req domain.FileRequest, state *fi
 	if err != nil {
 		return nil, err
 	}
+	ctx = processor.WithTraceScope(ctx, "file:"+firstNonEmptyString(spec.Name, req.Name, "inline"))
 	if spec.Name != "" {
 		if state.stack[spec.Name] {
 			return nil, &domain.AppError{

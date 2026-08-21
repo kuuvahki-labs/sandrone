@@ -94,9 +94,9 @@ Vercel 不运行进程内 scheduler，也不提供任何 probe backend：
 - `core.mihomo=false`；
 - `core.sing_box=false`。
 
-Web UI 会隐藏定时更新、测活默认值和新增 probe processor 的入口。直接调用
-`/v1/probe`、MCP probe tool、脚本 probe 或执行已有 probe processor 时返回
-`probe_backend_unavailable`，不会静默跳过。
+Web UI 会隐藏定时更新、测活默认值和新增 probe processor 的入口。脚本
+`api.probe` 或执行已有 probe processor 时返回 `probe_backend_unavailable`，
+不会静默跳过。HTTP 与 MCP 不提供直接 probe 入口。
 
 CLI、Docker 与其他长驻 `serve` 部署不受此 profile 影响。
 

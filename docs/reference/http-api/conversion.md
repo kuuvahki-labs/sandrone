@@ -1,10 +1,10 @@
-# 转换、校验与能力检查
+# 转换与能力检查
 
 ## 用途
 
-本页说明一次性节点转换、无持久化校验和运行时能力检查。公开的精简转换是
+本页说明一次性节点转换和运行时能力检查。公开的精简转换是
 `GET /convert`，不使用 bearer token；完整转换是 `POST /v1/convert`，支持
-processor 与完整 report。完整转换、校验和能力检查位于 `/v1/*`，启用 token
+processor 与完整 report。完整转换和能力检查位于 `/v1/*`，启用 token
 时必须遵循[通用鉴权约定](README.md#鉴权)。
 
 输入/输出格式及字段兼容性以[格式与能力参考](../capabilities.md)为准；
@@ -209,86 +209,6 @@ curl -sS "$SANDRONE_URL/v1/convert" \
     "meta": {
       "caller": "example-skill"
     }
-  }'
-```
-
-## POST /v1/validate
-
-### 用途
-
-真实执行节点输入或文件生成链以返回结构化诊断，但不保存输入、生成内容或
-report。
-
-### 请求
-
-请求体支持两种使用模式；调用方不应混用：
-
-| 模式 | 字段 | 契约 |
-| --- | --- | --- |
-| 文件校验 | `file`, `spec`, `target` | `file` 引用已保存的单 segment 文件名；`spec` 是内联 `FileSpec`。至少提供其一。 |
-| 节点校验 | `format`, `content`, `remote`, `target`, `processors` | `content` 与 `remote` 互斥；内联正文需要 `format`，远程输入可省略格式自动检测。 |
-
-文件字段的完整语义见 [FileSpec 参考](../file-spec.md)。同时给出 `file` 与
-`spec` 时以内联 `spec` 为准；若 `spec.name` 为空，则用 `file` 补入名称。
-文件模式会读取 source、解析 typed 配置及其订阅依赖，并运行
-`FileSpec.processors`，但不会保存生成结果。
-
-节点模式在规范化后检查节点语义；`processors` 只作用于通过第一轮检查的节点，
-处理后再校验一次。`target` 为校验和 processor 提供目标上下文，不负责选择
-parser。若文件字段与节点字段混用，handler 优先进入文件模式；调用方应选择一种
-模式，避免依赖该优先级。
-
-### 响应
-
-校验流程完成时返回 `200`：
-
-```json
-{
-  "ok": false,
-  "counts": {
-    "input": 1,
-    "valid": 0,
-    "invalid": 1,
-    "error": 1,
-    "warning": 0
-  },
-  "issues": [
-    {
-      "severity": "error",
-      "stage": "normalized",
-      "code": "node_validation_invalid",
-      "message": "port must be between 1 and 65535",
-      "node_index": 0,
-      "field": "port"
-    }
-  ],
-  "warnings": []
-}
-```
-
-`ok: false` 表示发现 validation issue，不是 HTTP error。`counts` 的键固定为
-`input`、`valid`、`invalid`、`error`、`warning`；`issues` 可带节点、字段、
-stage 和 target 上下文。文件校验成功时当前 counts 为零，`issues` 可为
-`null`；`warnings` 仍总是数组。
-
-### 失败与安全边界
-
-- 两种模式都未被选中时返回 `400 invalid_argument`；仅提供 `content` 而没有
-  `format` 不会隐式启用节点模式。
-- 无法读取或解析输入、文件依赖缺失、依赖成环或 processor 执行失败属于操作
-  error，而不是 `ok: false` 的 validation issue。
-- 校验会真实读取声明的受控 store 或远程 source，因此可能产生网络访问和缓存
-  读取；它只承诺不持久化本次生成结果。
-
-### 最小示例
-
-```sh
-curl -sS "$SANDRONE_URL/v1/validate" \
-  -H "Authorization: Bearer $SANDRONE_TOKEN" \
-  -H "Content-Type: application/json" \
-  --data '{
-    "format": "uri-list",
-    "content": "ss://aes-128-gcm:example-password@proxy.example.com:8388#example-node"
   }'
 ```
 

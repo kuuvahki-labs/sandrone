@@ -23,10 +23,13 @@ fi
 
 umask 077
 output_tmp=$(mktemp "${output_file}.tmp.XXXXXX")
-probe_tmp=$(mktemp "${TMPDIR:-/tmp}/sandrone-probe.XXXXXX")
+diagnose_tmp=$(mktemp "${TMPDIR:-/tmp}/sandrone-diagnose.XXXXXX")
+processors_tmp=$(mktemp "${TMPDIR:-/tmp}/sandrone-processors.XXXXXX")
+
+printf '%s\n' '[{"type":"probe","stage":"nodes","params":{"fail_mode":"keep","annotate":false}}]' >"$processors_tmp"
 
 cleanup() {
-  rm -f "$output_tmp" "$probe_tmp"
+  rm -f "$output_tmp" "$diagnose_tmp" "$processors_tmp"
 }
 
 trap cleanup 0
@@ -45,10 +48,10 @@ while IFS= read -r raw_line || [ -n "$raw_line" ]; do
   esac
 
   checked=$((checked + 1))
-  : >"$probe_tmp"
+  : >"$diagnose_tmp"
 
-  if "$sandrone_cli" probe --input-url "$url" --output "$probe_tmp" 2>/dev/null &&
-    jq -e 'any(.results[]?; .alive == true)' "$probe_tmp" >/dev/null 2>&1; then
+  if "$sandrone_cli" diagnose url "$url" --processors "$processors_tmp" --output "$diagnose_tmp" 2>/dev/null &&
+    jq -e 'any(.stages[]?.probes[]?.results[]?; .alive == true)' "$diagnose_tmp" >/dev/null 2>&1; then
     printf '%s\n' "$url" >>"$output_tmp"
     kept=$((kept + 1))
     printf '[%d] alive\n' "$checked" >&2

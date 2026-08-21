@@ -41,7 +41,6 @@ func TestSandroneSkillSupportsHTTPWithoutMandatoryMCP(t *testing.T) {
 		"/v1/capabilities/formats/{direction}/{format}",
 		"/v1/capabilities/ui",
 		"/v1/convert",
-		"/v1/probe",
 		"/v1/subscriptions/{name}/render",
 		"/v1/schemas/processors",
 		"/v1/schemas/file-kinds/{kind}",
@@ -56,7 +55,6 @@ func TestSandroneSkillSupportsHTTPWithoutMandatoryMCP(t *testing.T) {
 func TestSandroneHTTPShapeDocumentationIsLinked(t *testing.T) {
 	schemas := readRepoFile(t, "../../../docs/reference/http-api/schemas.md")
 	conversion := readRepoFile(t, "../../../docs/reference/http-api/conversion.md")
-	probing := readRepoFile(t, "../../../docs/reference/http-api/probing.md")
 	subscriptions := readRepoFile(t, "../../../docs/reference/http-api/subscriptions.md")
 	httpIndex := readRepoFile(t, "../../../docs/reference/http-api/README.md")
 	mcpReference := readRepoFile(t, "../../../docs/reference/mcp.md")
@@ -74,10 +72,8 @@ func TestSandroneHTTPShapeDocumentationIsLinked(t *testing.T) {
 		require.Contains(t, schemas, route)
 	}
 	require.Contains(t, conversion, "POST /v1/convert")
-	require.Contains(t, probing, "POST /v1/probe")
 	require.Contains(t, subscriptions, "POST /v1/subscriptions/{name}/render")
 	require.Contains(t, httpIndex, "schemas.md")
-	require.Contains(t, httpIndex, "probing.md")
 	require.Contains(t, mcpReference, "SANDRONE_URL")
 	require.Contains(t, mcpReference, "可选")
 }

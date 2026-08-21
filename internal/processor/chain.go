@@ -36,13 +36,24 @@ func (r *Registry) RunNodes(ctx context.Context, specs []domain.ProcessorSpec, i
 	}
 	current := domain.NodeProcessOutput{Nodes: cloneNodes(in.Nodes)}
 	for _, spec := range stageSpecs {
+		stageCtx := ctx
+		traceID := -1
+		if recorder := traceFromContext(ctx); recorder != nil {
+			stageCtx, traceID = recorder.begin(ctx, spec, domain.StageNodes, len(current.Nodes))
+		}
 		proc, err := r.BuildNode(spec)
 		if err != nil {
+			if recorder := traceFromContext(ctx); recorder != nil {
+				recorder.finish(traceID, len(current.Nodes), nil, err)
+			}
 			return current, err
 		}
 		stageIn := in
 		stageIn.Nodes = current.Nodes
-		out, err := proc.ApplyNodes(ctx, stageIn)
+		out, err := proc.ApplyNodes(stageCtx, stageIn)
+		if recorder := traceFromContext(ctx); recorder != nil {
+			recorder.finish(traceID, len(out.Nodes), out.Warnings, err)
+		}
 		if err != nil {
 			return current, wrapStageErr(domain.CodeNodeProcessorFailed, proc.Name(), err)
 		}
@@ -61,14 +72,25 @@ func (r *Registry) RunFile(ctx context.Context, specs []domain.ProcessorSpec, in
 	current := domain.FileProcessOutput{File: cloneFile(in.File)}
 	parts := cloneParts(in.Parts)
 	for _, spec := range stageSpecs {
+		stageCtx := ctx
+		traceID := -1
+		if recorder := traceFromContext(ctx); recorder != nil {
+			stageCtx, traceID = recorder.begin(ctx, spec, domain.StageFile, fileNodeCount(current.File, parts))
+		}
 		proc, err := r.BuildFile(spec)
 		if err != nil {
+			if recorder := traceFromContext(ctx); recorder != nil {
+				recorder.finish(traceID, fileNodeCount(current.File, parts), nil, err)
+			}
 			return current, err
 		}
 		stageIn := in
 		stageIn.File = current.File
 		stageIn.Parts = parts
-		out, err := proc.ApplyFile(ctx, stageIn)
+		out, err := proc.ApplyFile(stageCtx, stageIn)
+		if recorder := traceFromContext(ctx); recorder != nil {
+			recorder.finish(traceID, fileNodeCount(out.File, parts), out.Warnings, err)
+		}
 		if err != nil {
 			return current, wrapStageErr(domain.CodeFileProcessorFailed, proc.Name(), err)
 		}
@@ -76,6 +98,18 @@ func (r *Registry) RunFile(ctx context.Context, specs []domain.ProcessorSpec, in
 		current.Warnings = append(current.Warnings, out.Warnings...)
 	}
 	return current, nil
+}
+
+func fileNodeCount(file domain.FileDocument, fallback []domain.FilePart) int {
+	parts := file.Parts
+	if parts == nil {
+		parts = fallback
+	}
+	count := 0
+	for _, part := range parts {
+		count += len(part.Nodes)
+	}
+	return count
 }
 
 func wrapStageErr(code domain.ErrorCode, processor string, err error) error {

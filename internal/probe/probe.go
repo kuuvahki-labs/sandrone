@@ -139,6 +139,14 @@ func (e *Engine) Probe(ctx context.Context, req domain.ProbeRequest, nodes []dom
 	return backend.Probe(ctx, BackendRequest{Probe: req, Payload: payload}, nodes)
 }
 
+// CheckAvailability resolves the requested backend without starting it. The
+// service uses this before node rendering so unavailable cores fail with their
+// canonical runtime error.
+func (e *Engine) CheckAvailability(req domain.ProbeRequest) error {
+	_, err := e.selectBackend(normalizeRequest(req))
+	return err
+}
+
 func (e *Engine) SelectCore(req domain.ProbeRequest, nodes []domain.NodeIR) (string, bool) {
 	req = normalizeRequest(req)
 	if req.Method != domain.ProbeURLTest && req.Method != domain.ProbeUDPNTP {

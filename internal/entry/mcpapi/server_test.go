@@ -39,6 +39,8 @@ func TestToolsAndResourceRead(t *testing.T) {
 	require.True(t, names["sandrone_get_file"])
 	require.True(t, names["sandrone_inspect"])
 	require.True(t, names["sandrone_put_subscription"])
+	require.False(t, names["sandrone_probe_nodes"])
+	require.False(t, names["sandrone_validate_file"])
 	require.NotNil(t, convertTool)
 	require.NotNil(t, convertTool.Annotations)
 	require.NotNil(t, convertTool.Annotations.OpenWorldHint)
@@ -137,12 +139,6 @@ func TestMCPPublicResourceNamesRejectSlash(t *testing.T) {
 		{
 			name:      "get file",
 			tool:      "sandrone_get_file",
-			arguments: map[string]any{"file": "files/default.yaml"},
-			want:      "file name must be a single path segment",
-		},
-		{
-			name:      "validate file",
-			tool:      "sandrone_validate_file",
 			arguments: map[string]any{"file": "files/default.yaml"},
 			want:      "file name must be a single path segment",
 		},

@@ -1,6 +1,6 @@
 ---
 name: sandrone
-description: Use when an Agent must operate Sandrone to convert proxy or subscription data, inspect or manage subscriptions and FileSpecs, render client configurations, probe nodes, author processors or sandbox scripts, or explain Sandrone reports.
+description: Use when an Agent must operate Sandrone to convert proxy or subscription data, inspect or manage subscriptions and FileSpecs, render client configurations, author processors or sandbox scripts, or explain Sandrone reports.
 ---
 
 # Sandrone
@@ -37,7 +37,7 @@ to retry.
 
 Read [references/workflows.md](references/workflows.md) for HTTP-first operation
 mappings and task recipes. Read [references/safety.md](references/safety.md)
-before any put, overwrite, delete, remote fetch, probe, or processor-script
+before any put, overwrite, delete, remote fetch, or processor-script
 task.
 
 ## Treat the Server as Canonical
@@ -68,7 +68,7 @@ when the user's instruction is already explicit and the target is exact.
 ## Return Useful Results
 
 Lead with the completed outcome. Include the resource name, whether state was
-persisted, the validation/render/probe result, and material warnings. Never
+persisted, the preview/render result, and material warnings. Never
 echo bearer tokens, credentials, subscription URLs, or full node secrets unless
 the user explicitly requests the sensitive value.
 

@@ -1,7 +1,6 @@
 package vercelhandler
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -91,21 +90,6 @@ func TestBuildHandlerServesVersionAndDisabledCapabilities(t *testing.T) {
 		require.Contains(t, features, key)
 		require.False(t, features[key], key)
 	}
-}
-
-func TestBuildHandlerProbeReturnsBackendUnavailable(t *testing.T) {
-	var captured app.Config
-	handler, err := buildHandler(context.Background(), envLookup(vercelTestEnv()), filesystemRuntimeFactory(t, &captured))
-	require.NoError(t, err)
-	request := httptest.NewRequest(http.MethodPost, "/v1/probe", bytes.NewBufferString(`{}`))
-	request.Header.Set("Authorization", "Bearer test-token")
-	request.Header.Set("Content-Type", "application/json")
-	response := httptest.NewRecorder()
-
-	handler.ServeHTTP(response, request)
-
-	require.Equal(t, http.StatusInternalServerError, response.Code, response.Body.String())
-	require.Contains(t, response.Body.String(), "probe_backend_unavailable")
 }
 
 func TestInitializationErrorResponseIsSanitized(t *testing.T) {

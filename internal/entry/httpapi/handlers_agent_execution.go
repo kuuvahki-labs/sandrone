@@ -36,15 +36,6 @@ func (s *Server) agentConvert(w http.ResponseWriter, r *http.Request) {
 	writeAgentRenderResult(w, result, err)
 }
 
-func (s *Server) agentProbe(w http.ResponseWriter, r *http.Request) {
-	var in domain.ProbeRequest
-	if !decodeJSON(w, r, &in) {
-		return
-	}
-	result, err := s.rt.Service.Probe(r.Context(), in)
-	writeResult(w, result, err)
-}
-
 func writeAgentRenderResult(w http.ResponseWriter, result *domain.RenderResult, err error) {
 	if err != nil {
 		writeServiceError(w, err)

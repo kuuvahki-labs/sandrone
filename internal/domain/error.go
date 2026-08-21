@@ -10,6 +10,8 @@ type ErrorCode string
 
 const (
 	CodeInvalidArgument        ErrorCode = "invalid_argument"
+	CodeInputKindAmbiguous     ErrorCode = "input_kind_ambiguous"
+	CodeInputKindUnrecognized  ErrorCode = "input_kind_unrecognized"
 	CodeParseFailed            ErrorCode = "parse_failed"
 	CodeRenderFailed           ErrorCode = "render_failed"
 	CodeFileInputNotFound      ErrorCode = "file_input_not_found"

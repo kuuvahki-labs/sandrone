@@ -22,7 +22,7 @@ Web UI、CLI、HTTP API、MCP 与可嵌入 Go API。
 - **从订阅到完整配置**：聚合多个来源，处理节点，再生成带代理组、规则和 DNS
   设置的客户端配置，不止转换分享 URI。
 - **先看清，再交付**：在保存或分享前预览节点变化和最终文件；通过结构化 warning、
-  validate 与 Mihomo / sing-box 探测发现有损字段和不可用节点。
+  diagnose 与声明式 Mihomo / sing-box probe processor 发现有损字段和不可用节点。
 - **可视化，也可自动化**：Web UI 适合日常管理；CLI、HTTP API、MCP 与 Go API
   复用相同的 service 层，脚本和 Agent 不需要另造一套流程。
 - **扩展但不失控**：filter、dedup、rename、sort、probe 等内建 processor 与受限
@@ -81,7 +81,7 @@ Mihomo / sing-box / Shadowrocket 完整配置
 | 节点输出 | Mihomo proxies、sing-box outbounds / endpoints、Shadowrocket `[Proxy]`、URI 列表 |
 | 完整文件 | Mihomo、sing-box、Shadowrocket typed config，以及 static / remote file |
 | 文件处理 | YAML / JSON / INI merge、JSON Patch、template 与 sandboxed JavaScript |
-| 运行能力 | preview、validate、TCP / UDP / URL probe、缓存、定时刷新、分享、备份与恢复 |
+| 运行能力 | preview、CLI diagnose、声明式 TCP / UDP / URL probe、缓存、定时刷新、分享、备份与恢复 |
 | 接入方式 | Web UI、CLI、HTTP API、MCP Streamable HTTP、`pkg/sandrone` Go API |
 
 格式转换存在目标客户端无法表达的边界。Sandrone 会保留可保留的原始字段并返回

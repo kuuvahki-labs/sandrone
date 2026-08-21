@@ -119,7 +119,7 @@ func toolContext(toolName string, input map[string]any) toolErrorContext {
 		"sandrone_get_subscription_traffic", "sandrone_put_subscription",
 		"sandrone_delete_subscription":
 		kind, field = "subscription", "name"
-	case "sandrone_get_file", "sandrone_validate_file":
+	case "sandrone_get_file":
 		kind, field = "file", "file"
 	case "sandrone_put_file", "sandrone_delete_file":
 		kind, field = "file", "name"
@@ -127,10 +127,5 @@ func toolContext(toolName string, input map[string]any) toolErrorContext {
 		return toolErrorContext{}
 	}
 	name, _ := input[field].(string)
-	if name == "" && toolName == "sandrone_validate_file" {
-		if spec, ok := input["spec"].(map[string]any); ok {
-			name, _ = spec["name"].(string)
-		}
-	}
 	return toolErrorContext{ResourceKind: kind, ResourceName: name}
 }

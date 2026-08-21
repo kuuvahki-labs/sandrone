@@ -14,11 +14,6 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
 
-type validateFileOutput struct {
-	OK     bool          `json:"ok"`
-	Report domain.Report `json:"report"`
-}
-
 type fileSpecOutput struct {
 	Name                  string                `json:"name"`
 	DisplayName           string                `json:"display_name,omitempty"`
@@ -124,37 +119,6 @@ func registerFileTools(server *mcp.Server, rt *app.Runtime) {
 		}), nil
 	})
 
-	addTool(server, &mcp.Tool{
-		Name:        "sandrone_validate_file",
-		Description: "Generate and validate a FileSpec without bypassing service file flow.",
-		InputSchema: validateFileInputSchema(),
-		Annotations: &mcp.ToolAnnotations{
-			ReadOnlyHint:  true,
-			OpenWorldHint: &openWorld,
-		},
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in validateFileInput) (*mcp.CallToolResult, validateFileOutput, error) {
-		if err := validateOptionalPublicResourceName("file name", in.File); err != nil {
-			return nil, validateFileOutput{}, err
-		}
-		var spec *domain.FileSpec
-		if in.Spec != nil {
-			converted, err := in.Spec.domain()
-			if err != nil {
-				return nil, validateFileOutput{}, err
-			}
-			spec = &converted
-		}
-		result, err := rt.Service.ValidateFile(ctx, domain.FileRequest{
-			Name:    in.File,
-			Spec:    spec,
-			Target:  in.Target,
-			Request: domain.RequestInfo{Args: in.Args},
-		})
-		if err != nil {
-			return nil, validateFileOutput{}, err
-		}
-		return nil, validateFileOutput{OK: result.OK, Report: result.Report}, nil
-	})
 }
 
 func newFileSourceOutput(source domain.FileDocument) (fileSourceOutput, error) {

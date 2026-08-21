@@ -85,38 +85,6 @@ func setPublicConvertHeaders(w http.ResponseWriter) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 }
 
-func (s *Server) validate(w http.ResponseWriter, r *http.Request) {
-	var req validateRequest
-	if !decodeJSON(w, r, &req) {
-		return
-	}
-	if err := validateOptionalPublicResourceName("file name", req.File); err != nil {
-		writeError(w, err, http.StatusBadRequest)
-		return
-	}
-	if req.File != "" || req.Spec != nil {
-		result, err := s.rt.Service.ValidateFile(r.Context(), domain.FileRequest{
-			Name:   req.File,
-			Spec:   req.Spec,
-			Target: req.Target,
-		})
-		writeValidateResult(w, result, err)
-		return
-	}
-	if req.Format != "" || req.Remote != nil {
-		result, err := s.rt.Service.ValidateNodes(r.Context(), domain.ParseRequest{
-			Format:     req.Format,
-			Content:    []byte(req.Content),
-			Remote:     req.Remote,
-			Target:     req.Target,
-			Processors: req.Processors,
-		})
-		writeValidateResult(w, result, err)
-		return
-	}
-	writeError(w, domain.NewError(domain.CodeInvalidArgument, "validate requires file/spec or format/content"), http.StatusBadRequest)
-}
-
 func (s *Server) inspect(w http.ResponseWriter, r *http.Request) {
 	result, err := s.rt.Service.Inspect(r.Context())
 	if err != nil {

@@ -223,21 +223,16 @@ func TestEngineSettingsRoundTrip(t *testing.T) {
 	require.Equal(t, update.CacheDefaults, got.Settings.CacheDefaults)
 }
 
-func TestEngineProbe(t *testing.T) {
+func TestEngineDiagnose(t *testing.T) {
 	engine := sandrone.New()
-	result, err := engine.Probe(context.Background(), sandrone.ProbeRequest{
-		Input: sandrone.NodeInput{
-			Type: "inline_nodes",
-			Nodes: []sandrone.NodeIR{{
-				Name:   "invalid",
-				Server: "example.com",
-			}},
-		},
-		Method: sandrone.ProbeTCPConnect,
+	result, err := engine.Diagnose(context.Background(), sandrone.DiagnoseRequest{
+		Kind:    sandrone.DiagnoseInputNodes,
+		Format:  "json-nodes",
+		Content: []byte(`[{"name":"invalid","type":"ss","server":"example.com"}]`),
 	})
-	require.Nil(t, result)
-	require.Error(t, err)
-	require.True(t, sandrone.IsCode(err, "node_validation_failed"))
+	require.NoError(t, err)
+	require.Equal(t, sandrone.DiagnoseStatusFailed, result.Status)
+	require.Equal(t, "node_validation_failed", string(result.Error.Code))
 }
 
 func TestIsCode(t *testing.T) {

@@ -43,19 +43,6 @@ func writeResult(w http.ResponseWriter, result any, err error) {
 	writeJSON(w, http.StatusOK, result)
 }
 
-func writeValidateResult(w http.ResponseWriter, result *domain.ValidateResult, err error) {
-	if err != nil {
-		writeServiceError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, validateResponse{
-		OK:       result.OK,
-		Counts:   result.Counts,
-		Issues:   result.Issues,
-		Warnings: reportWarnings(result.Report),
-	})
-}
-
 func reportWarnings(report domain.Report) []domain.Warning {
 	if report.Warnings == nil {
 		return []domain.Warning{}

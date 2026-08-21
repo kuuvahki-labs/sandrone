@@ -7,6 +7,7 @@ import (
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/nodevalidation"
+	"github.com/kuuvahki-labs/sandrone/internal/processor"
 )
 
 type subscriptionResolveState struct {
@@ -65,6 +66,8 @@ func (s *Service) materializeSubscription(ctx context.Context, sub domain.Subscr
 		return nil, err
 	}
 	sub = normalized
+	scopeName := firstNonEmptyString(sub.Name, req.Name, "inline")
+	ctx = processor.WithTraceScope(ctx, "subscription:"+scopeName)
 	if sub.Name != "" {
 		if state.stack[sub.Name] {
 			return nil, domain.NewError(domain.CodeInvalidArgument, fmt.Sprintf("subscription dependency cycle at %q", sub.Name))

@@ -150,7 +150,7 @@ func TestBodyLimitDoesNotClaimGlobalLimitsForNonBodyOutputs(t *testing.T) {
 	tools, err := session.ListTools(ctx, nil)
 	require.NoError(t, err)
 	for _, tool := range tools.Tools {
-		if tool.Name != "sandrone_probe_nodes" && tool.Name != "sandrone_preview_subscription" {
+		if tool.Name != "sandrone_preview_subscription" {
 			continue
 		}
 		body, err := json.Marshal(tool.OutputSchema)

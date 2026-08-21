@@ -98,7 +98,7 @@ func TestToolAnnotations(t *testing.T) {
 		require.False(t, *tool.Annotations.OpenWorldHint, name)
 	}
 
-	for _, name := range []string{"sandrone_get_file", "sandrone_validate_file"} {
+	for _, name := range []string{"sandrone_get_file"} {
 		tool := tools[name]
 		require.NotNil(t, tool, name)
 		require.NotNil(t, tool.Annotations, name)

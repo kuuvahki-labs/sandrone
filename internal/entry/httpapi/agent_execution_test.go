@@ -5,10 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -192,7 +190,6 @@ func TestAgentExecutionRoutesRequireBearer(t *testing.T) {
 	handler := httpapi.New(rt).Handler()
 	for _, path := range []string{
 		"/v1/convert",
-		"/v1/probe",
 		"/v1/subscriptions/demo/render",
 	} {
 		rec := httptest.NewRecorder()
@@ -307,7 +304,6 @@ func TestAgentExecutionRoutesRejectGET(t *testing.T) {
 		wantStatus int
 	}{
 		{path: "/v1/convert", wantStatus: http.StatusMethodNotAllowed},
-		{path: "/v1/probe", wantStatus: http.StatusMethodNotAllowed},
 		{path: "/v1/subscriptions/local/render", wantStatus: http.StatusBadRequest},
 	} {
 		rec := httptest.NewRecorder()
@@ -316,70 +312,6 @@ func TestAgentExecutionRoutesRejectGET(t *testing.T) {
 		if tc.path == "/v1/subscriptions/local/render" {
 			require.Contains(t, rec.Body.String(), "subscription action requires POST")
 		}
-	}
-}
-
-func TestAgentProbeReturnsLiveResultAndCompleteReport(t *testing.T) {
-	rt := testRuntime(t, app.Config{})
-	httpListener := openAgentProbeListener(t)
-	httpRequest := agentProbeRequest(httpListener)
-	body, err := json.Marshal(httpRequest)
-	require.NoError(t, err)
-
-	rec := httptest.NewRecorder()
-	httpapi.New(rt).Handler().ServeHTTP(rec, httptest.NewRequest(
-		http.MethodPost, "/v1/probe", bytes.NewReader(body),
-	))
-	require.Equal(t, http.StatusOK, rec.Code)
-	var result domain.ProbeResult
-	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &result))
-	require.Len(t, result.Results, 1)
-	require.True(t, result.Results[0].Alive)
-	require.Equal(t, "probe", result.Report.Kind)
-	require.NotNil(t, result.Report.Probe)
-
-	directListener := openAgentProbeListener(t)
-	expected, err := rt.Service.Probe(context.Background(), agentProbeRequest(directListener))
-	require.NoError(t, err)
-	require.Equal(t, expected.Results[0].Alive, result.Results[0].Alive)
-	require.Equal(t, expected.Results[0].Method, result.Results[0].Method)
-	require.Equal(t, expected.Results[0].Backend, result.Results[0].Backend)
-	require.Equal(t, expected.Report.Kind, result.Report.Kind)
-	require.Equal(t, expected.Report.Status, result.Report.Status)
-	wireExpected := agentWireReport(t, expected.Report)
-	require.Equal(t, agentComparableReport(wireExpected), agentComparableReport(result.Report))
-}
-
-func TestAgentProbePreservesStructuredServiceErrors(t *testing.T) {
-	rt := testRuntime(t, app.Config{})
-	node := `{"type":"inline_nodes","nodes":[{"name":"local","server":"127.0.0.1","port":9}]}`
-	for _, tc := range []struct {
-		name   string
-		body   string
-		code   string
-		status int
-	}{
-		{
-			name:   "invalid method",
-			body:   `{"input":` + node + `,"method":"invalid"}`,
-			code:   string(domain.CodeInvalidArgument),
-			status: http.StatusBadRequest,
-		},
-		{
-			name:   "unavailable core backend",
-			body:   `{"input":` + node + `,"method":"url_test","core":"missing"}`,
-			code:   string(domain.CodeProbeCoreUnavailable),
-			status: http.StatusInternalServerError,
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			rec := httptest.NewRecorder()
-			httpapi.New(rt).Handler().ServeHTTP(rec, httptest.NewRequest(
-				http.MethodPost, "/v1/probe", strings.NewReader(tc.body),
-			))
-			require.Equal(t, tc.status, rec.Code)
-			require.Contains(t, rec.Body.String(), `"code": "`+tc.code+`"`)
-		})
 	}
 }
 
@@ -397,9 +329,6 @@ func TestAgentExecutionDoesNotMutateResources(t *testing.T) {
 	beforeShares, err := rt.Service.ListShares(ctx)
 	require.NoError(t, err)
 
-	listener := openAgentProbeListener(t)
-	probeBody, err := json.Marshal(agentProbeRequest(listener))
-	require.NoError(t, err)
 	handler := httpapi.New(rt).Handler()
 	for _, request := range []*http.Request{
 		httptest.NewRequest(http.MethodPost, "/v1/convert", strings.NewReader(`{
@@ -407,7 +336,6 @@ func TestAgentExecutionDoesNotMutateResources(t *testing.T) {
 			"to_format":"json-nodes",
 			"content":"ss://aes-128-gcm:secret@example.com:8388#node-a"
 		}`)),
-		httptest.NewRequest(http.MethodPost, "/v1/probe", bytes.NewReader(probeBody)),
 		httptest.NewRequest(http.MethodPost, "/v1/subscriptions/local/render", strings.NewReader(`{"format":"json-nodes"}`)),
 	} {
 		rec := httptest.NewRecorder()
@@ -424,39 +352,6 @@ func TestAgentExecutionDoesNotMutateResources(t *testing.T) {
 	require.Equal(t, beforeSubscriptions, afterSubscriptions)
 	require.Equal(t, beforeFiles, afterFiles)
 	require.Equal(t, beforeShares, afterShares)
-}
-
-func openAgentProbeListener(t *testing.T) net.Listener {
-	t.Helper()
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = listener.Close() })
-	go func() {
-		for {
-			conn, err := listener.Accept()
-			if err != nil {
-				return
-			}
-			_ = conn.Close()
-		}
-	}()
-	return listener
-}
-
-func agentProbeRequest(listener net.Listener) domain.ProbeRequest {
-	port := listener.Addr().(*net.TCPAddr).Port
-	uri := fmt.Sprintf("ss://aes-128-gcm:secret@127.0.0.1:%s#local", strconv.Itoa(port))
-	return domain.ProbeRequest{
-		Input: domain.NodeInput{
-			Type:    "inline",
-			Format:  "uri-list",
-			Content: uri,
-		},
-		Method:      domain.ProbeTCPConnect,
-		TimeoutMS:   1000,
-		Attempts:    1,
-		Concurrency: 1,
-	}
 }
 
 func agentWireReport(t *testing.T, report domain.Report) domain.Report {

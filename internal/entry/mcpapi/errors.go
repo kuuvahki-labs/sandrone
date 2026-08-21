@@ -193,9 +193,6 @@ func contextualizeToolError(err error, context toolErrorContext, toolName string
 	}
 	if context.Field == "" {
 		if path := settingsPathPattern.FindString(appErr.Message); path != "" {
-			if toolName == "sandrone_validate_file" {
-				path = "spec." + path
-			}
 			context.Field = path
 		}
 	}

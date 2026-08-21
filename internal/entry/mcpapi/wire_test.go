@@ -116,7 +116,7 @@ func TestTypedSettingsAcceptOrdinaryObjectBeforeDriverValidation(t *testing.T) {
 	require.NotContains(t, body, "want array")
 }
 
-func TestTypedFileEmptySourceUsesBuiltinBaseForPutAndValidate(t *testing.T) {
+func TestTypedFileEmptySourceUsesBuiltinBaseForPut(t *testing.T) {
 	ctx := context.Background()
 	rt := testRuntime(t, app.Config{})
 	session := connect(t, ctx, mcpapi.SDKServer(rt))
@@ -146,17 +146,6 @@ func TestTypedFileEmptySourceUsesBuiltinBaseForPutAndValidate(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, string(sourceBody), "proxy-groups")
 
-	validate, err := session.CallTool(ctx, &mcp.CallToolParams{
-		Name: "sandrone_validate_file",
-		Arguments: map[string]any{
-			"spec": map[string]any{
-				"kind":   "mihomo",
-				"source": map[string]any{},
-			},
-		},
-	})
-	require.NoError(t, err)
-	require.False(t, validate.IsError)
 }
 
 func TestPutFileRequiresNameAtMCPBoundary(t *testing.T) {

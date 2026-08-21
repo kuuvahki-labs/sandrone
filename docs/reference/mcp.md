@@ -95,7 +95,7 @@ script，以 `SANDRONE_URL` 指向 Sandrone server，并通过可选
 
 ## Tool 注册与管理边界
 
-固定注册下列十三个 tool，其中九个只读或执行现有定义，四个可以修改保存的定义。
+固定注册下列十一个 tool，其中七个只读或执行现有定义，四个可以修改保存的定义。
 
 MCP 面向可信 Agent，不是多租户授权边界。任何能连接该 server 的客户端（配置
 token 时需通过 bearer 鉴权）都可以写入当前 data dir：`put` 会立即保存并覆盖
@@ -121,17 +121,16 @@ schema 为准；未知字段会被拒绝。与 Go/持久化表示不同，MCP wi
 | `sandrone_list_resources` | 可选 `kind`（`subscription` 或 `file`）、`cursor`、`limit`。 | 当前定义摘要 `items` 与可选 `next_cursor`。 |
 | `sandrone_inspect` | 无参数。 | 轻量运行时摘要与 capability/schema catalog URI；不内嵌字段详情。 |
 | `sandrone_convert` | `to_format`，以及 inline `content` + `from_format` 或受控 `remote`；可带 parse/render processors、render options 和 metadata。 | `content_type`、可选 `body` 与 `report`。 |
-| `sandrone_probe_nodes` | 一个 `NodeInput`，以及 method、core、目标、timeout、attempts、concurrency 和 cache TTL 等探测参数。method 为 `tcp_connect`、`udp_ntp` 或 `url_test`。 | 节点级 `results` 与汇总 `report`。 |
 | `sandrone_preview_subscription` | 已保存的 subscription `name` 与可选字符串 `args`。 | processor 前后的节点、数量与 `report`。 |
 | `sandrone_render_subscription` | 已保存的 subscription `name`、目标 `format`、可选字符串 `args` 与 `refresh`。 | `content_type`、可选 `body`、`cached` 与 `report`。 |
 | `sandrone_get_subscription_traffic` | 已保存的 remote subscription `name`；可用 `refresh` 强制刷新。 | 流量 metadata 与 `report`。 |
 | `sandrone_get_file` | 已保存的 `file` 名称、可选 `target`/字符串 `args`/`refresh`；`mode` 为 `render`、`source` 或 `spec`，省略时默认 `render`。 | render 返回正文、`cached` 与 report；source 返回 `FileDocument`；spec 返回完整定义与 `resource_uri`。 |
-| `sandrone_validate_file` | 已保存的 `file` 名称或 inline `spec`，以及可选 `target`/字符串 `args`。 | `ok` 与完整 `report`，不发布最终文件正文。 |
 
 `sandrone_convert` 的格式与有损边界见[格式与能力参考](capabilities.md)；
 processor 声明见 [Processors](processors.md)。文件 source、typed config 与完整
 file flow 见 [FileSpec](file-spec.md)和[文件管线](../architecture/file-pipeline.md)。
-探测语义见[节点探测](../architecture/probing.md)。
+MCP 不提供直接 diagnose、validate 或 probe tool；声明在 Subscription/FileSpec
+processor 链中的内部 probe 能力仍会在对应 preview/render/file flow 中执行。
 
 `sandrone_list_resources` 的 `limit` 缺省为 `50`，有效范围为 `1..200`。
 `next_cursor` 是 server 生成、重启后仍有效但不可由客户端解释或修改的不透明
@@ -154,9 +153,9 @@ typed config 与 processors 见 [FileSpec](file-spec.md)。文件删除的精确
 
 ### Tool annotations
 
-九个常驻 tool 的 `readOnlyHint` 都为 `true`。其中
+七个常驻 tool 的 `readOnlyHint` 都为 `true`。其中
 `sandrone_list_resources` 和 `sandrone_inspect` 的
-`openWorldHint` 为 `false`；其余七个常驻 tool 可能经受控 fetch、probe、
+`openWorldHint` 为 `false`；其余五个常驻 tool 可能经受控 fetch、probe、
 subscription 或 file flow 访问外部世界，`openWorldHint` 为 `true`。
 
 四个管理 tool 的 annotations 相同：`readOnlyHint: false`、
@@ -246,7 +245,7 @@ inline `body`：
 `body_omitted: true`、实际 `body_bytes` 与配置的 `max_output_bytes`。
 省略正文绝不会隐式创建 share、文件、artifact 或可读取 URI。
 
-该限制不全局覆盖 reports、probe results、preview/traffic 输出、resource JSON、
+该限制不全局覆盖 reports、preview/traffic 输出、resource JSON、
 `sandrone_get_file` 的 source/spec 输出或 capability/schema catalogs；这些结果
 仍可能很大，调用方应只读取当前任务所需的 exact resource，并限制自己保存、
 展示和转发的 MCP 结果。`sandrone_inspect` 本身保持轻量，不用于传输字段 catalog。
@@ -255,20 +254,20 @@ inline `body`：
 
 ```text
 inspect → read capability/schema index → list → read exact definition/schema
-→ optional prompt → preview/validate → put/delete/render/probe
+→ optional prompt → preview/render → put/delete/render
 ```
 
 先用 `sandrone_inspect` 确认当前运行时摘要和目录入口，按需读取
 `sandrone://capabilities/formats`、`sandrone://schemas` 及 exact detail，再用
 `sandrone_list_resources` 发现已存定义；通过标准 MCP resource 读取定义及其
 processor、file-kind 或 script schema。只有需要起草或解释时才调用 prompt。
-随后用 convert/preview/validate 做无持久化检查。只有用户明确要求时才 put 或
-delete；最后按目标 render、get file 或 probe，并检查 structured output 中的
+随后用 convert/preview 做无持久化检查。只有用户明确要求时才 put 或
+delete；最后按目标 render 或 get file，并检查 structured output 中的
 report/warnings。
 
-Preview/validate 是推荐检查，不是 put 的服务端前置条件。反过来，
-subscription preview/render 只接受已存定义，所以新 subscription 通常要在用户
-授权后先 put；FileSpec 可以直接以 inline `spec` 调用 `sandrone_validate_file`。
+Preview/render 不是 put 的服务端前置条件。subscription preview/render 与 file
+render 都只接受已存定义，因此新资源通常要在用户授权后先 put，再执行并检查
+report。需要统一诊断本地草稿时使用 CLI `sandrone diagnose`。
 
 ## 安全边界
 

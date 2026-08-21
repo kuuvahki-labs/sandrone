@@ -31,19 +31,8 @@ func TestToolSchemasExposeObjectValuesAndBoundaryValidation(t *testing.T) {
 		{"required":["content","from_format"],"not":{"required":["remote"]}},
 		{"required":["remote"],"not":{"required":["content"]}}
 	]`, extractSchema(t, result.Tools, "sandrone_convert", "oneOf"))
-	require.JSONEq(t, `[
-		{"required":["file"],"not":{"required":["spec"]}},
-		{"required":["spec"],"not":{"required":["file"]}}
-	]`, extractSchema(t, result.Tools, "sandrone_validate_file", "oneOf"))
-
 	require.JSONEq(t, `["spec","source","render"]`, extractSchema(
 		t, result.Tools, "sandrone_get_file", "properties.mode.enum",
-	))
-	require.JSONEq(t, `["tcp_connect","udp_ntp","url_test"]`, extractSchema(
-		t, result.Tools, "sandrone_probe_nodes", "properties.method.enum",
-	))
-	require.JSONEq(t, `["mihomo","sing-box"]`, extractSchema(
-		t, result.Tools, "sandrone_probe_nodes", "properties.core.enum",
 	))
 	require.JSONEq(t, `["uri","uri-list","base64","mihomo","sing-box","json-nodes"]`, extractSchema(
 		t, result.Tools, "sandrone_convert", "properties.from_format.enum",
@@ -57,17 +46,8 @@ func TestToolSchemasExposeObjectValuesAndBoundaryValidation(t *testing.T) {
 	require.JSONEq(t, `["auto","uri","uri-list","base64","mihomo","sing-box","json-nodes"]`, extractSchema(
 		t, result.Tools, "sandrone_put_subscription", "properties.format.enum",
 	))
-	require.JSONEq(t, `["inline_nodes","inline","local","remote","ref","subscription"]`, extractSchema(
-		t, result.Tools, "sandrone_probe_nodes", "properties.input.properties.type.enum",
-	))
-	require.JSONEq(t, `["uri","uri-list","base64","mihomo","sing-box","json-nodes"]`, extractSchema(
-		t, result.Tools, "sandrone_probe_nodes", "properties.input.properties.format.enum",
-	))
 	require.JSONEq(t, `["name","kind","source"]`, extractSchema(
 		t, result.Tools, "sandrone_put_file", "required",
-	))
-	require.JSONEq(t, `["kind","source"]`, extractSchema(
-		t, result.Tools, "sandrone_validate_file", "properties.spec.required",
 	))
 	requireSchemaPathMissing(
 		t, result.Tools, "sandrone_put_file", "properties.source.required",
@@ -76,14 +56,8 @@ func TestToolSchemasExposeObjectValuesAndBoundaryValidation(t *testing.T) {
 	for _, path := range []string{
 		"properties.remote.properties.timeout_ms.minimum",
 		"properties.remote.properties.cache_ttl_seconds.minimum",
-		"properties.input.properties.timeout_ms.minimum",
-		"properties.input.properties.cache_ttl_seconds.minimum",
-		"properties.timeout_ms.minimum",
-		"properties.attempts.minimum",
-		"properties.concurrency.minimum",
-		"properties.cache_ttl_seconds.minimum",
 	} {
-		require.JSONEq(t, `0`, extractSchema(t, result.Tools, schemaTool(path), path), path)
+		require.JSONEq(t, `0`, extractSchema(t, result.Tools, "sandrone_convert", path), path)
 	}
 }
 
@@ -136,25 +110,6 @@ func TestToolSchemaEnumsRejectUnknownValues(t *testing.T) {
 				"content": "ss://aes-128-gcm:secret@example.com:8388#node",
 			},
 		},
-		{
-			name: "node input type",
-			tool: "sandrone_probe_nodes",
-			arguments: map[string]any{
-				"input": map[string]any{"name": "probe", "type": "future"},
-			},
-		},
-		{
-			name: "node input format",
-			tool: "sandrone_probe_nodes",
-			arguments: map[string]any{
-				"input": map[string]any{
-					"name":    "probe",
-					"type":    "inline",
-					"format":  "future",
-					"content": "ss://aes-128-gcm:secret@example.com:8388#node",
-				},
-			},
-		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -162,13 +117,6 @@ func TestToolSchemaEnumsRejectUnknownValues(t *testing.T) {
 			require.Contains(t, body, "does not equal any of")
 		})
 	}
-}
-
-func schemaTool(path string) string {
-	if len(path) >= len("properties.remote") && path[:len("properties.remote")] == "properties.remote" {
-		return "sandrone_convert"
-	}
-	return "sandrone_probe_nodes"
 }
 
 func extractSchema(t *testing.T, tools []*mcp.Tool, toolName, path string) string {

@@ -14,7 +14,6 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/app"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/entry/mcpapi"
-	"github.com/kuuvahki-labs/sandrone/internal/probe"
 )
 
 type structuredToolError struct {
@@ -31,30 +30,6 @@ type structuredToolError struct {
 		Processor    string `json:"processor,omitempty"`
 		Path         string `json:"path,omitempty"`
 	} `json:"error"`
-}
-
-func TestDisabledProbeReturnsStructuredUnavailableError(t *testing.T) {
-	ctx := context.Background()
-	rt, err := app.NewRuntimeContext(
-		ctx,
-		app.Config{DataDir: t.TempDir()},
-		nil,
-		app.WithProbeEngine(probe.NewDisabled()),
-		app.WithSchedulerEnabled(false),
-	)
-	require.NoError(t, err)
-	session := connect(t, ctx, mcpapi.SDKServer(rt))
-	defer session.Close()
-
-	body := callStructuredToolError(t, ctx, session, "sandrone_probe_nodes", map[string]any{
-		"input": map[string]any{
-			"name":    "disabled-probe",
-			"type":    "inline",
-			"format":  "uri-list",
-			"content": "ss://aes-128-gcm:secret@example.com:8388#node",
-		},
-	})
-	require.Equal(t, string(domain.CodeProbeBackendUnavailable), body.Error.Code)
 }
 
 func TestStructuredToolErrorsInputValidationForEveryAlwaysRegisteredTool(t *testing.T) {
@@ -78,14 +53,12 @@ func TestStructuredToolErrorsInputValidationForEveryAlwaysRegisteredTool(t *test
 			},
 			field: "parse_processors[1].stage",
 		},
-		{tool: "sandrone_probe_nodes", arguments: map[string]any{}, field: "input"},
 		{tool: "sandrone_list_resources", arguments: map[string]any{"limit": 201}, field: "limit"},
 		{tool: "sandrone_inspect", arguments: map[string]any{"unexpected": true}, field: "unexpected"},
 		{tool: "sandrone_preview_subscription", arguments: map[string]any{}, field: "name"},
 		{tool: "sandrone_render_subscription", arguments: map[string]any{"name": "demo"}, field: "format"},
 		{tool: "sandrone_get_subscription_traffic", arguments: map[string]any{}, field: "name"},
 		{tool: "sandrone_get_file", arguments: map[string]any{}, field: "file"},
-		{tool: "sandrone_validate_file", arguments: map[string]any{}, field: ""},
 	}
 	for _, test := range tests {
 		t.Run(test.tool, func(t *testing.T) {
@@ -117,11 +90,6 @@ func TestStructuredToolErrorsServiceFailuresForEveryAlwaysRegisteredTool(t *test
 			code:      domain.CodeParseFailed,
 		},
 		{
-			name: "probe invalid node", tool: "sandrone_probe_nodes",
-			arguments: map[string]any{"input": map[string]any{"name": "bad", "type": "inline", "format": "uri-list", "content": "not-a-node"}},
-			code:      domain.CodeParseFailed,
-		},
-		{
 			name: "list cursor", tool: "sandrone_list_resources",
 			arguments: map[string]any{"cursor": "invalid"},
 			code:      domain.CodeInvalidArgument,
@@ -144,11 +112,6 @@ func TestStructuredToolErrorsServiceFailuresForEveryAlwaysRegisteredTool(t *test
 		{
 			name: "get file missing", tool: "sandrone_get_file",
 			arguments: map[string]any{"file": "missing", "mode": "render"},
-			code:      domain.CodeFileInputNotFound, resourceKind: "file", resourceName: "missing",
-		},
-		{
-			name: "validate file missing", tool: "sandrone_validate_file",
-			arguments: map[string]any{"file": "missing"},
 			code:      domain.CodeFileInputNotFound, resourceKind: "file", resourceName: "missing",
 		},
 	}
@@ -302,30 +265,6 @@ func TestStructuredToolErrorsSanitizeRemoteSourceURL(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, json.Unmarshal(structuredJSON, &body))
 	require.Equal(t, remote.URL, body.Error.Source)
-}
-
-func TestStructuredToolErrorsPreserveTypedSettingsDecodeCodeAndResource(t *testing.T) {
-	ctx := context.Background()
-	session := connect(t, ctx, mcpapi.SDKServer(testRuntime(t, app.Config{})))
-	defer session.Close()
-
-	body := callStructuredToolError(t, ctx, session, "sandrone_validate_file", map[string]any{
-		"spec": map[string]any{
-			"name": "bad.yaml",
-			"kind": "mihomo",
-			"source": map[string]any{
-				"type":    "inline",
-				"content": "proxies: []\n",
-			},
-			"config": map[string]any{
-				"settings": map[string]any{"groups": nil},
-			},
-		},
-	})
-	require.Equal(t, string(domain.CodeInvalidArgument), body.Error.Code)
-	require.Equal(t, "spec.config.settings.groups", body.Error.Field)
-	require.Equal(t, "file", body.Error.ResourceKind)
-	require.Equal(t, "bad.yaml", body.Error.ResourceName)
 }
 
 func callStructuredToolError(

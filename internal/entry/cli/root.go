@@ -23,10 +23,7 @@ type engine interface {
 	Parse(context.Context, sandrone.ParseRequest) (*sandrone.ParseResult, error)
 	Render(context.Context, sandrone.RenderRequest) (*sandrone.RenderResult, error)
 	Convert(context.Context, sandrone.ConvertRequest) (*sandrone.RenderResult, error)
-	Probe(context.Context, sandrone.ProbeRequest) (*sandrone.ProbeResult, error)
-	GetFile(context.Context, sandrone.FileRequest) (*sandrone.FileResult, error)
-	ValidateFile(context.Context, sandrone.FileRequest) (*sandrone.ValidateResult, error)
-	ValidateNodes(context.Context, sandrone.ParseRequest) (*sandrone.ValidateResult, error)
+	Diagnose(context.Context, sandrone.DiagnoseRequest) (*sandrone.DiagnoseResult, error)
 	Inspect(context.Context) (*sandrone.InspectResult, error)
 	ListFormatCapabilities(context.Context) (*sandrone.FormatCapabilityListResult, error)
 	GetFormatCapability(context.Context, sandrone.FormatCapabilityRequest) (*sandrone.FormatCapability, error)
@@ -127,11 +124,9 @@ func newRootCommand(cfg *config) *cobra.Command {
 	root.PersistentFlags().StringVar(&cfg.dataDir, "data-dir", cfg.dataDir, "resource data directory")
 	root.AddCommand(
 		newConvertCommand(cfg),
-		newProbeCommand(cfg),
-		newValidateCommand(cfg),
+		newDiagnoseCommand(cfg),
 		newInspectCommand(cfg),
 		newCapabilityCommand(cfg),
-		newFileCommand(cfg),
 		newDoctorCommand(cfg),
 		newServeCommand(cfg),
 	)

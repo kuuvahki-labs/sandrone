@@ -2,7 +2,6 @@ package cli
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,8 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"gopkg.in/yaml.v3"
 
 	"github.com/kuuvahki-labs/sandrone/pkg/sandrone"
 )
@@ -41,6 +38,34 @@ func writeJSONOutput(outputPath string, stdout io.Writer, value any) error {
 	}
 	body = append(body, '\n')
 	return writeOutput(outputPath, stdout, body)
+}
+
+func writeSensitiveJSONOutput(outputPath string, stdout io.Writer, value any) error {
+	body, err := json.MarshalIndent(value, "", "  ")
+	if err != nil {
+		return err
+	}
+	body = append(body, '\n')
+	if outputPath == "" || outputPath == "-" {
+		_, err = stdout.Write(body)
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
+		return err
+	}
+	file, err := os.OpenFile(outputPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	if err != nil {
+		return err
+	}
+	if err := file.Chmod(0o600); err != nil {
+		_ = file.Close()
+		return err
+	}
+	if _, err := file.Write(body); err != nil {
+		_ = file.Close()
+		return err
+	}
+	return file.Close()
 }
 
 func writeReportOutput(outputPath string, report sandrone.Report) error {
@@ -80,46 +105,6 @@ func validateOutputPaths(outputPath, reportOutputPath string) error {
 	return nil
 }
 
-func renderFile(ctx context.Context, engine engine, arg string, req sandrone.FileRequest) (*sandrone.FileResult, error) {
-	if isStoreNameCandidate(arg) {
-		req.Name = arg
-		result, err := engine.GetFile(ctx, req)
-		if err == nil {
-			return result, nil
-		}
-		if !errors.Is(err, os.ErrNotExist) || !isLocalSpecPath(arg) {
-			return nil, err
-		}
-	}
-	spec, err := readFileSpec(arg)
-	if err != nil {
-		return nil, err
-	}
-	req.Name = ""
-	req.Spec = spec
-	return engine.GetFile(ctx, req)
-}
-
-func validateFile(ctx context.Context, engine engine, arg string, req sandrone.FileRequest) (*sandrone.ValidateResult, error) {
-	if isStoreNameCandidate(arg) {
-		req.Name = arg
-		result, err := engine.ValidateFile(ctx, req)
-		if err == nil {
-			return result, nil
-		}
-		if !errors.Is(err, os.ErrNotExist) || !isLocalSpecPath(arg) {
-			return nil, err
-		}
-	}
-	spec, err := readFileSpec(arg)
-	if err != nil {
-		return nil, err
-	}
-	req.Name = ""
-	req.Spec = spec
-	return engine.ValidateFile(ctx, req)
-}
-
 func readFileSpec(specPath string) (*sandrone.FileSpec, error) {
 	body, err := os.ReadFile(specPath)
 	if err != nil {
@@ -128,54 +113,33 @@ func readFileSpec(specPath string) (*sandrone.FileSpec, error) {
 	var spec sandrone.FileSpec
 	switch strings.ToLower(filepath.Ext(specPath)) {
 	case ".json":
-		decoder := json.NewDecoder(bytes.NewReader(body))
-		decoder.UseNumber()
-		if err := decoder.Decode(&spec); err != nil {
-			return nil, err
-		}
-	case ".yaml", ".yml":
-		var raw any
-		if err := yaml.Unmarshal(body, &raw); err != nil {
-			return nil, err
-		}
-		jsonBody, err := json.Marshal(yamlToJSONValue(raw))
-		if err != nil {
-			return nil, err
-		}
-		decoder := json.NewDecoder(bytes.NewReader(jsonBody))
-		decoder.UseNumber()
-		if err := decoder.Decode(&spec); err != nil {
+		if err := decodeJSONResourceDefinition(body, &spec); err != nil {
 			return nil, err
 		}
 	default:
-		return nil, fmt.Errorf("file spec must be .json, .yaml, or .yml: %s", specPath)
+		return nil, fmt.Errorf("file spec must be .json: %s", specPath)
 	}
 	return &spec, nil
 }
 
-func yamlToJSONValue(v any) any {
-	switch value := v.(type) {
-	case map[string]any:
-		out := make(map[string]any, len(value))
-		for key, child := range value {
-			out[key] = yamlToJSONValue(child)
-		}
-		return out
-	case map[any]any:
-		out := make(map[string]any, len(value))
-		for key, child := range value {
-			out[fmt.Sprint(key)] = yamlToJSONValue(child)
-		}
-		return out
-	case []any:
-		out := make([]any, len(value))
-		for i, child := range value {
-			out[i] = yamlToJSONValue(child)
-		}
-		return out
-	default:
-		return value
+func decodeJSONResourceDefinition(body []byte, out any) error {
+	trimmed := bytes.TrimSpace(body)
+	if len(trimmed) == 0 {
+		return fmt.Errorf("JSON resource definition is empty")
 	}
+	decoder := json.NewDecoder(bytes.NewReader(trimmed))
+	decoder.UseNumber()
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(out); err != nil {
+		return err
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return fmt.Errorf("multiple JSON values are not supported")
+		}
+		return err
+	}
+	return nil
 }
 
 func isLocalSpecPath(specPath string) bool {
@@ -184,7 +148,7 @@ func isLocalSpecPath(specPath string) bool {
 		return false
 	}
 	switch strings.ToLower(filepath.Ext(specPath)) {
-	case ".json", ".yaml", ".yml":
+	case ".json":
 		return true
 	default:
 		return false

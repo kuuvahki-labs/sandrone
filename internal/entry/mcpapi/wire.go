@@ -159,27 +159,6 @@ type getFileInput struct {
 	Refresh bool              `json:"refresh,omitempty"`
 }
 
-type validateFileInput struct {
-	File   string            `json:"file,omitempty"`
-	Spec   *fileSpec         `json:"spec,omitempty"`
-	Target string            `json:"target,omitempty"`
-	Args   map[string]string `json:"args,omitempty"`
-}
-
-type probeInput struct {
-	Input           domain.NodeInput   `json:"input"`
-	Method          domain.ProbeMethod `json:"method,omitempty"`
-	Core            string             `json:"core,omitempty"`
-	URL             string             `json:"url,omitempty"`
-	NTPServer       string             `json:"ntp_server,omitempty"`
-	ExpectedStatus  string             `json:"expected_status,omitempty"`
-	TimeoutMS       int                `json:"timeout_ms,omitempty"`
-	Attempts        int                `json:"attempts,omitempty"`
-	Concurrency     int                `json:"concurrency,omitempty"`
-	CacheTTLSeconds int                `json:"cache_ttl_seconds,omitempty"`
-	Meta            map[string]string  `json:"meta,omitempty"`
-}
-
 type putSubscriptionInput struct {
 	subscription
 }

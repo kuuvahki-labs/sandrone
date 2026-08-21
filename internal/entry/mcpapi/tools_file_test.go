@@ -138,14 +138,6 @@ func TestFileLifecycle(t *testing.T) {
 			require.Contains(t, render["body"], test.initialWant)
 			require.NotContains(t, render, "resource_uri")
 
-			validateArguments := map[string]any{"file": test.fileName}
-			if test.renderArgs != nil {
-				validateArguments["args"] = test.renderArgs
-			}
-			validate := callToolSuccess(t, ctx, session, "sandrone_validate_file", validateArguments)
-			require.Equal(t, true, validate["ok"])
-			require.ElementsMatch(t, []string{"ok", "report"}, mapKeys(validate))
-
 			putArgs = filePutArguments(test.fileName, kind, test.updatedSource, test.processors)
 			overwritten := callToolSuccess(t, ctx, session, "sandrone_put_file", putArgs)
 			require.Equal(t, "sandrone://files/"+test.fileName, overwritten["resource_uri"])
@@ -200,12 +192,4 @@ func callToolSuccess(t *testing.T, ctx context.Context, session *mcp.ClientSessi
 	var output map[string]any
 	require.NoError(t, json.Unmarshal(data, &output))
 	return output
-}
-
-func mapKeys(values map[string]any) []string {
-	keys := make([]string, 0, len(values))
-	for key := range values {
-		keys = append(keys, key)
-	}
-	return keys
 }
