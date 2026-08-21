@@ -182,6 +182,9 @@ func validateTLS(options *domain.TLSOptions, prefix string, add func(string, str
 	if options == nil {
 		return
 	}
+	if !validTLSClientFingerprint(options.ClientFingerprint) {
+		add("node_validation_invalid", prefix+".client_fingerprint", "TLS client fingerprint is not supported")
+	}
 	if (options.Certificate == "") != (options.PrivateKey == "") {
 		add("node_validation_conflict", prefix+".certificate", "TLS certificate and private key must be configured together")
 	}
@@ -191,6 +194,17 @@ func validateTLS(options *domain.TLSOptions, prefix string, add func(string, str
 		default:
 			add("node_validation_invalid", prefix+".ech.force_query", "ECH force query must be none, half, or full")
 		}
+	}
+}
+
+func validTLSClientFingerprint(value string) bool {
+	switch value {
+	case "",
+		"chrome", "firefox", "edge", "safari", "360", "qq", "ios", "android", "random", "randomized",
+		"chrome_psk", "chrome_psk_shuffle", "chrome_padding_psk_shuffle", "chrome_pq", "chrome_pq_psk":
+		return true
+	default:
+		return false
 	}
 }
 

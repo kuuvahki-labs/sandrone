@@ -57,6 +57,35 @@ func TestServiceMihomoURLTestWithLocalProxy(t *testing.T) {
 	require.Equal(t, "mihomo_url_test", result.Report.Probe.Backend)
 }
 
+func TestServiceMihomoURLTestIsolatesUnsupportedTLSClientFingerprint(t *testing.T) {
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer target.Close()
+	proxyAddr, closeProxy := startConnectProxy(t)
+	defer closeProxy()
+	host, port := splitHostPort(t, proxyAddr)
+
+	result, err := service.New().Probe(context.Background(), domain.ProbeRequest{
+		Input: domain.NodeInput{Type: "inline_nodes", Nodes: []domain.NodeIR{
+			{Name: "valid", Type: domain.NodeTypeHTTP, Server: host, Port: port},
+			{
+				Name: "unsupported", Type: domain.NodeTypeVLESS, Server: "example.com", Port: 443,
+				UUID: "11111111-1111-1111-1111-111111111111",
+				TLS:  &domain.TLSOptions{Enabled: true, ClientFingerprint: "unsafe"},
+			},
+		}},
+		Method: domain.ProbeURLTest, Core: "mihomo", URL: target.URL,
+		ExpectedStatus: "200-299", TimeoutMS: 2000,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result.Results, 1)
+	require.True(t, result.Results[0].Alive)
+	require.NotEqual(t, string(domain.CodeProbeCoreStartFailed), result.Results[0].ErrorCode)
+	require.True(t, containsWarning(result.Report.Warnings, "node_validation_dropped", "tls.client_fingerprint"))
+}
+
 func TestServiceMihomoURLTestVMessDefaultsEmptyCipherBeforeCoreParse(t *testing.T) {
 	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)

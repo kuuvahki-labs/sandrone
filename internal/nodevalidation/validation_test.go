@@ -125,6 +125,59 @@ func TestValidateVLESSFlow(t *testing.T) {
 	}
 }
 
+func TestValidateTLSClientFingerprint(t *testing.T) {
+	t.Parallel()
+
+	base := domain.NodeIR{
+		Name: "vless", Type: domain.NodeTypeVLESS, Server: "example.com", Port: 443,
+		UUID: "11111111-1111-1111-1111-111111111111", Encryption: "none",
+	}
+	valid := []string{
+		"", "chrome", "firefox", "edge", "safari", "360", "qq", "ios", "android", "random", "randomized",
+		"chrome_psk", "chrome_psk_shuffle", "chrome_padding_psk_shuffle", "chrome_pq", "chrome_pq_psk",
+	}
+	for _, fingerprint := range valid {
+		fingerprint := fingerprint
+		t.Run("valid_"+fingerprint, func(t *testing.T) {
+			t.Parallel()
+			node := base
+			node.TLS = &domain.TLSOptions{Enabled: true, ClientFingerprint: fingerprint}
+			require.Equal(t, 1, nodevalidation.Validate([]domain.NodeIR{node}, nodevalidation.StageNormalized, "").Counts.Valid)
+		})
+	}
+
+	for _, fingerprint := range []string{"unsafe", "chrome120", "none", " Chrome"} {
+		fingerprint := fingerprint
+		t.Run("invalid_"+fingerprint, func(t *testing.T) {
+			t.Parallel()
+			node := base
+			node.TLS = &domain.TLSOptions{Enabled: true, ClientFingerprint: fingerprint}
+			result := nodevalidation.Validate([]domain.NodeIR{node}, nodevalidation.StageNormalized, "")
+			require.Equal(t, 1, result.Counts.Invalid)
+			require.Equal(t, []string{"tls.client_fingerprint"}, issueFields(result.Issues))
+		})
+	}
+}
+
+func TestValidateXHTTPDownloadTLSClientFingerprint(t *testing.T) {
+	t.Parallel()
+
+	node := domain.NodeIR{
+		Name: "vless", Type: domain.NodeTypeVLESS, Server: "example.com", Port: 443,
+		UUID: "11111111-1111-1111-1111-111111111111", Encryption: "none",
+		Transport: &domain.TransportOptions{Type: "xhttp", XHTTP: &domain.XHTTPTransportOptions{
+			DownloadSettings: &domain.XHTTPDownloadSettings{
+				TLS: &domain.TLSOptions{Enabled: true, ClientFingerprint: "unsafe"},
+			},
+		}},
+	}
+
+	result := nodevalidation.Validate([]domain.NodeIR{node}, nodevalidation.StageNormalized, "")
+
+	require.Equal(t, 1, result.Counts.Invalid)
+	require.Equal(t, []string{"transport.xhttp.download_settings.tls.client_fingerprint"}, issueFields(result.Issues))
+}
+
 func TestValidateTUICRequiresEnabledTLS(t *testing.T) {
 	t.Parallel()
 

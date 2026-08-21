@@ -105,8 +105,13 @@ canonical UUID 字符串，否则静默映射为以 nil UUID 为 namespace、原
 Reality TLS 的有效 client fingerprint 也在共享 service 边界规范化：顶层
 `tls.reality` 或 xHTTP download TLS 包含 Reality、但
 `tls.client_fingerprint` 为空时，Sandrone 静默补为 `chrome`。显式 fingerprint
-保持不变；规范化后的值写入 `NodeIR`，因此 URI、Mihomo、sing-box 和 JSON Nodes
-输出使用同一有效语义，而不是由单个目标 renderer 私自选择默认值。
+必须属于共同 uTLS 值域，否则节点在 shared validation 阶段隔离，不会交给任一
+renderer 或 probe core。当前值域为 `chrome`、`firefox`、`edge`、`safari`、
+`360`、`qq`、`ios`、`android`、`random`、`randomized`；另为现有订阅兼容保留
+`chrome_psk`、`chrome_psk_shuffle`、`chrome_padding_psk_shuffle`、`chrome_pq`、
+`chrome_pq_psk`。来源私有值、未知值和仅单一目标接受的值不会清空、猜测或按前缀
+映射。规范化后的值写入 `NodeIR`，因此 URI、Mihomo、sing-box 和 JSON Nodes 输出
+使用同一有效语义，而不是由单个目标 renderer 私自选择默认值。
 
 ## 输出格式
 
@@ -214,7 +219,7 @@ renderer 跳过整个节点并产生 `render_node_skipped`。
 
 - `name`、`type`、`server`、`port` 是普通代理的共同核心字段；认证字段按协议
   分别使用 `password`、`uuid`、`username`、`cipher` 等。
-- `tls.client_fingerprint` 表示 uTLS client fingerprint；
+- `tls.client_fingerprint` 表示上述共同值域内的 uTLS client fingerprint；
   `tls.fingerprint`、URI `pinSHA256`/`pcs` 表示证书 fingerprint 或 pin，
   两者不可互换。
 - `dialer.udp_relay` 是 Sandrone 的显式 UDP 转发策略。sing-box 的

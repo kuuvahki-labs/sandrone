@@ -164,6 +164,51 @@ func TestServiceProbeRejectsInvalidTypedNodesBeforeBackend(t *testing.T) {
 	require.True(t, domain.IsCode(err, domain.CodeNodeValidationFailed))
 	require.False(t, called)
 }
+
+func TestServiceURLTestIsolatesUnsupportedTLSClientFingerprintForEveryCore(t *testing.T) {
+	t.Parallel()
+
+	for _, core := range []string{"sing-box", "mihomo"} {
+		core := core
+		t.Run(core, func(t *testing.T) {
+			t.Parallel()
+			svc := service.New(service.WithProbeEngine(fakeProbeEngine{probe: func(_ context.Context, req domain.ProbeRequest, nodes []domain.NodeIR, payloads ...probe.Payload) (*domain.ProbeResult, error) {
+				require.Equal(t, core, req.Core)
+				require.Len(t, nodes, 1)
+				require.Equal(t, "valid", nodes[0].Name)
+				require.Len(t, payloads, 1)
+				require.NotContains(t, string(payloads[0].Body), "unsafe")
+				return &domain.ProbeResult{Results: []domain.NodeProbeResult{{NodeName: "valid", Core: core}}}, nil
+			}}))
+
+			result, err := svc.Probe(context.Background(), domain.ProbeRequest{
+				Input: domain.NodeInput{Type: "inline_nodes", Nodes: []domain.NodeIR{
+					{Name: "valid", Type: domain.NodeTypeHTTP, Server: "127.0.0.1", Port: 8080},
+					{
+						Name: "unsupported", Type: domain.NodeTypeVLESS, Server: "example.com", Port: 443,
+						UUID: "11111111-1111-1111-1111-111111111111",
+						TLS:  &domain.TLSOptions{Enabled: true, ClientFingerprint: "unsafe"},
+					},
+				}},
+				Method: domain.ProbeURLTest, Core: core, URL: "https://example.com/generate_204",
+			})
+
+			require.NoError(t, err)
+			require.Len(t, result.Results, 1)
+			require.True(t, containsWarning(result.Report.Warnings, "node_validation_dropped", "tls.client_fingerprint"))
+		})
+	}
+}
+
+func containsWarning(warnings []domain.Warning, code, field string) bool {
+	for _, warning := range warnings {
+		if warning.Code == code && warning.Field == field {
+			return true
+		}
+	}
+	return false
+}
+
 func TestServiceProbeCache(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	resourceStore := store.NewFSStore(fs)

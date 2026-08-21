@@ -175,6 +175,94 @@ func TestServiceDefaultsRealityClientFingerprintAcrossEntryPointsAndTargets(t *t
 	require.Empty(t, rawNode.TLS.ClientFingerprint)
 }
 
+func TestServiceDropsUnsupportedTLSClientFingerprintAcrossInputs(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		format  string
+		content string
+	}{
+		{
+			name:   "uri list",
+			format: "uri-list",
+			content: strings.Join([]string{
+				"vless://11111111-1111-1111-1111-111111111111@example.com:443?encryption=none&security=tls&fp=chrome#valid",
+				"vless://22222222-2222-2222-2222-222222222222@example.com:443?encryption=none&security=tls&fp=unsafe#unsupported",
+			}, "\n"),
+		},
+		{
+			name:   "mihomo",
+			format: "mihomo",
+			content: `proxies:
+  - {name: valid, type: vless, server: example.com, port: 443, uuid: 11111111-1111-1111-1111-111111111111, tls: true, client-fingerprint: chrome}
+  - {name: unsupported, type: vless, server: example.com, port: 443, uuid: 22222222-2222-2222-2222-222222222222, tls: true, client-fingerprint: unsafe}`,
+		},
+		{
+			name:   "sing-box",
+			format: "sing-box",
+			content: `{"outbounds":[
+  {"tag":"valid","type":"vless","server":"example.com","server_port":443,"uuid":"11111111-1111-1111-1111-111111111111","tls":{"enabled":true,"utls":{"enabled":true,"fingerprint":"chrome"}}},
+  {"tag":"unsupported","type":"vless","server":"example.com","server_port":443,"uuid":"22222222-2222-2222-2222-222222222222","tls":{"enabled":true,"utls":{"enabled":true,"fingerprint":"unsafe"}}}
+]}`,
+		},
+		{
+			name:   "json nodes",
+			format: "json-nodes",
+			content: `[
+  {"name":"valid","type":"vless","server":"example.com","port":443,"uuid":"11111111-1111-1111-1111-111111111111","tls":{"enabled":true,"client_fingerprint":"chrome"}},
+  {"name":"unsupported","type":"vless","server":"example.com","port":443,"uuid":"22222222-2222-2222-2222-222222222222","tls":{"enabled":true,"client_fingerprint":"unsafe"}}
+]`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			result, err := service.New().Parse(context.Background(), domain.ParseRequest{
+				Format: tc.format, Content: []byte(tc.content),
+			})
+
+			require.NoError(t, err)
+			require.Len(t, result.Nodes, 1)
+			require.Equal(t, "valid", result.Nodes[0].Name)
+			require.Len(t, result.Report.Warnings, 1)
+			require.Equal(t, "node_validation_dropped", result.Report.Warnings[0].Code)
+			require.Equal(t, "tls.client_fingerprint", result.Report.Warnings[0].Field)
+		})
+	}
+}
+
+func TestServicePreservesPortableTLSClientFingerprintAcrossTargets(t *testing.T) {
+	t.Parallel()
+
+	node := domain.NodeIR{
+		Name: "vless", Type: domain.NodeTypeVLESS, Server: "example.com", Port: 443,
+		UUID: "11111111-1111-1111-1111-111111111111", Encryption: "none",
+		TLS: &domain.TLSOptions{Enabled: true, ClientFingerprint: "randomized"},
+	}
+	tests := []struct {
+		format string
+		want   string
+	}{
+		{format: "json-nodes", want: `"client_fingerprint": "randomized"`},
+		{format: "mihomo-proxies", want: "client-fingerprint: randomized"},
+		{format: "sing-box-outbounds", want: `"fingerprint": "randomized"`},
+		{format: "uri-list", want: "fp=randomized"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.format, func(t *testing.T) {
+			t.Parallel()
+			result, err := service.New().Render(context.Background(), domain.RenderRequest{
+				Format: tc.format, Nodes: []domain.NodeIR{node},
+			})
+			require.NoError(t, err)
+			require.Contains(t, string(result.Body), tc.want)
+		})
+	}
+}
+
 func TestServicePreservesDisabledPacketEncodingAcrossTargets(t *testing.T) {
 	svc := service.New()
 	content := []byte("vless://11111111-1111-1111-1111-111111111111@example.com:443?encryption=none&packetEncoding=none#disabled-packet-encoding")
