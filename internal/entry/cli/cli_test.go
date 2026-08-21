@@ -63,6 +63,11 @@ func TestCommandHelpDocumentsOperationalInputs(t *testing.T) {
 			args: []string{"diagnose"},
 			want: []string{"input", "url", "subscription", "file"},
 		},
+		{
+			name: "render",
+			args: []string{"render"},
+			want: []string{"subscription", "file"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -82,6 +87,88 @@ func TestCLIHelpDoesNotExposeFileCommand(t *testing.T) {
 	code, _, stderr := runCLI(t, []string{"file", "--help"}, "")
 	require.Equal(t, 1, code)
 	require.Contains(t, stderr, "unknown command")
+}
+
+func TestRenderSubscriptionMapsRequestAndWritesBody(t *testing.T) {
+	rec := &recordingEngine{
+		subscriptionRenderResult: &sandrone.RenderResult{Body: []byte("rendered\n")},
+	}
+	code, stdout, stderr := runCLI(t,
+		[]string{"render", "subscription", "example", "--format", "mihomo-proxies", "--arg", "environment=test", "--arg", "empty=", "--refresh"},
+		"",
+		WithEngineFactory(func(string) engine { return rec }),
+	)
+
+	require.Equal(t, 0, code, stderr)
+	require.Equal(t, "rendered\n", stdout)
+	require.Empty(t, stderr)
+	require.Len(t, rec.subscriptionRenderRequests, 1)
+	req := rec.subscriptionRenderRequests[0]
+	require.Equal(t, "example", req.Name)
+	require.Equal(t, "mihomo-proxies", req.Format)
+	require.Equal(t, map[string]string{"environment": "test", "empty": ""}, req.Request.Args)
+	require.True(t, req.Refresh)
+}
+
+func TestRenderSubscriptionRequiresFormatAndValidArgs(t *testing.T) {
+	for _, args := range [][]string{
+		{"render", "subscription", "example"},
+		{"render", "subscription", "example", "--format", "uri-list", "--arg", "missing-separator"},
+		{"render", "subscription", "example", "--format", "uri-list", "--arg", "=value"},
+	} {
+		code, stdout, stderr := runCLI(t, args, "")
+		require.Equal(t, 1, code)
+		require.Empty(t, stdout)
+		require.NotEmpty(t, stderr)
+	}
+}
+
+func TestRenderFileMapsStoredRequestAndWritesOutputs(t *testing.T) {
+	dir := t.TempDir()
+	outputPath := filepath.Join(dir, "client.conf")
+	reportPath := filepath.Join(dir, "report.json")
+	rec := &recordingEngine{
+		fileResult: &sandrone.FileResult{
+			Content: []byte("final body"),
+			Report:  sandrone.Report{Kind: "file"},
+		},
+	}
+	code, stdout, stderr := runCLI(t,
+		[]string{"render", "file", "client.conf", "--arg", "profile=travel", "--refresh", "--output", outputPath, "--report-output", reportPath},
+		"",
+		WithEngineFactory(func(string) engine { return rec }),
+	)
+
+	require.Equal(t, 0, code, stderr)
+	require.Empty(t, stdout)
+	require.Empty(t, stderr)
+	require.Len(t, rec.fileRequests, 1)
+	req := rec.fileRequests[0]
+	require.Equal(t, "client.conf", req.Name)
+	require.Nil(t, req.Spec)
+	require.Equal(t, map[string]string{"profile": "travel"}, req.Request.Args)
+	require.True(t, req.Refresh)
+	body, err := os.ReadFile(outputPath)
+	require.NoError(t, err)
+	require.Equal(t, "final body", string(body))
+	reportBody, err := os.ReadFile(reportPath)
+	require.NoError(t, err)
+	require.Contains(t, string(reportBody), `"kind": "file"`)
+}
+
+func TestRenderFileReadsLocalJSONSpec(t *testing.T) {
+	dir := t.TempDir()
+	specPath := filepath.Join(dir, "file.json")
+	require.NoError(t, os.WriteFile(specPath, []byte(`{"name":"local.txt","kind":"static","source":{"type":"inline","content":"body"}}`), 0o644))
+
+	code, stdout, stderr := runCLI(t,
+		[]string{"--data-dir", filepath.Join(dir, "data"), "render", "file", specPath},
+		"",
+	)
+
+	require.Equal(t, 0, code, stderr)
+	require.Equal(t, "body", stdout)
+	require.Empty(t, stderr)
 }
 
 func TestConvertMapsFlagsToEngineRequest(t *testing.T) {
@@ -900,18 +987,22 @@ func runCLI(t *testing.T, args []string, stdin string, opts ...Option) (int, str
 }
 
 type recordingEngine struct {
-	parseRequests            []sandrone.ParseRequest
-	renderRequests           []sandrone.RenderRequest
-	convertRequests          []sandrone.ConvertRequest
-	diagnoseRequests         []sandrone.DiagnoseRequest
-	parseResult              *sandrone.ParseResult
-	renderResult             *sandrone.RenderResult
-	convertResult            *sandrone.RenderResult
-	diagnoseResult           *sandrone.DiagnoseResult
-	inspectResult            *sandrone.InspectResult
-	formatCapabilityList     *sandrone.FormatCapabilityListResult
-	formatCapability         *sandrone.FormatCapability
-	formatCapabilityRequests []sandrone.FormatCapabilityRequest
+	parseRequests              []sandrone.ParseRequest
+	renderRequests             []sandrone.RenderRequest
+	convertRequests            []sandrone.ConvertRequest
+	diagnoseRequests           []sandrone.DiagnoseRequest
+	subscriptionRenderRequests []sandrone.SubscriptionRenderRequest
+	fileRequests               []sandrone.FileRequest
+	parseResult                *sandrone.ParseResult
+	renderResult               *sandrone.RenderResult
+	convertResult              *sandrone.RenderResult
+	diagnoseResult             *sandrone.DiagnoseResult
+	subscriptionRenderResult   *sandrone.RenderResult
+	fileResult                 *sandrone.FileResult
+	inspectResult              *sandrone.InspectResult
+	formatCapabilityList       *sandrone.FormatCapabilityListResult
+	formatCapability           *sandrone.FormatCapability
+	formatCapabilityRequests   []sandrone.FormatCapabilityRequest
 }
 
 func (e *recordingEngine) Parse(_ context.Context, req sandrone.ParseRequest) (*sandrone.ParseResult, error) {
@@ -935,6 +1026,22 @@ func (e *recordingEngine) Diagnose(_ context.Context, req sandrone.DiagnoseReque
 		return e.diagnoseResult, nil
 	}
 	return &sandrone.DiagnoseResult{Status: sandrone.DiagnoseStatusOK}, nil
+}
+
+func (e *recordingEngine) RenderSubscriptionRequest(_ context.Context, req sandrone.SubscriptionRenderRequest) (*sandrone.RenderResult, error) {
+	e.subscriptionRenderRequests = append(e.subscriptionRenderRequests, req)
+	if e.subscriptionRenderResult != nil {
+		return e.subscriptionRenderResult, nil
+	}
+	return &sandrone.RenderResult{}, nil
+}
+
+func (e *recordingEngine) GetFile(_ context.Context, req sandrone.FileRequest) (*sandrone.FileResult, error) {
+	e.fileRequests = append(e.fileRequests, req)
+	if e.fileResult != nil {
+		return e.fileResult, nil
+	}
+	return &sandrone.FileResult{}, nil
 }
 
 func (e *recordingEngine) Inspect(context.Context) (*sandrone.InspectResult, error) {

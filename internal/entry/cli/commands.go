@@ -77,7 +77,8 @@ conversion report as pretty JSON.
 
 json-nodes is the normalized node IR, useful for debugging or exporting parsed
 nodes. mihomo-proxies and sing-box-outbounds are structured node fragments;
-shadowrocket-proxies is a native [Proxy] section.
+shadowrocket-proxies is a native [Proxy] section. Use render when a declared
+Subscription or FileSpec should produce its final output.
 
 ` + inputFormatsHelp + `
 ` + targetFormatsHelp,

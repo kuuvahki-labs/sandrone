@@ -14,13 +14,14 @@ sandrone
 │   ├── url <url>
 │   ├── subscription <name>
 │   └── file <name-or-spec-path>
+├── render
+│   ├── subscription <name>
+│   └── file <name-or-spec.json>
 ├── inspect
 ├── capability
 │   ├── formats
 │   └── format <parse|render> <format>
 ├── doctor
-├── file
-│   └── render
 └── serve
 ```
 
@@ -160,6 +161,33 @@ Subscription、FileSpec 和一次性 ProcessorSpec 文件使用 JSON 定义。�
 失败，只写标准错误。每个 processor stage 记录 scope、声明顺序、前后计数、
 warnings，以及其内部产生的完整 probe results，即使 `annotate=false`。
 
+## `render`
+
+```text
+sandrone render subscription <name> --format <format>
+sandrone render file <name-or-spec.json>
+```
+
+`render` 执行已声明资源的完整物化流程并直接输出最终正文。三个相关入口的职责是：
+
+- `convert`：将一次性节点输入转换为另一种节点格式；
+- `diagnose`：执行输入流水线并输出 stages、warnings、report 和 probe trace 等
+  诊断 JSON；
+- `render`：执行 Store 中的 Subscription 或 Store/本地的 FileSpec，并输出供
+  客户端使用的最终正文。
+
+`render subscription` 只接受 Store 中的 Subscription 名称，`--format` 必填，格式范围
+与 `convert --to` 相同。`render file` 对安全名称先查询 Store；资源不存在且参数是已有
+本地 `.json` 文件时，将其作为 FileSpec 执行。
+
+两个子命令共同支持：
+
+- `--arg <key=value>` 为本次执行提供字符串请求参数，可重复；同名参数以后者为准；
+- `--refresh` 绕过已保存资源的 render cache 并重新物化；
+- `--output <path|->` 控制最终正文输出，省略或使用 `-` 时写标准输出；
+- `--report-output <path>` 将完整 report 写为缩进 JSON，不能为 `-`，也不能与
+  `--output` 指向同一文件。
+
 ## `inspect`、`capability` 与 `doctor`
 
 `inspect` 输出轻量运行时与存储摘要。结果包含格式和 processor 名称、file kind、
@@ -220,7 +248,7 @@ probe backend。Vercel serverless profile 的不同能力边界见
 
 - `--output` 为空或 `-` 时写标准输出；文件输出会创建父目录并覆盖已有文件。
 - `diagnose`、`inspect`、`capability`、`doctor` 产生缩进 JSON，并以换行结尾。
-- `convert` 的主输出是目标格式原文，不额外包装 JSON。
+- `convert` 与 `render` 的主输出是目标格式或最终文件原文，不额外包装 JSON。
 - `--report-output` 的 report 总是缩进 JSON 文件。主输出先写，report
   写入随后发生；若 report 写入失败，已经写出的主输出不会回滚。
 - 成功、`--help` 和 `--version` 返回退出码 `0`。

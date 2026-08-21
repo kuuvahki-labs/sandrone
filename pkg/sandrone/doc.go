@@ -4,7 +4,8 @@
 // Use New for the default in-memory engine, NewWithFS to back resources with an
 // afero filesystem, or NewWithStore to provide an application-owned storage
 // boundary. Engine methods cover the main service flows: Parse, Render,
-// Convert, Probe, ValidateFile, Inspect, GetFile and resource persistence.
+// Convert, Diagnose, RenderSubscription, GetFile, Inspect and resource
+// persistence.
 //
 // Public request, result and model types are aliases to the internal domain
 // model so callers can build structured requests without importing internal

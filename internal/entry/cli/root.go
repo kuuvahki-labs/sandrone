@@ -24,6 +24,8 @@ type engine interface {
 	Render(context.Context, sandrone.RenderRequest) (*sandrone.RenderResult, error)
 	Convert(context.Context, sandrone.ConvertRequest) (*sandrone.RenderResult, error)
 	Diagnose(context.Context, sandrone.DiagnoseRequest) (*sandrone.DiagnoseResult, error)
+	RenderSubscriptionRequest(context.Context, sandrone.SubscriptionRenderRequest) (*sandrone.RenderResult, error)
+	GetFile(context.Context, sandrone.FileRequest) (*sandrone.FileResult, error)
 	Inspect(context.Context) (*sandrone.InspectResult, error)
 	ListFormatCapabilities(context.Context) (*sandrone.FormatCapabilityListResult, error)
 	GetFormatCapability(context.Context, sandrone.FormatCapabilityRequest) (*sandrone.FormatCapability, error)
@@ -125,6 +127,7 @@ func newRootCommand(cfg *config) *cobra.Command {
 	root.AddCommand(
 		newConvertCommand(cfg),
 		newDiagnoseCommand(cfg),
+		newRenderCommand(cfg),
 		newInspectCommand(cfg),
 		newCapabilityCommand(cfg),
 		newDoctorCommand(cfg),
