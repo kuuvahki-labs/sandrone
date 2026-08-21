@@ -1,8 +1,8 @@
-# HTTP API：项目设置、规则集目录与备份
+# HTTP API：项目设置、缓存、规则集目录与备份
 
 ## 用途
 
-本页定义统一项目设置、内置规则集目录和 Store 整体备份的管理接口。除
+本页定义统一项目设置、持久缓存、内置规则集目录和 Store 整体备份的管理接口。除
 `data_dir` 和 bearer token 外，Sandrone 的启动设置、运行默认值、外观语言和
 订阅行为都属于同一个项目设置对象，权威文件是可选的
 `<data_dir>/settings.json`。bearer token 只从启动 flag 或环境变量读取，不进入
@@ -190,6 +190,21 @@ target 的 `kind` 只能是 `subscription` 或 `file`，`name` 去除首尾空�
 对应事件时省略。success/failure 是最近一次已完成运行的目标计数；skipped 是
 本进程启动后的累计重叠跳过次数。该接口与其它 `/v1/*` 一样受 bearer token
 保护。
+
+## 缓存管理
+
+### `DELETE /v1/cache`
+
+依次清空 `remote_fetch`、`probe`、`subscription_traffic`、
+`subscription_render` 和 `file_render` 五个持久缓存层，成功返回
+`204 No Content` 和 `Cache-Control: no-store`。空缓存同样成功。
+
+若某层 Store 删除失败，接口返回 `500 cache_operation_failed`；此前层的删除不会
+回滚。并发请求可以在清理期间或之后重新写入缓存，因此成功响应不承诺缓存会持续
+为空。
+
+该接口不处理请求内 memo，不提供统计、分层清理、条目浏览或单项删除，也不修改
+TTL、`refresh=true` 语义或缓存 envelope。服务不会在启动或后台定时调用它。
 
 ## 规则集目录
 

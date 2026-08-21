@@ -6,6 +6,7 @@ import { UICapabilityProvider } from "~/shared/capabilities/context";
 import { createTranslator } from "~/shared/i18n/context";
 
 import { useBackupOperations } from "./use-backup-operations";
+import { useCacheCleanup } from "./use-cache-cleanup";
 import { useScheduledRefreshStatus } from "./use-scheduled-refresh-status";
 import { useVersionInfo } from "./use-version-info";
 
@@ -100,6 +101,51 @@ describe("useScheduledRefreshStatus", () => {
 });
 
 const t = createTranslator("zh-CN");
+
+describe("useCacheCleanup", () => {
+  it("locks duplicate cleanup calls and reports success", async () => {
+    let finishDelete: (() => void) | undefined;
+    const clearCache = vi.fn(() => new Promise<void>((resolve) => {
+      finishDelete = resolve;
+    }));
+    const client = { clearCache } as unknown as ApiClient;
+    const showNotice = vi.fn();
+    const { result } = renderHook(() => useCacheCleanup({ client, showNotice, t }));
+
+    let pending: Promise<void> | undefined;
+    act(() => {
+      pending = result.current.clearCache();
+    });
+    expect(result.current.clearing).toBe(true);
+    await act(async () => result.current.clearCache());
+    expect(clearCache).toHaveBeenCalledTimes(1);
+
+    finishDelete?.();
+    await act(async () => pending);
+    expect(result.current.clearing).toBe(false);
+    expect(showNotice).toHaveBeenCalledWith("缓存已清空");
+  });
+
+  it("reports and propagates cleanup failures", async () => {
+    const clearCache = vi.fn().mockRejectedValue(new Error("backend unavailable"));
+    const client = { clearCache } as unknown as ApiClient;
+    const showNotice = vi.fn();
+    const { result } = renderHook(() => useCacheCleanup({ client, showNotice, t }));
+
+    let failure: unknown;
+    await act(async () => {
+      try {
+        await result.current.clearCache();
+      } catch (error) {
+        failure = error;
+      }
+    });
+
+    expect(failure).toEqual(new Error("backend unavailable"));
+    expect(result.current.clearing).toBe(false);
+    expect(showNotice).toHaveBeenCalledWith("backend unavailable", "error");
+  });
+});
 
 describe("useBackupOperations", () => {
   afterEach(() => {

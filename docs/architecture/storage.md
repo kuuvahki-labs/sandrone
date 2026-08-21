@@ -113,9 +113,9 @@ Sandrone 不调用 AWS 默认凭据链，不读取 shared profile 或 instance m
 service 分别持有权威 `Store` 与非权威 `Cache`，因此自定义 Cache 不需要充当
 资源 Store。当前仓库只内建 Store-backed 实现：它把 envelope 写到
 `cache/<layer>/`，使用无缩进和尾随换行的紧凑 JSON；读取过期 entry 时
-best-effort 删除。没有运行时 backend
-registry、第三方 cache 依赖或缓存管理 HTTP API；以后更换为内存或远程实现时，
-应保持相同的 miss/failure 语义，而不是让 cache 可用性影响业务结果。
+best-effort 删除。没有运行时 backend registry 或第三方 cache 依赖；以后更换为
+内存或远程实现时，应保持相同的 miss/failure 语义，而不是让 cache 可用性影响
+业务结果。
 
 持久 TTL 层共有五个：
 
@@ -140,6 +140,12 @@ remote-fetch 和 probe 的缓存读取，成功执行后仍按当前 TTL 重新�
 `ValidateFile` 不读取 file-result cache。除此之外，订阅解析和文件递归各有一次
 请求内 memo，用于去重同一调用中的重复依赖；它们不持久化、没有 TTL，也不是
 可配置 cache 层。
+
+手动清理通过现有 `Cache.DeleteLayer` 依次删除上述五层，不扫描 envelope，也不
+提供分层操作或统计。清理不持有覆盖五层的全局锁；若某层失败，已完成的层不会
+回滚，并发请求也可能立即重新填充缓存。该操作不修改 TTL、`refresh`、请求内
+memo 或缓存 envelope 格式，也不由后台任务自动触发。HTTP 路径见
+[项目设置与缓存管理 API](../reference/http-api/settings.md#缓存管理)。
 
 ### 定时更新
 

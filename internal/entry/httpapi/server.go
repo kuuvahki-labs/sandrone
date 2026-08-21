@@ -181,6 +181,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/schemas/file-spec", s.getFileSpecSchema)
 	s.mux.HandleFunc("GET /v1/backup", s.getBackup)
 	s.mux.HandleFunc("POST /v1/backup/restore", s.restoreBackup)
+	s.mux.HandleFunc("DELETE /v1/cache", s.clearCache)
 	s.mux.HandleFunc("GET /v1/subscriptions", s.listSubscriptions)
 	s.mux.HandleFunc("POST /v1/subscriptions", s.putSubscription)
 	s.mux.HandleFunc("GET /v1/subscriptions/", s.getSubscription)

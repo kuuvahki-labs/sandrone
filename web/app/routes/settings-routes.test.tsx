@@ -32,7 +32,7 @@ describe("SettingsRoute", () => {
 
   it.each([
     ["打开服务设置", "/settings/service", "service destination"],
-    ["管理备份与恢复", "/settings/data", "data destination"],
+    ["打开数据管理", "/settings/data", "data destination"],
   ])("navigates with %s", async (buttonName, destination, destinationText) => {
     const user = userEvent.setup();
     mockSettingsOverviewApp();
@@ -54,13 +54,15 @@ describe("SettingsRoute", () => {
 });
 
 describe("SettingsDataRoute", () => {
-  it("does not fetch settings resources before a data operation", () => {
+  it("does not fetch unrelated settings resources on load", () => {
     const client = mockSettingsDataApp();
 
     renderSettingsDataRoute();
 
     expect(client.getVersion).not.toHaveBeenCalled();
+    expect(client.clearCache).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "下载备份" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "清空缓存" })).toBeInTheDocument();
   });
 
   it("returns to the settings overview", async () => {
@@ -178,6 +180,7 @@ function mockSettingsOverviewApp() {
 
 function mockSettingsDataApp() {
   const client = {
+    clearCache: vi.fn().mockResolvedValue(undefined),
     downloadBackup: vi.fn(),
     getVersion: vi.fn(),
     restoreBackup: vi.fn(),

@@ -19,7 +19,7 @@ describe("ShellFrame", () => {
     expect(within(drawer).getByRole("link", { name: "订阅" })).toHaveAttribute("href", "/subscriptions");
     expect(within(drawer).getByRole("link", { name: "文件" })).toHaveAttribute("href", "/files");
     expect(within(drawer).getByRole("link", { name: "分享" })).toHaveAttribute("href", "/shares");
-    expect(within(drawer).getByRole("link", { name: "我的" })).toHaveAttribute("href", "/settings");
+    expect(within(drawer).getByRole("link", { name: "设置" })).toHaveAttribute("href", "/settings");
 
     const bottomNav = screen.getByRole("navigation", { name: "底部导航" });
     const bottomLink = within(bottomNav).getByRole("link", { name: "订阅" });

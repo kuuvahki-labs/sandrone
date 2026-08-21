@@ -53,8 +53,7 @@ export function SettingsPage({
     <>
       <section className="grid gap-6">
         <PageHeader
-          description={t("settings.description")}
-          label={t("nav.settings")}
+          label=""
           title={t("settings.title")}
         />
         <AppearanceSettingsSection

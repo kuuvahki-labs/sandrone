@@ -167,6 +167,15 @@ test.beforeEach(async ({ page }) => {
       },
     });
   });
+  await page.route("**/v1/cache**", async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (request.method() === "DELETE" && path === "/v1/cache") {
+      await route.fulfill({ status: 204 });
+      return;
+    }
+    await route.fallback();
+  });
   await page.route("**/version", async (route) => {
     await route.fulfill({
       json: {
@@ -193,6 +202,7 @@ const routes = [
   { path: "/files/default.yaml/preview", heading: "文件预览", content: longPreviewNode, focus: true },
   { path: "/shares", heading: "分享", content: "还没有分享链接", focus: false },
   { path: "/settings/service", heading: "服务设置", content: "远程请求", focus: false },
+  { path: "/settings/data", heading: "数据管理", content: "缓存", focus: false },
 ];
 
 test("settings overview opens service settings", async ({ page }) => {
@@ -228,8 +238,8 @@ for (const route of routes) {
       ? page.getByRole("group", { name: route.content }).first()
       : route.path === "/files/default.yaml/preview"
         ? page.getByRole("region", { name: "最终文件内容" })
-        : route.path === "/settings/service"
-          ? page.getByRole("heading", { name: route.content })
+        : route.path === "/settings/service" || route.path === "/settings/data"
+          ? page.getByRole("heading", { exact: true, name: route.content })
           : page.getByText(route.content);
     await expect(routeContent).toBeVisible();
 
@@ -299,6 +309,28 @@ for (const route of routes) {
     expect(consoleIssues).toEqual([]);
   });
 }
+
+test("cache cleanup requires confirmation and completes", async ({ page }) => {
+  const cacheCard = page.getByRole("article").filter({ has: page.getByRole("heading", { name: "缓存" }) });
+  await page.goto("/settings/data");
+
+  await cacheCard.getByRole("button", { name: "清空缓存" }).click();
+  const dialog = page.getByRole("dialog", { name: "清空缓存？" });
+  await expect(dialog).toContainText("后续请求可能暂时变慢");
+  const request = page.waitForRequest((candidate) => (
+    candidate.method() === "DELETE" && new URL(candidate.url()).pathname === "/v1/cache"
+  ));
+  await dialog.getByRole("button", { name: "清空缓存" }).click();
+  await request;
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText("缓存已清空")).toBeVisible();
+
+  const pageMetrics = await page.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+  }));
+  expect(pageMetrics.scrollWidth).toBeLessThanOrEqual(pageMetrics.clientWidth + 1);
+});
 
 test("the convert link dialog stays usable and does not execute the generated URL", async ({ page }) => {
   const convertRequests: string[] = [];

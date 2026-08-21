@@ -308,6 +308,10 @@ export class ApiClient {
     await this.rawRequest("/v1/backup/restore", { method: "POST", body: file });
   }
 
+  async clearCache(): Promise<void> {
+    await this.rawRequest("/v1/cache", { method: "DELETE" });
+  }
+
   getFileSpec(name: string): Promise<unknown> {
     return this.request(`/v1/files/${encodeURIComponent(name)}?mode=spec`);
   }

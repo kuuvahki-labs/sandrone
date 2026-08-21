@@ -217,6 +217,32 @@ describe("settings service page", () => {
 });
 
 describe("settings data page", () => {
+  it("confirms cache clearing", async () => {
+    const user = userEvent.setup();
+    const onClearCache = vi.fn().mockResolvedValue(undefined);
+    renderDataPage({ onClearCache });
+
+    expect(screen.getByRole("heading", { name: "缓存" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "清空缓存" }));
+    let dialog = screen.getByRole("dialog", { name: "清空缓存？" });
+    expect(dialog).toHaveTextContent("后续请求可能暂时变慢");
+    await user.click(within(dialog).getByRole("button", { name: "取消" }));
+    expect(onClearCache).not.toHaveBeenCalled();
+    await waitFor(() => expect(dialog).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole("button", { name: "清空缓存" }));
+    dialog = screen.getByRole("dialog", { name: "清空缓存？" });
+    await user.click(within(dialog).getByRole("button", { name: "清空缓存" }));
+    expect(onClearCache).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(dialog).not.toBeInTheDocument());
+  });
+
+  it("disables cache actions while clearing", () => {
+    renderDataPage({ cacheClearing: true });
+
+    expect(screen.getByRole("button", { name: "正在清理" })).toBeDisabled();
+  });
+
   it("shows the selected ZIP", async () => {
     const user = userEvent.setup();
     renderDataPage();
@@ -332,17 +358,23 @@ describe("settings data page", () => {
 });
 
 function renderDataPage({
+  cacheClearing = false,
   onBack = vi.fn(),
+  onClearCache = vi.fn().mockResolvedValue(undefined),
   onDownloadBackup = vi.fn().mockResolvedValue(undefined),
   onRestoreBackup = vi.fn().mockResolvedValue(undefined),
 }: {
+  cacheClearing?: boolean;
   onBack?: () => void;
+  onClearCache?: () => Promise<void>;
   onDownloadBackup?: () => Promise<void>;
   onRestoreBackup?: (file: Blob) => Promise<void>;
 } = {}) {
   return render(
     <SettingsDataPage
+      cacheClearing={cacheClearing}
       onBack={onBack}
+      onClearCache={onClearCache}
       onDownloadBackup={onDownloadBackup}
       onRestoreBackup={onRestoreBackup}
     />,

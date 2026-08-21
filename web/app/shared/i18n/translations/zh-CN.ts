@@ -414,7 +414,7 @@ export const zhCN = {
   "nav.bottom": "底部导航",
   "nav.desktop": "桌面导航",
   "nav.files": "文件",
-  "nav.settings": "我的",
+  "nav.settings": "设置",
   "nav.shares": "分享",
   "nav.subscriptions": "订阅",
   "resourceList.moreActions": "{title} 更多操作",

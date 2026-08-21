@@ -8,7 +8,7 @@
 - [运行时 schema catalog](schemas.md)
 - [订阅资源](subscriptions.md)
 - [文件资源](files.md)
-- [项目设置、规则集目录与备份](settings.md)
+- [项目设置、缓存、规则集目录与备份](settings.md)
 - [分享资源与公开输出](shares.md)
 
 格式名和 adapter 能力见[格式与能力参考](../capabilities.md)，统一错误码、

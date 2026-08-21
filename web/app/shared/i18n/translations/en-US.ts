@@ -416,7 +416,7 @@ export const enUS: Record<TranslationKey, string> = {
   "nav.bottom": "Bottom navigation",
   "nav.desktop": "Desktop navigation",
   "nav.files": "Files",
-  "nav.settings": "Me",
+  "nav.settings": "Settings",
   "nav.shares": "Shares",
   "nav.subscriptions": "Subscriptions",
   "resourceList.moreActions": "{title} more actions",

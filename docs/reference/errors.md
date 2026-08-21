@@ -50,7 +50,6 @@ Sandrone 有四种不同的失败或诊断载体：
 | `file_dependency_cycle` | 文件依赖解析遇到环 |
 | `file_merge_failed` | file-stage merge 的解码、运算或编码失败 |
 | `file_processor_failed` | file-stage processor 的通用失败 |
-| `file_validation_failed` | 文件内部验证失败的保留类型码；公开 diagnose 通常返回更具体错误 |
 | `processor_unknown` | processor type 未注册到所需 stage |
 | `processor_config_invalid` | processor 参数或 stage 选择无效、缺失或有歧义 |
 | `node_processor_failed` | node-stage processor 的通用失败 |
@@ -69,6 +68,12 @@ processor 已返回 `AppError` 时，处理链保留原 code，并补上缺失�
 | `backup_incompatible` | 归档格式或 storage schema 与当前版本不兼容 |
 | `backup_too_large` | 归档、文件数或解包后总量超过限制 |
 | `backup_restore_failed` | 已通过初步检查，但恢复事务无法完成 |
+
+### 缓存管理
+
+| code | 含义 |
+| --- | --- |
+| `cache_operation_failed` | 手动清空缓存期间 Store 操作失败；HTTP 不暴露底层 cause |
 
 ### Probe 批次错误
 
@@ -111,7 +116,7 @@ HTTP status 与 `AppError.code` 是两个维度，不能互相推导。通用 se
 | `404` | 非备份 service error 的 error chain 含 `os.ErrNotExist`；它会覆盖同一分支先选出的 `400` |
 | `413` | `backup_too_large` |
 | `422` | `backup_incompatible` |
-| `500` | `backup_restore_failed` 及没有专门映射的其它 service error |
+| `500` | `backup_restore_failed`、`cache_operation_failed` 及没有专门映射的其它 service error |
 
 因此，远程响应失败产生的 `file_input_not_found` 通常是 `400`，而包装了本地
 `os.ErrNotExist` 的同码错误是 `404`。`parse_failed`、`render_failed`、

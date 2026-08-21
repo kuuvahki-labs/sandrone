@@ -17,7 +17,6 @@ const (
 	CodeFileInputNotFound      ErrorCode = "file_input_not_found"
 	CodeFileMergeFailed        ErrorCode = "file_merge_failed"
 	CodeFileProcessorFailed    ErrorCode = "file_processor_failed"
-	CodeFileValidationFailed   ErrorCode = "file_validation_failed"
 	CodeNotImplemented         ErrorCode = "not_implemented"
 	CodeProcessorUnknown       ErrorCode = "processor_unknown"
 	CodeProcessorConfigInvalid ErrorCode = "processor_config_invalid"
@@ -30,6 +29,7 @@ const (
 	CodeBackupIncompatible     ErrorCode = "backup_incompatible"
 	CodeBackupTooLarge         ErrorCode = "backup_too_large"
 	CodeBackupRestoreFailed    ErrorCode = "backup_restore_failed"
+	CodeCacheOperationFailed   ErrorCode = "cache_operation_failed"
 )
 
 type AppError struct {

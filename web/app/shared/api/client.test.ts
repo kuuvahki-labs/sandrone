@@ -244,6 +244,20 @@ describe("ApiClient", () => {
     });
   });
 
+  it("clears cache through the protected management API", async () => {
+    const calls: Array<{ input: FetchInput; init?: FetchOptions }> = [];
+    const client = new ApiClient({
+      fetcher: async (input, init) => {
+        calls.push({ input, init });
+        return new Response(null, { status: 204 });
+      },
+    });
+
+    await expect(client.clearCache()).resolves.toBeUndefined();
+    expect(String(calls[0]?.input)).toBe("/v1/cache");
+    expect(calls[0]?.init?.method).toBe("DELETE");
+  });
+
   it.each(["download", "restore"] as const)("calls the unauthorized callback when backup %s returns 401", async (operation) => {
     const onUnauthorized = vi.fn();
     const client = new ApiClient({
