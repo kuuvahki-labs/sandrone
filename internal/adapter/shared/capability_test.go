@@ -110,6 +110,16 @@ func TestMihomoCapabilityDoesNotDeclareConnectionCriticalTransportLossy(t *testi
 	}
 }
 
+func TestClientCapabilitiesDoNotDeclareConnectionCriticalECHDNSLossy(t *testing.T) {
+	t.Parallel()
+
+	for _, format := range []string{"mihomo-proxies", "sing-box-outbounds"} {
+		capability := shared.CapabilityFor(format, shared.DirectionRender, []domain.NodeType{domain.NodeTypeVLESS}, false)
+		require.NotContains(t, irFields(capability.Lossy), "tls.ech.dns")
+		require.Contains(t, irFields(capability.Lossy), "tls.ech.force_query")
+	}
+}
+
 func TestFieldRefsCoverTargetSpecificFieldsAndRawOnlyCatalog(t *testing.T) {
 	fields := shared.FieldRefs("mihomo-proxies", []domain.NodeType{
 		domain.NodeTypeShadowsocks,

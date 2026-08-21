@@ -14,9 +14,6 @@ func singBoxStructuredLossWarnings(node domain.NodeIR) []domain.Warning {
 		warnings = append(warnings, lossyWarning(node, "tls.fingerprint", "TLS certificate fingerprint is not rendered to sing-box utls.fingerprint"))
 	}
 	if node.TLS != nil && node.TLS.ECH != nil {
-		if node.TLS.ECH.DNS != "" {
-			warnings = append(warnings, lossyWarning(node, "tls.ech.dns", "sing-box ECH options do not expose the URI DNS transport field"))
-		}
 		if node.TLS.ECH.ForceQuery != "" {
 			warnings = append(warnings, lossyWarning(node, "tls.ech.force_query", "sing-box ECH options do not expose the URI force-query mode"))
 		}

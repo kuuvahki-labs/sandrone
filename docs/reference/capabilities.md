@@ -189,6 +189,8 @@ raw 字段会产生 `render_lossy_field`。`json-nodes` 会原样承载 `raw`，
   `Sec-WebSocket-Protocol`，非法或冲突值仍保留到 `raw` 并告警；
 - VLESS/TCP 仅接受 `quicSecurity=none`；其它值以及 TCP 上的 `mode`、`spx`
   仍保留到 `raw` 并告警；
+- URI 中空的 `headerType=` 与 `headerType=none` 都按无语义默认值消费；其它值仍按
+  对应 transport 语义处理或保留到 `raw`；
 - Mihomo Hysteria2 仅接受布尔值 `udp: true`，gRPC 仅接受
   `grpc-mode: gun`；`udp: false`、非法 UDP 值、其它 gRPC mode 和
   `dialer-proxy` 仍保留到 `raw` 并告警；
@@ -297,9 +299,11 @@ Mbps 界限或其它无效 canonical 速率时只跳过该节点，不会使仍�
   未建模的实现私有子字段留在 `raw`。
 - `ss`、`vmess`、`vless`、`trojan`、`mieru`、`socks` 和 WireGuard
   可表达 `dialer.udp_relay`；其它协议不能据此推断有等价开关。
-- 已声明的典型有损项包括 ECH DNS/force-query 扩展、multiplex、
+- 已声明的典型有损项包括 ECH force-query 扩展、multiplex、
   Hysteria/Hysteria2 QUIC 调优、Hysteria2 Mbps 字段、
   TUIC zero-RTT/heartbeat，以及 HTTP path。
+- ECH 自定义 DNS transport 是连接关键语义；Mihomo schema 无法表达时会跳过节点，
+  不删除 `tls.ech.dns` 后继续转换或 Probe。
 - VMess、VLESS 和 Trojan 的非默认 transport 若无法由 Mihomo 等价表达，或
   transport 附加连接参数缺少 type，会跳过节点并产生 `render_node_skipped`。
 - SS `v2ray-plugin` 只在 SIP002 options 能完整解析为 Mihomo 的
@@ -313,9 +317,11 @@ Mbps 界限或其它无效 canonical 速率时只跳过该节点，不会使仍�
 - 支持 AnyTLS，以及 sing-box 的 TLS、transport、multiplex、network、
   UDP-over-TCP 等协议适用字段。
 - 没有通用 `dialer.udp_relay` 等价项；该字段不能用 `network` 代替。
-- 已声明的典型有损项包括证书 fingerprint、ECH DNS/force-query 扩展、
+- 已声明的典型有损项包括证书 fingerprint、ECH force-query 扩展、
   Hysteria `protocol` 与 QUIC 调优、Hysteria2 字符串速率及 `bbr_profile`/`realm`/`cwnd`/
   `udp_mtu`、TUIC token/reduce-RTT/UDP-over-stream version、SOCKS TLS。
+- ECH 自定义 DNS transport 是连接关键语义；sing-box schema 无法表达时会跳过节点，
+  不删除 `tls.ech.dns` 后继续转换或 Probe。
 - VMess、VLESS 和 Trojan 的非默认 transport 若无法由 sing-box 等价表达（包括
   xHTTP 与 TCP HTTP header obfs），以及非 `none` 的 VLESS `encryption`，会跳过
   节点并产生 `render_node_skipped`，不会删除连接关键字段后输出或进入 probe。

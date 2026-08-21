@@ -62,6 +62,9 @@ func (r *Renderer) RenderWithReport(_ context.Context, nodes []domain.NodeIR, _ 
 }
 
 func nodeToSingBox(node domain.NodeIR) (map[string]any, bool, map[string]bool, []domain.Warning, error) {
+	if field := singBoxUnsupportedECHDNSField(node); field != "" {
+		return nil, false, nil, nil, domain.NewError(domain.CodeRenderFailed, field+" requires a custom ECH DNS transport that sing-box cannot express")
+	}
 	if node.Network != "" && node.Network != "tcp" && node.Network != "udp" {
 		return nil, false, nil, nil, domain.NewError(domain.CodeRenderFailed, "network must be tcp or udp")
 	}
@@ -91,6 +94,19 @@ func nodeToSingBox(node domain.NodeIR) (map[string]any, bool, map[string]bool, [
 	default:
 		return nil, false, nil, nil, domain.WrapError(domain.CodeRenderFailed, "unsupported node type", fmt.Errorf("%s", node.Type))
 	}
+}
+
+func singBoxUnsupportedECHDNSField(node domain.NodeIR) string {
+	if node.TLS != nil && node.TLS.ECH != nil && node.TLS.ECH.DNS != "" {
+		return "tls.ech.dns"
+	}
+	if node.Transport != nil && node.Transport.XHTTP != nil && node.Transport.XHTTP.DownloadSettings != nil {
+		tls := node.Transport.XHTTP.DownloadSettings.TLS
+		if tls != nil && tls.ECH != nil && tls.ECH.DNS != "" {
+			return "transport.xhttp.download_settings.tls.ech.dns"
+		}
+	}
+	return ""
 }
 
 func renderSS(node domain.NodeIR) (map[string]any, bool, map[string]bool, []domain.Warning, error) {

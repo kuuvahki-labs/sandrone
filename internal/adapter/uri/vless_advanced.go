@@ -506,7 +506,7 @@ func parseECHQuery(value, forceQuery string) *domain.ECHOptions {
 		return nil
 	}
 	options := &domain.ECHOptions{Enabled: true, ForceQuery: forceQuery}
-	for _, marker := range []string{"+https://", "+tls://"} {
+	for _, marker := range []string{"+https://", "+tls://", "+udp://"} {
 		if queryServerName, dnsSuffix, ok := strings.Cut(value, marker); ok {
 			options.QueryServerName = queryServerName
 			options.DNS = strings.TrimPrefix(marker, "+") + dnsSuffix

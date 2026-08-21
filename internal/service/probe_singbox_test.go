@@ -364,6 +364,13 @@ func TestServiceSingBoxProbeDoesNotStartSemanticallyDowngradedOutbounds(t *testi
 					Name: "vless-missing-transport-type", Type: domain.NodeTypeVLESS, Server: "invalid.example", Port: 443,
 					UUID: "33333333-3333-3333-3333-333333333333", Encryption: "none", Transport: &domain.TransportOptions{Path: "/must-not-drop"},
 				},
+				{
+					Name: "vless-ech-dns", Type: domain.NodeTypeVLESS, Server: "invalid.example", Port: 443,
+					UUID: "44444444-4444-4444-4444-444444444444", Encryption: "none",
+					TLS: &domain.TLSOptions{Enabled: true, ECH: &domain.ECHOptions{
+						Enabled: true, QueryServerName: "ip.gs", DNS: "udp://8.8.8.8",
+					}},
+				},
 				{Name: "valid-http", Type: domain.NodeTypeHTTP, Server: proxyHost, Port: proxyPort},
 			},
 		},
@@ -375,21 +382,21 @@ func TestServiceSingBoxProbeDoesNotStartSemanticallyDowngradedOutbounds(t *testi
 	})
 
 	require.NoError(t, err)
-	require.Len(t, result.Results, 6)
-	for i, name := range []string{"vless-xhttp", "vless-encryption", "hysteria2-range", "hysteria-range", "vless-missing-transport-type"} {
+	require.Len(t, result.Results, 7)
+	for i, name := range []string{"vless-xhttp", "vless-encryption", "hysteria2-range", "hysteria-range", "vless-missing-transport-type", "vless-ech-dns"} {
 		require.Equal(t, name, result.Results[i].NodeName)
 		require.False(t, result.Results[i].Alive)
 		require.Equal(t, string(domain.CodeProbeInvalidTarget), result.Results[i].ErrorCode)
 	}
-	require.Equal(t, "valid-http", result.Results[5].NodeName)
-	require.True(t, result.Results[5].Alive)
+	require.Equal(t, "valid-http", result.Results[6].NodeName)
+	require.True(t, result.Results[6].Alive)
 	renderSkips := 0
 	for _, warning := range result.Report.Warnings {
 		if warning.Code == "render_node_skipped" {
 			renderSkips++
 		}
 	}
-	require.Equal(t, 5, renderSkips)
+	require.Equal(t, 6, renderSkips)
 	select {
 	case <-targetHit:
 	case <-time.After(time.Second):

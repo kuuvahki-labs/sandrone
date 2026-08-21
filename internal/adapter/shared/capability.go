@@ -343,7 +343,7 @@ func shadowrocketSupportedFieldNames(nodeType domain.NodeType) []string {
 
 func mihomoLossyFieldNames(nodeType domain.NodeType) []string {
 	common := []string{"network"}
-	tlsECHAdvanced := []string{"tls.ech.dns", "tls.ech.force_query"}
+	tlsECHAdvanced := []string{"tls.ech.force_query"}
 	switch nodeType {
 	case domain.NodeTypeShadowsocks:
 		return fields(common, "transport.type")
@@ -371,7 +371,7 @@ func mihomoLossyFieldNames(nodeType domain.NodeType) []string {
 }
 
 func singBoxLossyFieldNames(nodeType domain.NodeType) []string {
-	common := []string{"dialer.udp_relay", "tls.ech.dns", "tls.ech.force_query"}
+	common := []string{"dialer.udp_relay", "tls.ech.force_query"}
 	tlsFingerprint := fields(common, "tls.fingerprint")
 	switch nodeType {
 	case domain.NodeTypeVLESS:

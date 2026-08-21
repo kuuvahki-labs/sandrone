@@ -22,9 +22,6 @@ func mihomoStructuredLossWarnings(node domain.NodeIR) []domain.Warning {
 		add("transport.type", "mihomo proxy schema for "+string(node.Type)+" does not support "+node.Transport.Type+" transport")
 	}
 	if node.TLS != nil && node.TLS.ECH != nil {
-		if node.TLS.ECH.DNS != "" {
-			add("tls.ech.dns", "mihomo ECH options do not expose a DNS transport field")
-		}
 		if node.TLS.ECH.ForceQuery != "" {
 			add("tls.ech.force_query", "mihomo ECH options do not expose a force-query mode")
 		}

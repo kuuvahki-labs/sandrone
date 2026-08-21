@@ -2490,6 +2490,19 @@ func TestParseVLESSDefaultTCPCompatibilityQueryIsSilent(t *testing.T) {
 	require.Empty(t, source.Warnings)
 }
 
+func TestParseVLESSEmptyHeaderTypeCompatibilityQueryIsSilent(t *testing.T) {
+	p := uri.NewParser()
+	raw := "vless://11111111-1111-1111-1111-111111111111@example.com:443?encryption=none&type=ws&path=%2Fws&headerType=#vless"
+
+	nodes, source, err := p.Parse(context.Background(), []byte(raw))
+
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	require.Equal(t, "websocket", nodes[0].Transport.Type)
+	require.NotContains(t, nodes[0].Raw, "uri.query.headerType")
+	require.Empty(t, source.Warnings)
+}
+
 func TestParseVLESSTCPQUICSecurityCompatibilityBoundary(t *testing.T) {
 	p := uri.NewParser()
 

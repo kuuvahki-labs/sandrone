@@ -810,6 +810,33 @@ func TestRenderSingBoxTLSFullOptions(t *testing.T) {
 	}
 }
 
+func TestRenderSingBoxSkipsCustomECHDNSTransport(t *testing.T) {
+	nodes := []domain.NodeIR{
+		{Name: "valid", Type: domain.NodeTypeHTTP, Server: "valid.example", Port: 8080},
+		{
+			Name: "ech", Type: domain.NodeTypeVLESS, Server: "ech.example", Port: 443,
+			UUID: "11111111-1111-1111-1111-111111111111", Encryption: "none",
+			TLS: &domain.TLSOptions{Enabled: true, ECH: &domain.ECHOptions{
+				Enabled: true, QueryServerName: "ip.gs", DNS: "udp://8.8.8.8",
+			}},
+		},
+	}
+
+	out, report, err := singbox.NewRenderer().RenderWithReport(context.Background(), nodes, domain.RenderOptions{Format: "sing-box-outbounds"})
+
+	require.NoError(t, err)
+	require.Equal(t, 1, report.SuccessCount)
+	require.Len(t, report.Warnings, 1)
+	require.Equal(t, "render_node_skipped", report.Warnings[0].Code)
+	require.Contains(t, report.Warnings[0].Message, "ECH DNS transport")
+	var doc struct {
+		Outbounds []map[string]any `json:"outbounds"`
+	}
+	require.NoError(t, json.Unmarshal(out, &doc))
+	require.Len(t, doc.Outbounds, 1)
+	require.Equal(t, "valid", doc.Outbounds[0]["tag"])
+}
+
 func TestRenderSingBoxTransportVariantsAndPluginOptions(t *testing.T) {
 	r := singbox.NewRenderer()
 	nodes := []domain.NodeIR{

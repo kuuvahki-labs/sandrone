@@ -48,19 +48,23 @@ func TestVLESSXHTTPExtraRoundTrip(t *testing.T) {
 }
 
 func TestVLESSECHDNSAndForceQueryRoundTrip(t *testing.T) {
-	node := domain.NodeIR{
-		Name: "ech", Type: domain.NodeTypeVLESS,
-		Server: "example.com", Port: 443,
-		UUID: "11111111-1111-1111-1111-111111111111",
-		TLS: &domain.TLSOptions{Enabled: true, ECH: &domain.ECHOptions{
-			Enabled: true, QueryServerName: "cloudflare-ech.com", DNS: "https://1.1.1.1/dns-query", ForceQuery: "full",
-		}},
-	}
+	for _, dns := range []string{"https://1.1.1.1/dns-query", "udp://8.8.8.8"} {
+		t.Run(dns, func(t *testing.T) {
+			node := domain.NodeIR{
+				Name: "ech", Type: domain.NodeTypeVLESS,
+				Server: "example.com", Port: 443,
+				UUID: "11111111-1111-1111-1111-111111111111",
+				TLS: &domain.TLSOptions{Enabled: true, ECH: &domain.ECHOptions{
+					Enabled: true, QueryServerName: "cloudflare-ech.com", DNS: dns, ForceQuery: "full",
+				}},
+			}
 
-	rendered, _, err := renderVLESSURI(node)
-	require.NoError(t, err)
-	parsed, _, err := parseVLESS(rendered)
-	require.NoError(t, err)
-	require.Equal(t, node.TLS.ECH, parsed.TLS.ECH)
-	require.Empty(t, parsed.Raw)
+			rendered, _, err := renderVLESSURI(node)
+			require.NoError(t, err)
+			parsed, _, err := parseVLESS(rendered)
+			require.NoError(t, err)
+			require.Equal(t, node.TLS.ECH, parsed.TLS.ECH)
+			require.Empty(t, parsed.Raw)
+		})
+	}
 }

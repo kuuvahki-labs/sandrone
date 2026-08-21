@@ -5,6 +5,7 @@ package probe
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"net"
 	"sync"
 	"time"
@@ -62,8 +63,18 @@ func (b *MihomoBackend) Probe(ctx context.Context, backendReq BackendRequest, no
 	if err != nil {
 		return nil, err
 	}
-	if len(proxies) != len(nodes) {
+	skipped := mihomoSkippedNodeIndexes(backendReq.Payload, len(nodes))
+	if len(proxies) != len(nodes)-len(skipped) {
 		return nil, domain.NewError(domain.CodeProbeInvalidTarget, "mihomo probe payload count does not match nodes")
+	}
+	proxyByNode := make([]map[string]any, len(nodes))
+	proxyIndex := 0
+	for nodeIndex := range nodes {
+		if skipped[nodeIndex] {
+			continue
+		}
+		proxyByNode[nodeIndex] = proxies[proxyIndex]
+		proxyIndex++
 	}
 
 	attempts := attemptsFromRequest(req)
@@ -78,6 +89,10 @@ func (b *MihomoBackend) Probe(ctx context.Context, backendReq BackendRequest, no
 		go func() {
 			defer wg.Done()
 			defer recoverProbeWorkerPanic(&results[i], req, node, string(domain.CodeProbeCoreAPIFailed))
+			if proxyByNode[i] == nil {
+				results[i] = resultForError(req, node, string(domain.CodeProbeInvalidTarget), fmt.Errorf("mihomo proxy %q was skipped by renderer", node.Name), b.now())
+				return
+			}
 			select {
 			case sem <- struct{}{}:
 				defer func() { <-sem }()
@@ -85,7 +100,7 @@ func (b *MihomoBackend) Probe(ctx context.Context, backendReq BackendRequest, no
 				results[i] = resultForError(req, node, "probe_context_canceled", ctx.Err(), b.now())
 				return
 			}
-			results[i] = b.probeNode(ctx, req, node, proxies[i], target, expectedStatus, timeout, attempts)
+			results[i] = b.probeNode(ctx, req, node, proxyByNode[i], target, expectedStatus, timeout, attempts)
 		}()
 	}
 	wg.Wait()
@@ -95,6 +110,22 @@ func (b *MihomoBackend) Probe(ctx context.Context, backendReq BackendRequest, no
 		results[i].Backend = b.Name()
 	}
 	return &domain.ProbeResult{Results: results, Report: report}, nil
+}
+
+func mihomoSkippedNodeIndexes(payload *Payload, nodeCount int) map[int]bool {
+	skipped := map[int]bool{}
+	if payload == nil {
+		return skipped
+	}
+	for _, warning := range payload.RenderReport.Warnings {
+		if warning.Code != "render_node_skipped" || warning.Target != "mihomo-proxies" || warning.NodeIndex == nil {
+			continue
+		}
+		if index := *warning.NodeIndex; index >= 0 && index < nodeCount {
+			skipped[index] = true
+		}
+	}
+	return skipped
 }
 
 func (b *MihomoBackend) probeNode(ctx context.Context, req domain.ProbeRequest, node domain.NodeIR, mapping map[string]any, target urlTestTarget, expectedStatus expectedStatusMatcher, timeout time.Duration, attempts int) domain.NodeProbeResult {

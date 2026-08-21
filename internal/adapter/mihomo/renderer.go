@@ -30,10 +30,12 @@ func (r *Renderer) RenderWithReport(ctx context.Context, nodes []domain.NodeIR, 
 	_ = opt
 	docs := make([]map[string]any, 0, len(nodes))
 	report := domain.RenderReport{}
-	for _, node := range nodes {
+	for index, node := range nodes {
 		doc, skipRaw, warnings, err := nodeToMihomo(node)
 		if err != nil {
-			shared.MergeWarnings(&report, []domain.Warning{shared.RenderNodeSkippedWarning(node, r.Name(), err)})
+			warning := shared.RenderNodeSkippedWarning(node, r.Name(), err)
+			warning.NodeIndex = &index
+			shared.MergeWarnings(&report, []domain.Warning{warning})
 			continue
 		}
 		warnings = append(warnings, mihomoStructuredLossWarnings(node)...)
@@ -53,6 +55,9 @@ func (r *Renderer) RenderWithReport(ctx context.Context, nodes []domain.NodeIR, 
 }
 
 func nodeToMihomo(node domain.NodeIR) (map[string]any, map[string]bool, []domain.Warning, error) {
+	if field := mihomoUnsupportedECHDNSField(node); field != "" {
+		return nil, nil, nil, domain.NewError(domain.CodeRenderFailed, field+" requires a custom ECH DNS transport that mihomo cannot express")
+	}
 	switch node.Type {
 	case domain.NodeTypeShadowsocks:
 		return renderSS(node)
@@ -85,6 +90,19 @@ func nodeToMihomo(node domain.NodeIR) (map[string]any, map[string]bool, []domain
 	default:
 		return nil, nil, nil, domain.WrapError(domain.CodeRenderFailed, "unsupported node type", fmt.Errorf("%s", node.Type))
 	}
+}
+
+func mihomoUnsupportedECHDNSField(node domain.NodeIR) string {
+	if node.TLS != nil && node.TLS.ECH != nil && node.TLS.ECH.DNS != "" {
+		return "tls.ech.dns"
+	}
+	if node.Transport != nil && node.Transport.XHTTP != nil && node.Transport.XHTTP.DownloadSettings != nil {
+		tls := node.Transport.XHTTP.DownloadSettings.TLS
+		if tls != nil && tls.ECH != nil && tls.ECH.DNS != "" {
+			return "transport.xhttp.download_settings.tls.ech.dns"
+		}
+	}
+	return ""
 }
 
 func renderSS(node domain.NodeIR) (map[string]any, map[string]bool, []domain.Warning, error) {
