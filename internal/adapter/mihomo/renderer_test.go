@@ -613,14 +613,17 @@ func TestRenderMihomoSSSIP002SimpleObfsPlugin(t *testing.T) {
 func TestRenderMihomoSSV2RayPluginSIP002Options(t *testing.T) {
 	r := mihomo.NewRenderer()
 	nodes := []domain.NodeIR{{
-		Name:          "ss-v2ray-plugin",
-		Type:          domain.NodeTypeShadowsocks,
-		Server:        "example.com",
-		Port:          8388,
-		Cipher:        "AEAD_AES_128_GCM",
-		Password:      "secret",
-		Plugin:        "v2ray-plugin",
-		PluginOptions: map[string]any{"raw": `mode=websocket;host=cdn\;edge.example.com;path=/ws\=v1;tls;mux=0`},
+		Name:     "ss-v2ray-plugin",
+		Type:     domain.NodeTypeShadowsocks,
+		Server:   "example.com",
+		Port:     8388,
+		Cipher:   "AEAD_AES_128_GCM",
+		Password: "secret",
+		Plugin:   "v2ray-plugin",
+		PluginOptions: map[string]any{
+			"raw":              `mode=websocket;host=cdn\;edge.example.com;path=/ws\=v1;tls;mux=0`,
+			"skip-cert-verify": false,
+		},
 	}}
 	out, report, err := r.RenderWithReport(context.Background(), nodes, domain.RenderOptions{Format: "mihomo-proxies"})
 	require.NoError(t, err)
@@ -634,11 +637,12 @@ func TestRenderMihomoSSV2RayPluginSIP002Options(t *testing.T) {
 	require.Equal(t, "aes-128-gcm", proxy["cipher"])
 	require.Equal(t, "v2ray-plugin", proxy["plugin"])
 	require.Equal(t, map[string]any{
-		"mode": "websocket",
-		"host": "cdn;edge.example.com",
-		"path": "/ws=v1",
-		"tls":  true,
-		"mux":  false,
+		"mode":             "websocket",
+		"host":             "cdn;edge.example.com",
+		"path":             "/ws=v1",
+		"tls":              true,
+		"mux":              false,
+		"skip-cert-verify": false,
 	}, proxy["plugin-opts"])
 }
 

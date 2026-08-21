@@ -307,8 +307,8 @@ Mbps 界限或其它无效 canonical 速率时只跳过该节点，不会使仍�
 - VMess、VLESS 和 Trojan 的非默认 transport 若无法由 Mihomo 等价表达，或
   transport 附加连接参数缺少 type，会跳过节点并产生 `render_node_skipped`。
 - SS `v2ray-plugin` 只在 SIP002 options 能完整解析为 Mihomo 的
-  `mode`/`host`/`path`/`tls`/`mux` 时输出；未知、非法、重复冲突参数会跳过节点，
-  不删除连接参数后继续转换或 Probe。
+  `mode`/`host`/`path`/`tls`/`skip-cert-verify`/`mux` 时输出；未知、非法、
+  重复冲突参数会跳过节点，不删除连接参数后继续转换或 Probe。
 
 ### `sing-box-outbounds`
 
@@ -325,6 +325,8 @@ Mbps 界限或其它无效 canonical 速率时只跳过该节点，不会使仍�
 - VMess、VLESS 和 Trojan 的非默认 transport 若无法由 sing-box 等价表达（包括
   xHTTP 与 TCP HTTP header obfs），以及非 `none` 的 VLESS `encryption`，会跳过
   节点并产生 `render_node_skipped`，不会删除连接关键字段后输出或进入 probe。
+- SS `v2ray-plugin` 的结构化 Mihomo options 会把布尔 `mux` 映射为 SIP003 整数；
+  `skip-cert-verify: false` 作为无操作默认值消费，`true` 因目标插件无法表达而跳过节点。
 - Hysteria/Hysteria2 `hop_interval` 只有在目标 sing-box duration schema 能接受时
   才会输出；端口跳跃区间等不能由该字段表达的值会跳过节点。
 

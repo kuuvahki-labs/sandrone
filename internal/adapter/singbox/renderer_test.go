@@ -371,6 +371,59 @@ func TestRenderSingBoxSSSIP002SimpleObfsPlugin(t *testing.T) {
 	}
 }
 
+func TestRenderSingBoxSSV2RayPluginNormalizesMihomoOptions(t *testing.T) {
+	r := singbox.NewRenderer()
+	nodes := []domain.NodeIR{{
+		Name:     "ss-v2ray-plugin",
+		Type:     domain.NodeTypeShadowsocks,
+		Server:   "example.com",
+		Port:     8388,
+		Cipher:   "aes-256-gcm",
+		Password: "secret",
+		Plugin:   "v2ray-plugin",
+		PluginOptions: map[string]any{
+			"mode":             "websocket",
+			"host":             "cdn.example.com",
+			"path":             "/ws",
+			"tls":              true,
+			"mux":              true,
+			"skip-cert-verify": false,
+		},
+	}}
+	out, report, err := r.RenderWithReport(context.Background(), nodes, domain.RenderOptions{Format: "sing-box-outbounds"})
+	require.NoError(t, err)
+	require.Equal(t, 1, report.SuccessCount)
+	require.Empty(t, report.Warnings)
+
+	var doc map[string]any
+	require.NoError(t, json.Unmarshal(out, &doc))
+	ob := doc["outbounds"].([]any)[0].(map[string]any)
+	require.Equal(t, "v2ray-plugin", ob["plugin"])
+	require.Equal(t, "host=cdn.example.com;mode=websocket;mux=1;path=/ws;tls=true", ob["plugin_opts"])
+}
+
+func TestRenderSingBoxSkipsV2RayPluginInsecureTLS(t *testing.T) {
+	r := singbox.NewRenderer()
+	nodes := []domain.NodeIR{
+		{
+			Name: "insecure", Type: domain.NodeTypeShadowsocks, Server: "insecure.example.com", Port: 8388,
+			Cipher: "aes-256-gcm", Password: "secret", Plugin: "v2ray-plugin",
+			PluginOptions: map[string]any{"mode": "websocket", "tls": true, "skip-cert-verify": true},
+		},
+		{Name: "neighbor", Type: domain.NodeTypeShadowsocks, Server: "neighbor.example.com", Port: 8388, Cipher: "aes-256-gcm", Password: "secret"},
+	}
+
+	out, report, err := r.RenderWithReport(context.Background(), nodes, domain.RenderOptions{Format: "sing-box-outbounds"})
+	require.NoError(t, err)
+	require.Equal(t, 1, report.SuccessCount)
+	require.Len(t, report.Warnings, 1)
+	require.Equal(t, "render_node_skipped", report.Warnings[0].Code)
+	require.Equal(t, "insecure", report.Warnings[0].Node)
+	require.Contains(t, report.Warnings[0].Message, "skip-cert-verify")
+	require.Contains(t, string(out), "neighbor")
+	require.NotContains(t, string(out), "insecure.example.com")
+}
+
 func TestRenderSingBoxSkipsUnsupportedVLESSEncryption(t *testing.T) {
 	r := singbox.NewRenderer()
 	nodes := []domain.NodeIR{

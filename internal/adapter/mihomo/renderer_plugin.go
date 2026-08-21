@@ -126,7 +126,7 @@ func applyMihomoV2RayPluginOption(out map[string]any, rawKey, value string, hasV
 			return false
 		}
 		normalized = value
-	case "tls", "mux":
+	case "tls", "mux", "skip-cert-verify":
 		if !hasValue || value == "" {
 			normalized = true
 			break

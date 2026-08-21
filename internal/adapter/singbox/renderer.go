@@ -116,7 +116,10 @@ func renderSS(node domain.NodeIR) (map[string]any, bool, map[string]bool, []doma
 	out := baseOutbound(node, "shadowsocks")
 	out["method"] = node.Cipher
 	out["password"] = node.Password
-	plugin, pluginOptions := renderSingBoxSSPlugin(node.Plugin, node.PluginOptions)
+	plugin, pluginOptions, err := renderSingBoxSSPlugin(node.Plugin, node.PluginOptions)
+	if err != nil {
+		return nil, false, nil, nil, err
+	}
 	if plugin != "" {
 		out["plugin"] = plugin
 	}
