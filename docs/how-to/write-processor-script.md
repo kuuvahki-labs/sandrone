@@ -65,6 +65,55 @@ curl -sS -X POST \
 
 响应中的 `after` 节点名应以 `script-` 开头。只需标准重命名、过滤或排序时，优先使用内建 processor。
 
+## 完整示例：节点名称规范化
+
+仓库提供了可直接运行的
+[`examples/scripts/normalize-nodes.js`](../../examples/scripts/normalize-nodes.js)。它面向
+Mihomo 与 sing-box 共用的 nodes-stage，在一个脚本中完成信息节点过滤、连接去重、
+地区和线路识别、倍率提取、稳定排序、编号、协议标注及最终名称去重。脚本只修改
+保留节点的 `name`，协议、安全层、传输层和 Flow 均读取 canonical `NodeIR`，不会从
+名称猜测连接配置，也不会访问网络。
+
+在仓库根目录执行以下命令，将示例登记成 `kind=static` 的文件资源：
+
+```sh
+jq -Rs '{
+  name: "normalize-nodes.js",
+  kind: "static",
+  source: {type: "inline", content: .}
+}' examples/scripts/normalize-nodes.js |
+curl -fsS -X POST "$SANDRONE_API/v1/files" \
+  -H "Authorization: Bearer $SANDRONE_TOKEN" \
+  -H "Content-Type: application/json" \
+  --data-binary @-
+```
+
+在 subscription 的 processors 中引用该文件：
+
+```json
+{
+  "type": "script",
+  "stage": "nodes",
+  "params": {
+    "source": {"type": "file", "name": "normalize-nodes.js"},
+    "args": {
+      "separator": " ",
+      "protocol_mode": "main",
+      "name_conflict": "drop"
+    }
+  }
+}
+```
+
+默认名称类似 `🇭🇰 香港 01 IPLC 家宽 2× VLESS`。将 `separator` 设为
+`" · "` 可改用圆点分隔；将 `protocol_mode` 设为 `detailed` 可输出
+`VLESS Reality gRPC Vision` 一类详细协议组合。最终名称仍然重复时，默认保留
+排序后的第一个节点并直接删除其余节点，从而保证 Mihomo proxy name 与 sing-box
+outbound tag 唯一；设为 `name_conflict: "error"` 可改成显式失败。
+
+脚本支持的全部参数、模板变量和默认值写在文件头部。连接去重发生在命名之前，
+因此两个原始名称相同但连接不同的节点仍会被编号成不同名称，不会被提前误删。
+
 引用文件脚本时，Sandrone 会先渲染目标文件资源，再把最终正文作为脚本执行。
 若脚本文件本身需要渲染参数，把字符串键值放在 `params.source.args`；当前脚本的
 业务参数仍放在 `params.args`。两组参数彼此不继承：
