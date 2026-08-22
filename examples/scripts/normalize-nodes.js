@@ -578,7 +578,17 @@ function buildRegions() {
         var flag = countryFlag(row[0]);
         var aliases = [row[0], row[1], row[2], flag];
         if (REGION_ALIASES[row[0]]) aliases = aliases.concat(REGION_ALIASES[row[0]]);
-        regions.push({code: row[0], zh: row[1], en: row[2], flag: flag, aliases: aliases, order: index});
+        aliases.sort(function (left, right) { return right.length - left.length; });
+        var matchers = [];
+        for (var aliasIndex = 0; aliasIndex < aliases.length; aliasIndex += 1) {
+            var alias = aliases[aliasIndex];
+            if (/^[A-Za-z0-9]{2,4}$/.test(alias)) {
+                matchers.push({pattern: new RegExp("(^|[^A-Za-z0-9])" + escapeRegExp(alias) + "($|[^A-Za-z0-9])", "i")});
+            } else {
+                matchers.push({text: String(alias).toLocaleLowerCase()});
+            }
+        }
+        regions.push({code: row[0], zh: row[1], en: row[2], flag: flag, aliases: aliases, matchers: matchers, order: index});
     }
     return regions;
 }
@@ -617,22 +627,15 @@ function extractMetadata(node, original, options) {
 }
 
 function detectRegion(name) {
+    var foldedName = String(name).toLocaleLowerCase();
     for (var regionIndex = 0; regionIndex < REGIONS.length; regionIndex += 1) {
         var region = REGIONS[regionIndex];
-        var aliases = region.aliases.slice().sort(function (left, right) { return right.length - left.length; });
-        for (var aliasIndex = 0; aliasIndex < aliases.length; aliasIndex += 1) {
-            if (containsAlias(name, aliases[aliasIndex])) return region;
+        for (var matcherIndex = 0; matcherIndex < region.matchers.length; matcherIndex += 1) {
+            var matcher = region.matchers[matcherIndex];
+            if (matcher.pattern ? matcher.pattern.test(name) : foldedName.indexOf(matcher.text) !== -1) return region;
         }
     }
     return null;
-}
-
-function containsAlias(name, alias) {
-    if (!alias) return false;
-    if (/^[A-Za-z0-9]{2,4}$/.test(alias)) {
-        return new RegExp("(^|[^A-Za-z0-9])" + escapeRegExp(alias) + "($|[^A-Za-z0-9])", "i").test(name);
-    }
-    return String(name).toLocaleLowerCase().indexOf(String(alias).toLocaleLowerCase()) !== -1;
 }
 
 function detectFirst(name, definitions) {
