@@ -70,9 +70,9 @@ curl -sS -X POST \
 仓库提供了可直接运行的
 [`examples/scripts/normalize-nodes.js`](../../examples/scripts/normalize-nodes.js)。它面向
 Mihomo 与 sing-box 共用的 nodes-stage，在一个脚本中完成信息节点过滤、连接去重、
-地区和线路识别、倍率提取、稳定排序、编号、协议标注及最终名称去重。脚本只修改
-保留节点的 `name`，协议、安全层、传输层和 Flow 均读取 canonical `NodeIR`，不会从
-名称猜测连接配置，也不会访问网络。
+地区和线路识别、倍率提取、稳定排序、编号、协议标注及最终名称去重。脚本修改
+保留节点的 `name`，并可选写入 `meta`；协议、安全层、传输层和 Flow 均读取
+canonical `NodeIR`，不会从名称猜测连接配置，也不会访问网络。
 
 在仓库根目录执行以下命令，将示例登记成 `kind=static` 的文件资源：
 
@@ -110,6 +110,12 @@ curl -fsS -X POST "$SANDRONE_API/v1/files" \
 `VLESS Reality gRPC Vision` 一类详细协议组合。最终名称仍然重复时，默认保留
 排序后的第一个节点并直接删除其余节点，从而保证 Mihomo proxy name 与 sing-box
 outbound tag 唯一；设为 `name_conflict: "error"` 可改成显式失败。
+
+`write_meta` 默认为 `false`，关闭时不会改写节点 `meta`。设为 `true` 后，最终保留
+节点会写入 `normalize.*` 元数据，包括首次处理前的名称、地区、编号、线路、特征、
+倍率、协议、安全层、传输层、Flow、IP 栈和来源标签。脚本保留其他已有 `meta`；
+重复执行时不会覆盖最初记录的 `normalize.original_name`，其余派生字段按本次识别
+结果刷新。
 
 脚本支持的全部参数、模板变量和默认值写在文件头部。连接去重发生在命名之前，
 因此两个原始名称相同但连接不同的节点仍会被编号成不同名称，不会被提前误删。

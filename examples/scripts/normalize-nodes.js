@@ -3,12 +3,13 @@
  *
  * 用途：作为 nodes-stage 的 script processor 使用，在不访问网络、不修改连接
  * 参数的前提下，完成信息节点过滤、连接去重、地区/线路/倍率识别、稳定排序、
- * 编号、协议标注和最终名称去重。
+ * 编号、协议标注、规范化元数据写入和最终名称去重。
  *
  * 默认输出示例：
  *   🇭🇰 香港 01 IPLC 家宽 2× VLESS
  *
- * 处理顺序：提取元数据 -> 过滤 -> 连接去重 -> 稳定排序 -> 命名 -> 名称去重。
+ * 处理顺序：提取元数据 -> 过滤 -> 连接去重 -> 稳定排序 -> 命名 -> 名称去重
+ * -> 写入 normalize.* 元数据。
  * 最终名称重复时默认保留排序后的第一个节点，直接删除其余节点；不会添加随机后缀。
  *
  * 常用参数（通过 ProcessorSpec.params.args 或请求参数传入）：
@@ -19,6 +20,7 @@
  *   unknown_region=keep          keep / drop
  *   dedupe_connection=true       删除连接配置完全相同的节点
  *   name_conflict=drop           drop / error
+ *   write_meta=false             是否给保留节点写入 normalize.* 元数据
  *   sort=true                    按地区和提取出的元数据稳定排序
  *   region_style=zh              zh / code / en
  *   show_flag=true               是否显示国旗
@@ -54,6 +56,14 @@
 
 var DEFAULT_TEMPLATE = "{prefix}{separator}{flag}{separator}{region}{separator}{index}{separator}{entry}{separator}{city}{separator}{line}{separator}{features}{separator}{multiplier}{separator}{protocol}";
 var DEFAULT_UNKNOWN_TEMPLATE = "{prefix}{separator}{original}{separator}{protocol}";
+
+var NORMALIZE_META_KEYS = [
+    "normalize.version", "normalize.original_name", "normalize.region_code",
+    "normalize.region", "normalize.region_en", "normalize.index", "normalize.entry",
+    "normalize.city", "normalize.line", "normalize.features", "normalize.multiplier",
+    "normalize.protocol", "normalize.protocol_detail", "normalize.security",
+    "normalize.transport", "normalize.flow", "normalize.ip_stack", "normalize.source"
+];
 
 var PROTOCOL_NAMES = {
     ss: "SS",
@@ -458,6 +468,7 @@ function main(input, api) {
             continue;
         }
         seenNames[name] = true;
+        if (options.writeMeta) writeNodeMetadata(item.node, item.metadata, values);
         item.node.name = name;
         output.push(item.node);
     }
@@ -476,6 +487,7 @@ function readOptions(args, context) {
         unknownRegion: readEnum(args.unknown_region, "keep", ["keep", "drop"], "unknown_region"),
         dedupeConnection: readBoolean(args.dedupe_connection, true, "dedupe_connection"),
         nameConflict: readEnum(args.name_conflict, "drop", ["drop", "error"], "name_conflict"),
+        writeMeta: readBoolean(args.write_meta, false, "write_meta"),
         sort: readBoolean(args.sort, true, "sort"),
         regionStyle: readEnum(args.region_style, "zh", ["zh", "code", "en"], "region_style"),
         showFlag: readBoolean(args.show_flag, true, "show_flag"),
@@ -881,21 +893,70 @@ function templateValues(item, options, regionCounts, regionIndexes) {
     };
 }
 
+function writeNodeMetadata(node, metadata, values) {
+    var hasNodeMeta = node.meta && typeof node.meta === "object" && !Array.isArray(node.meta);
+    var nodeMeta = hasNodeMeta ? node.meta : {};
+    var originalName = cleanText(nodeMeta["normalize.original_name"]) || metadata.original;
+    if (hasNodeMeta) {
+        for (var index = 0; index < NORMALIZE_META_KEYS.length; index += 1) {
+            delete nodeMeta[NORMALIZE_META_KEYS[index]];
+        }
+    }
+    putNodeMetadata(nodeMeta, "normalize.version", "1");
+    putNodeMetadata(nodeMeta, "normalize.original_name", originalName);
+    putNodeMetadata(nodeMeta, "normalize.region_code", metadata.region && metadata.region.code);
+    putNodeMetadata(nodeMeta, "normalize.region", metadata.region && metadata.region.zh);
+    putNodeMetadata(nodeMeta, "normalize.region_en", metadata.region && metadata.region.en);
+    putNodeMetadata(nodeMeta, "normalize.index", values.index);
+    putNodeMetadata(nodeMeta, "normalize.entry", metadata.entry);
+    putNodeMetadata(nodeMeta, "normalize.city", metadata.city);
+    putNodeMetadata(nodeMeta, "normalize.line", values.line);
+    putNodeMetadata(nodeMeta, "normalize.features", values.features);
+    putNodeMetadata(nodeMeta, "normalize.multiplier", formatNumber(metadata.multiplier.value));
+    putNodeMetadata(nodeMeta, "normalize.protocol", metadata.protocol.base);
+    putNodeMetadata(nodeMeta, "normalize.protocol_detail", metadata.protocol.detailed);
+    putNodeMetadata(nodeMeta, "normalize.security", metadata.protocol.security);
+    putNodeMetadata(nodeMeta, "normalize.transport", metadata.protocol.transport);
+    putNodeMetadata(nodeMeta, "normalize.flow", metadata.protocol.flow);
+    putNodeMetadata(nodeMeta, "normalize.ip_stack", metadata.ipStack);
+    putNodeMetadata(nodeMeta, "normalize.source", values.source);
+    node.meta = nodeMeta;
+}
+
+function putNodeMetadata(nodeMeta, key, value) {
+    if (value !== undefined && value !== null && value !== "") nodeMeta[key] = String(value);
+}
+
 function stripGeneratedParts(original, prefix, protocol) {
     var value = cleanText(original);
     if (prefix && value.indexOf(prefix) === 0) {
         value = cleanText(value.slice(prefix.length).replace(/^[\s|/·•—–_-]+/, ""));
     }
     var suffixes = [protocol.detailed, protocol.base];
+    var foldedValue = value.toLocaleLowerCase();
     for (var index = 0; index < suffixes.length; index += 1) {
         if (!suffixes[index]) continue;
-        var pattern = new RegExp("(?:[\\s|/·•—–_-]+)" + escapeRegExp(suffixes[index]) + "$", "i");
-        if (pattern.test(value)) {
-            value = cleanText(value.replace(pattern, ""));
+        var suffixStart = generatedSuffixStart(value, foldedValue, suffixes[index]);
+        if (suffixStart !== -1) {
+            value = cleanText(value.slice(0, suffixStart));
             break;
         }
     }
     return value || original;
+}
+
+function generatedSuffixStart(value, foldedValue, suffix) {
+    var foldedSuffix = String(suffix).toLocaleLowerCase();
+    var suffixStart = foldedValue.length - foldedSuffix.length;
+    if (suffixStart <= 0 || foldedValue.slice(suffixStart) !== foldedSuffix || !isNameSeparator(value.charAt(suffixStart - 1))) {
+        return -1;
+    }
+    while (suffixStart > 0 && isNameSeparator(value.charAt(suffixStart - 1))) suffixStart -= 1;
+    return suffixStart;
+}
+
+function isNameSeparator(character) {
+    return character.trim() === "" || "|/·•—–_-".indexOf(character) !== -1;
 }
 
 function renderTemplate(template, values, separator) {
@@ -920,8 +981,13 @@ function cleanChunk(value) {
 function cleanRenderedName(value, separator) {
     var name = cleanText(value);
     if (!separator) return name;
-    var escaped = escapeRegExp(separator);
-    return name.replace(new RegExp("(?:" + escaped + "){2,}", "g"), separator).replace(new RegExp("^(?:" + escaped + ")+|(?:" + escaped + ")+$", "g"), "").trim();
+    var repeated = separator + separator;
+    while (name.indexOf(repeated) !== -1) name = name.split(repeated).join(separator);
+    while (name.indexOf(separator) === 0) name = name.slice(separator.length);
+    while (name.length >= separator.length && name.lastIndexOf(separator) === name.length - separator.length) {
+        name = name.slice(0, name.length - separator.length);
+    }
+    return name.trim();
 }
 
 function cleanText(value) {
@@ -938,10 +1004,6 @@ function padNumber(value, width) {
     var output = String(value);
     while (output.length < width) output = "0" + output;
     return output;
-}
-
-function escapeRegExp(value) {
-    return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function reportCounts(api, counts, before, after) {

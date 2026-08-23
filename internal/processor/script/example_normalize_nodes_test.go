@@ -46,7 +46,7 @@ func applyExampleNormalizer(t *testing.T, args map[string]any, nodes []domain.No
 	return out
 }
 
-func TestExampleNormalizeNodesDefaultPipelineIsIdempotent(t *testing.T) {
+func TestExampleNormalizeNodesPipelineWithMetadataIsIdempotent(t *testing.T) {
 	reality := &domain.TLSOptions{
 		Enabled: true,
 		Reality: &domain.RealityOptions{Enabled: true, PublicKey: "public-key", ShortID: "01"},
@@ -55,6 +55,7 @@ func TestExampleNormalizeNodesDefaultPipelineIsIdempotent(t *testing.T) {
 		{
 			Name: "香港 IPLC 家宽 2x", Type: domain.NodeTypeVLESS, Server: "one.example.com", Port: 443,
 			UUID: "11111111-1111-1111-1111-111111111111", Encryption: "none", TLS: reality,
+			Meta: map[string]string{"keep": "yes", "normalize.city": "stale"},
 		},
 		{
 			Name: "香港 IPLC 家宽 2x", Type: domain.NodeTypeVLESS, Server: "two.example.com", Port: 443,
@@ -70,20 +71,46 @@ func TestExampleNormalizeNodesDefaultPipelineIsIdempotent(t *testing.T) {
 		},
 	}
 
-	first := applyExampleNormalizer(t, nil, nodes)
+	args := map[string]any{"write_meta": true}
+	first := applyExampleNormalizer(t, args, nodes)
 	require.Equal(t, []string{
 		"🇭🇰 香港 01 IPLC 家宽 2× VLESS",
 		"🇭🇰 香港 02 IPLC 家宽 2× VLESS",
 	}, []string{first.Nodes[0].Name, first.Nodes[1].Name})
 	require.Equal(t, []string{"one.example.com", "two.example.com"}, []string{first.Nodes[0].Server, first.Nodes[1].Server})
+	require.Equal(t, map[string]string{
+		"keep":                      "yes",
+		"normalize.version":         "1",
+		"normalize.original_name":   "香港 IPLC 家宽 2x",
+		"normalize.region_code":     "HK",
+		"normalize.region":          "香港",
+		"normalize.region_en":       "Hong Kong",
+		"normalize.index":           "01",
+		"normalize.line":            "IPLC",
+		"normalize.features":        "家宽",
+		"normalize.multiplier":      "2",
+		"normalize.protocol":        "VLESS",
+		"normalize.protocol_detail": "VLESS Reality",
+		"normalize.security":        "Reality",
+		"normalize.source":          "example-source",
+	}, first.Nodes[0].Meta)
 	require.ElementsMatch(t, []string{
 		"node_normalize_information_filtered",
 		"node_normalize_connection_deduped",
 	}, warningCodes(first.Warnings))
 
-	second := applyExampleNormalizer(t, nil, first.Nodes)
+	second := applyExampleNormalizer(t, args, first.Nodes)
 	require.Equal(t, first.Nodes, second.Nodes)
 	require.Empty(t, second.Warnings)
+}
+
+func TestExampleNormalizeNodesMetadataDefaultsToDisabled(t *testing.T) {
+	out := applyExampleNormalizer(t, nil, []domain.NodeIR{{
+		Name: "香港", Type: domain.NodeTypeShadowsocks, Server: "one.example.com", Port: 8388,
+		Cipher: "aes-128-gcm", Password: "one", Meta: map[string]string{"keep": "yes"},
+	}})
+
+	require.Equal(t, map[string]string{"keep": "yes"}, out.Nodes[0].Meta)
 }
 
 func TestExampleNormalizeNodesConnectionDedupPreservesSemanticRawFields(t *testing.T) {
@@ -108,6 +135,7 @@ func TestExampleNormalizeNodesDetailedProtocolAndCustomSeparator(t *testing.T) {
 	out := applyExampleNormalizer(t, map[string]any{
 		"separator":     " · ",
 		"protocol_mode": "detailed",
+		"write_meta":    true,
 		"template":      "{flag}{separator}{region}{separator}{index}{separator}{city}{separator}{line}{separator}{features}{separator}{multiplier}{separator}{protocol}{separator}{ip_stack}",
 	}, []domain.NodeIR{{
 		Name: "US LAX CN2-GIA Native GPT ˣ²", Type: domain.NodeTypeVLESS,
@@ -120,6 +148,15 @@ func TestExampleNormalizeNodesDetailedProtocolAndCustomSeparator(t *testing.T) {
 	}})
 
 	require.Equal(t, "🇺🇸 · 美国 · 01 · 洛杉矶 · CN2 GIA · 原生/GPT · 2× · VLESS Reality gRPC Vision · IPv6", out.Nodes[0].Name)
+	require.Equal(t, "US LAX CN2-GIA Native GPT ˣ²", out.Nodes[0].Meta["normalize.original_name"])
+	require.Equal(t, "洛杉矶", out.Nodes[0].Meta["normalize.city"])
+	require.Equal(t, "CN2 GIA", out.Nodes[0].Meta["normalize.line"])
+	require.Equal(t, "原生/GPT", out.Nodes[0].Meta["normalize.features"])
+	require.Equal(t, "2", out.Nodes[0].Meta["normalize.multiplier"])
+	require.Equal(t, "VLESS Reality gRPC Vision", out.Nodes[0].Meta["normalize.protocol_detail"])
+	require.Equal(t, "gRPC", out.Nodes[0].Meta["normalize.transport"])
+	require.Equal(t, "Vision", out.Nodes[0].Meta["normalize.flow"])
+	require.Equal(t, "IPv6", out.Nodes[0].Meta["normalize.ip_stack"])
 }
 
 func TestExampleNormalizeNodesDropsFinalNameConflicts(t *testing.T) {
@@ -265,6 +302,26 @@ func TestExampleNormalizeNodesRegionIndexPreservesMatchingSemantics(t *testing.T
 		"🇸🇬 新加坡 02 Edge SS",
 		"prefixHKGsuffix SS",
 	}, []string{out.Nodes[0].Name, out.Nodes[1].Name, out.Nodes[2].Name, out.Nodes[3].Name})
+}
+
+func TestExampleNormalizeNodesStringCleanupPreservesLiteralSeparatorSemantics(t *testing.T) {
+	body, err := os.ReadFile(exampleNormalizeNodesPath())
+	require.NoError(t, err)
+	runtime := goja.New()
+	_, err = runtime.RunString(string(body))
+	require.NoError(t, err)
+
+	cleaned, err := runtime.RunString(`cleanRenderedName(".*.*Hong Kong.*", ".*")`)
+	require.NoError(t, err)
+	require.Equal(t, "Hong Kong", cleaned.String())
+
+	stripped, err := runtime.RunString(`stripGeneratedParts("Hong Kong | VLESS Reality", "", {detailed: "VLESS Reality", base: "VLESS"})`)
+	require.NoError(t, err)
+	require.Equal(t, "Hong Kong", stripped.String())
+
+	untouched, err := runtime.RunString(`stripGeneratedParts("NotVLESS", "", {detailed: "VLESS", base: "VLESS"})`)
+	require.NoError(t, err)
+	require.Equal(t, "NotVLESS", untouched.String())
 }
 
 func TestExampleNormalizeNodesHandlesLargeSubscriptionWithinTimeout(t *testing.T) {
