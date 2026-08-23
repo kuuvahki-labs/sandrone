@@ -250,3 +250,43 @@ func TestExampleNormalizeNodesRegionRegistryAndAllProtocols(t *testing.T) {
 		require.Contains(t, protocolOutput.Nodes[index].Name, protocol.label)
 	}
 }
+
+func TestExampleNormalizeNodesRegionIndexPreservesMatchingSemantics(t *testing.T) {
+	out := applyExampleNormalizer(t, map[string]any{"sort": false}, []domain.NodeIR{
+		{Name: "Hysteria2-SG-07", Type: domain.NodeTypeHysteria2, Server: "one.example.com", Port: 443},
+		{Name: "US 香港", Type: domain.NodeTypeShadowsocks, Server: "two.example.com", Port: 8388, Cipher: "aes-128-gcm", Password: "two"},
+		{Name: "edge-SingaporePremium", Type: domain.NodeTypeShadowsocks, Server: "three.example.com", Port: 8388, Cipher: "aes-128-gcm", Password: "three"},
+		{Name: "prefixHKGsuffix", Type: domain.NodeTypeShadowsocks, Server: "four.example.com", Port: 8388, Cipher: "aes-128-gcm", Password: "four"},
+	})
+
+	require.Equal(t, []string{
+		"🇸🇬 新加坡 01 HY2",
+		"🇭🇰 香港 01 SS",
+		"🇸🇬 新加坡 02 Edge SS",
+		"prefixHKGsuffix SS",
+	}, []string{out.Nodes[0].Name, out.Nodes[1].Name, out.Nodes[2].Name, out.Nodes[3].Name})
+}
+
+func TestExampleNormalizeNodesHandlesLargeSubscriptionWithinTimeout(t *testing.T) {
+	const nodeCount = 1725
+	const otherCount = 318
+	regionCodes := []string{"HK", "JP", "SG", "US", "GB", "DE", "NL"}
+	nodes := make([]domain.NodeIR, 0, nodeCount)
+	for index := 0; index < nodeCount-otherCount; index++ {
+		nodes = append(nodes, domain.NodeIR{
+			Name: fmt.Sprintf("%s-%d", regionCodes[index%len(regionCodes)], index),
+			Type: domain.NodeTypeShadowsocks, Server: fmt.Sprintf("region-%d.example.com", index),
+			Port: 8388, Cipher: "aes-128-gcm", Password: fmt.Sprintf("region-%d", index),
+		})
+	}
+	for index := 0; index < otherCount; index++ {
+		nodes = append(nodes, domain.NodeIR{
+			Name: fmt.Sprintf("❓Other_%d", index+1),
+			Type: domain.NodeTypeShadowsocks, Server: fmt.Sprintf("other-%d.example.com", index),
+			Port: 8388, Cipher: "aes-128-gcm", Password: fmt.Sprintf("other-%d", index),
+		})
+	}
+
+	out := applyExampleNormalizer(t, nil, nodes)
+	require.Len(t, out.Nodes, nodeCount)
+}
