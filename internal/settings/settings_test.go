@@ -25,6 +25,7 @@ func TestDefaultSettingsContainsWholeProject(t *testing.T) {
 	require.Zero(t, got.CacheDefaults.ProbeTTLSeconds)
 	require.Equal(t, 60, got.CacheDefaults.SubscriptionTrafficTTLSeconds)
 	require.Equal(t, "https://cp.cloudflare.com", got.ProbeDefaults.URL)
+	require.Equal(t, 2000, got.ScriptDefaults.TimeoutMS)
 	require.False(t, got.ScheduledRefresh.Enabled)
 	require.Equal(t, "@every 10m", got.ScheduledRefresh.Schedule)
 	require.Empty(t, got.ScheduledRefresh.Targets)
@@ -100,6 +101,7 @@ func TestDecodeMigratesLegacyStartupAuthenticationAndMCPTransport(t *testing.T) 
 	require.NoError(t, err)
 	require.Equal(t, "127.0.0.1:2237", value.HTTP.Listen)
 	require.Equal(t, "/agent", value.MCP.Path)
+	require.Equal(t, 2000, value.ScriptDefaults.TimeoutMS)
 
 	body, err := json.Marshal(value)
 	require.NoError(t, err)
@@ -134,6 +136,12 @@ func TestNormalizeRejectsInvalidProjectFields(t *testing.T) {
 			},
 		},
 		{
+			name: "script timeout",
+			mutate: func(value *domain.Settings) {
+				value.ScriptDefaults.TimeoutMS = -1
+			},
+		},
+		{
 			name: "probe ttl",
 			mutate: func(value *domain.Settings) {
 				value.CacheDefaults.ProbeTTLSeconds = -1
@@ -158,6 +166,16 @@ func TestNormalizeRejectsInvalidProjectFields(t *testing.T) {
 			require.True(t, domain.IsCode(err, domain.CodeInvalidArgument), "got %v", err)
 		})
 	}
+}
+
+func TestNormalizeDefaultsMissingScriptTimeout(t *testing.T) {
+	value := settings.Default()
+	value.ScriptDefaults.TimeoutMS = 0
+
+	got, err := settings.Normalize(value)
+
+	require.NoError(t, err)
+	require.Equal(t, 2000, got.ScriptDefaults.TimeoutMS)
 }
 
 func TestNormalizeRejectsMCPPathsThatBypassSharedAuthentication(t *testing.T) {

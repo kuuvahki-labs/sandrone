@@ -32,12 +32,13 @@ export interface FileFormFieldsProps {
   processorsDefault?: ProcessorDetail[];
   renderCacheTTLSeconds?: number;
   scriptFiles?: ResourceOption[];
+  scriptTimeoutMS?: number;
   sourceDefault?: FileSourceDetail;
   sourceEditorKey?: string;
   subscriptions?: ResourceOption[];
 }
 
-export function FileFormFields({ configDefault, defaultName, description = "", displayName = "", driver, loadRuleSetCatalog, loadSubscriptionPreview, mode, onDirty, onValidityChange, processorsDefault, renderCacheTTLSeconds, scriptFiles, sourceDefault, sourceEditorKey, subscriptions = [] }: FileFormFieldsProps) {
+export function FileFormFields({ configDefault, defaultName, description = "", displayName = "", driver, loadRuleSetCatalog, loadSubscriptionPreview, mode, onDirty, onValidityChange, processorsDefault, renderCacheTTLSeconds, scriptFiles, scriptTimeoutMS, sourceDefault, sourceEditorKey, subscriptions = [] }: FileFormFieldsProps) {
   const { locale, t } = useI18n();
   const initialConfigDraft = driver.configuration.mode === "structured"
     ? driver.configuration.adapter.decode(configDefault, locale)
@@ -120,7 +121,7 @@ export function FileFormFields({ configDefault, defaultName, description = "", d
         </WorkbenchGroupSection>
       )}
       <WorkbenchGroupSection keepMounted defaultExpanded id="file-processors" label={t("files.form.processors")}>
-        <FileProcessorBuilder defaultValue={processors} key={driver.kind} kind={driver.kind} onDirty={onDirty} onValidityChange={setProcessorsValid} scriptFiles={scriptFiles} />
+        <FileProcessorBuilder defaultValue={processors} key={driver.kind} kind={driver.kind} onDirty={onDirty} onValidityChange={setProcessorsValid} scriptFiles={scriptFiles} scriptTimeoutMS={scriptTimeoutMS} />
       </WorkbenchGroupSection>
     </div>
   );

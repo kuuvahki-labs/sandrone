@@ -21,9 +21,10 @@ export interface SubscriptionNewPageProps {
   probeCacheTTLSeconds: number;
   probeDefaults: ProbeDefaultsInput;
   scriptFiles?: ResourceOption[];
+  scriptTimeoutMS?: number;
 }
 
-export function SubscriptionNewPage({ sources, type, onBack, onCopySource, onSave, onTypeChange, probeCacheTTLSeconds, probeDefaults, scriptFiles }: SubscriptionNewPageProps) {
+export function SubscriptionNewPage({ sources, type, onBack, onCopySource, onSave, onTypeChange, probeCacheTTLSeconds, probeDefaults, scriptFiles, scriptTimeoutMS }: SubscriptionNewPageProps) {
   const { t } = useI18n();
   const [dirty, setDirty] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
@@ -58,7 +59,7 @@ export function SubscriptionNewPage({ sources, type, onBack, onCopySource, onSav
           title={t("subscriptions.create")}
         />
 
-        <SubscriptionFormFields mode="create" probeCacheTTLSeconds={probeCacheTTLSeconds} probeDefaults={probeDefaults} scriptFiles={scriptFiles} sources={sources} type={type} onCopySource={onCopySource} onTypeChange={onTypeChange} />
+        <SubscriptionFormFields mode="create" probeCacheTTLSeconds={probeCacheTTLSeconds} probeDefaults={probeDefaults} scriptFiles={scriptFiles} scriptTimeoutMS={scriptTimeoutMS} sources={sources} type={type} onCopySource={onCopySource} onTypeChange={onTypeChange} />
         {error ? <Alert severity="error">{error}</Alert> : null}
       </form>
       {confirmLeave ? <DiscardChangesDialog onCancel={() => setConfirmLeave(false)} onConfirm={onBack} /> : null}

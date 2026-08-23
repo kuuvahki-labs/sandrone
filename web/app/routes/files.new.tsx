@@ -48,6 +48,7 @@ export default function NewFileRoute() {
       onBack={() => navigate("/files")}
       onSave={fileActions.createFile}
       scriptFiles={files.items.map(({ name, title }) => ({ name, title }))}
+      scriptTimeoutMS={app.effectiveSettings.script_defaults.timeout_ms}
       subscriptions={subscriptions.items.map(({ name, title }) => ({ name, title }))}
     />
   );

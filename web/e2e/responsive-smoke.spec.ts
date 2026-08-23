@@ -108,6 +108,7 @@ function settingsEnvelope() {
       attempts: 1,
       concurrency: 10,
     },
+    script_defaults: { timeout_ms: 2000 },
     cache_defaults: {
       remote_fetch_ttl_seconds: 0,
       probe_ttl_seconds: 0,

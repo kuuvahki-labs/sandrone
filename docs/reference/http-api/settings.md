@@ -54,6 +54,9 @@ SettingsEnvelope {
     "attempts": 1,
     "concurrency": 10
   },
+  "script_defaults": {
+    "timeout_ms": 2000
+  },
   "cache_defaults": {
     "remote_fetch_ttl_seconds": 0,
     "probe_ttl_seconds": 0,
@@ -116,6 +119,9 @@ SettingsEnvelope {
     "attempts": 2,
     "concurrency": 10
   },
+  "script_defaults": {
+    "timeout_ms": 2000
+  },
   "cache_defaults": {
     "remote_fetch_ttl_seconds": 120,
     "probe_ttl_seconds": 300,
@@ -138,11 +144,13 @@ SettingsEnvelope {
 
 远程 proxy 只接受带 host 的 `http`、`https` 或 `socks5` URL。probe method
 只接受 `tcp_connect`、`udp_ntp`、`url_test`，core 只接受 `mihomo` 或
-`sing-box`。TTL 必须非负；远程与 probe 的 timeout、attempts 和 concurrency
-归一化后必须为正数。主题接受 `system`、`light`、`dark`，语言接受 `auto`、
+`sing-box`。TTL 必须非负；远程、probe 与 script 默认 timeout 以及 attempts 和
+concurrency 归一化后必须为正数。`script_defaults.timeout_ms` 省略或为 `0` 时使用
+2000 ms；正数作为没有显式 `params.timeout_ms` 的 script processor 的执行时限。
+主题接受 `system`、`light`、`dark`，语言接受 `auto`、
 `zh-CN`、`en-US`。
 
-远程、probe、cache、appearance、subscriptions 和 scheduled-refresh 组保存后立即生效。
+远程、probe、script、cache、appearance、subscriptions 和 scheduled-refresh 组保存后立即生效。
 HTTP listen、MCP 三个字段和日志级别属于启动组，保存后列入 `restart_required`；
 当前 listener、MCP 路径与 tool catalog、鉴权边界和其它启动组件不会热切换。
 

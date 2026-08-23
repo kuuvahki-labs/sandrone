@@ -78,6 +78,7 @@ func applyDynamicSettings(effective *domain.Settings, stored domain.Settings) {
 	effective.SchemaVersion = stored.SchemaVersion
 	effective.RemoteDefaults = stored.RemoteDefaults
 	effective.ProbeDefaults = stored.ProbeDefaults
+	effective.ScriptDefaults = stored.ScriptDefaults
 	effective.SpecifyCacheDefaults(stored.CacheDefaults)
 	effective.Appearance = stored.Appearance
 	effective.Subscriptions = stored.Subscriptions

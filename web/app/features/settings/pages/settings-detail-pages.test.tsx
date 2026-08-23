@@ -57,6 +57,7 @@ describe("settings service page", () => {
     const automaticTraffic = screen.getByRole("switch", { name: "在订阅列表显示" });
     expect(automaticTraffic).not.toBeChecked();
     expect(screen.getByRole("heading", { name: "远程请求", level: 4 })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "脚本", level: 4 })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "测活", level: 4 })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "渲染与流量缓存", level: 4 })).toBeInTheDocument();
 
@@ -75,6 +76,11 @@ describe("settings service page", () => {
     });
     fireEvent.change(within(remoteGroup).getByRole("spinbutton", { name: "远程请求缓存（秒）" }), {
       target: { value: "120" },
+    });
+
+    const scriptGroup = screen.getByRole("region", { name: "脚本" });
+    fireEvent.change(within(scriptGroup).getByRole("spinbutton", { name: "脚本执行超时（毫秒）" }), {
+      target: { value: "3500" },
     });
 
     const probeGroup = screen.getByRole("region", { name: "测活" });
@@ -123,6 +129,7 @@ describe("settings service page", () => {
         core: "sing-box",
         url: "http://cp.cloudflare.com/generate_204",
       }),
+      script_defaults: { timeout_ms: 3500 },
       cache_defaults: expect.objectContaining({
         remote_fetch_ttl_seconds: 120,
         probe_ttl_seconds: 300,

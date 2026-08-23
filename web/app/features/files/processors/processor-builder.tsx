@@ -58,7 +58,7 @@ type PresetNotice = {
   removedLabels: string[];
 };
 
-export function FileProcessorBuilder({ defaultValue = [], kind, onDirty, onValidityChange, scriptFiles = [] }: { defaultValue?: ProcessorDetail[]; kind: FileKind; onDirty?: () => void; onValidityChange?: (valid: boolean) => void; scriptFiles?: ResourceOption[] }) {
+export function FileProcessorBuilder({ defaultValue = [], kind, onDirty, onValidityChange, scriptFiles = [], scriptTimeoutMS }: { defaultValue?: ProcessorDetail[]; kind: FileKind; onDirty?: () => void; onValidityChange?: (valid: boolean) => void; scriptFiles?: ResourceOption[]; scriptTimeoutMS?: number }) {
   const { t } = useI18n();
   const [presetNotice, setPresetNotice] = useState<PresetNotice | null>(null);
   const [validationIssueCount, setValidationIssueCount] = useState(0);
@@ -81,7 +81,7 @@ export function FileProcessorBuilder({ defaultValue = [], kind, onDirty, onValid
   ];
 
   function ParamsEditor(props: ProcessorParamsEditorProps) {
-    return <FileProcessorParamsEditor {...props} kind={kind} scriptFiles={scriptFiles} />;
+    return <FileProcessorParamsEditor {...props} kind={kind} scriptFiles={scriptFiles} scriptTimeoutMS={scriptTimeoutMS} />;
   }
 
   const serializeProcessorDraft = useCallback(
@@ -155,7 +155,7 @@ export function FileProcessorBuilder({ defaultValue = [], kind, onDirty, onValid
   );
 }
 
-function FileProcessorParamsEditor({ draft, kind, onChange, scriptFiles }: ProcessorParamsEditorProps & { kind: FileKind; scriptFiles: ResourceOption[] }) {
+function FileProcessorParamsEditor({ draft, kind, onChange, scriptFiles, scriptTimeoutMS }: ProcessorParamsEditorProps & { kind: FileKind; scriptFiles: ResourceOption[]; scriptTimeoutMS?: number }) {
 	const { t } = useI18n();
 	if (draft.opaque) {
 		return <Alert severity="info">{t("files.processor.opaquePreserved")}</Alert>;
@@ -163,7 +163,7 @@ function FileProcessorParamsEditor({ draft, kind, onChange, scriptFiles }: Proce
   const params = draft.params;
   switch (draft.type) {
     case "script":
-      return <ScriptProcessorParamsEditor params={params} scriptFiles={scriptFiles} onChange={onChange} />;
+      return <ScriptProcessorParamsEditor defaultTimeoutMS={scriptTimeoutMS} params={params} scriptFiles={scriptFiles} onChange={onChange} />;
     case "merge":
       return <FileMergeParamsEditor kind={kind} params={params} onChange={onChange} />;
     default:

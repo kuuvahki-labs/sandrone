@@ -44,13 +44,13 @@ const fieldOptions = fields.map((field) => ({ value: field, label: field }));
 const informationNodePattern =
   "(?i)(网址|官网|流量|剩余|时间|应急|套餐|订阅|公告|重置|过期|到期|bandwidth|traffic|quota|reset|expire|expiry|expiration)";
 
-export function ProcessorBuilder({ defaultValue = [], onDirty, probeCacheTTLSeconds, probeDefaults, scriptFiles = [] }: { defaultValue?: ProcessorDetail[]; onDirty?: () => void; probeCacheTTLSeconds: number; probeDefaults: ProbeDefaultsInput; scriptFiles?: ResourceOption[] }) {
+export function ProcessorBuilder({ defaultValue = [], onDirty, probeCacheTTLSeconds, probeDefaults, scriptFiles = [], scriptTimeoutMS }: { defaultValue?: ProcessorDetail[]; onDirty?: () => void; probeCacheTTLSeconds: number; probeDefaults: ProbeDefaultsInput; scriptFiles?: ResourceOption[]; scriptTimeoutMS?: number }) {
   const { t } = useI18n();
   const { hasFeature } = useUICapabilities();
   const options = processorOptions(t, hasFeature("probe.enabled"));
 
   function ParamsEditor(props: ProcessorParamsEditorProps) {
-    return <ProcessorParamsEditor {...props} probeCacheTTLSeconds={probeCacheTTLSeconds} probeDefaults={probeDefaults} scriptFiles={scriptFiles} />;
+    return <ProcessorParamsEditor {...props} probeCacheTTLSeconds={probeCacheTTLSeconds} probeDefaults={probeDefaults} scriptFiles={scriptFiles} scriptTimeoutMS={scriptTimeoutMS} />;
   }
 
   return (
@@ -69,7 +69,7 @@ export function ProcessorBuilder({ defaultValue = [], onDirty, probeCacheTTLSeco
   );
 }
 
-function ProcessorParamsEditor({ draft, onChange, probeCacheTTLSeconds, probeDefaults, scriptFiles }: ProcessorParamsEditorProps & { probeCacheTTLSeconds: number; probeDefaults: ProbeDefaultsInput; scriptFiles: ResourceOption[] }) {
+function ProcessorParamsEditor({ draft, onChange, probeCacheTTLSeconds, probeDefaults, scriptFiles, scriptTimeoutMS }: ProcessorParamsEditorProps & { probeCacheTTLSeconds: number; probeDefaults: ProbeDefaultsInput; scriptFiles: ResourceOption[]; scriptTimeoutMS?: number }) {
   const { t } = useI18n();
   const params = draft.params;
   switch (draft.type) {
@@ -183,7 +183,7 @@ function ProcessorParamsEditor({ draft, onChange, probeCacheTTLSeconds, probeDef
       );
     }
     case "script":
-      return <ScriptProcessorParamsEditor params={params} scriptFiles={scriptFiles} onChange={onChange} />;
+      return <ScriptProcessorParamsEditor defaultTimeoutMS={scriptTimeoutMS} params={params} scriptFiles={scriptFiles} onChange={onChange} />;
     default:
       return <KeyValueParamsEditor params={params} onChange={onChange} />;
   }

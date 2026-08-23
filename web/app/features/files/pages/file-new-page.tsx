@@ -19,10 +19,11 @@ export interface FileNewPageProps {
   onBack: () => void;
   onSave: (kind: string, form: FormData) => void | Promise<void>;
   scriptFiles?: ResourceOption[];
+  scriptTimeoutMS?: number;
   subscriptions?: ResourceOption[];
 }
 
-export function FileNewPage({ loadRuleSetCatalog, loadSubscriptionPreview, source, onBack, onSave, scriptFiles, subscriptions }: FileNewPageProps) {
+export function FileNewPage({ loadRuleSetCatalog, loadSubscriptionPreview, source, onBack, onSave, scriptFiles, scriptTimeoutMS, subscriptions }: FileNewPageProps) {
   const { t } = useI18n();
   const [dirty, setDirty] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
@@ -70,6 +71,7 @@ export function FileNewPage({ loadRuleSetCatalog, loadSubscriptionPreview, sourc
           onDirty={() => setDirty(true)}
           onValidityChange={setValid}
           scriptFiles={scriptFiles}
+          scriptTimeoutMS={scriptTimeoutMS}
           sourceDefault={createPreset.sourceType === "remote" ? { type: "remote", remote: {} } : { type: "inline", content: "" }}
           sourceEditorKey={source}
           subscriptions={subscriptions}

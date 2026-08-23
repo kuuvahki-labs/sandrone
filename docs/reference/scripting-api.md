@@ -30,7 +30,7 @@ processors:
 | `source` | object | 必填且只能指定一个脚本来源，见下一节 |
 | `engine` | string | 省略时为 `js`；当前只接受 `js` |
 | `args` | object | processor 级参数，合并后作为 `input.args` |
-| `timeout_ms` | integer | 大于 `0` 时覆盖执行超时；省略、`0` 或负数使用 2000 ms |
+| `timeout_ms` | integer | 大于 `0` 时覆盖执行超时；省略、`0` 或负数继承项目 `script_defaults.timeout_ms` |
 | `id` | string | inline 脚本的诊断标识；省略时为 `<inline>` |
 | `permissions` | object | 保留配置；当前不授予原生宿主能力 |
 
@@ -290,7 +290,8 @@ header；未知字段同样会使 `api.ini.stringify` 失败。输出统一使�
 
 ## 超时、隔离与敏感信息
 
-每次执行有一个总超时，默认 2000 ms。它覆盖顶层求值、`main`、`api.probe`
+每次执行有一个总超时。未配置 processor 级正数 `timeout_ms` 时继承项目
+`script_defaults.timeout_ms`，该项目默认值为 2000 ms。它覆盖顶层求值、`main`、`api.probe`
 及执行期间的受控资源调用；超时返回 `script_timeout`。脚本 source 的加载和
 编译发生在该执行时限之前，remote source 使用自己的抓取超时。调用方 context
 取消也会中断执行，但不伪装成脚本自身超时。

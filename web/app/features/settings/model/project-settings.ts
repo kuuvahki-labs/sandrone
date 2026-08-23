@@ -33,6 +33,9 @@ export const defaultProjectSettings: SettingsView = {
     attempts: 1,
     concurrency: 10,
   },
+  script_defaults: {
+    timeout_ms: 2000,
+  },
   cache_defaults: {
     remote_fetch_ttl_seconds: 0,
     probe_ttl_seconds: 0,
@@ -63,6 +66,7 @@ export function completeProjectSettings(settings?: Partial<SettingsView>): Setti
     log: { ...defaultProjectSettings.log, ...settings?.log },
     remote_defaults: { ...defaultProjectSettings.remote_defaults, ...settings?.remote_defaults },
     probe_defaults: { ...defaultProjectSettings.probe_defaults, ...settings?.probe_defaults },
+    script_defaults: { ...defaultProjectSettings.script_defaults, ...settings?.script_defaults },
     cache_defaults: { ...defaultProjectSettings.cache_defaults, ...settings?.cache_defaults },
     appearance: { ...defaultProjectSettings.appearance, ...settings?.appearance },
     subscriptions: { ...defaultProjectSettings.subscriptions, ...settings?.subscriptions },
@@ -82,6 +86,7 @@ export function settingsUpdateFromView(view: SettingsView): SettingsUpdate {
     log: view.log,
     remote_defaults: view.remote_defaults,
     probe_defaults: view.probe_defaults,
+    script_defaults: view.script_defaults,
     cache_defaults: view.cache_defaults,
     appearance: view.appearance,
     subscriptions: view.subscriptions,
@@ -110,6 +115,7 @@ export function optimisticSettingsEnvelope(
       ...previous.effective,
       remote_defaults: settings.remote_defaults,
       probe_defaults: settings.probe_defaults,
+      script_defaults: settings.script_defaults,
       cache_defaults: settings.cache_defaults,
       appearance: settings.appearance,
       subscriptions: settings.subscriptions,

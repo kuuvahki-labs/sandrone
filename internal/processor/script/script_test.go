@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -153,6 +154,42 @@ func TestScriptTimeout(t *testing.T) {
 	_, err = proc.ApplyNodes(context.Background(), domain.NodeProcessInput{Nodes: []domain.NodeIR{{Name: "a", Type: domain.NodeTypeShadowsocks}}})
 	require.Error(t, err)
 	require.True(t, domain.IsCode(err, domain.CodeScriptTimeout))
+}
+
+func TestScriptDefaultTimeoutCanBeInjectedAndExplicitTimeoutWins(t *testing.T) {
+	t.Run("injected default", func(t *testing.T) {
+		r := processor.NewRegistry()
+		registerScript(r, script.WithDefaultTimeout(func() time.Duration { return 10 * time.Millisecond }))
+		proc, err := r.BuildNode(domain.ProcessorSpec{
+			Type: "script", Stage: domain.StageNodes,
+			Params: params(t, map[string]any{"source": fileScriptSource(filepath.Join("testdata", "timeout.js"))}),
+		})
+		require.NoError(t, err)
+
+		_, err = proc.ApplyNodes(context.Background(), domain.NodeProcessInput{Nodes: []domain.NodeIR{{Name: "a", Type: domain.NodeTypeShadowsocks}}})
+		require.Error(t, err)
+		require.True(t, domain.IsCode(err, domain.CodeScriptTimeout))
+	})
+
+	t.Run("explicit override", func(t *testing.T) {
+		r := processor.NewRegistry()
+		registerScript(r, script.WithDefaultTimeout(func() time.Duration { return time.Millisecond }))
+		proc, err := r.BuildNode(domain.ProcessorSpec{
+			Type: "script", Stage: domain.StageNodes,
+			Params: params(t, map[string]any{
+				"source": inlineScriptSource(`function main(input) {
+  var end = Date.now() + 20;
+  while (Date.now() < end) {}
+  return input;
+}`),
+				"timeout_ms": 200,
+			}),
+		})
+		require.NoError(t, err)
+
+		_, err = proc.ApplyNodes(context.Background(), domain.NodeProcessInput{Nodes: []domain.NodeIR{{Name: "a", Type: domain.NodeTypeShadowsocks}}})
+		require.NoError(t, err)
+	})
 }
 
 func TestScriptRegistryAmbiguousWithoutStage(t *testing.T) {

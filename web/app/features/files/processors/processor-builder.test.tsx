@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -16,16 +16,24 @@ describe("FileProcessorBuilder", () => {
       <FileProcessorBuilder
         kind="mihomo"
         defaultValue={[
-          { name: "Remote script", type: "script", stage: "file", params: { source: { type: "remote", remote: { url: "https://example.com/process.js" } }, timeout_ms: 2000 } },
+          { name: "Remote script", type: "script", stage: "file", params: { source: { type: "remote", remote: { url: "https://example.com/process.js", cache_ttl_seconds: 300 } }, timeout_ms: 2000 } },
           { type: "merge", stage: "file", params: { mode: "yaml_override", content: "dns:\n  enable: true" } },
         ]}
       />,
     );
 
     expect(currentProcessors()).toEqual([
-      { name: "Remote script", type: "script", stage: "file", params: { source: { type: "remote", remote: { url: "https://example.com/process.js" } }, timeout_ms: 2000 } },
+      { name: "Remote script", type: "script", stage: "file", params: { source: { type: "remote", remote: { url: "https://example.com/process.js", cache_ttl_seconds: 300 } }, timeout_ms: 2000 } },
       { type: "merge", stage: "file", params: { mode: "yaml_override", content: "dns:\n  enable: true" } },
     ]);
+
+    const remoteScript = screen.getByRole("group", { name: "处理器 Remote script" });
+    fireEvent.change(within(remoteScript).getByRole("spinbutton", { name: "远程请求缓存（秒）" }), {
+      target: { value: "450" },
+    });
+    expect(currentProcessors()[0]).toMatchObject({
+      params: { source: { remote: { cache_ttl_seconds: 450 } } },
+    });
   });
 
   it.each(typedRuleSourceKinds)("offers the rule source mirror preset for %s", async (kind) => {

@@ -2,6 +2,7 @@ package service_test
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/spf13/afero"
@@ -22,6 +23,7 @@ func TestServiceSettingsSaveAppliesDynamicGroupsAndDefersStartupGroups(t *testin
 	update.Appearance.ThemeMode = "light"
 	update.Subscriptions.AutoLoadTraffic = true
 	update.RemoteDefaults.TimeoutMS = 9000
+	update.ScriptDefaults.TimeoutMS = 3500
 
 	after, err := svc.PutSettings(context.Background(), update)
 
@@ -31,6 +33,7 @@ func TestServiceSettingsSaveAppliesDynamicGroupsAndDefersStartupGroups(t *testin
 	require.Equal(t, "light", after.Effective.Appearance.ThemeMode)
 	require.True(t, after.Effective.Subscriptions.AutoLoadTraffic)
 	require.Equal(t, 9000, after.Effective.RemoteDefaults.TimeoutMS)
+	require.Equal(t, 3500, after.Effective.ScriptDefaults.TimeoutMS)
 	require.Equal(t, []string{"http.listen"}, after.RestartRequired)
 }
 
@@ -77,6 +80,46 @@ func TestServiceSettingsCanClearRemoteUserAgent(t *testing.T) {
 	require.Empty(t, readBack.Effective.RemoteDefaults.UserAgent)
 }
 
+func TestServiceSettingsApplyScriptTimeoutToSubsequentProcessors(t *testing.T) {
+	svc := newProjectSettingsService()
+	before, err := svc.GetSettings(context.Background())
+	require.NoError(t, err)
+	update := settingsUpdate(before.Settings)
+	update.ScriptDefaults.TimeoutMS = 5
+	_, err = svc.PutSettings(context.Background(), update)
+	require.NoError(t, err)
+
+	source, err := json.Marshal(map[string]any{
+		"type": "inline",
+		"content": `function main(input) {
+  var end = Date.now() + 30;
+  while (Date.now() < end) {}
+  return input;
+}`,
+	})
+	require.NoError(t, err)
+	spec := domain.ProcessorSpec{
+		Type:   "script",
+		Stage:  domain.StageNodes,
+		Params: map[string]json.RawMessage{"source": source},
+	}
+	input := domain.NodeProcessInput{Nodes: []domain.NodeIR{{Name: "a", Type: domain.NodeTypeShadowsocks}}}
+
+	proc, err := svc.Registry().BuildNode(spec)
+	require.NoError(t, err)
+	_, err = proc.ApplyNodes(context.Background(), input)
+	require.Error(t, err)
+	require.True(t, domain.IsCode(err, domain.CodeScriptTimeout))
+
+	update.ScriptDefaults.TimeoutMS = 200
+	_, err = svc.PutSettings(context.Background(), update)
+	require.NoError(t, err)
+	proc, err = svc.Registry().BuildNode(spec)
+	require.NoError(t, err)
+	_, err = proc.ApplyNodes(context.Background(), input)
+	require.NoError(t, err)
+}
+
 func newProjectSettingsService() *service.Service {
 	value := projectsettings.Default()
 	return newProjectSettingsServiceWithState(value, value, nil)
@@ -100,6 +143,7 @@ func settingsUpdate(value domain.SettingsView) domain.SettingsUpdate {
 		Log:              value.Log,
 		RemoteDefaults:   value.RemoteDefaults,
 		ProbeDefaults:    value.ProbeDefaults,
+		ScriptDefaults:   value.ScriptDefaults,
 		CacheDefaults:    value.CacheDefaults,
 		Appearance:       value.Appearance,
 		Subscriptions:    value.Subscriptions,

@@ -27,6 +27,7 @@ func TestSettingsEndpointRoundTripOmitsRemovedStartupFields(t *testing.T) {
 	update.HTTP.Listen = "127.0.0.1:2237"
 	update.Appearance.ThemeMode = "light"
 	update.Subscriptions.AutoLoadTraffic = true
+	update.ScriptDefaults.TimeoutMS = 3500
 	update.ScheduledRefresh = domain.ScheduledRefreshSettings{
 		Enabled:  true,
 		Schedule: "@daily",
@@ -50,6 +51,7 @@ func TestSettingsEndpointRoundTripOmitsRemovedStartupFields(t *testing.T) {
 	require.Equal(t, "127.0.0.1:2237", snapshot.Settings.HTTP.Listen)
 	require.Equal(t, "light", snapshot.Effective.Appearance.ThemeMode)
 	require.True(t, snapshot.Effective.Subscriptions.AutoLoadTraffic)
+	require.Equal(t, 3500, snapshot.Effective.ScriptDefaults.TimeoutMS)
 	require.Equal(t, update.ScheduledRefresh, snapshot.Effective.ScheduledRefresh)
 	require.Contains(t, snapshot.RestartRequired, "http.listen")
 
@@ -186,6 +188,7 @@ func settingsUpdate() domain.SettingsUpdate {
 		Log:              value.Log,
 		RemoteDefaults:   value.RemoteDefaults,
 		ProbeDefaults:    value.ProbeDefaults,
+		ScriptDefaults:   value.ScriptDefaults,
 		CacheDefaults:    value.CacheDefaults,
 		Appearance:       value.Appearance,
 		Subscriptions:    value.Subscriptions,

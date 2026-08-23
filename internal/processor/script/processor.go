@@ -3,6 +3,7 @@ package script
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/processor"
@@ -109,6 +110,7 @@ type registerConfig struct {
 	probeRunner      ProbeRunner
 	resourceResolver ResourceResolver
 	loader           Loader
+	defaultTimeout   func() time.Duration
 }
 
 type RegisterOption func(*registerConfig)
@@ -131,18 +133,27 @@ func WithLoader(loader Loader) RegisterOption {
 	}
 }
 
+// WithDefaultTimeout resolves the execution timeout used when a script does
+// not provide a positive params.timeout_ms override.
+func WithDefaultTimeout(resolve func() time.Duration) RegisterOption {
+	return func(cfg *registerConfig) {
+		cfg.defaultTimeout = resolve
+	}
+}
+
 // NodeProcessor is the node-stage script processor.
 type NodeProcessor struct {
 	cfg    Config
 	runner *runner
 }
 
-func buildNodeProcessorWithProbe(runner ProbeRunner, resolver ResourceResolver, loader Loader) processor.NodeBuilder {
+func buildNodeProcessorWithProbe(runner ProbeRunner, resolver ResourceResolver, loader Loader, resolveDefaultTimeout func() time.Duration) processor.NodeBuilder {
 	return func(spec domain.ProcessorSpec) (domain.NodeProcessor, error) {
 		cfg, err := parseConfig(spec)
 		if err != nil {
 			return nil, err
 		}
+		applyDefaultTimeout(&cfg, resolveDefaultTimeout)
 		warnings := []domain.Warning{}
 		logs := []string{}
 		r, err := newRunner(cfg, newScriptAPI(cfg, &warnings, &logs, runner, resolver), loader)
@@ -195,12 +206,13 @@ type FileProcessor struct {
 	runner *runner
 }
 
-func buildFileProcessorWithResources(resolver ResourceResolver, loader Loader) processor.FileBuilder {
+func buildFileProcessorWithResources(resolver ResourceResolver, loader Loader, resolveDefaultTimeout func() time.Duration) processor.FileBuilder {
 	return func(spec domain.ProcessorSpec) (domain.FileProcessor, error) {
 		cfg, err := parseConfig(spec)
 		if err != nil {
 			return nil, err
 		}
+		applyDefaultTimeout(&cfg, resolveDefaultTimeout)
 		warnings := []domain.Warning{}
 		logs := []string{}
 		r, err := newRunner(cfg, newScriptAPI(cfg, &warnings, &logs, nil, resolver), loader)
@@ -208,6 +220,15 @@ func buildFileProcessorWithResources(resolver ResourceResolver, loader Loader) p
 			return nil, err
 		}
 		return &FileProcessor{cfg: cfg, runner: r}, nil
+	}
+}
+
+func applyDefaultTimeout(cfg *Config, resolve func() time.Duration) {
+	if cfg.TimeoutMS > 0 || resolve == nil {
+		return
+	}
+	if timeout := resolve(); timeout > 0 {
+		cfg.TimeoutMS = int(timeout / time.Millisecond)
 	}
 }
 
@@ -272,8 +293,8 @@ func Register(r *processor.Registry, opts ...RegisterOption) {
 	}
 	nodeDescriptor := descriptor
 	nodeDescriptor.Effects.Probes = true
-	r.RegisterNodeWithDescriptor("script", buildNodeProcessorWithProbe(cfg.probeRunner, cfg.resourceResolver, cfg.loader), nodeDescriptor)
-	r.RegisterFileWithDescriptor("script", buildFileProcessorWithResources(cfg.resourceResolver, cfg.loader), descriptor)
+	r.RegisterNodeWithDescriptor("script", buildNodeProcessorWithProbe(cfg.probeRunner, cfg.resourceResolver, cfg.loader, cfg.defaultTimeout), nodeDescriptor)
+	r.RegisterFileWithDescriptor("script", buildFileProcessorWithResources(cfg.resourceResolver, cfg.loader, cfg.defaultTimeout), descriptor)
 }
 
 func requestArgs(req domain.RequestInfo) map[string]any {

@@ -12,6 +12,7 @@ describe("project settings model", () => {
     expect(defaultProjectSettings.remote_defaults.user_agent).toBe("");
     expect(defaultProjectSettings.appearance.locale).toBe("auto");
     expect(defaultProjectSettings.probe_defaults.url).toBe("https://cp.cloudflare.com");
+    expect(defaultProjectSettings.script_defaults.timeout_ms).toBe(2000);
     expect(defaultProjectSettings.scheduled_refresh).toEqual({
       enabled: false,
       schedule: "@every 10m",
@@ -36,5 +37,6 @@ describe("project settings model", () => {
     expect(update.mcp).not.toHaveProperty("allow_management_tools");
     expect(update).not.toHaveProperty("webui");
     expect(update.scheduled_refresh).toEqual(defaultProjectSettings.scheduled_refresh);
+    expect(update.script_defaults).toEqual({ timeout_ms: 2000 });
   });
 });

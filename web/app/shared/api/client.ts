@@ -86,6 +86,10 @@ export interface ProbeDefaultsInput {
   concurrency: number;
 }
 
+export interface ScriptDefaultsInput {
+  timeout_ms: number;
+}
+
 export interface CacheDefaultsInput {
   remote_fetch_ttl_seconds: number;
   probe_ttl_seconds: number;
@@ -115,6 +119,7 @@ export interface SettingsView {
   };
   remote_defaults: RemoteDefaultsInput;
   probe_defaults: ProbeDefaultsInput;
+  script_defaults: ScriptDefaultsInput;
   cache_defaults: CacheDefaultsInput;
   appearance: {
     theme_mode: "system" | "light" | "dark";
@@ -139,6 +144,7 @@ export interface SettingsUpdate {
   log: SettingsView["log"];
   remote_defaults: RemoteDefaultsInput;
   probe_defaults: ProbeDefaultsInput;
+  script_defaults: ScriptDefaultsInput;
   cache_defaults: CacheDefaultsInput;
   appearance: SettingsView["appearance"];
   subscriptions: SettingsView["subscriptions"];

@@ -24,7 +24,7 @@ type Config struct {
 	Source      ScriptSource     `json:"source,omitempty" jsonschema:"Structured inline controlled file or controlled remote source"`
 	Engine      string           `json:"engine,omitempty" jsonschema:"Script engine" enum:"js" default:"js"`
 	Args        map[string]any   `json:"args,omitempty" jsonschema:"Arguments exposed to the script envelope"`
-	TimeoutMS   int              `json:"timeout_ms,omitempty" jsonschema:"Execution timeout in milliseconds" minimum:"0"`
+	TimeoutMS   int              `json:"timeout_ms,omitempty" jsonschema:"Execution timeout override in milliseconds; zero inherits the project script default" minimum:"0"`
 	ScriptID    string           `json:"id,omitempty" jsonschema:"Stable identifier for inline source diagnostics"`
 	Permissions PermissionConfig `json:"permissions,omitempty" jsonschema:"Explicit side-effect permissions"`
 }

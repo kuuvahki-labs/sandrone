@@ -38,10 +38,11 @@ export interface FileEditPageProps {
   onSave: (form: FormData) => void | Promise<void>;
   onShare: () => void;
   scriptFiles?: ResourceOption[];
+  scriptTimeoutMS?: number;
   subscriptions?: ResourceOption[];
 }
 
-export function FileEditPage({ detail, detailPending = false, item, loadRuleSetCatalog, loadSubscriptionPreview, onBack, onPreview, onSave, onShare, scriptFiles, subscriptions }: FileEditPageProps) {
+export function FileEditPage({ detail, detailPending = false, item, loadRuleSetCatalog, loadSubscriptionPreview, onBack, onPreview, onSave, onShare, scriptFiles, scriptTimeoutMS, subscriptions }: FileEditPageProps) {
   const { t } = useI18n();
   const [editSession, setEditSession] = useState(createEditSession);
   const [confirmLeave, setConfirmLeave] = useState(false);
@@ -143,6 +144,7 @@ export function FileEditPage({ detail, detailPending = false, item, loadRuleSetC
           processorsDefault={detail?.processors}
           renderCacheTTLSeconds={detail?.renderCacheTTLSeconds}
           scriptFiles={scriptFiles}
+          scriptTimeoutMS={scriptTimeoutMS}
           sourceDefault={detail?.source}
           subscriptions={subscriptions}
         />

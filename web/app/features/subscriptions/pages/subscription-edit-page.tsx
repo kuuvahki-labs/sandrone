@@ -29,6 +29,7 @@ export interface SubscriptionEditPageProps {
   definition?: SubscriptionDefinition | null;
   definitionPending?: boolean;
   scriptFiles?: ResourceOption[];
+  scriptTimeoutMS?: number;
   sources: SubscriptionItem[];
   onBack: () => void;
   onCopySource?: (value: string, target: SubscriptionCopyTarget) => void | Promise<void>;
@@ -44,6 +45,7 @@ export function SubscriptionEditPage({
   definition,
   definitionPending = false,
   scriptFiles,
+  scriptTimeoutMS,
   sources,
   onBack,
   onCopySource,
@@ -132,6 +134,7 @@ export function SubscriptionEditPage({
             probeCacheTTLSeconds={probeCacheTTLSeconds}
             probeDefaults={probeDefaults}
             scriptFiles={scriptFiles}
+            scriptTimeoutMS={scriptTimeoutMS}
             sources={sources}
             type={selectedType}
             onCopySource={onCopySource}

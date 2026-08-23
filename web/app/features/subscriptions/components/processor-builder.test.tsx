@@ -18,11 +18,13 @@ function renderProcessorBuilder({
   onDirty,
 	probeEnabled = true,
   scriptFiles: availableScriptFiles = [],
+  scriptTimeoutMS,
 }: {
   defaultValue?: ProcessorDetail[];
   onDirty?: () => void;
 	probeEnabled?: boolean;
   scriptFiles?: ResourceOption[];
+  scriptTimeoutMS?: number;
 } = {}) {
   const { container } = render(
     <UICapabilityProvider value={{
@@ -37,6 +39,7 @@ function renderProcessorBuilder({
         probeCacheTTLSeconds={probeCacheTTLSeconds}
         probeDefaults={probeDefaults}
         scriptFiles={availableScriptFiles}
+        scriptTimeoutMS={scriptTimeoutMS}
       />
     </UICapabilityProvider>,
   );
@@ -352,6 +355,7 @@ describe("ProcessorBuilder", () => {
         },
       ],
       scriptFiles: scriptFiles.map((file) => file.name === "rename.js" ? { ...file, title: "Rename Nodes" } : file),
+      scriptTimeoutMS: 3500,
     });
 
     const scriptGroup = screen.getByRole("group", { name: "处理器 脚本处理" });
@@ -368,7 +372,8 @@ describe("ProcessorBuilder", () => {
     const argsInput = within(scriptGroup).getByRole("textbox", { name: "脚本参数" });
     expect(argsInput.closest("[data-highlighted-textarea]")).toHaveAttribute("data-highlighted-textarea", "text");
     expect(argsInput).toHaveValue("flag=true\nin=zh");
-    expect(within(scriptGroup).getByRole("spinbutton", { name: "超时毫秒" })).toHaveValue(5000);
+    expect(within(scriptGroup).getByRole("spinbutton", { name: "脚本执行超时（毫秒）" })).toHaveValue(5000);
+    expect(within(scriptGroup).getByRole("spinbutton", { name: "脚本执行超时（毫秒）" })).toHaveAttribute("placeholder", "3500");
     expect(within(scriptGroup).queryByRole("textbox", { name: "脚本 ID" })).not.toBeInTheDocument();
 
     const customGroup = screen.getByRole("group", { name: "处理器 custom" });
@@ -385,6 +390,8 @@ describe("ProcessorBuilder", () => {
     expect(within(scriptGroup).queryByRole("textbox", { name: "脚本路径" })).not.toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "default.yaml" })).not.toBeInTheDocument();
     await user.selectOptions(scriptFileSelect, "other.js");
+    const sourceArgsInput = within(scriptGroup).getByRole("textbox", { name: "脚本文件渲染参数" });
+    fireEvent.change(sourceArgsInput, { target: { value: "variant=production\ncount=2" } });
     fireEvent.change(argsInput, { target: { value: "in=zh\nflag=true\nthreshold=2" } });
 
     expect(serializedProcessors()).toEqual([
@@ -395,7 +402,7 @@ describe("ProcessorBuilder", () => {
           engine: "js",
           args: { in: "zh", flag: true, threshold: 2 },
           id: "legacy-script",
-          source: { type: "file", name: "other.js" },
+          source: { type: "file", name: "other.js", args: { variant: "production", count: "2" } },
           timeout_ms: 5000,
         },
       },

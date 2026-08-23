@@ -14,8 +14,8 @@ import { ProbeURLField } from "~/shared/ui/probe-url-field";
 
 interface RuntimeSettingsSectionProps {
   defaultUserAgent?: string;
-  value: Pick<SettingsView, "remote_defaults" | "probe_defaults" | "cache_defaults">;
-  onChange: (value: Pick<SettingsView, "remote_defaults" | "probe_defaults" | "cache_defaults">) => void;
+  value: Pick<SettingsView, "remote_defaults" | "probe_defaults" | "script_defaults" | "cache_defaults">;
+  onChange: (value: Pick<SettingsView, "remote_defaults" | "probe_defaults" | "script_defaults" | "cache_defaults">) => void;
 }
 
 export function RuntimeSettingsSection({
@@ -45,6 +45,13 @@ export function RuntimeSettingsSection({
     onChange({
       ...value,
       cache_defaults: { ...value.cache_defaults, ...patch },
+    });
+  }
+
+  function updateScriptDefaults(patch: Partial<SettingsView["script_defaults"]>) {
+    onChange({
+      ...value,
+      script_defaults: { ...value.script_defaults, ...patch },
     });
   }
 
@@ -92,6 +99,16 @@ export function RuntimeSettingsSection({
             type="number"
             value={numberInputValue(value.cache_defaults.remote_fetch_ttl_seconds)}
             onChange={(event) => updateCacheDefaults({ remote_fetch_ttl_seconds: numberOrZero(event.target.value) })}
+          />
+        </RuntimeSettingsGroup>
+        <RuntimeSettingsGroup id="runtime-script-defaults" title={t("settings.runtime.group.script")}>
+          <TextField
+            fullWidth
+            helperText={t("settings.runtime.scriptTimeoutHint")}
+            label={t("settings.runtime.scriptTimeoutMs")}
+            type="number"
+            value={numberInputValue(value.script_defaults.timeout_ms)}
+            onChange={(event) => updateScriptDefaults({ timeout_ms: numberOrZero(event.target.value) })}
           />
         </RuntimeSettingsGroup>
         {hasFeature("probe.enabled") ? (

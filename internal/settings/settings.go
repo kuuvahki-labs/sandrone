@@ -51,6 +51,7 @@ func DecodeStored(body []byte) (domain.Settings, bool, error) {
 		Log:              stored.Log,
 		RemoteDefaults:   stored.RemoteDefaults,
 		ProbeDefaults:    stored.ProbeDefaults,
+		ScriptDefaults:   stored.ScriptDefaults,
 		Appearance:       stored.Appearance,
 		Subscriptions:    stored.Subscriptions,
 		ScheduledRefresh: stored.ScheduledRefresh,
@@ -78,6 +79,7 @@ type storedSettings struct {
 	Log              domain.LogSettings              `json:"log"`
 	RemoteDefaults   domain.RemoteDefaults           `json:"remote_defaults"`
 	ProbeDefaults    domain.ProbeDefaults            `json:"probe_defaults"`
+	ScriptDefaults   domain.ScriptDefaults           `json:"script_defaults"`
 	CacheDefaults    *domain.CacheDefaults           `json:"cache_defaults"`
 	Appearance       domain.AppearanceSettings       `json:"appearance"`
 	Subscriptions    domain.SubscriptionSettings     `json:"subscriptions"`
@@ -124,6 +126,7 @@ func Default() domain.Settings {
 			Attempts:    1,
 			Concurrency: 10,
 		},
+		ScriptDefaults: domain.ScriptDefaults{TimeoutMS: 2000},
 		CacheDefaults: domain.CacheDefaults{
 			SubscriptionTrafficTTLSeconds: 60,
 		},
@@ -178,6 +181,10 @@ func Normalize(value domain.Settings) (domain.Settings, error) {
 	if err != nil {
 		return domain.Settings{}, err
 	}
+	out.ScriptDefaults, err = normalizeScriptDefaults(value.ScriptDefaults, defaults.ScriptDefaults)
+	if err != nil {
+		return domain.Settings{}, err
+	}
 	if value.CacheDefaultsSpecified() {
 		out.SpecifyCacheDefaults(value.CacheDefaults)
 	}
@@ -206,6 +213,7 @@ func ApplyUpdate(update domain.SettingsUpdate) (domain.Settings, error) {
 		Log:              update.Log,
 		RemoteDefaults:   update.RemoteDefaults,
 		ProbeDefaults:    update.ProbeDefaults,
+		ScriptDefaults:   update.ScriptDefaults,
 		Appearance:       update.Appearance,
 		Subscriptions:    update.Subscriptions,
 		ScheduledRefresh: update.ScheduledRefresh,
@@ -222,6 +230,7 @@ func View(value domain.Settings) domain.SettingsView {
 		Log:              value.Log,
 		RemoteDefaults:   value.RemoteDefaults,
 		ProbeDefaults:    value.ProbeDefaults,
+		ScriptDefaults:   value.ScriptDefaults,
 		CacheDefaults:    value.CacheDefaults,
 		Appearance:       value.Appearance,
 		Subscriptions:    value.Subscriptions,
@@ -336,6 +345,16 @@ func normalizeProbeDefaults(value, defaults domain.ProbeDefaults) (domain.ProbeD
 		return domain.ProbeDefaults{}, invalid("unsupported probe core %q", out.Core)
 	}
 	return out, nil
+}
+
+func normalizeScriptDefaults(value, defaults domain.ScriptDefaults) (domain.ScriptDefaults, error) {
+	if value.TimeoutMS < 0 {
+		return domain.ScriptDefaults{}, invalid("script timeout_ms must be non-negative")
+	}
+	if value.TimeoutMS == 0 {
+		return defaults, nil
+	}
+	return value, nil
 }
 
 func validateHTTP(value domain.HTTPSettings) error {

@@ -233,7 +233,15 @@ func New(opts ...Option) *Service {
 	}
 	nodeproc.Register(registry, s)
 	fileproc.Register(registry)
-	scriptproc.Register(registry, scriptproc.WithProbeRunner(s), scriptproc.WithResourceResolver(s), scriptproc.WithLoader(s.loadScriptSource))
+	scriptproc.Register(
+		registry,
+		scriptproc.WithProbeRunner(s),
+		scriptproc.WithResourceResolver(s),
+		scriptproc.WithLoader(s.loadScriptSource),
+		scriptproc.WithDefaultTimeout(func() time.Duration {
+			return time.Duration(s.currentSettings().ScriptDefaults.TimeoutMS) * time.Millisecond
+		}),
+	)
 	for _, opt := range opts {
 		opt(s)
 	}

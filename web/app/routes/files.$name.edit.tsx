@@ -90,6 +90,7 @@ export default function FileEditRoute() {
       onSave={(form) => fileActions.saveFileEdit(item, form, detail)}
       onShare={() => shareDialog.open({ kind: "file", name: item.name })}
       scriptFiles={files.items.map(({ name, title }) => ({ name, title }))}
+      scriptTimeoutMS={app.effectiveSettings.script_defaults.timeout_ms}
       subscriptions={subscriptions.items.map(({ name, title }) => ({ name, title }))}
     />
   );

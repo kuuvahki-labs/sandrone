@@ -21,6 +21,10 @@ type ProbeDefaults struct {
 	Concurrency int    `json:"concurrency,omitempty" yaml:"concurrency,omitempty"`
 }
 
+type ScriptDefaults struct {
+	TimeoutMS int `json:"timeout_ms" yaml:"timeout_ms"`
+}
+
 type CacheDefaults struct {
 	RemoteFetchTTLSeconds         int `json:"remote_fetch_ttl_seconds,omitempty" yaml:"remote_fetch_ttl_seconds,omitempty"`
 	ProbeTTLSeconds               int `json:"probe_ttl_seconds,omitempty" yaml:"probe_ttl_seconds,omitempty"`
@@ -36,6 +40,7 @@ type Settings struct {
 	Log              LogSettings              `json:"log"`
 	RemoteDefaults   RemoteDefaults           `json:"remote_defaults"`
 	ProbeDefaults    ProbeDefaults            `json:"probe_defaults"`
+	ScriptDefaults   ScriptDefaults           `json:"script_defaults"`
 	CacheDefaults    CacheDefaults            `json:"cache_defaults"`
 	Appearance       AppearanceSettings       `json:"appearance"`
 	Subscriptions    SubscriptionSettings     `json:"subscriptions"`
@@ -117,6 +122,7 @@ type SettingsUpdate struct {
 	Log              LogSettings              `json:"log"`
 	RemoteDefaults   RemoteDefaults           `json:"remote_defaults"`
 	ProbeDefaults    ProbeDefaults            `json:"probe_defaults"`
+	ScriptDefaults   ScriptDefaults           `json:"script_defaults"`
 	CacheDefaults    CacheDefaults            `json:"cache_defaults"`
 	Appearance       AppearanceSettings       `json:"appearance"`
 	Subscriptions    SubscriptionSettings     `json:"subscriptions"`
@@ -130,6 +136,7 @@ type SettingsView struct {
 	Log              LogSettings              `json:"log"`
 	RemoteDefaults   RemoteDefaults           `json:"remote_defaults"`
 	ProbeDefaults    ProbeDefaults            `json:"probe_defaults"`
+	ScriptDefaults   ScriptDefaults           `json:"script_defaults"`
 	CacheDefaults    CacheDefaults            `json:"cache_defaults"`
 	Appearance       AppearanceSettings       `json:"appearance"`
 	Subscriptions    SubscriptionSettings     `json:"subscriptions"`

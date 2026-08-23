@@ -184,6 +184,7 @@ func scheduledRefreshSettingsUpdate(value domain.Settings) domain.SettingsUpdate
 		Log:              value.Log,
 		RemoteDefaults:   value.RemoteDefaults,
 		ProbeDefaults:    value.ProbeDefaults,
+		ScriptDefaults:   value.ScriptDefaults,
 		CacheDefaults:    value.CacheDefaults,
 		Appearance:       value.Appearance,
 		Subscriptions:    value.Subscriptions,
