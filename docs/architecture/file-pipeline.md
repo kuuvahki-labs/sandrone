@@ -153,8 +153,8 @@ file-stage script 可以通过窄接口读取已保存 subscription 的节点或
 
 service 为同一次文件请求维护调用栈和 memo：
 
-- file-backed script 的 `source.args` 只用于渲染脚本文件资源；脚本运行时的
-  `params.args` 仍单独与当前请求参数合并。
+- file-backed script 独立渲染脚本文件资源，不继承当前 processor 或请求参数；
+  脚本运行时的 `params.args` 仍与当前请求参数合并。
 - `api.subscription.produce` 与 `api.file.content` 的子调用参数只来自各自显式
   `options.args`，不会继承父文件请求参数。
 - 动态 subscription/file 引用加入 report dependencies。

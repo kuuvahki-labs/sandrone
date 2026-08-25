@@ -34,7 +34,7 @@ func normalizeScriptSource(cfg *Config, processorType string) error {
 	cfg.Source.Type = strings.ToLower(strings.TrimSpace(cfg.Source.Type))
 	cfg.Source.Name = strings.TrimSpace(cfg.Source.Name)
 	cfg.Source.SHA256 = strings.ToLower(strings.TrimSpace(cfg.Source.SHA256))
-	structured := cfg.Source.Type != "" || cfg.Source.Content != "" || cfg.Source.Name != "" || cfg.Source.argsPresent || cfg.Source.Args != nil || cfg.Source.Remote != nil || cfg.Source.SHA256 != ""
+	structured := cfg.Source.Type != "" || cfg.Source.Content != "" || cfg.Source.Name != "" || cfg.Source.Remote != nil || cfg.Source.SHA256 != ""
 	legacyContent := strings.TrimSpace(cfg.Content) != ""
 	legacyPath := strings.TrimSpace(cfg.Path) != ""
 	if structured && (legacyContent || legacyPath) {
@@ -65,13 +65,6 @@ func normalizeScriptSource(cfg *Config, processorType string) error {
 				Message:   "script requires exactly one source",
 				Processor: processorType,
 			}
-		}
-	}
-	if cfg.Source.Args != nil && cfg.Source.Type != "file" {
-		return &domain.AppError{
-			Code:      domain.CodeProcessorConfigInvalid,
-			Message:   "source.args is allowed only for file script sources",
-			Processor: processorType,
 		}
 	}
 	switch cfg.Source.Type {

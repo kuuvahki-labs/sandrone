@@ -75,18 +75,15 @@ func (s *Service) loadScriptFileResource(ctx context.Context, source scriptproc.
 		stack: map[string]bool{},
 		memo:  map[string]*domain.FileResult{},
 	}
-	req := domain.FileRequest{
-		Name:    name,
-		Request: domain.RequestInfo{Args: cloneArgs(source.Args)},
-	}
+	req := domain.FileRequest{Name: name}
 	if rctx, ok := fileResolutionContextFrom(ctx); ok {
 		state = rctx.state
-		req.Request = requestWithExplicitArgs(rctx.req.Request, source.Args)
+		req.Request = requestWithExplicitArgs(rctx.req.Request, nil)
 		req.Meta = rctx.req.Meta
 		state.dynamicDeps = appendResourceRef(state.dynamicDeps, domain.ResourceRef{Kind: "file", Name: name})
 	} else if fctx, ok := fileScriptContextFrom(ctx); ok {
 		state = fctx.state
-		req.Request = requestWithExplicitArgs(fctx.req.Request, source.Args)
+		req.Request = requestWithExplicitArgs(fctx.req.Request, nil)
 		req.Meta = fctx.req.Meta
 		state.dynamicDeps = appendResourceRef(state.dynamicDeps, domain.ResourceRef{Kind: "file", Name: name})
 	}

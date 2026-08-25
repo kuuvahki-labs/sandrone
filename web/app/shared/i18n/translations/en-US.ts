@@ -433,7 +433,6 @@ export const enUS: Record<TranslationKey, string> = {
   "script.remoteUrl": "Script URL",
   "script.remoteUserAgent": "User-Agent",
   "script.selectFile": "Select script file",
-  "script.sourceArgs": "Script file render arguments",
   "script.source": "Script source",
   "shares.resourceLabel": "Share link",
   "shares.actions.copy": "Copy link",

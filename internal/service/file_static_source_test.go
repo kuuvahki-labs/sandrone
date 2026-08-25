@@ -205,6 +205,7 @@ func TestServiceScriptProcessorLoadsScriptFromFileResource(t *testing.T) {
   input.file.content = input.file.content.replace("__SOURCE_OUTER__", input.args.outer || "isolated-");
   return input;
 }`),
+				"args": map[string]any{"prefix": "rendered-"},
 			}),
 		}},
 	}))
@@ -220,7 +221,6 @@ func TestServiceScriptProcessorLoadsScriptFromFileResource(t *testing.T) {
 				"source": map[string]any{
 					"type": "file",
 					"name": "rename.js",
-					"args": map[string]string{"prefix": "rendered-"},
 				},
 				"args": map[string]any{"prefix": "params-"},
 			}),

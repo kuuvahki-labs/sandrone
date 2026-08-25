@@ -390,8 +390,6 @@ describe("ProcessorBuilder", () => {
     expect(within(scriptGroup).queryByRole("textbox", { name: "脚本路径" })).not.toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "default.yaml" })).not.toBeInTheDocument();
     await user.selectOptions(scriptFileSelect, "other.js");
-    const sourceArgsInput = within(scriptGroup).getByRole("textbox", { name: "脚本文件渲染参数" });
-    fireEvent.change(sourceArgsInput, { target: { value: "variant=production\ncount=2" } });
     fireEvent.change(argsInput, { target: { value: "in=zh\nflag=true\nthreshold=2" } });
 
     expect(serializedProcessors()).toEqual([
@@ -402,7 +400,7 @@ describe("ProcessorBuilder", () => {
           engine: "js",
           args: { in: "zh", flag: true, threshold: 2 },
           id: "legacy-script",
-          source: { type: "file", name: "other.js", args: { variant: "production", count: "2" } },
+          source: { type: "file", name: "other.js" },
           timeout_ms: 5000,
         },
       },

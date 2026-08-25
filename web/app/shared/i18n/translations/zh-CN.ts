@@ -431,7 +431,6 @@ export const zhCN = {
   "script.remoteUrl": "脚本地址",
   "script.remoteUserAgent": "User-Agent",
   "script.selectFile": "选择脚本文件",
-  "script.sourceArgs": "脚本文件渲染参数",
   "script.source": "脚本来源",
   "shares.resourceLabel": "分享链接",
   "shares.actions.copy": "复制链接",

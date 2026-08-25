@@ -2,7 +2,6 @@
 package script
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -33,45 +32,8 @@ type ScriptSource struct {
 	Type    string              `json:"type,omitempty" jsonschema:"Script source kind" enum:"inline,file,remote"`
 	Content string              `json:"content,omitempty" jsonschema:"JavaScript body for inline source"`
 	Name    string              `json:"name,omitempty" jsonschema:"Controlled resource name for file source"`
-	Args    map[string]string   `json:"args,omitempty" jsonschema:"Arguments used to render a file source"`
 	Remote  *domain.RemoteInput `json:"remote,omitempty" jsonschema:"Controlled remote source configuration"`
 	SHA256  string              `json:"sha256,omitempty" jsonschema:"Optional lowercase SHA-256 integrity digest" pattern:"^[0-9a-f]{64}$"`
-
-	argsPresent bool
-}
-
-func (s *ScriptSource) UnmarshalJSON(body []byte) error {
-	var wire struct {
-		Type    string              `json:"type,omitempty"`
-		Content string              `json:"content,omitempty"`
-		Name    string              `json:"name,omitempty"`
-		Args    json.RawMessage     `json:"args,omitempty"`
-		Remote  *domain.RemoteInput `json:"remote,omitempty"`
-		SHA256  string              `json:"sha256,omitempty"`
-	}
-	decoder := json.NewDecoder(bytes.NewReader(body))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&wire); err != nil {
-		return err
-	}
-	*s = ScriptSource{
-		Type:    wire.Type,
-		Content: wire.Content,
-		Name:    wire.Name,
-		Remote:  wire.Remote,
-		SHA256:  wire.SHA256,
-	}
-	if wire.Args == nil {
-		return nil
-	}
-	s.argsPresent = true
-	if bytes.Equal(bytes.TrimSpace(wire.Args), []byte("null")) {
-		return errors.New("source.args must be an object, not null")
-	}
-	if err := json.Unmarshal(wire.Args, &s.Args); err != nil {
-		return fmt.Errorf("decode source.args: %w", err)
-	}
-	return nil
 }
 
 // PermissionConfig declares which side-effect APIs the script may use.

@@ -121,15 +121,14 @@ outbound tag 唯一；设为 `name_conflict: "error"` 可改成显式失败。
 因此两个原始名称相同但连接不同的节点仍会被编号成不同名称，不会被提前误删。
 
 引用文件脚本时，Sandrone 会先渲染目标文件资源，再把最终正文作为脚本执行。
-若脚本文件本身需要渲染参数，把字符串键值放在 `params.source.args`；当前脚本的
-业务参数仍放在 `params.args`。两组参数彼此不继承：
+脚本文件资源自身的 processors 使用各自配置的参数，不继承当前 script processor
+或请求的参数；当前脚本的业务参数放在 `params.args`：
 
 ```json
 {
   "source": {
     "type": "file",
-    "name": "generated-script.js",
-    "args": {"variant": "production"}
+    "name": "normalize-nodes.js"
   },
   "args": {"prefix": "script-"}
 }

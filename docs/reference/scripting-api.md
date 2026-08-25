@@ -64,15 +64,13 @@ source:
 source:
   type: file
   name: normalize.js
-  args:
-    environment: production
 ```
 
 加载器以 `render` 模式执行该文件资源，并把最终正文当作 JavaScript。也就是说，
-typed 编译和该资源自身的 file-stage processors 都会生效。`source.args` 只接受
-字符串键值，并只传给这次脚本文件渲染；它不会进入随后脚本运行的
-`input.args`。文件资源自身只能使用支持的 inline 或 remote FileSource；非法、
-绝对、越界或写成内部 `files/` key 的资源名会被拒绝。
+typed 编译和该资源自身的 file-stage processors 都会生效；这些 processors 使用
+各自配置的参数，当前 script processor 的参数和请求参数不会传入脚本文件渲染。
+文件资源自身只能使用支持的 inline 或 remote FileSource；非法、绝对、越界或
+写成内部 `files/` key 的资源名会被拒绝。
 
 ### `remote`
 
@@ -182,8 +180,8 @@ JSON 中带 `omitempty` 的成员在无值时可能不存在。脚本应对 `arg
 const prefix = (input.args && input.args.prefix) || "";
 ```
 
-file-backed source 的 `source.args` 与这里的 `params.args` 是两个独立层：
-前者只渲染脚本文件，后者只参与当前脚本的 `input.args` 合并，彼此不继承。
+`params.args` 只参与当前脚本的 `input.args` 合并，不会传给 file-backed source
+的文件渲染流程。
 
 `api.subscription.produce` 与 `api.file.content` 的 `options.args` 只接受字符串
 键值，并作为子调用的完整参数集。省略 `options.args` 表示子调用无参数；父文件

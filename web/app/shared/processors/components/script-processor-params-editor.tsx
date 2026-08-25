@@ -38,7 +38,6 @@ export function ScriptProcessorParamsEditor({
   const source = scriptSourceFromParams(params);
   const [mode, setMode] = useState<ScriptSourceMode>(() => source.type);
   const [argsText, setArgsText] = useState(() => objectToKeyValueText(params.args));
-  const [sourceArgsText, setSourceArgsText] = useState(() => source.type === "file" ? objectToKeyValueText(source.args) : "");
   const currentFileName = source.type === "file" ? source.name : stringValue(params.path);
   const scriptFileOptions = useMemo(() => scriptFileOptionsFor(scriptFiles, currentFileName), [currentFileName, scriptFiles]);
 
@@ -50,7 +49,7 @@ export function ScriptProcessorParamsEditor({
       return;
     }
     if (nextMode === "file") {
-      onChange(sourcePatch({ type: "file", name: currentFileName || scriptFileOptions[0]?.value || "", args: stringParamsFromText(sourceArgsText) }));
+      onChange(sourcePatch({ type: "file", name: currentFileName || scriptFileOptions[0]?.value || "" }));
       return;
     }
     onChange(sourcePatch({ type: "remote", remote: source.type === "remote" ? source.remote : {}, sha256: source.type === "remote" ? source.sha256 : "" }));
@@ -59,13 +58,6 @@ export function ScriptProcessorParamsEditor({
   function updateArgs(value: string) {
     setArgsText(value);
     onChange({ args: keyValueTextToObject(value) });
-  }
-
-  function updateSourceArgs(value: string) {
-    setSourceArgsText(value);
-    if (source.type === "file") {
-      onChange(sourcePatch({ ...source, args: stringParamsFromText(value) }));
-    }
   }
 
   return (
@@ -85,15 +77,12 @@ export function ScriptProcessorParamsEditor({
         <ToggleButton aria-label={t("script.remote")} value="remote">{t("script.remote")}</ToggleButton>
       </ToggleButtonGroup>
       {mode === "file" ? (
-        <>
-          <ScriptFileSelect
-            options={scriptFileOptions}
-            value={source.type === "file" ? source.name : ""}
-            t={t}
-            onChange={(value) => onChange(sourcePatch({ type: "file", name: value, args: stringParamsFromText(sourceArgsText) }))}
-          />
-          <HighlightedTextarea className="md:col-span-2" label={t("script.sourceArgs")} language="text" minRows={3} placeholder="variant=production" value={sourceArgsText} onChange={(event) => updateSourceArgs(event.target.value)} />
-        </>
+        <ScriptFileSelect
+          options={scriptFileOptions}
+          value={source.type === "file" ? source.name : ""}
+          t={t}
+          onChange={(value) => onChange(sourcePatch({ type: "file", name: value }))}
+        />
       ) : null}
       {mode === "inline" ? (
         <HighlightedTextarea showLineNumbers className="md:col-span-2" label={t("script.inline")} language="javascript" minRows={8} value={source.type === "inline" ? source.content : ""} onChange={(event) => onChange(sourcePatch({ type: "inline", content: event.target.value }))} />
@@ -190,7 +179,7 @@ type RemoteScriptDraft = {
 
 type ScriptSourceDraft =
   | { type: "inline"; content: string }
-  | { type: "file"; name: string; args?: Record<string, string> }
+  | { type: "file"; name: string }
   | RemoteScriptSourceDraft;
 
 type RemoteScriptSourceDraft = { type: "remote"; remote: RemoteScriptDraft; sha256?: string };
@@ -219,7 +208,7 @@ function scriptSourceFromParams(params: Record<string, unknown>): ScriptSourceDr
     return { type: "inline", content: stringValue(source.content) };
   }
   if (type === "file") {
-    return { type: "file", name: stringValue(source.name), args: stringParamsFromValue(source.args) };
+    return { type: "file", name: stringValue(source.name) };
   }
   if (type === "remote") {
     return { type: "remote", remote: remoteScriptDraftFrom(source.remote), sha256: stringValue(source.sha256) };
@@ -238,7 +227,7 @@ function sanitizeScriptSource(source: ScriptSourceDraft): Record<string, unknown
     case "inline":
       return stringValue(source.content) ? { type: "inline", content: source.content } : null;
     case "file":
-      return stringValue(source.name) ? { type: "file", name: source.name, ...(source.args && Object.keys(source.args).length ? { args: source.args } : {}) } : null;
+      return stringValue(source.name) ? { type: "file", name: source.name } : null;
     case "remote": {
       const remote = cleanRemoteScriptDraft(source.remote);
       if (!stringValue(remote.url)) return null;
@@ -260,22 +249,6 @@ function remoteScriptDraftFrom(value: unknown): RemoteScriptDraft {
     timeout_ms: numberOrEmpty(String(remote.timeout_ms ?? "")),
     cache_ttl_seconds: numberOrEmpty(String(remote.cache_ttl_seconds ?? "")),
   });
-}
-
-function stringParamsFromText(value: string): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const line of value.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    const index = trimmed.indexOf("=");
-    if (index <= 0) continue;
-    out[trimmed.slice(0, index).trim()] = trimmed.slice(index + 1).trim();
-  }
-  return out;
-}
-
-function stringParamsFromValue(value: unknown): Record<string, string> {
-  return Object.fromEntries(Object.entries(objectValue(value)).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
 }
 
 function cleanRemoteScriptDraft(remote: RemoteScriptDraft): RemoteScriptDraft {

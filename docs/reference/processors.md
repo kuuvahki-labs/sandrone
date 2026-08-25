@@ -174,9 +174,8 @@ canonical 字段与单位边界见
 ### nodes script
 
 `script` 的 `engine` 当前只能是 `js`，source 可为 `inline`、`file` 或受控
-`remote`。`file` source 会渲染目标文件资源；其字符串 `source.args` 仅用于
-这次渲染，与进入当前脚本 `input.args` 的 `params.args` 分层。完整输入输出、
-timeout 和可用 API 以
+`remote`。`file` source 会独立渲染目标文件资源；当前 processor 的
+`params.args` 只进入随后执行的脚本 `input.args`。完整输入输出、timeout 和可用 API 以
 [Scripting API](scripting-api.md) 为准；不要把它当作 Node.js 或通用系统访问。
 
 ## file stage
