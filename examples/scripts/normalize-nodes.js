@@ -666,7 +666,7 @@ function detectRegion(name) {
             continue;
         }
         if (tokenStart !== -1) {
-            var tokenRegion = REGION_INDEX.tokens[foldedName.slice(tokenStart, index)];
+            var tokenRegion = detectTokenRegion(foldedName.slice(tokenStart, index));
             if (tokenRegion && (!best || tokenRegion.order < best.order)) best = tokenRegion;
             tokenStart = -1;
             if (best && best.order === 0) return best;
@@ -684,6 +684,24 @@ function detectRegion(name) {
         }
     }
     return best;
+}
+
+function detectTokenRegion(token) {
+    var exact = REGION_INDEX.tokens[token];
+    if (exact) return exact;
+
+    var suffixStart = token.length;
+    while (suffixStart > 0) {
+        var suffixCode = token.charCodeAt(suffixStart - 1);
+        if (suffixCode < 48 || suffixCode > 57) break;
+        suffixStart -= 1;
+    }
+    if (suffixStart === token.length || suffixStart < 2 || suffixStart > 4) return null;
+    for (var index = 0; index < suffixStart; index += 1) {
+        var prefixCode = token.charCodeAt(index);
+        if (prefixCode < 97 || prefixCode > 122) return null;
+    }
+    return REGION_INDEX.tokens[token.slice(0, suffixStart)] || null;
 }
 
 function detectFirst(name, definitions) {

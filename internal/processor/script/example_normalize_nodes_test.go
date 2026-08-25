@@ -304,6 +304,42 @@ func TestExampleNormalizeNodesRegionIndexPreservesMatchingSemantics(t *testing.T
 	}, []string{out.Nodes[0].Name, out.Nodes[1].Name, out.Nodes[2].Name, out.Nodes[3].Name})
 }
 
+func TestExampleNormalizeNodesRegionIndexAcceptsNumberedShortAliases(t *testing.T) {
+	body, err := os.ReadFile(exampleNormalizeNodesPath())
+	require.NoError(t, err)
+	runtime := goja.New()
+	_, err = runtime.RunString(string(body))
+	require.NoError(t, err)
+
+	tests := []struct {
+		name string
+		want string
+	}{
+		{name: "[Hy2]CCS US1", want: "US"},
+		{name: "HK02", want: "HK"},
+		{name: "LAX3", want: "US"},
+		{name: "USAFAST"},
+		{name: "prefixUS1suffix"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			value, err := runtime.RunString(fmt.Sprintf("detectRegion(%q)", test.name))
+			require.NoError(t, err)
+			if test.want == "" {
+				require.True(t, goja.IsNull(value))
+				return
+			}
+			require.Equal(t, test.want, value.ToObject(runtime).Get("code").String())
+		})
+	}
+
+	out := applyExampleNormalizer(t, map[string]any{"sort": false}, []domain.NodeIR{{
+		Name: "[Hy2]CCS US1", Type: domain.NodeTypeHysteria2, Server: "us.example.com", Port: 443,
+	}})
+	require.Len(t, out.Nodes, 1)
+	require.Equal(t, "🇺🇸 美国 01 HY2", out.Nodes[0].Name)
+}
+
 func TestExampleNormalizeNodesStringCleanupPreservesLiteralSeparatorSemantics(t *testing.T) {
 	body, err := os.ReadFile(exampleNormalizeNodesPath())
 	require.NoError(t, err)
