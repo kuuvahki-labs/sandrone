@@ -90,15 +90,21 @@
 - `subscription_name`、可选 `type` 与 `format`；
 - `before_count`、`after_count`；
 - `status_counts`，键固定为 `added`、`modified`、`removed`、`unchanged`；
-- `nodes` 差异；每项含稳定连接身份哈希 `identity`、`status`，以及适用的
-  `before`、`after`；
+- `nodes` 差异；每项含用于展示的稳定连接身份哈希 `identity`、`status`，以及
+  适用的 `before`、`after`；
 - 有 `after` 的节点可带 `target_names.shadowrocket`，表示真实
   Shadowrocket renderer 归一化后的目标名；空字符串表示该节点会被跳过；
 - `warnings`，无 warning 时仍为 `[]`。warning 结构见
   [错误与诊断参考](../errors.md)。
 
-节点按连接身份而非名称或数组位置匹配，所以重命名表现为 `modified`，过滤、
-排除或去重表现为 `removed`。远程订阅按保存的抓取设置读取，正数
+preview 在执行 processor 链前为输入节点附加仅运行时存在的来源标记，并且只按
+该标记关联前后节点，不使用名称、数组位置、连接字段或内容相等作为兜底。保留的
+节点即使被改名、重排或修改连接字段也仍按同一节点计算，变化表现为 `modified`；
+过滤、排除或去重表现为 `removed`。processor 新建或手工重建且未继承来源标记的
+节点表现为 `added`，对应的原节点表现为 `removed`。来源标记不属于 NodeIR JSON，
+不会出现在 `before`、`after` 或持久化数据中。
+
+远程订阅按保存的抓取设置读取，正数
 `cache_ttl_seconds` 可以复用 remote-fetch 缓存。preview 不返回 traffic，
 也不会把节点或 report 写回订阅。`refresh: true` 跳过本次 remote-fetch 与 probe
 缓存读取，并在成功时按当前 TTL 重新填充；preview 本身不使用

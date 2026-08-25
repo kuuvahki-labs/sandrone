@@ -81,6 +81,75 @@ func TestScriptNodesFilterRename(t *testing.T) {
 	require.NotContains(t, warningCodes(out.Nodes[0].Warnings), "script_modified")
 }
 
+func TestScriptNodeLineageSurvivesObjectSpreadWithoutPublicField(t *testing.T) {
+	r := processor.NewRegistry()
+	registerScript(r)
+	proc, err := r.BuildNode(domain.ProcessorSpec{
+		Type: "script", Stage: domain.StageNodes,
+		Params: params(t, map[string]any{
+			"source": inlineScriptSource(`function main(input) {
+  const node = input.nodes[0];
+  if (Object.keys(node).some(function(key) { return key.includes("lineage"); })) {
+    throw new Error("lineage leaked through Object.keys");
+  }
+  if (JSON.stringify(node).includes("origin-1")) {
+    throw new Error("lineage leaked through JSON");
+  }
+  input.nodes = [{...node, name: "renamed"}];
+  return input;
+}`),
+		}),
+	})
+	require.NoError(t, err)
+	node := domain.NodeIR{
+		Name: "original", Type: domain.NodeTypeShadowsocks, Server: "example.com",
+		Port: 443, Cipher: "aes-128-gcm", Password: "secret",
+	}
+	domain.SetNodeLineage(&node, "origin-1")
+
+	out, err := proc.ApplyNodes(context.Background(), domain.NodeProcessInput{Nodes: []domain.NodeIR{node}})
+
+	require.NoError(t, err)
+	require.Len(t, out.Nodes, 1)
+	require.Equal(t, "renamed", out.Nodes[0].Name)
+	require.Equal(t, "origin-1", domain.NodeLineage(out.Nodes[0]))
+}
+
+func TestScriptRebuiltNodeDoesNotInheritLineage(t *testing.T) {
+	r := processor.NewRegistry()
+	registerScript(r)
+	proc, err := r.BuildNode(domain.ProcessorSpec{
+		Type: "script", Stage: domain.StageNodes,
+		Params: params(t, map[string]any{
+			"source": inlineScriptSource(`function main(input) {
+  const node = input.nodes[0];
+  input.nodes = [{
+    name: "rebuilt",
+    type: node.type,
+    server: node.server,
+    port: node.port,
+    cipher: node.cipher,
+    password: node.password
+  }];
+  return input;
+}`),
+		}),
+	})
+	require.NoError(t, err)
+	node := domain.NodeIR{
+		Name: "original", Type: domain.NodeTypeShadowsocks, Server: "example.com",
+		Port: 443, Cipher: "aes-128-gcm", Password: "secret",
+	}
+	domain.SetNodeLineage(&node, "origin-1")
+
+	out, err := proc.ApplyNodes(context.Background(), domain.NodeProcessInput{Nodes: []domain.NodeIR{node}})
+
+	require.NoError(t, err)
+	require.Len(t, out.Nodes, 1)
+	require.Equal(t, "rebuilt", out.Nodes[0].Name)
+	require.Empty(t, domain.NodeLineage(out.Nodes[0]))
+}
+
 func TestScriptLoadsFileSourceAtExecutionWithContext(t *testing.T) {
 	type contextKey struct{}
 	ctx := context.WithValue(context.Background(), contextKey{}, "execution")

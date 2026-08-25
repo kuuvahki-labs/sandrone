@@ -156,6 +156,7 @@ func (s *Service) subscriptionPreviewNodes(ctx context.Context, sub domain.Subsc
 		Traffic:      cloneSubscriptionTrafficItems(base.Traffic),
 		Meta:         cloneStringMap(base.Meta),
 	}
+	assignPreviewNodeLineage(before.Nodes)
 	processed, err := s.registry.RunNodes(ctx, sub.Processors, domain.NodeProcessInput{
 		Target: req.Target,
 		Nodes:  append([]domain.NodeIR{}, before.Nodes...),

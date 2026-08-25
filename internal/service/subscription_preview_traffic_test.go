@@ -217,7 +217,7 @@ func TestServiceSubscriptionProcessorsRoundtripAndPreviewOrder(t *testing.T) {
 	require.Contains(t, result.Report.Dependencies, domain.ResourceRef{Kind: "subscription", Name: "remote/provider"})
 }
 
-func TestServicePreviewSubscriptionDiffsByConnectionIdentity(t *testing.T) {
+func TestServicePreviewSubscriptionDiffsByNodeLineage(t *testing.T) {
 	ctx := context.Background()
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
 	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
@@ -306,7 +306,7 @@ func TestServicePreviewSubscriptionTreatsEmptyHysteriaRoundtripAsSameIdentity(t 
 	require.Equal(t, preview.Nodes[1].Before.Port, preview.Nodes[1].After.Port)
 }
 
-func TestServicePreviewSubscriptionStillDistinguishesNonEmptyHysteriaIdentity(t *testing.T) {
+func TestServicePreviewSubscriptionTreatsConnectionChangesAsModificationOfSameNode(t *testing.T) {
 	ctx := context.Background()
 	svc := service.New(
 		service.WithFS(afero.NewMemMapFs()),
@@ -332,8 +332,100 @@ func TestServicePreviewSubscriptionStillDistinguishesNonEmptyHysteriaIdentity(t 
 
 	require.Equal(t, 1, preview.BeforeCount)
 	require.Equal(t, 1, preview.AfterCount)
+	require.Equal(t, map[string]int{"added": 0, "modified": 1, "removed": 0, "unchanged": 0}, preview.StatusCounts)
+	require.Len(t, preview.Nodes, 1)
+	require.Equal(t, "modified", preview.Nodes[0].Status)
+	require.Empty(t, preview.Nodes[0].Before.Hysteria.Auth)
+	require.Equal(t, "changed", preview.Nodes[0].After.Hysteria.Auth)
+}
+
+func TestServicePreviewSubscriptionTracksFilteredRenamedDuplicateConnectionNode(t *testing.T) {
+	ctx := context.Background()
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+		Name:   "local/duplicate-vless",
+		Type:   domain.SubscriptionTypeLocal,
+		Format: "json-nodes",
+		Content: `{"nodes":[
+  {"name":"[vless]剩余流量：94.15 GB","type":"vless","server":"example.com","port":443,"uuid":"11111111-1111-1111-1111-111111111111","encryption":"none"},
+  {"name":"[vless]US massivegrid 0.1倍","type":"vless","server":"example.com","port":443,"uuid":"11111111-1111-1111-1111-111111111111","encryption":"none"},
+  {"name":"[vless]套餐到期：长期有效","type":"vless","server":"example.com","port":443,"uuid":"11111111-1111-1111-1111-111111111111","encryption":"none"}
+]}`,
+		Processors: []domain.ProcessorSpec{{
+			Type:  "script",
+			Stage: domain.StageNodes,
+			Params: params(t, map[string]any{
+				"source": inlineScriptSource(`function main(input) {
+  input.nodes = input.nodes
+    .filter(function(node) { return !/(剩余流量|套餐到期)/.test(node.name); })
+    .map(function(node) { return {...node, name: "🇺🇸 美国 01 0.1× VLESS"}; });
+  return input;
+}`),
+			}),
+		}},
+	}))
+
+	preview, err := svc.PreviewSubscription(ctx, "local/duplicate-vless")
+
+	require.NoError(t, err)
+	require.Equal(t, 3, preview.BeforeCount)
+	require.Equal(t, 1, preview.AfterCount)
+	require.Equal(t, map[string]int{"added": 0, "modified": 1, "removed": 2, "unchanged": 0}, preview.StatusCounts)
+	require.Len(t, preview.Nodes, 3)
+	require.Equal(t, "removed", preview.Nodes[0].Status)
+	require.Equal(t, "[vless]剩余流量：94.15 GB", preview.Nodes[0].Before.Name)
+	require.Equal(t, "modified", preview.Nodes[1].Status)
+	require.Equal(t, "[vless]US massivegrid 0.1倍", preview.Nodes[1].Before.Name)
+	require.Equal(t, "🇺🇸 美国 01 0.1× VLESS", preview.Nodes[1].After.Name)
+	require.Equal(t, "removed", preview.Nodes[2].Status)
+	require.Equal(t, "[vless]套餐到期：长期有效", preview.Nodes[2].Before.Name)
+	for _, diff := range preview.Nodes {
+		if diff.Before != nil {
+			require.Empty(t, domain.NodeLineage(*diff.Before))
+		}
+		if diff.After != nil {
+			require.Empty(t, domain.NodeLineage(*diff.After))
+		}
+	}
+}
+
+func TestServicePreviewSubscriptionDoesNotFallbackForRebuiltNode(t *testing.T) {
+	ctx := context.Background()
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+		Name:    "local/rebuilt",
+		Type:    domain.SubscriptionTypeLocal,
+		Format:  "uri-list",
+		Content: "ss://aes-128-gcm:secret@example.com:8388#original",
+		Processors: []domain.ProcessorSpec{{
+			Type:  "script",
+			Stage: domain.StageNodes,
+			Params: params(t, map[string]any{
+				"source": inlineScriptSource(`function main(input) {
+  const node = input.nodes[0];
+  input.nodes = [{
+    name: "rebuilt",
+    type: node.type,
+    server: node.server,
+    port: node.port,
+    cipher: node.cipher,
+    password: node.password
+  }];
+  return input;
+}`),
+			}),
+		}},
+	}))
+
+	preview, err := svc.PreviewSubscription(ctx, "local/rebuilt")
+
+	require.NoError(t, err)
 	require.Equal(t, map[string]int{"added": 1, "modified": 0, "removed": 1, "unchanged": 0}, preview.StatusCounts)
 	require.Len(t, preview.Nodes, 2)
+	require.Equal(t, "added", preview.Nodes[0].Status)
+	require.Equal(t, "rebuilt", preview.Nodes[0].After.Name)
+	require.Equal(t, "removed", preview.Nodes[1].Status)
+	require.Equal(t, "original", preview.Nodes[1].Before.Name)
 }
 
 func TestServicePreviewSubscriptionDoesNotShiftDuplicateConnectionIdentityAfterRemoval(t *testing.T) {
@@ -540,6 +632,7 @@ func (insertFirstProcessor) Name() string { return "insert_first" }
 func (insertFirstProcessor) ApplyNodes(_ context.Context, in domain.NodeProcessInput) (domain.NodeProcessOutput, error) {
 	out := append([]domain.NodeIR{}, in.Nodes...)
 	inserted := out[0]
+	domain.ClearNodeLineage(&inserted)
 	inserted.Name = "inserted"
 	out = append([]domain.NodeIR{inserted}, out...)
 	return domain.NodeProcessOutput{Nodes: out}, nil

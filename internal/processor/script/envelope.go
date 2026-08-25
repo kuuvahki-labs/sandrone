@@ -36,6 +36,7 @@ type ScriptEnvelope struct {
 // `Ext` is a free-form bag for script-added fields that don't map back to
 // known IR fields.
 type ScriptNode struct {
+	lineage        string
 	ID             string            `json:"id,omitempty"`
 	Name           string            `json:"name"`
 	Type           string            `json:"type"`
@@ -108,6 +109,7 @@ func nodeToScript(n domain.NodeIR) (ScriptNode, error) {
 	if err := json.Unmarshal(body, &s); err != nil {
 		return ScriptNode{}, err
 	}
+	s.lineage = domain.NodeLineage(n)
 	return s, nil
 }
 
@@ -120,6 +122,7 @@ func scriptToNode(s ScriptNode) (domain.NodeIR, []domain.Warning, error) {
 	if err := json.Unmarshal(body, &node); err != nil {
 		return domain.NodeIR{}, nil, err
 	}
+	domain.SetNodeLineage(&node, s.lineage)
 	warnings := []domain.Warning{}
 	if node.Type == "" {
 		return node, nil, fmt.Errorf("script returned node %q without type", node.Name)

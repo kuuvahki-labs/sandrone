@@ -22,6 +22,7 @@ const (
 )
 
 type NodeIR struct {
+	lineage        string
 	ID             string                     `json:"id,omitempty" yaml:"id,omitempty"`
 	Name           string                     `json:"name" yaml:"name"`
 	Type           NodeType                   `json:"type" yaml:"type"`

@@ -21,6 +21,7 @@ func TestNodeToScriptRoundtrip(t *testing.T) {
 			Path: "/ws",
 		},
 	}
+	domain.SetNodeLineage(&in, "origin-1")
 	s, err := nodeToScript(in)
 	require.NoError(t, err)
 	require.Equal(t, in.Name, s.Name)
@@ -33,6 +34,7 @@ func TestNodeToScriptRoundtrip(t *testing.T) {
 	require.Equal(t, in.UUID, out.UUID)
 	require.NotNil(t, out.TLS)
 	require.True(t, out.TLS.Enabled)
+	require.Equal(t, "origin-1", domain.NodeLineage(out))
 }
 
 func TestNodeToScriptRoundtripPreservesAdvancedProtocolOptions(t *testing.T) {

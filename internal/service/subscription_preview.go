@@ -99,7 +99,7 @@ func diffPreviewNodes(before, after []domain.NodeIR) ([]domain.SubscriptionPrevi
 		afterIdentities[index] = previewNodeIdentity(node)
 	}
 
-	ops := previewDiffOps(before, after, beforeIdentities, afterIdentities)
+	ops := previewDiffOps(before, after)
 	diffs := make([]domain.SubscriptionPreviewNodeDiff, 0, len(ops))
 	for _, op := range ops {
 		switch op.Kind {
@@ -136,8 +136,8 @@ func diffPreviewNodes(before, after []domain.NodeIR) ([]domain.SubscriptionPrevi
 	return diffs, counts
 }
 
-func previewDiffOps(before, after []domain.NodeIR, beforeIdentities, afterIdentities []string) []previewDiffStep {
-	beforeToAfter, afterToBefore := matchPreviewNodes(before, after, beforeIdentities, afterIdentities)
+func previewDiffOps(before, after []domain.NodeIR) []previewDiffStep {
+	beforeToAfter, afterToBefore := matchPreviewNodes(before, after)
 	steps := make([]previewDiffStep, 0, max(len(before), len(after)))
 	removedEmitted := make([]bool, len(before))
 	emitRemovedBefore := func(limit int) {
@@ -162,7 +162,7 @@ func previewDiffOps(before, after []domain.NodeIR, beforeIdentities, afterIdenti
 	return steps
 }
 
-func matchPreviewNodes(before, after []domain.NodeIR, beforeIdentities, afterIdentities []string) ([]int, []int) {
+func matchPreviewNodes(before, after []domain.NodeIR) ([]int, []int) {
 	beforeToAfter := make([]int, len(before))
 	for index := range beforeToAfter {
 		beforeToAfter[index] = -1
@@ -171,32 +171,29 @@ func matchPreviewNodes(before, after []domain.NodeIR, beforeIdentities, afterIde
 	for index := range afterToBefore {
 		afterToBefore[index] = -1
 	}
-	for beforeIndex, beforeNode := range before {
-		for afterIndex, afterNode := range after {
-			if afterToBefore[afterIndex] != -1 || beforeIdentities[beforeIndex] != afterIdentities[afterIndex] {
-				continue
-			}
-			if previewNodeNativeEqual(beforeNode, afterNode) {
-				beforeToAfter[beforeIndex] = afterIndex
-				afterToBefore[afterIndex] = beforeIndex
-				break
-			}
+	beforeByLineage := make(map[string]int, len(before))
+	for beforeIndex, node := range before {
+		lineage := domain.NodeLineage(node)
+		if lineage != "" {
+			beforeByLineage[lineage] = beforeIndex
 		}
 	}
-	for beforeIndex := range before {
-		if beforeToAfter[beforeIndex] != -1 {
+	for afterIndex, node := range after {
+		lineage := domain.NodeLineage(node)
+		beforeIndex, ok := beforeByLineage[lineage]
+		if !ok || lineage == "" || beforeToAfter[beforeIndex] != -1 {
 			continue
 		}
-		for afterIndex := range after {
-			if afterToBefore[afterIndex] != -1 || beforeIdentities[beforeIndex] != afterIdentities[afterIndex] {
-				continue
-			}
-			beforeToAfter[beforeIndex] = afterIndex
-			afterToBefore[afterIndex] = beforeIndex
-			break
-		}
+		beforeToAfter[beforeIndex] = afterIndex
+		afterToBefore[afterIndex] = beforeIndex
 	}
 	return beforeToAfter, afterToBefore
+}
+
+func assignPreviewNodeLineage(nodes []domain.NodeIR) {
+	for index := range nodes {
+		domain.SetNodeLineage(&nodes[index], "preview:"+strconv.Itoa(index))
+	}
 }
 
 func previewNodeNativeEqual(left, right domain.NodeIR) bool {
@@ -204,6 +201,7 @@ func previewNodeNativeEqual(left, right domain.NodeIR) bool {
 }
 
 func previewNodeNativeFields(node domain.NodeIR) domain.NodeIR {
+	domain.ClearNodeLineage(&node)
 	node.ID = ""
 	node.Tags = nil
 	node.Meta = nil
@@ -230,6 +228,7 @@ type previewDiffStep struct {
 
 func clonePreviewNode(node domain.NodeIR) *domain.NodeIR {
 	cloned := node
+	domain.ClearNodeLineage(&cloned)
 	return &cloned
 }
 

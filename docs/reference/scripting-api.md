@@ -152,6 +152,12 @@ JSON 中带 `omitempty` 的成员在无值时可能不存在。脚本应对 `arg
 
 返回转换时，每个节点都必须保留非空 `name` 和 `type`。`ext` 的每个键会存入节点的 `raw["script.ext."+key]`，并产生一个 `script_ext_field` warning；任意值无法 JSON 编码时转换失败。
 
+订阅 preview 会给输入节点附加一个不属于上述 JSON 字段的运行时来源标记。
+原地修改节点、筛选数组、排序以及用 `{...node}` 展开已有节点都会保留该标记；
+它不会出现在 `Object.keys(node)`、`JSON.stringify(node)`、NodeIR JSON 或节点详情中。
+如果脚本只从上述公开字段手工构造一个新对象，preview 会把它视为新节点，同时把
+未返回的原节点视为已删除，不会再按连接字段猜测两者是同一个节点。
+
 ### `file` 阶段
 
 `input.file` 是当前完整文件：
