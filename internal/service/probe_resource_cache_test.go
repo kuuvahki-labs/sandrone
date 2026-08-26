@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 	"time"
 
@@ -56,7 +55,7 @@ func TestSavedResourceProbeCacheIsPartialAndResourceLocal(t *testing.T) {
 		{Name: "c", Type: domain.NodeTypeShadowsocks, Server: "c.example", Port: 3, Cipher: "aes-128-gcm", Password: "p"},
 	}
 	request := func(scope string, nodes []domain.NodeIR) *domain.ProbeResult {
-		result, err := svc.Probe(withSubscriptionCacheScope(ctx, scope), domain.ProbeRequest{
+		result, err := svc.Probe(withSubscriptionCacheOwner(ctx, scope), domain.ProbeRequest{
 			Input:  domain.NodeInput{Type: "inline_nodes", Nodes: nodes},
 			Method: domain.ProbeTCPConnect, CacheTTLSeconds: 60,
 		})
@@ -84,19 +83,21 @@ func TestSavedResourceProbeCacheIsPartialAndResourceLocal(t *testing.T) {
 	require.Len(t, engine.calls, 3)
 
 	for _, name := range []string{"A", "B"} {
-		item, found, err := svc.cache.Get(ctx, "probe/subscriptions/"+name)
+		item, found, err := cachepkg.GetJSON[probeCacheValue](ctx, svc.cache, "probe/subscriptions/"+name)
 		require.NoError(t, err)
 		require.True(t, found)
-		var document struct {
-			Entries map[string]json.RawMessage `json:"entries"`
+		require.NotEmpty(t, item.Value.Groups)
+		for _, group := range item.Value.Groups {
+			require.NotEmpty(t, group.Nodes)
+			if name == "A" {
+				require.Len(t, group.Nodes, 3, "the current selector snapshot drops nodes no longer present")
+			}
 		}
-		require.NoError(t, json.Unmarshal(item.Value, &document))
-		require.NotEmpty(t, document.Entries)
 	}
 }
 
 func TestSavedResourceProbeProfileSeparatesTargets(t *testing.T) {
-	ctx := withSubscriptionCacheScope(context.Background(), "A")
+	ctx := withSubscriptionCacheOwner(context.Background(), "A")
 	engine := &resourceCacheProbeEngine{}
 	svc := New(WithFS(afero.NewMemMapFs()), WithProbeEngine(engine))
 	node := domain.NodeIR{Name: "n", Type: domain.NodeTypeShadowsocks, Server: "same.example", Port: 443, Cipher: "aes-128-gcm", Password: "p"}
@@ -111,5 +112,11 @@ func TestSavedResourceProbeProfileSeparatesTargets(t *testing.T) {
 	require.False(t, request("https://one.example/generate_204").Results[0].CacheHit)
 	require.True(t, request("https://one.example/generate_204").Results[0].CacheHit)
 	require.False(t, request("https://two.example/generate_204").Results[0].CacheHit)
+	require.True(t, request("https://one.example/generate_204").Results[0].CacheHit)
 	require.Len(t, engine.calls, 2)
+
+	item, found, err := cachepkg.GetJSON[probeCacheValue](ctx, svc.cache, "probe/subscriptions/A")
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Len(t, item.Value.Groups, 2)
 }

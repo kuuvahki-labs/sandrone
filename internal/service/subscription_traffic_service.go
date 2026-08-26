@@ -5,8 +5,14 @@ import (
 	"strings"
 	"time"
 
+	cachepkg "github.com/kuuvahki-labs/sandrone/internal/cache"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
+
+type subscriptionTrafficCacheValue struct {
+	EntryID string                           `json:"entry_id"`
+	Result  domain.SubscriptionTrafficResult `json:"result"`
+}
 
 func (s *Service) SubscriptionTraffic(ctx context.Context, req domain.SubscriptionTrafficRequest) (*domain.SubscriptionTrafficResult, error) {
 	if s.metaStore == nil {
@@ -24,7 +30,7 @@ func (s *Service) SubscriptionTraffic(ctx context.Context, req domain.Subscripti
 	if err != nil {
 		return nil, err
 	}
-	ctx = withSubscriptionCacheScope(ctx, sub.Name)
+	ctx = withSubscriptionCacheOwner(ctx, sub.Name)
 	sub, err = normalizeSubscription(sub)
 	if err != nil {
 		return nil, err
@@ -67,34 +73,38 @@ func (s *Service) readSubscriptionTrafficCache(ctx context.Context, entryID stri
 	if ttlSeconds <= 0 {
 		return nil
 	}
-	key, scoped := persistentCacheKey(ctx, cacheKeyPrefixSubscriptionTraffic)
-	if !scoped {
+	key, owned := ownedCacheKey(ctx, cacheKeyPrefixSubscriptionTraffic)
+	if !owned {
 		return nil
 	}
 	c := s.cache
 	if c == nil {
 		return nil
 	}
-	var result domain.SubscriptionTrafficResult
-	if !s.readCacheJSON(ctx, key, entryID, time.Duration(ttlSeconds)*time.Second, &result) {
+	item, found := readCacheValue[subscriptionTrafficCacheValue](s, ctx, key, time.Duration(ttlSeconds)*time.Second)
+	if !found || item.Value.EntryID != entryID {
 		return nil
 	}
-	return cloneSubscriptionTrafficValue(result)
+	return cloneSubscriptionTrafficValue(item.Value.Result)
 }
 
 func (s *Service) writeSubscriptionTrafficCache(ctx context.Context, entryID string, ttlSeconds int, result *domain.SubscriptionTrafficResult) {
 	if ttlSeconds <= 0 || result == nil {
 		return
 	}
-	key, scoped := persistentCacheKey(ctx, cacheKeyPrefixSubscriptionTraffic)
-	if !scoped {
+	key, owned := ownedCacheKey(ctx, cacheKeyPrefixSubscriptionTraffic)
+	if !owned {
 		return
 	}
-	c := s.cache
-	if c == nil {
+	if s.cache == nil {
 		return
 	}
-	_ = s.writeCacheJSON(ctx, key, entryID, time.Duration(ttlSeconds)*time.Second, cloneSubscriptionTrafficResult(result))
+	_, remaining, ok := prepareCacheValueWrite[subscriptionTrafficCacheValue](s, ctx, key, time.Duration(ttlSeconds)*time.Second)
+	if !ok {
+		return
+	}
+	cloned := cloneSubscriptionTrafficResult(result)
+	_ = cachepkg.SetJSON(ctx, s.cache, key, subscriptionTrafficCacheValue{EntryID: entryID, Result: *cloned}, remaining)
 }
 
 func subscriptionTrafficCacheEntryID(input domain.RemoteInput) (string, error) {

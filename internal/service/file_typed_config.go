@@ -93,7 +93,7 @@ func (s *Service) configNodes(ctx context.Context, subscriptions []string, req d
 		if err != nil {
 			return nil, err
 		}
-		subCtx := withSubscriptionCacheScope(ctx, sub.Name)
+		subCtx := withSubscriptionCacheOwner(ctx, sub.Name)
 		nodeSet, err := s.materializeSubscription(subCtx, sub, domain.FileRequest{
 			Name:    name,
 			Target:  req.Target,

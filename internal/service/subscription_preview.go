@@ -33,7 +33,7 @@ func (s *Service) PreviewSubscriptionRequest(ctx context.Context, req domain.Sub
 	if err != nil {
 		return nil, err
 	}
-	ctx = withSubscriptionCacheScope(ctx, sub.Name)
+	ctx = withSubscriptionCacheOwner(ctx, sub.Name)
 	before, after, err := s.subscriptionPreviewNodes(ctx, sub, domain.FileRequest{
 		Request: domain.RequestInfo{Args: req.Request.Args, Meta: sub.Meta},
 		Meta:    sub.Meta,

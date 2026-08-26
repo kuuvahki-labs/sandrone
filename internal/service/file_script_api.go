@@ -180,7 +180,7 @@ func (s *Service) ProduceSubscription(ctx context.Context, name string, opts dom
 	if err != nil {
 		return nil, err
 	}
-	ctx = withSubscriptionCacheScope(ctx, sub.Name)
+	ctx = withSubscriptionCacheOwner(ctx, sub.Name)
 	nodeSet, err := s.materializeSubscription(ctx, sub, req, newSubscriptionResolveState())
 	if err != nil {
 		return nil, err

@@ -43,7 +43,7 @@ func (s *Service) GetFile(ctx context.Context, req domain.FileRequest) (*domain.
 	if err != nil {
 		return nil, err
 	}
-	ctx = withFileCacheScope(ctx, spec.Name)
+	ctx = withFileCacheOwner(ctx, spec.Name)
 	ttlSeconds := s.fileRenderTTLSeconds(spec.RenderCacheTTLSeconds)
 	cacheEntryID := ""
 	if ttlSeconds > 0 {
@@ -74,7 +74,7 @@ func (s *Service) getFile(ctx context.Context, req domain.FileRequest, state *fi
 		return nil, err
 	}
 	if storedRequest {
-		ctx = withFileCacheScope(ctx, spec.Name)
+		ctx = withFileCacheOwner(ctx, spec.Name)
 	}
 	ctx = processor.WithTraceScope(ctx, "file:"+firstNonEmptyString(spec.Name, req.Name, "inline"))
 	if spec.Name != "" {

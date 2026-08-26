@@ -433,7 +433,7 @@ func (s *Service) diagnoseStoredSubscription(ctx context.Context, req domain.Dia
 	if err != nil {
 		return err
 	}
-	return s.diagnoseSubscription(withSubscriptionCacheScope(ctx, sub.Name), sub, req, result)
+	return s.diagnoseSubscription(withSubscriptionCacheOwner(ctx, sub.Name), sub, req, result)
 }
 
 func (s *Service) diagnoseSubscription(ctx context.Context, sub domain.Subscription, req domain.DiagnoseRequest, result *domain.DiagnoseResult) error {

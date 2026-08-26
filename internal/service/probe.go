@@ -2,11 +2,11 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"time"
 
+	cachepkg "github.com/kuuvahki-labs/sandrone/internal/cache"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/nodevalidation"
 	"github.com/kuuvahki-labs/sandrone/internal/probe"
@@ -29,15 +29,36 @@ type cachedNodeProbe struct {
 }
 
 type probeNodeGroup struct {
-	EntryID   string
-	Node      domain.NodeIR
-	Indexes   []int
-	Cached    *cachedNodeProbe
-	MissIndex int
+	ConnectionKey string
+	Node          domain.NodeIR
+	Indexes       []int
+	Cached        *cachedNodeProbe
+	MissIndex     int
+}
+
+type probeCacheSelector struct {
+	Method         string `json:"method"`
+	Core           string `json:"core,omitempty"`
+	Backend        string `json:"backend,omitempty"`
+	BackendVersion string `json:"backend_version,omitempty"`
+	URL            string `json:"url,omitempty"`
+	NTPServer      string `json:"ntp_server,omitempty"`
+	ExpectedStatus string `json:"expected_status,omitempty"`
+	TimeoutMS      int    `json:"timeout_ms,omitempty"`
+	Attempts       int    `json:"attempts,omitempty"`
+}
+
+type probeCacheGroup struct {
+	Selector probeCacheSelector         `json:"selector"`
+	Nodes    map[string]cachedNodeProbe `json:"nodes"`
+}
+
+type probeCacheValue struct {
+	Groups map[string]probeCacheGroup `json:"groups"`
 }
 
 func (s *Service) Probe(ctx context.Context, req domain.ProbeRequest) (out *domain.ProbeResult, err error) {
-	ctx = withProbeInputCacheScope(ctx, req.Input.Type, req.Input.Ref.Kind, req.Input.Ref.Name)
+	ctx = withProbeInputCacheOwner(ctx, req.Input.Type, req.Input.Ref.Kind, req.Input.Ref.Name)
 	start := time.Now()
 	nodeCount := 0
 	defer func() {
@@ -94,7 +115,7 @@ func (s *Service) Probe(ctx context.Context, req domain.ProbeRequest) (out *doma
 	if err != nil {
 		return nil, err
 	}
-	groups, misses, err := s.resolveProbeNodeGroups(ctx, req, backend, nodeSet.Nodes)
+	groups, misses, cacheSelector, err := s.resolveProbeNodeGroups(ctx, req, backend, nodeSet.Nodes)
 	if err != nil {
 		return nil, err
 	}
@@ -184,7 +205,7 @@ func (s *Service) Probe(ctx context.Context, req domain.ProbeRequest) (out *doma
 			}
 		}
 		if cacheFreshResults {
-			if writeErr := s.writeProbeNodeGroups(ctx, req, groups); writeErr != nil {
+			if writeErr := s.writeProbeNodeGroups(ctx, req, cacheSelector, groups); writeErr != nil {
 				renderWarnings = append(renderWarnings, domain.Warning{Code: "probe_cache_write_failed", Message: writeErr.Error()})
 				s.log(ctx, slog.LevelWarn, "service probe cache write failed",
 					"operation", "probe",
@@ -349,38 +370,43 @@ func (s *Service) renderProbePayloads(ctx context.Context, req *domain.ProbeRequ
 	return []probe.Payload{payload}, append([]domain.Warning{}, renderReport.Warnings...), nil
 }
 
-func (s *Service) resolveProbeNodeGroups(ctx context.Context, req domain.ProbeRequest, backend domain.ProbeBackendSummary, nodes []domain.NodeIR) ([]probeNodeGroup, []domain.NodeIR, error) {
+func (s *Service) resolveProbeNodeGroups(ctx context.Context, req domain.ProbeRequest, backend domain.ProbeBackendSummary, nodes []domain.NodeIR) ([]probeNodeGroup, []domain.NodeIR, probeCacheSelector, error) {
+	selector := newProbeCacheSelector(req, backend)
+	selectorID, err := cacheIdentity(selector)
+	if err != nil {
+		return nil, nil, probeCacheSelector{}, err
+	}
 	groups := make([]probeNodeGroup, 0, len(nodes))
 	byKey := make(map[string]int, len(nodes))
 	for nodeIndex, node := range nodes {
-		entryID, err := probeNodeCacheEntryID(req, backend, node)
+		connectionKey, err := domain.NodeConnectionKey(node)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, probeCacheSelector{}, err
 		}
-		if groupIndex, exists := byKey[entryID]; exists {
+		if groupIndex, exists := byKey[connectionKey]; exists {
 			groups[groupIndex].Indexes = append(groups[groupIndex].Indexes, nodeIndex)
 			continue
 		}
-		byKey[entryID] = len(groups)
-		groups = append(groups, probeNodeGroup{EntryID: entryID, Node: node, Indexes: []int{nodeIndex}, MissIndex: -1})
+		byKey[connectionKey] = len(groups)
+		groups = append(groups, probeNodeGroup{ConnectionKey: connectionKey, Node: node, Indexes: []int{nodeIndex}, MissIndex: -1})
 	}
 
 	misses := make([]domain.NodeIR, 0, len(groups))
-	key, scoped := persistentCacheKey(ctx, cacheKeyPrefixProbe)
-	canRead := req.CacheTTLSeconds > 0 && s.cache != nil && scoped && !cacheReadBypass(ctx)
-	cachedValues := map[string]json.RawMessage{}
+	key, owned := ownedCacheKey(ctx, cacheKeyPrefixProbe)
+	canRead := req.CacheTTLSeconds > 0 && s.cache != nil && owned && !cacheReadBypass(ctx)
+	cachedNodes := map[string]cachedNodeProbe{}
 	if canRead {
-		entryIDs := make([]string, len(groups))
-		for index := range groups {
-			entryIDs[index] = groups[index].EntryID
+		item, found := readCacheValue[probeCacheValue](s, ctx, key, time.Duration(req.CacheTTLSeconds)*time.Second)
+		if found {
+			if cachedGroup, exists := item.Value.Groups[selectorID]; exists && cachedGroup.Selector == selector {
+				cachedNodes = cachedGroup.Nodes
+			}
 		}
-		cachedValues = s.readCacheEntries(ctx, key, entryIDs, time.Duration(req.CacheTTLSeconds)*time.Second)
 	}
 	for groupIndex := range groups {
 		group := &groups[groupIndex]
 		if canRead {
-			var cached cachedNodeProbe
-			if body, ok := cachedValues[group.EntryID]; ok && json.Unmarshal(body, &cached) == nil {
+			if cached, ok := cachedNodes[group.ConnectionKey]; ok {
 				group.Cached = &cached
 				continue
 			}
@@ -388,28 +414,40 @@ func (s *Service) resolveProbeNodeGroups(ctx context.Context, req domain.ProbeRe
 		group.MissIndex = len(misses)
 		misses = append(misses, group.Node)
 	}
-	return groups, misses, nil
+	return groups, misses, selector, nil
 }
 
-func (s *Service) writeProbeNodeGroups(ctx context.Context, req domain.ProbeRequest, groups []probeNodeGroup) error {
+func (s *Service) writeProbeNodeGroups(ctx context.Context, req domain.ProbeRequest, selector probeCacheSelector, groups []probeNodeGroup) error {
 	if req.CacheTTLSeconds <= 0 || s.cache == nil {
 		return nil
 	}
-	key, scoped := persistentCacheKey(ctx, cacheKeyPrefixProbe)
-	if !scoped {
+	key, owned := ownedCacheKey(ctx, cacheKeyPrefixProbe)
+	if !owned {
 		return nil
 	}
-	entries := make([]cacheDocumentUpdate, 0, len(groups))
+	selectorID, err := cacheIdentity(selector)
+	if err != nil {
+		return err
+	}
+	value, remaining, ok := prepareCacheValueWrite[probeCacheValue](s, ctx, key, time.Duration(req.CacheTTLSeconds)*time.Second)
+	if !ok {
+		return nil
+	}
+	if value.Groups == nil {
+		value.Groups = map[string]probeCacheGroup{}
+	}
+	nodes := make(map[string]cachedNodeProbe, len(groups))
 	for _, group := range groups {
-		if group.MissIndex < 0 || group.Cached == nil {
+		if group.Cached == nil {
 			continue
 		}
-		entries = append(entries, cacheDocumentUpdate{ID: group.EntryID, Value: *group.Cached})
+		nodes[group.ConnectionKey] = *group.Cached
 	}
-	return s.writeCacheEntries(ctx, key, time.Duration(req.CacheTTLSeconds)*time.Second, entries)
+	value.Groups[selectorID] = probeCacheGroup{Selector: selector, Nodes: nodes}
+	return cachepkg.SetJSON(ctx, s.cache, key, value, remaining)
 }
 
-func probeNodeCacheEntryID(req domain.ProbeRequest, backend domain.ProbeBackendSummary, node domain.NodeIR) (string, error) {
+func newProbeCacheSelector(req domain.ProbeRequest, backend domain.ProbeBackendSummary) probeCacheSelector {
 	req.Method = probe.NormalizeMethod(req.Method)
 	req.Core = probe.NormalizeCore(req.Core)
 	switch req.Method {
@@ -425,28 +463,11 @@ func probeNodeCacheEntryID(req domain.ProbeRequest, backend domain.ProbeBackendS
 		req.NTPServer = ""
 		req.ExpectedStatus = ""
 	}
-	connectionKey, err := domain.NodeConnectionKey(node)
-	if err != nil {
-		return "", err
-	}
-	value := struct {
-		ConnectionKey  string `json:"connection_key"`
-		Method         string `json:"method"`
-		Core           string `json:"core,omitempty"`
-		Backend        string `json:"backend,omitempty"`
-		BackendVersion string `json:"backend_version,omitempty"`
-		URL            string `json:"url,omitempty"`
-		NTPServer      string `json:"ntp_server,omitempty"`
-		ExpectedStatus string `json:"expected_status,omitempty"`
-		TimeoutMS      int    `json:"timeout_ms,omitempty"`
-		Attempts       int    `json:"attempts,omitempty"`
-	}{
-		ConnectionKey: connectionKey,
-		Method:        string(req.Method), Core: req.Core, Backend: backend.Name, BackendVersion: backend.Version,
+	return probeCacheSelector{
+		Method: string(req.Method), Core: req.Core, Backend: backend.Name, BackendVersion: backend.Version,
 		URL: req.URL, NTPServer: req.NTPServer, ExpectedStatus: req.ExpectedStatus,
 		TimeoutMS: req.TimeoutMS, Attempts: req.Attempts,
 	}
-	return cacheIdentity(value)
 }
 
 func bindProbeResult(result domain.NodeProbeResult, node domain.NodeIR, cacheHit bool) domain.NodeProbeResult {

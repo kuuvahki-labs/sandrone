@@ -310,7 +310,7 @@ func (s *Service) RenderSubscriptionRequest(ctx context.Context, request domain.
 	if err != nil {
 		return nil, err
 	}
-	ctx = withSubscriptionCacheScope(ctx, sub.Name)
+	ctx = withSubscriptionCacheOwner(ctx, sub.Name)
 	ttlSeconds := s.subscriptionRenderTTLSeconds(sub.RenderCacheTTLSeconds)
 	cacheEntryID := ""
 	if ttlSeconds > 0 {

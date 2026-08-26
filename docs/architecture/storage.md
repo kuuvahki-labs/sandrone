@@ -116,17 +116,20 @@ service 分别持有权威 `Store` 与非权威 `Cache`，因此自定义 Cache 
 资源 Store。service 使用 `remote_fetch/subscriptions/A` 这类普通字符串作为 key；
 当前 Store-backed 实现把它映射为 `cache/remote_fetch/subscriptions/A.json`，以后
 替换为内存或 Redis 实现时可以直接把同一字符串作为缓存 key。Cache 接口没有
-layer、资源种类、JSON 或内部 entry 概念。Store-backed 实现会尝试用 gzip 压缩
+layer、资源种类、JSON 或内部 record 概念。`internal/cache` 另外提供可选的
+`GetJSON[T]`/`SetJSON` 辅助函数，把业务结构体与 opaque bytes 相互转换；它们不改变
+Cache 接口，也不决定 value 的业务结构。Store-backed 实现会尝试用 gzip 压缩
 超过 4 KiB 的 opaque value，只有压缩结果更小时才在内部 envelope 标记并保存，
 `Get` 会透明解压；该存储选择不会进入 Cache 接口或 service 业务文档。
 
-service 在单个 value 内保存无 TTL 的 JSON entry map，用于节点或请求变体的部分
-命中。读取或普通合并都采用现有绝对过期时间与 `now + effectiveTTL` 中较早者；
-较短的新策略会缩短整个 key，写入部分新结果也不会延长旧结果。整个 value 到期后
-全部 miss。`refresh` 对每个 key
-第一次写入时替换旧 value 并重建 TTL，同一 refresh 请求后续写入该 key 时继续合并
-本次 fresh entry。多个实例共享 Store-backed Cache 时，并发 read-modify-write
-可能最后写入覆盖并降低后续命中率，但不会影响权威资源或业务正确性。
+每类 service 业务拥有自己的 typed JSON value，负责读取完整内容、比较当前语义、
+修改适用记录并全量覆盖保存；Cache 不提供通用 document、RawMessage entry map 或
+合并规则。读取或普通全量保存都采用现有绝对过期时间与 `now + effectiveTTL` 中较早
+者；较短的新策略会缩短整个 key，普通保存不会延长旧 value。整个 value 到期后全部
+miss。`refresh` 对每个 key 第一次写入时丢弃旧 value 并重建 TTL，同一 refresh 请求
+后续访问该 key 时使用本次已重建的业务 value。多个实例共享 Store-backed Cache 时，
+并发 read-modify-write 可能最后写入覆盖并降低后续命中率，但不会影响权威资源或业务
+正确性。
 
 持久缓存共有五类 key 前缀：
 
@@ -145,7 +148,7 @@ Subscription/FileSpec 的 `render_cache_ttl_seconds` 是 nullable 三态字段�
 不读写任何持久层，只保留请求内 memo。share 没有独立缓存层，但生成已保存目标时可以
 复用目标自身的结果缓存。超过 16 MiB 的最终正文不会写入结果缓存。
 
-文档内部 entry identity 只包含影响对应结果的有效语义。结果缓存包含构建
+各业务缓存记录的 identity 只包含影响对应结果的有效语义。结果缓存包含构建
 版本/revision、完整资源定义、目标格式、请求参数和影响执行的设置摘要，并记录
 上次执行实际使用的依赖资源定义摘要；命中前会重新验证这些依赖。资源更新不再
 广泛清空其它资源的结果层，未变化的 fetch、traffic 和节点观测可以继续复用。
@@ -155,7 +158,7 @@ remote-fetch 和 probe 的缓存读取，成功执行后仍按当前 TTL 重新�
 请求内 memo，用于去重同一调用中的重复依赖；它们不持久化、没有 TTL，也不是
 可配置 cache 层。
 
-手动清理调用一次 `Cache.Clear`，不扫描 value 内部 entry，也不提供按前缀操作或
+手动清理调用一次 `Cache.Clear`，不解析业务 value，也不提供按前缀操作或
 统计。并发请求可能在清理期间或之后重新填充缓存。该操作不修改 TTL、`refresh`、
 请求内 memo 或缓存 value 格式，也不由后台任务自动触发。HTTP 路径见
 [项目设置与缓存管理 API](../reference/http-api/settings.md#缓存管理)。
@@ -205,8 +208,8 @@ cache/<cache-key-prefix>/files/<name>.json
   `settings.json` 是统一项目设置。
 - `cache/` 只用于可重建的内部加速，不是权威资源。
 - 每种适用缓存与保存资源组合最多一个 key；Store-backed Cache 将它保存成一个
-  文件。同一资源的不同请求变体或节点观测是 value 内 entry，全部共享该 key 的
-  单一绝对过期时间。资源名中的安全 `/` 与领域资源一样形成子目录。
+  文件。同一资源的不同请求变体或节点观测由对应业务 value 自行组织，全部共享该
+  key 的单一绝对过期时间。资源名中的安全 `/` 与领域资源一样形成子目录。
 - 同一 URL 或连接出现在不同资源时分别缓存，不跨 Subscription/File 复用。
 - 未知安全 key 可以由自定义集成保存；raw Store 备份会保留非 cache key。
 

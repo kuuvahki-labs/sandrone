@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/kuuvahki-labs/sandrone/internal/buildinfo"
+	cachepkg "github.com/kuuvahki-labs/sandrone/internal/cache"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
 
@@ -41,6 +42,14 @@ type cachedRenderResult struct {
 type cachedFileResult struct {
 	Result       domain.FileResult         `json:"result"`
 	Dependencies []cacheDependencyRevision `json:"dependencies,omitempty"`
+}
+
+type subscriptionRenderCacheValue struct {
+	Results map[string]cachedRenderResult `json:"results"`
+}
+
+type fileRenderCacheValue struct {
+	Results map[string]cachedFileResult `json:"results"`
 }
 
 func currentResultCacheBuild() resultCacheBuild {
@@ -100,12 +109,16 @@ func (s *Service) fileRenderCacheEntryID(spec domain.FileSpec, req domain.FileRe
 }
 
 func (s *Service) readSubscriptionRenderCache(ctx context.Context, entryID string, ttl time.Duration) *domain.RenderResult {
-	key, scoped := persistentCacheKey(ctx, cacheKeyPrefixSubscriptionRender)
-	if s.cache == nil || entryID == "" || !scoped {
+	key, owned := ownedCacheKey(ctx, cacheKeyPrefixSubscriptionRender)
+	if s.cache == nil || entryID == "" || !owned {
 		return nil
 	}
-	var cached cachedRenderResult
-	if !s.readCacheJSON(ctx, key, entryID, ttl, &cached) || !s.cacheDependenciesCurrent(ctx, cached.Dependencies) {
+	item, found := readCacheValue[subscriptionRenderCacheValue](s, ctx, key, ttl)
+	if !found {
+		return nil
+	}
+	cached, found := item.Value.Results[entryID]
+	if !found || !s.cacheDependenciesCurrent(ctx, cached.Dependencies) {
 		return nil
 	}
 	out := cloneRenderResult(&cached.Result)
@@ -114,8 +127,8 @@ func (s *Service) readSubscriptionRenderCache(ctx context.Context, entryID strin
 }
 
 func (s *Service) writeSubscriptionRenderCache(ctx context.Context, entryID string, ttlSeconds int, result *domain.RenderResult) {
-	key, scoped := persistentCacheKey(ctx, cacheKeyPrefixSubscriptionRender)
-	if s.cache == nil || entryID == "" || ttlSeconds <= 0 || result == nil || len(result.Body) > maxResultCacheBodyBytes || !scoped {
+	key, owned := ownedCacheKey(ctx, cacheKeyPrefixSubscriptionRender)
+	if s.cache == nil || entryID == "" || ttlSeconds <= 0 || result == nil || len(result.Body) > maxResultCacheBodyBytes || !owned {
 		return
 	}
 	dependencies, err := s.snapshotCacheDependencies(ctx, result.Report.Dependencies)
@@ -124,18 +137,31 @@ func (s *Service) writeSubscriptionRenderCache(ctx context.Context, entryID stri
 	}
 	out := cloneRenderResult(result)
 	out.Cached = false
-	_ = s.writeCacheJSON(ctx, key, entryID, time.Duration(ttlSeconds)*time.Second, cachedRenderResult{
+	ttl := time.Duration(ttlSeconds) * time.Second
+	value, remaining, ok := prepareCacheValueWrite[subscriptionRenderCacheValue](s, ctx, key, ttl)
+	if !ok {
+		return
+	}
+	if value.Results == nil {
+		value.Results = map[string]cachedRenderResult{}
+	}
+	value.Results[entryID] = cachedRenderResult{
 		Result: *out, Dependencies: dependencies,
-	})
+	}
+	_ = cachepkg.SetJSON(ctx, s.cache, key, value, remaining)
 }
 
 func (s *Service) readFileRenderCache(ctx context.Context, entryID string, ttl time.Duration) *domain.FileResult {
-	key, scoped := persistentCacheKey(ctx, cacheKeyPrefixFileRender)
-	if s.cache == nil || entryID == "" || !scoped {
+	key, owned := ownedCacheKey(ctx, cacheKeyPrefixFileRender)
+	if s.cache == nil || entryID == "" || !owned {
 		return nil
 	}
-	var cached cachedFileResult
-	if !s.readCacheJSON(ctx, key, entryID, ttl, &cached) || !s.cacheDependenciesCurrent(ctx, cached.Dependencies) {
+	item, found := readCacheValue[fileRenderCacheValue](s, ctx, key, ttl)
+	if !found {
+		return nil
+	}
+	cached, found := item.Value.Results[entryID]
+	if !found || !s.cacheDependenciesCurrent(ctx, cached.Dependencies) {
 		return nil
 	}
 	out := cloneFileResult(&cached.Result)
@@ -144,8 +170,8 @@ func (s *Service) readFileRenderCache(ctx context.Context, entryID string, ttl t
 }
 
 func (s *Service) writeFileRenderCache(ctx context.Context, entryID string, ttlSeconds int, result *domain.FileResult) {
-	key, scoped := persistentCacheKey(ctx, cacheKeyPrefixFileRender)
-	if s.cache == nil || entryID == "" || ttlSeconds <= 0 || result == nil || len(result.Content) > maxResultCacheBodyBytes || !scoped {
+	key, owned := ownedCacheKey(ctx, cacheKeyPrefixFileRender)
+	if s.cache == nil || entryID == "" || ttlSeconds <= 0 || result == nil || len(result.Content) > maxResultCacheBodyBytes || !owned {
 		return
 	}
 	dependencies, err := s.snapshotCacheDependencies(ctx, result.Report.Dependencies)
@@ -154,9 +180,18 @@ func (s *Service) writeFileRenderCache(ctx context.Context, entryID string, ttlS
 	}
 	out := cloneFileResult(result)
 	out.Cached = false
-	_ = s.writeCacheJSON(ctx, key, entryID, time.Duration(ttlSeconds)*time.Second, cachedFileResult{
+	ttl := time.Duration(ttlSeconds) * time.Second
+	value, remaining, ok := prepareCacheValueWrite[fileRenderCacheValue](s, ctx, key, ttl)
+	if !ok {
+		return
+	}
+	if value.Results == nil {
+		value.Results = map[string]cachedFileResult{}
+	}
+	value.Results[entryID] = cachedFileResult{
 		Result: *out, Dependencies: dependencies,
-	})
+	}
+	_ = cachepkg.SetJSON(ctx, s.cache, key, value, remaining)
 }
 
 func (s *Service) snapshotCacheDependencies(ctx context.Context, refs []domain.ResourceRef) ([]cacheDependencyRevision, error) {

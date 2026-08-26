@@ -101,10 +101,14 @@ cache。它不是写入 `NodeIR` 的状态，也不是长期历史数据库。
 缓存只保存单节点观测、backend 信息和可重新绑定的 renderer warning 模板；它是内部加速数据，不会成为可列举、可分享的 report 资源。Store 备份也排除 cache 前缀，见[存储架构](storage.md)。
 
 缓存 key 按保存资源隔离为 `probe/subscriptions/<name>`；Store-backed Cache 将其
-映射为 `cache/probe/subscriptions/<name>.json`。value 包含该资源自身发起的全部连接
-与探测参数组合，内部记录没有独立 TTL，整个 key 统一过期。普通部分更新不能延长
-已有绝对过期时间。组合订阅递归执行时，B、C 自身的处理结果仍分别写入自己的 key；
-只有 A 自己发起的组合后探测才写入 A，不跨资源复用相同连接。
+映射为 `cache/probe/subscriptions/<name>.json`。probe 业务把完整 value 解码为
+“探测参数 selector -> ConnectionKey -> 节点观测”的 typed 结构；selector 包含
+method、core、URL、backend 等有效探测语义。同一 selector 更新时以当前连接集合
+全量替换该组，因此已经移除或连接发生变化的节点不会继续留在当前组。其它 selector
+不做猜测性清理，由 TTL、`refresh` 或显式缓存清理结束生命周期。内部记录没有独立
+TTL，整个 key 统一过期，普通全量保存不能延长已有绝对过期时间。组合订阅递归执行
+时，B、C 自身的处理结果仍分别写入自己的 key；只有 A 自己发起的组合后探测才写入
+A，不跨资源复用相同连接。
 
 ## Report 与失败语义
 

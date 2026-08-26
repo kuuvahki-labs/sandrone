@@ -102,7 +102,7 @@ func (s *Service) resolveSubscriptionNodeInput(ctx context.Context, input domain
 	if err != nil {
 		return nil, nodeInputReadError(input, err)
 	}
-	ctx = withSubscriptionCacheScope(ctx, sub.Name)
+	ctx = withSubscriptionCacheOwner(ctx, sub.Name)
 	childReq := req
 	childReq.Name = input.Name
 	nodeSet, err := s.materializeSubscription(ctx, sub, childReq, subscriptionState)

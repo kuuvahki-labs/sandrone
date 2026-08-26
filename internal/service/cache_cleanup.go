@@ -8,16 +8,16 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
 
-func (s *Service) deletePersistentCacheScope(ctx context.Context, resourceKind, resourceName string) {
+func (s *Service) deleteCacheOwner(ctx context.Context, resourceKind, resourceName string) {
 	if s.cache == nil {
 		return
 	}
-	for _, prefix := range persistentCacheKeyPrefixes {
+	for _, prefix := range ownedCacheKeyPrefixes {
 		_ = s.cache.Delete(ctx, path.Join(prefix, resourceKind, resourceName))
 	}
 }
 
-var persistentCacheKeyPrefixes = []string{
+var ownedCacheKeyPrefixes = []string{
 	cacheKeyPrefixRemoteFetch,
 	cacheKeyPrefixProbe,
 	cacheKeyPrefixSubscriptionTraffic,
