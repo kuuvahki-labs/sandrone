@@ -52,7 +52,7 @@ func summarizeFormatCapability(capability domain.FormatCapability) domain.Format
 	return domain.FormatCapabilitySummary{
 		Direction:  capability.Direction,
 		Format:     capability.Format,
-		NodeTypes:  append([]domain.NodeType(nil), capability.Types...),
+		NodeTypes:  cloneNonEmptySlice(capability.Types),
 		Reversible: capability.Reversible,
 		FieldCounts: domain.FormatCapabilityFieldCounts{
 			Supported: len(capability.Fields),
@@ -64,9 +64,9 @@ func summarizeFormatCapability(capability domain.FormatCapability) domain.Format
 }
 
 func cloneFormatCapability(capability domain.FormatCapability) domain.FormatCapability {
-	capability.Types = append([]domain.NodeType(nil), capability.Types...)
-	capability.Fields = append([]domain.CapabilityFieldRef(nil), capability.Fields...)
-	capability.Lossy = append([]domain.CapabilityFieldRef(nil), capability.Lossy...)
-	capability.RawOnly = append([]domain.CapabilityFieldRef(nil), capability.RawOnly...)
+	capability.Types = cloneNonEmptySlice(capability.Types)
+	capability.Fields = cloneNonEmptySlice(capability.Fields)
+	capability.Lossy = cloneNonEmptySlice(capability.Lossy)
+	capability.RawOnly = cloneNonEmptySlice(capability.RawOnly)
 	return capability
 }

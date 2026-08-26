@@ -1,4 +1,4 @@
-package service
+package filedriver
 
 import (
 	"context"
@@ -6,12 +6,13 @@ import (
 	"strings"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
+	"github.com/kuuvahki-labs/sandrone/internal/filekind"
 )
 
 type singBoxFileDriver struct{}
 
-func (singBoxFileDriver) Descriptor() typedFileDescriptor {
-	return typedFileDescriptor{
+func (singBoxFileDriver) Descriptor() Descriptor {
+	return Descriptor{
 		Kind:              domain.FileKindSingBox,
 		Description:       "Compile subscriptions into a complete sing-box JSON configuration.",
 		MediaType:         "application/json",
@@ -19,7 +20,7 @@ func (singBoxFileDriver) Descriptor() typedFileDescriptor {
 		DefaultExtension:  ".json",
 		NodeRenderFormat:  "sing-box-outbounds",
 		SettingsPrototype: SingBoxFileSettings{},
-		SourceRules: FileKindSourceRules{
+		SourceRules: filekind.SourceRules{
 			AllowedTypes: []string{"inline", "remote"},
 		},
 		Defaults: map[string]any{"source": "built-in", "settings": map[string]any{}},
@@ -47,7 +48,7 @@ func (singBoxFileDriver) ValidateSettings(raw json.RawMessage) error {
 	return err
 }
 
-func (singBoxFileDriver) Compile(_ context.Context, in typedFileCompileInput) ([]byte, error) {
+func (singBoxFileDriver) Compile(_ context.Context, in CompileInput) ([]byte, error) {
 	settings, err := decodeSingBoxFileSettings(in.Settings)
 	if err != nil {
 		return nil, err

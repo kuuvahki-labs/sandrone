@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"gopkg.in/yaml.v3"
-
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
+	"github.com/kuuvahki-labs/sandrone/internal/filedriver"
 )
 
 func (s *Service) resolveConfigFile(ctx context.Context, spec domain.FileSpec, req domain.FileRequest, state *fileResolveState) (domain.FileDocument, *domain.SourceRef, []domain.Warning, error) {
@@ -44,7 +43,7 @@ func (s *Service) resolveConfigFile(ctx context.Context, spec domain.FileSpec, r
 	if err != nil {
 		return domain.FileDocument{}, nil, nil, err
 	}
-	body, err := driver.Compile(ctx, typedFileCompileInput{
+	body, err := driver.Compile(ctx, filedriver.CompileInput{
 		Base:          base.Content,
 		RenderedNodes: rendered,
 		Settings:      config.Settings,
@@ -56,7 +55,7 @@ func (s *Service) resolveConfigFile(ctx context.Context, spec domain.FileSpec, r
 	return base, sourceRef, warnings, nil
 }
 
-func (s *Service) renderTypedFileNodes(ctx context.Context, descriptor typedFileDescriptor, nodes []domain.NodeIR) ([]byte, []domain.Warning, error) {
+func (s *Service) renderTypedFileNodes(ctx context.Context, descriptor filedriver.Descriptor, nodes []domain.NodeIR) ([]byte, []domain.Warning, error) {
 	renderer, ok := s.renderers[descriptor.NodeRenderFormat]
 	if !ok {
 		return nil, nil, domain.NewError(domain.CodeInvalidArgument, fmt.Sprintf("file kind %q requires node renderer %q", descriptor.Kind, descriptor.NodeRenderFormat))
@@ -112,74 +111,4 @@ func (s *Service) configNodes(ctx context.Context, subscriptions []string, req d
 		}
 	}
 	return nodes, nil
-}
-
-func renderedYAMLList(body []byte, key string) ([]any, error) {
-	var doc map[string]any
-	if err := yaml.Unmarshal(body, &doc); err != nil {
-		return nil, domain.WrapError(domain.CodeInvalidArgument, "parse rendered mihomo proxies", err)
-	}
-	return anyList(doc[key]), nil
-}
-
-func namesFromMihomoProxies(proxies []any) []string {
-	names := []string{}
-	for _, item := range proxies {
-		proxy, ok := item.(map[string]any)
-		if !ok {
-			continue
-		}
-		if name, ok := proxy["name"].(string); ok && name != "" {
-			names = append(names, name)
-		}
-	}
-	return uniqueStrings(names)
-}
-
-func namesFromSingBoxOutbounds(outbounds []any, endpoints []any) []string {
-	names := []string{}
-	for _, item := range append(outbounds, endpoints...) {
-		outbound, ok := item.(map[string]any)
-		if !ok {
-			continue
-		}
-		if tag, ok := outbound["tag"].(string); ok && tag != "" {
-			names = append(names, tag)
-		}
-	}
-	return uniqueStrings(names)
-}
-
-func uniqueStrings(values []string) []string {
-	seen := map[string]bool{}
-	out := []string{}
-	for _, value := range values {
-		if value == "" || seen[value] {
-			continue
-		}
-		seen[value] = true
-		out = append(out, value)
-	}
-	return out
-}
-
-func anyList(value any) []any {
-	if value == nil {
-		return []any{}
-	}
-	list, ok := value.([]any)
-	if !ok {
-		return []any{}
-	}
-	return list
-}
-
-func mapValue(value any) map[string]any {
-	if value == nil {
-		return map[string]any{}
-	}
-	if out, ok := value.(map[string]any); ok {
-		return out
-	}
-	return map[string]any{}
 }

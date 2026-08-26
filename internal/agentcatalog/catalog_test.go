@@ -7,6 +7,7 @@ import (
 
 	"github.com/kuuvahki-labs/sandrone/internal/agentcatalog"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
+	"github.com/kuuvahki-labs/sandrone/internal/filekind"
 	"github.com/kuuvahki-labs/sandrone/internal/service"
 )
 
@@ -24,7 +25,7 @@ func TestCatalogBuildsServerOwnedDocuments(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 1, script.Version)
 
-	var mihomo service.FileKindCapability
+	var mihomo filekind.Capability
 	for _, capability := range svc.FileKindCapabilities() {
 		if capability.Kind == domain.FileKindMihomo {
 			mihomo = capability

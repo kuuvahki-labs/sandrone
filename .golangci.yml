@@ -10,6 +10,7 @@ linters:
   enable:
     - bodyclose
     - copyloopvar
+    - depguard
     - durationcheck
     - errcheck
     - errorlint
@@ -46,6 +47,56 @@ linters:
           - gosec
         text: "G30[16]:"
   settings:
+    depguard:
+      rules:
+        adapters:
+          files:
+            - internal/adapter/**/*.go
+            - "!$test"
+          deny:
+            - pkg: github.com/kuuvahki-labs/sandrone/internal/entry
+              desc: adapters must not depend on entrypoints
+            - pkg: github.com/kuuvahki-labs/sandrone/internal/store
+              desc: adapters must not access resource storage
+        processors:
+          files:
+            - internal/processor/**/*.go
+            - "!$test"
+          deny:
+            - pkg: github.com/kuuvahki-labs/sandrone/internal/adapter
+              desc: processors must operate on canonical domain values
+            - pkg: github.com/kuuvahki-labs/sandrone/internal/entry
+              desc: processors must not depend on entrypoints
+            - pkg: github.com/kuuvahki-labs/sandrone/internal/store
+              desc: processors must not access resource storage
+        orchestration:
+          files:
+            - internal/domain/**/*.go
+            - internal/service/**/*.go
+            - "!$test"
+          deny:
+            - pkg: github.com/kuuvahki-labs/sandrone/internal/entry
+              desc: domain and service must not depend on entrypoints
+        file-drivers:
+          files:
+            - internal/filedriver/**/*.go
+            - "!$test"
+          deny:
+            - pkg: github.com/kuuvahki-labs/sandrone/internal/entry
+              desc: file drivers must not depend on entrypoints
+            - pkg: github.com/kuuvahki-labs/sandrone/internal/processor
+              desc: file drivers must not execute processor pipelines
+            - pkg: github.com/kuuvahki-labs/sandrone/internal/service
+              desc: file drivers must not depend on service orchestration
+            - pkg: github.com/kuuvahki-labs/sandrone/internal/store
+              desc: file drivers must not access resource storage
+        catalogs:
+          files:
+            - internal/agentcatalog/**/*.go
+            - "!$test"
+          deny:
+            - pkg: github.com/kuuvahki-labs/sandrone/internal/service
+              desc: catalogs consume leaf contracts instead of service internals
     errcheck:
       check-type-assertions: true
       check-blank: false

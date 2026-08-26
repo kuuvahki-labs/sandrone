@@ -2,7 +2,9 @@ package service
 
 import (
 	"fmt"
+	"maps"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
@@ -117,10 +119,7 @@ func cloneReport(report domain.Report) domain.Report {
 	if report.Probe != nil {
 		probeReport := *report.Probe
 		if report.Probe.ErrorCounts != nil {
-			probeReport.ErrorCounts = make(map[string]int, len(report.Probe.ErrorCounts))
-			for code, count := range report.Probe.ErrorCounts {
-				probeReport.ErrorCounts[code] = count
-			}
+			probeReport.ErrorCounts = maps.Clone(report.Probe.ErrorCounts)
 		}
 		out.Probe = &probeReport
 	}
@@ -128,15 +127,16 @@ func cloneReport(report domain.Report) domain.Report {
 }
 
 func cloneStringMap(in map[string]string) map[string]string {
-	if in == nil {
+	return maps.Clone(in)
+}
+
+func cloneNonEmptySlice[T any](values []T) []T {
+	if len(values) == 0 {
 		return nil
 	}
-	out := make(map[string]string, len(in))
-	for k, v := range in {
-		out[k] = v
-	}
-	return out
+	return slices.Clone(values)
 }
+
 func mergeStringMaps(base, override map[string]string) map[string]string {
 	if len(base) == 0 && len(override) == 0 {
 		return nil

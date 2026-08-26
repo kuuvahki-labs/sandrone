@@ -2,8 +2,8 @@ package agentcatalog
 
 import (
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
+	"github.com/kuuvahki-labs/sandrone/internal/filekind"
 	"github.com/kuuvahki-labs/sandrone/internal/processor"
-	"github.com/kuuvahki-labs/sandrone/internal/service"
 )
 
 type ProcessorSummaryDocument struct {
@@ -49,7 +49,7 @@ func ProcessorSummary(descriptors []processor.Descriptor) ProcessorSummaryDocume
 	return ProcessorSummaryDocument{Processors: items}
 }
 
-func FileKindSummary(capabilities []service.FileKindCapability) FileKindSummaryDocument {
+func FileKindSummary(capabilities []filekind.Capability) FileKindSummaryDocument {
 	items := make([]FileKindSummaryEntry, len(capabilities))
 	for index, capability := range capabilities {
 		items[index] = FileKindSummaryEntry{

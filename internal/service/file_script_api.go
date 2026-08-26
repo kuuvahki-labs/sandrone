@@ -235,14 +235,7 @@ func (s *Service) FileContent(ctx context.Context, name string, opts domain.Scri
 }
 
 func cloneArgs(args map[string]string) map[string]string {
-	if args == nil {
-		return nil
-	}
-	out := make(map[string]string, len(args))
-	for key, value := range args {
-		out[key] = value
-	}
-	return out
+	return cloneStringMap(args)
 }
 
 func appendResourceRef(refs []domain.ResourceRef, ref domain.ResourceRef) []domain.ResourceRef {

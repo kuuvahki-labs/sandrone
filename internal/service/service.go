@@ -24,6 +24,7 @@ import (
 	cachepkg "github.com/kuuvahki-labs/sandrone/internal/cache"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/fetcher"
+	"github.com/kuuvahki-labs/sandrone/internal/filedriver"
 	"github.com/kuuvahki-labs/sandrone/internal/probe"
 	"github.com/kuuvahki-labs/sandrone/internal/processor"
 	fileproc "github.com/kuuvahki-labs/sandrone/internal/processor/file"
@@ -78,7 +79,7 @@ type Service struct {
 	renderers               map[string]Renderer
 	uriParser               *uri.Parser
 	registry                *processor.Registry
-	typedFiles              *typedFileRegistry
+	typedFiles              *filedriver.Registry
 	prober                  ProbeEngine
 	cache                   cachepkg.Cache
 	store                   store.Store
@@ -204,12 +205,7 @@ func New(opts ...Option) *Service {
 	shadowrocketRenderer := shadowrocket.NewRenderer()
 
 	registry := processor.NewRegistry()
-	typedFiles := newTypedFileRegistry()
-	for _, driver := range []typedFileDriver{mihomoFileDriver{}, singBoxFileDriver{}, shadowrocketFileDriver{}} {
-		if err := typedFiles.Register(driver); err != nil {
-			panic(err)
-		}
-	}
+	typedFiles := filedriver.New()
 	s := &Service{
 		parsers: map[string]Parser{
 			"uri":        uriParser,

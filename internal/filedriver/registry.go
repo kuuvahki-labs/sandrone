@@ -1,4 +1,5 @@
-package service
+// Package filedriver compiles rendered canonical nodes into complete client configurations.
+package filedriver
 
 import (
 	"context"
@@ -6,9 +7,11 @@ import (
 	"fmt"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
+	"github.com/kuuvahki-labs/sandrone/internal/filekind"
 )
 
-type typedFileDescriptor struct {
+// Descriptor declares one typed file format and its public capability data.
+type Descriptor struct {
 	Kind              domain.FileKind
 	Description       string
 	MediaType         string
@@ -17,32 +20,42 @@ type typedFileDescriptor struct {
 	DefaultBase       []byte
 	NodeRenderFormat  string
 	SettingsPrototype any
-	SourceRules       FileKindSourceRules
+	SourceRules       filekind.SourceRules
 	Defaults          map[string]any
 	Examples          []map[string]any
 }
 
-type typedFileCompileInput struct {
+// CompileInput contains the resolved base document and rendered canonical nodes.
+type CompileInput struct {
 	Base          []byte
 	RenderedNodes []byte
 	Settings      json.RawMessage
 }
 
-type typedFileDriver interface {
-	Descriptor() typedFileDescriptor
+// Driver validates and compiles one typed file format.
+type Driver interface {
+	Descriptor() Descriptor
 	ValidateSettings(json.RawMessage) error
-	Compile(context.Context, typedFileCompileInput) ([]byte, error)
+	Compile(context.Context, CompileInput) ([]byte, error)
 }
 
-type typedFileRegistry struct {
-	drivers map[domain.FileKind]typedFileDriver
+// Registry owns the typed file drivers available to the service.
+type Registry struct {
+	drivers map[domain.FileKind]Driver
 }
 
-func newTypedFileRegistry() *typedFileRegistry {
-	return &typedFileRegistry{drivers: map[domain.FileKind]typedFileDriver{}}
+// New returns a registry containing all built-in typed file drivers.
+func New() *Registry {
+	registry := &Registry{drivers: map[domain.FileKind]Driver{}}
+	for _, driver := range []Driver{mihomoFileDriver{}, singBoxFileDriver{}, shadowrocketFileDriver{}} {
+		if err := registry.register(driver); err != nil {
+			panic(err)
+		}
+	}
+	return registry
 }
 
-func (r *typedFileRegistry) Register(driver typedFileDriver) error {
+func (r *Registry) register(driver Driver) error {
 	if driver == nil {
 		return fmt.Errorf("typed file driver is nil")
 	}
@@ -79,7 +92,7 @@ func (r *typedFileRegistry) Register(driver typedFileDriver) error {
 	return nil
 }
 
-func (r *typedFileRegistry) Lookup(kind domain.FileKind) (typedFileDriver, error) {
+func (r *Registry) Lookup(kind domain.FileKind) (Driver, error) {
 	driver, ok := r.drivers[kind]
 	if !ok {
 		return nil, domain.NewError(domain.CodeInvalidArgument, fmt.Sprintf("file kind %q is not registered", kind))

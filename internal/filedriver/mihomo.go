@@ -1,4 +1,4 @@
-package service
+package filedriver
 
 import (
 	"bytes"
@@ -8,12 +8,13 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
+	"github.com/kuuvahki-labs/sandrone/internal/filekind"
 )
 
 type mihomoFileDriver struct{}
 
-func (mihomoFileDriver) Descriptor() typedFileDescriptor {
-	return typedFileDescriptor{
+func (mihomoFileDriver) Descriptor() Descriptor {
+	return Descriptor{
 		Kind:              domain.FileKindMihomo,
 		Description:       "Compile subscriptions into a complete Mihomo YAML configuration.",
 		MediaType:         "application/yaml",
@@ -21,7 +22,7 @@ func (mihomoFileDriver) Descriptor() typedFileDescriptor {
 		DefaultExtension:  ".yaml",
 		NodeRenderFormat:  "mihomo-proxies",
 		SettingsPrototype: MihomoFileCapabilitySettings{},
-		SourceRules: FileKindSourceRules{
+		SourceRules: filekind.SourceRules{
 			AllowedTypes: []string{"inline", "remote"},
 		},
 		Defaults: map[string]any{"source": "built-in", "settings": map[string]any{}},
@@ -57,7 +58,7 @@ func (mihomoFileDriver) ValidateSettings(raw json.RawMessage) error {
 	return err
 }
 
-func (mihomoFileDriver) Compile(_ context.Context, in typedFileCompileInput) ([]byte, error) {
+func (mihomoFileDriver) Compile(_ context.Context, in CompileInput) ([]byte, error) {
 	settings, err := decodeMihomoFileSettings(in.Settings)
 	if err != nil {
 		return nil, err

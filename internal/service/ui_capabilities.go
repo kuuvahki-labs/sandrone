@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"slices"
 	"sort"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
@@ -18,7 +19,7 @@ func (s *Service) ListUICapabilities(_ context.Context) (*domain.UICapabilityLis
 			Key:          key,
 			Enabled:      enabled,
 			Reason:       reason,
-			Dependencies: append([]string(nil), dependencies...),
+			Dependencies: slices.Clone(dependencies),
 		}
 	}
 
@@ -42,7 +43,7 @@ func (s *Service) ListUICapabilities(_ context.Context) (*domain.UICapabilityLis
 
 	items := make([]domain.UICapability, 0, len(features))
 	for _, feature := range features {
-		feature.Dependencies = append([]string(nil), feature.Dependencies...)
+		feature.Dependencies = slices.Clone(feature.Dependencies)
 		items = append(items, feature)
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].Key < items[j].Key })

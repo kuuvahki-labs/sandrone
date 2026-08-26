@@ -1,4 +1,4 @@
-package service
+package filedriver
 
 import (
 	"bytes"
@@ -14,9 +14,9 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
 
-func TestServiceFileKindCapabilities(t *testing.T) {
-	service := New()
-	capabilities := service.FileKindCapabilities()
+func TestCapabilities(t *testing.T) {
+	registry := New()
+	capabilities := registry.Capabilities()
 	kinds := make([]domain.FileKind, len(capabilities))
 	for i, capability := range capabilities {
 		kinds[i] = capability.Kind
@@ -41,7 +41,7 @@ func TestServiceFileKindCapabilities(t *testing.T) {
 
 		raw, err := json.Marshal(capability.SettingsPrototype)
 		require.NoError(t, err)
-		driver, err := service.typedFiles.Lookup(capability.Kind)
+		driver, err := registry.Lookup(capability.Kind)
 		require.NoError(t, err)
 		require.NoError(t, driver.ValidateSettings(raw), "%s settings prototype must be accepted by its driver", capability.Kind)
 		for index, example := range capability.Examples {
@@ -70,7 +70,7 @@ func TestServiceFileKindCapabilities(t *testing.T) {
 }
 
 func TestMihomoCapabilityPrototypeMatchesExecutedSettings(t *testing.T) {
-	capabilities := New().FileKindCapabilities()
+	capabilities := New().Capabilities()
 	prototypeType := reflect.TypeOf(capabilities[1].SettingsPrototype)
 	_, exists := prototypeType.FieldByName("AdaptiveGroups")
 	require.False(t, exists)
@@ -83,13 +83,14 @@ func TestMihomoCapabilityPrototypeMatchesExecutedSettings(t *testing.T) {
 }
 
 func TestMihomoFileDriverKeepsLegacyAdaptiveGroupsCompatibleWithExplicitGroups(t *testing.T) {
-	driver := mihomoFileDriver{}
+	driver, err := New().Lookup(domain.FileKindMihomo)
+	require.NoError(t, err)
 	settings := json.RawMessage(`{
   "adaptive_groups": {"type": "url-test", "regions": ["hk", "jp"]},
   "groups": [{"name": "Manual", "type": "select", "proxies": ["hk-node", "DIRECT"]}]
 }`)
 	require.NoError(t, driver.ValidateSettings(settings))
-	result, err := driver.Compile(context.Background(), typedFileCompileInput{
+	result, err := driver.Compile(context.Background(), CompileInput{
 		Base: driver.Descriptor().DefaultBase,
 		RenderedNodes: []byte(`proxies:
   - name: hk-node
@@ -107,14 +108,14 @@ func TestMihomoFileDriverKeepsLegacyAdaptiveGroupsCompatibleWithExplicitGroups(t
 	}}, document["proxy-groups"])
 }
 
-func TestServiceFileKindCapabilitiesReturnImmutableCopies(t *testing.T) {
-	service := New()
-	first := service.FileKindCapabilities()
+func TestCapabilitiesReturnImmutableCopies(t *testing.T) {
+	registry := New()
+	first := registry.Capabilities()
 	first[0].SourceRules.AllowedTypes[0] = "mutated"
 	first[1].Defaults["source"] = "mutated"
 	first[1].Examples[0]["kind"] = "mutated"
 
-	second := service.FileKindCapabilities()
+	second := registry.Capabilities()
 	require.Equal(t, "inline", second[0].SourceRules.AllowedTypes[0])
 	require.NotEqual(t, "mutated", second[1].Defaults["source"])
 	require.Equal(t, string(domain.FileKindMihomo), second[1].Examples[0]["kind"])

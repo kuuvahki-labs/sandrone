@@ -12,10 +12,10 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
+	"github.com/kuuvahki-labs/sandrone/internal/filekind"
 	"github.com/kuuvahki-labs/sandrone/internal/inidoc"
 	"github.com/kuuvahki-labs/sandrone/internal/processor"
 	scriptproc "github.com/kuuvahki-labs/sandrone/internal/processor/script"
-	"github.com/kuuvahki-labs/sandrone/internal/service"
 )
 
 type ProcessorCatalogDocument struct {
@@ -29,16 +29,16 @@ type ProcessorCatalogDocument struct {
 }
 
 type FileKindCatalogDocument struct {
-	Kind              domain.FileKind             `json:"kind"`
-	Description       string                      `json:"description"`
-	SettingsSupported bool                        `json:"settings_supported"`
-	SettingsSchema    *jsonschema.Schema          `json:"settings_schema,omitempty"`
-	MediaType         string                      `json:"media_type"`
-	Syntax            string                      `json:"syntax"`
-	DefaultExtension  string                      `json:"default_extension"`
-	SourceRules       service.FileKindSourceRules `json:"source_rules"`
-	Defaults          map[string]any              `json:"defaults"`
-	Examples          []map[string]any            `json:"examples"`
+	Kind              domain.FileKind      `json:"kind"`
+	Description       string               `json:"description"`
+	SettingsSupported bool                 `json:"settings_supported"`
+	SettingsSchema    *jsonschema.Schema   `json:"settings_schema,omitempty"`
+	MediaType         string               `json:"media_type"`
+	Syntax            string               `json:"syntax"`
+	DefaultExtension  string               `json:"default_extension"`
+	SourceRules       filekind.SourceRules `json:"source_rules"`
+	Defaults          map[string]any       `json:"defaults"`
+	Examples          []map[string]any     `json:"examples"`
 }
 
 type ScriptAPIDocument struct {
@@ -121,7 +121,7 @@ func ProcessorDetail(descriptor processor.Descriptor) (ProcessorCatalogDocument,
 	}, nil
 }
 
-func FileKindDetail(capability service.FileKindCapability) (FileKindCatalogDocument, error) {
+func FileKindDetail(capability filekind.Capability) (FileKindCatalogDocument, error) {
 	document := FileKindCatalogDocument{
 		Kind: capability.Kind, Description: capability.Description,
 		MediaType: capability.MediaType, Syntax: capability.Syntax,

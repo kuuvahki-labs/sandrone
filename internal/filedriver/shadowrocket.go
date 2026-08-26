@@ -1,4 +1,4 @@
-package service
+package filedriver
 
 import (
 	"context"
@@ -9,13 +9,14 @@ import (
 
 	shadowrocketadapter "github.com/kuuvahki-labs/sandrone/internal/adapter/shadowrocket"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
+	"github.com/kuuvahki-labs/sandrone/internal/filekind"
 	"github.com/kuuvahki-labs/sandrone/internal/inidoc"
 )
 
 type shadowrocketFileDriver struct{}
 
-func (shadowrocketFileDriver) Descriptor() typedFileDescriptor {
-	return typedFileDescriptor{
+func (shadowrocketFileDriver) Descriptor() Descriptor {
+	return Descriptor{
 		Kind:              domain.FileKindShadowrocket,
 		Description:       "Compile subscriptions into a complete Shadowrocket INI configuration.",
 		MediaType:         "text/plain; charset=utf-8",
@@ -23,7 +24,7 @@ func (shadowrocketFileDriver) Descriptor() typedFileDescriptor {
 		DefaultExtension:  ".conf",
 		NodeRenderFormat:  "shadowrocket-proxies",
 		SettingsPrototype: ShadowrocketFileCapabilitySettings{},
-		SourceRules: FileKindSourceRules{
+		SourceRules: filekind.SourceRules{
 			AllowedTypes: []string{"inline", "remote"},
 		},
 		Defaults: map[string]any{"source": "built-in", "settings": map[string]any{}},
@@ -43,7 +44,7 @@ func (shadowrocketFileDriver) ValidateSettings(raw json.RawMessage) error {
 	return err
 }
 
-func (shadowrocketFileDriver) Compile(_ context.Context, in typedFileCompileInput) ([]byte, error) {
+func (shadowrocketFileDriver) Compile(_ context.Context, in CompileInput) ([]byte, error) {
 	settings, err := decodeShadowrocketFileSettings(in.Settings)
 	if err != nil {
 		return nil, err
