@@ -35,22 +35,21 @@ func TestClearCacheRequiresAuthenticationAndDisablesHTTPStorage(t *testing.T) {
 	require.Empty(t, response.Body.String())
 }
 
-func TestClearCacheDeletesAllPersistentLayersAndIsIdempotent(t *testing.T) {
+func TestClearCacheDeletesAllPersistentKeysAndIsIdempotent(t *testing.T) {
 	rt, resourceStore := cacheHTTPRuntime(t, app.Config{})
 	cache := cachepkg.New(resourceStore, time.Now)
 	ctx := context.Background()
 	keys := make([]string, 0, 5)
-	for _, layer := range []string{
+	for _, prefix := range []string{
 		"remote_fetch",
 		"probe",
 		"subscription_traffic",
 		"subscription_render",
 		"file_render",
 	} {
-		key, err := cachepkg.HashKey(layer, layer)
-		require.NoError(t, err)
-		require.NoError(t, cache.PutJSON(ctx, key, time.Hour, layer))
-		keys = append(keys, key)
+		key := prefix + "/subscriptions/all"
+		require.NoError(t, cache.Set(ctx, key, []byte(`{"entries":{"entry":"value"}}`), time.Hour))
+		keys = append(keys, "cache/"+key+".json")
 	}
 
 	server := httpapi.New(rt)
@@ -81,7 +80,7 @@ func TestClearCacheMapsFailuresWithoutLeakingCause(t *testing.T) {
 	httpapi.New(rt).Handler().ServeHTTP(response, httptest.NewRequest(http.MethodDelete, "/v1/cache", nil))
 	require.Equal(t, http.StatusInternalServerError, response.Code)
 	require.Equal(t, "no-store", response.Header().Get("Cache-Control"))
-	require.JSONEq(t, `{"error":{"code":"cache_operation_failed","message":"cache clear failed for layer \"remote_fetch\""}}`, response.Body.String())
+	require.JSONEq(t, `{"error":{"code":"cache_operation_failed","message":"cache clear failed"}}`, response.Body.String())
 	require.NotContains(t, response.Body.String(), secret)
 }
 
@@ -97,10 +96,16 @@ type cacheHTTPDeleteFailCache struct {
 	err error
 }
 
-func (c *cacheHTTPDeleteFailCache) GetJSON(context.Context, string, any) bool { return false }
+func (c *cacheHTTPDeleteFailCache) Get(context.Context, string) (cachepkg.Item, bool, error) {
+	return cachepkg.Item{}, false, nil
+}
 
-func (c *cacheHTTPDeleteFailCache) PutJSON(context.Context, string, time.Duration, any) error {
+func (c *cacheHTTPDeleteFailCache) Set(context.Context, string, []byte, time.Duration) error {
 	return nil
 }
 
-func (c *cacheHTTPDeleteFailCache) DeleteLayer(context.Context, string) error { return c.err }
+func (c *cacheHTTPDeleteFailCache) Delete(context.Context, string) error {
+	return nil
+}
+
+func (c *cacheHTTPDeleteFailCache) Clear(context.Context) error { return c.err }

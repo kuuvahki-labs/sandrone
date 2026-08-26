@@ -36,7 +36,6 @@ func (s *Service) PutSettings(ctx context.Context, update domain.SettingsUpdate)
 	snapshot := settingsSnapshot(s.storedSettings, s.effectiveSettings, s.settingsOverrides)
 	s.settingsMu.Unlock()
 
-	s.invalidateResultCaches(ctx)
 	s.notifyScheduledRefreshSettingsChanged()
 	s.logResource(ctx, "put", "settings", "project")
 	return snapshot, nil
@@ -63,7 +62,6 @@ func (s *Service) ReloadSettings(ctx context.Context) error {
 	s.storedSettings = next
 	applyDynamicSettings(&s.effectiveSettings, next)
 	s.settingsMu.Unlock()
-	s.invalidateResultCaches(ctx)
 	s.notifyScheduledRefreshSettingsChanged()
 	return nil
 }

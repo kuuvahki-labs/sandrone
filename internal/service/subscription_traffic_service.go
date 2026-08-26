@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	cachepkg "github.com/kuuvahki-labs/sandrone/internal/cache"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
 
@@ -17,13 +16,6 @@ func (s *Service) SubscriptionTraffic(ctx context.Context, req domain.Subscripti
 	if name == "" {
 		return nil, domain.NewError(domain.CodeInvalidArgument, "subscription name is required")
 	}
-	ttlSeconds := s.subscriptionTrafficTTLSeconds()
-	if !req.Refresh {
-		if cached := s.readSubscriptionTrafficCache(ctx, name, ttlSeconds); cached != nil {
-			cached.Cached = true
-			return cached, nil
-		}
-	}
 	if req.Refresh {
 		ctx = withCacheReadBypass(ctx)
 	}
@@ -32,12 +24,24 @@ func (s *Service) SubscriptionTraffic(ctx context.Context, req domain.Subscripti
 	if err != nil {
 		return nil, err
 	}
+	ctx = withSubscriptionCacheScope(ctx, sub.Name)
 	sub, err = normalizeSubscription(sub)
 	if err != nil {
 		return nil, err
 	}
 	if sub.Type != domain.SubscriptionTypeRemote {
 		return nil, domain.NewError(domain.CodeInvalidArgument, "subscription traffic requires remote subscription")
+	}
+	ttlSeconds := s.subscriptionTrafficTTLSeconds()
+	entryID, err := subscriptionTrafficCacheEntryID(s.remoteInputWithDefaults(*sub.Remote))
+	if err != nil {
+		return nil, err
+	}
+	if !req.Refresh {
+		if cached := s.readSubscriptionTrafficCache(ctx, entryID, ttlSeconds); cached != nil {
+			cached.Cached = true
+			return cached, nil
+		}
 	}
 
 	base, err := s.subscriptionBaseNodes(ctx, sub, domain.FileRequest{}, newSubscriptionResolveState())
@@ -50,7 +54,7 @@ func (s *Service) SubscriptionTraffic(ctx context.Context, req domain.Subscripti
 		Format:           sub.Format,
 		Traffic:          subscriptionTrafficItem(base.Traffic),
 	}
-	s.writeSubscriptionTrafficCache(ctx, name, ttlSeconds, result)
+	s.writeSubscriptionTrafficCache(ctx, entryID, ttlSeconds, result)
 	return cloneSubscriptionTrafficResult(result), nil
 }
 
@@ -59,12 +63,12 @@ func (s *Service) subscriptionTrafficTTLSeconds() int {
 	return settings.CacheDefaults.SubscriptionTrafficTTLSeconds
 }
 
-func (s *Service) readSubscriptionTrafficCache(ctx context.Context, name string, ttlSeconds int) *domain.SubscriptionTrafficResult {
+func (s *Service) readSubscriptionTrafficCache(ctx context.Context, entryID string, ttlSeconds int) *domain.SubscriptionTrafficResult {
 	if ttlSeconds <= 0 {
 		return nil
 	}
-	key, err := subscriptionTrafficCacheKey(name)
-	if err != nil {
+	key, scoped := persistentCacheKey(ctx, cacheKeyPrefixSubscriptionTraffic)
+	if !scoped {
 		return nil
 	}
 	c := s.cache
@@ -72,37 +76,33 @@ func (s *Service) readSubscriptionTrafficCache(ctx context.Context, name string,
 		return nil
 	}
 	var result domain.SubscriptionTrafficResult
-	if !c.GetJSON(ctx, key, &result) {
+	if !s.readCacheJSON(ctx, key, entryID, time.Duration(ttlSeconds)*time.Second, &result) {
 		return nil
 	}
 	return cloneSubscriptionTrafficValue(result)
 }
 
-func (s *Service) writeSubscriptionTrafficCache(ctx context.Context, name string, ttlSeconds int, result *domain.SubscriptionTrafficResult) {
+func (s *Service) writeSubscriptionTrafficCache(ctx context.Context, entryID string, ttlSeconds int, result *domain.SubscriptionTrafficResult) {
 	if ttlSeconds <= 0 || result == nil {
 		return
 	}
-	key, err := subscriptionTrafficCacheKey(name)
-	if err != nil {
+	key, scoped := persistentCacheKey(ctx, cacheKeyPrefixSubscriptionTraffic)
+	if !scoped {
 		return
 	}
 	c := s.cache
 	if c == nil {
 		return
 	}
-	_ = c.PutJSON(ctx, key, time.Duration(ttlSeconds)*time.Second, cloneSubscriptionTrafficResult(result))
+	_ = s.writeCacheJSON(ctx, key, entryID, time.Duration(ttlSeconds)*time.Second, cloneSubscriptionTrafficResult(result))
 }
 
-func (s *Service) invalidateSubscriptionTrafficCache(ctx context.Context) {
-	c := s.cache
-	if c == nil {
-		return
-	}
-	_ = c.DeleteLayer(ctx, cacheLayerSubscriptionTraffic)
-}
-
-func subscriptionTrafficCacheKey(name string) (string, error) {
-	return cachepkg.HashKey(cacheLayerSubscriptionTraffic, strings.TrimSpace(name))
+func subscriptionTrafficCacheEntryID(input domain.RemoteInput) (string, error) {
+	return cacheIdentity(struct {
+		URL       string `json:"url"`
+		UserAgent string `json:"user_agent,omitempty"`
+		Proxy     string `json:"proxy,omitempty"`
+	}{URL: input.URL, UserAgent: input.UserAgent, Proxy: input.Proxy})
 }
 
 func cloneSubscriptionTrafficResult(result *domain.SubscriptionTrafficResult) *domain.SubscriptionTrafficResult {

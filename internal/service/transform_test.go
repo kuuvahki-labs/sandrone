@@ -593,7 +593,7 @@ func TestServiceConvertPreservesExplicitLegacyLookingUserAgent(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestServiceConvertResolvesEmptyUserAgentBeforeRemoteCacheLookup(t *testing.T) {
+func TestServiceConvertResolvesEmptyUserAgentWithoutPersistentCache(t *testing.T) {
 	body := base64.StdEncoding.EncodeToString([]byte("ss://aes-128-gcm:secret@example.com:8388#remote-node"))
 	calls := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -617,7 +617,7 @@ func TestServiceConvertResolvesEmptyUserAgentBeforeRemoteCacheLookup(t *testing.
 		require.NoError(t, err)
 	}
 
-	require.Equal(t, 1, calls)
+	require.Equal(t, 2, calls)
 }
 
 func TestServiceConvertRemoteInputUsesRuntimeDefaultsAndLocalOverride(t *testing.T) {
@@ -654,7 +654,7 @@ func TestServiceConvertRemoteInputUsesRuntimeDefaultsAndLocalOverride(t *testing
 	require.Equal(t, []string{"Sandrone Global", "Sandrone Local"}, userAgents)
 }
 
-func TestServiceConvertRemoteInputUsesExplicitCacheTTL(t *testing.T) {
+func TestServiceConvertRemoteInputDoesNotPersistExplicitCacheTTL(t *testing.T) {
 	body := base64.StdEncoding.EncodeToString([]byte("ss://aes-128-gcm:secret@example.com:8388#remote-1"))
 	calls := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -676,13 +676,13 @@ func TestServiceConvertRemoteInputUsesExplicitCacheTTL(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	require.Equal(t, 1, calls)
+	require.Equal(t, 2, calls)
 	require.Contains(t, string(first.Body), "remote-1")
-	require.Contains(t, string(second.Body), "remote-1")
-	require.Contains(t, second.Report.SourceRefs[0].Note, "cache_hit=true")
+	require.Contains(t, string(second.Body), "remote-2")
+	require.NotContains(t, second.Report.SourceRefs[0].Note, "cache_hit=true")
 }
 
-func TestServiceRemoteFetchCacheUsesRuntimeDefaultAndRequestIdentity(t *testing.T) {
+func TestServiceTransientRemoteFetchUsesRuntimeDefaultOnEveryRequest(t *testing.T) {
 	body := base64.StdEncoding.EncodeToString([]byte("ss://aes-128-gcm:secret@example.com:8388#remote"))
 	userAgents := []string{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -716,7 +716,7 @@ func TestServiceRemoteFetchCacheUsesRuntimeDefaultAndRequestIdentity(t *testing.
 	})
 	require.NoError(t, err)
 
-	require.Equal(t, []string{"Sandrone Global", "Sandrone Local"}, userAgents)
+	require.Equal(t, []string{"Sandrone Global", "Sandrone Global", "Sandrone Local"}, userAgents)
 }
 
 func TestServiceParseRemoteAutoDetectsURIList(t *testing.T) {

@@ -15,6 +15,7 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/probe"
 	"github.com/kuuvahki-labs/sandrone/internal/processor"
 	"github.com/kuuvahki-labs/sandrone/internal/service"
+	"github.com/kuuvahki-labs/sandrone/internal/store"
 )
 
 func TestServiceSubscriptionTrafficIsRemoteOnlyAndPreviewDetectsCycles(t *testing.T) {
@@ -217,7 +218,7 @@ func TestServiceSubscriptionProcessorsRoundtripAndPreviewOrder(t *testing.T) {
 	require.Contains(t, result.Report.Dependencies, domain.ResourceRef{Kind: "subscription", Name: "remote/provider"})
 }
 
-func TestServicePreviewSubscriptionDiffsByNodeLineage(t *testing.T) {
+func TestServicePreviewSubscriptionDiffsByNodeRuntimeID(t *testing.T) {
 	ctx := context.Background()
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
 	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
@@ -256,8 +257,8 @@ func TestServicePreviewSubscriptionDiffsByNodeLineage(t *testing.T) {
 	require.Equal(t, map[string]int{"added": 0, "modified": 1, "removed": 1, "unchanged": 0}, preview.StatusCounts)
 	require.Len(t, preview.Nodes, 2)
 	require.Equal(t, "modified", preview.Nodes[0].Status)
-	require.NotEmpty(t, preview.Nodes[0].Identity)
-	require.NotContains(t, preview.Nodes[0].Identity, "secret")
+	require.NotEmpty(t, preview.Nodes[0].RuntimeID)
+	require.NotContains(t, preview.Nodes[0].RuntimeID, "secret")
 	require.Equal(t, "keep", preview.Nodes[0].Before.Name)
 	require.Equal(t, "source-keep", preview.Nodes[0].After.Name)
 	require.Equal(t, "removed", preview.Nodes[1].Status)
@@ -381,10 +382,10 @@ func TestServicePreviewSubscriptionTracksFilteredRenamedDuplicateConnectionNode(
 	require.Equal(t, "[vless]套餐到期：长期有效", preview.Nodes[2].Before.Name)
 	for _, diff := range preview.Nodes {
 		if diff.Before != nil {
-			require.Empty(t, domain.NodeLineage(*diff.Before))
+			require.Empty(t, domain.NodeRuntimeID(*diff.Before))
 		}
 		if diff.After != nil {
-			require.Empty(t, domain.NodeLineage(*diff.After))
+			require.Empty(t, domain.NodeRuntimeID(*diff.After))
 		}
 	}
 }
@@ -584,6 +585,74 @@ func TestServicePreviewSubscriptionProbeAnnotationKeepsNodesUnchanged(t *testing
 	require.Equal(t, "node-a", preview.Nodes[0].TargetNames["shadowrocket"])
 }
 
+func TestSavedSubscriptionCachesStayInTheirCanonicalResourceScopes(t *testing.T) {
+	ctx := context.Background()
+	fs := afero.NewMemMapFs()
+	resourceStore := store.NewFSStore(fs)
+	var calls [][]string
+	svc := service.New(
+		service.WithStore(resourceStore),
+		service.WithProbeEngine(fakeProbeEngine{probe: func(_ context.Context, req domain.ProbeRequest, nodes []domain.NodeIR, _ ...probe.Payload) (*domain.ProbeResult, error) {
+			servers := make([]string, len(nodes))
+			results := make([]domain.NodeProbeResult, len(nodes))
+			for index, node := range nodes {
+				servers[index] = node.Server
+				results[index] = domain.NodeProbeResult{Method: string(req.Method), Alive: true, CheckedAt: time.Now()}
+			}
+			calls = append(calls, servers)
+			return &domain.ProbeResult{Results: results}, nil
+		}}),
+	)
+	probeProcessor := domain.ProcessorSpec{
+		Type: "probe", Stage: domain.StageNodes,
+		Params: params(t, map[string]any{"method": "tcp_connect", "cache_ttl_seconds": 60}),
+	}
+	putLeaf := func(name, server string) {
+		require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+			Name: name, Type: domain.SubscriptionTypeLocal, Format: "uri-list",
+			Content:    "ss://aes-128-gcm:secret@" + server + ":8388#" + name,
+			Processors: []domain.ProcessorSpec{probeProcessor},
+		}))
+	}
+	putLeaf("B", "b.example")
+	putLeaf("C", "c.example")
+	a := domain.Subscription{
+		Name: "A", Type: domain.SubscriptionTypeCollection,
+		Inputs: []domain.NodeInput{
+			{Name: "child-b", Type: "subscription", Ref: domain.ResourceRef{Kind: "subscription", Name: "B"}, Required: true},
+			{Name: "child-c", Type: "subscription", Ref: domain.ResourceRef{Kind: "subscription", Name: "C"}, Required: true},
+		},
+		Processors: []domain.ProcessorSpec{probeProcessor},
+	}
+	require.NoError(t, svc.PutSubscription(ctx, a))
+
+	_, err := svc.PreviewSubscription(ctx, "A")
+	require.NoError(t, err)
+	require.Equal(t, [][]string{{"b.example"}, {"c.example"}, {"b.example", "c.example"}}, calls)
+	_, err = svc.PreviewSubscription(ctx, "A")
+	require.NoError(t, err)
+	require.Len(t, calls, 3)
+
+	a.DisplayName = "renamed display"
+	require.NoError(t, svc.PutSubscription(ctx, a))
+	_, err = svc.PreviewSubscription(ctx, "A")
+	require.NoError(t, err)
+	require.Len(t, calls, 3)
+
+	putLeaf("B", "changed.example")
+	_, err = svc.PreviewSubscription(ctx, "A")
+	require.NoError(t, err)
+	require.Equal(t, [][]string{
+		{"b.example"}, {"c.example"}, {"b.example", "c.example"},
+		{"changed.example"}, {"changed.example"},
+	}, calls)
+
+	for _, name := range []string{"A", "B", "C"} {
+		_, err := resourceStore.Stat(ctx, "cache/probe/subscriptions/"+name+".json")
+		require.NoError(t, err)
+	}
+}
+
 func TestServicePreviewSubscriptionSkipsProbeForDuplicateNodeNames(t *testing.T) {
 	ctx := context.Background()
 	probeCalls := 0
@@ -632,7 +701,7 @@ func (insertFirstProcessor) Name() string { return "insert_first" }
 func (insertFirstProcessor) ApplyNodes(_ context.Context, in domain.NodeProcessInput) (domain.NodeProcessOutput, error) {
 	out := append([]domain.NodeIR{}, in.Nodes...)
 	inserted := out[0]
-	domain.ClearNodeLineage(&inserted)
+	domain.ClearNodeRuntimeID(&inserted)
 	inserted.Name = "inserted"
 	out = append([]domain.NodeIR{inserted}, out...)
 	return domain.NodeProcessOutput{Nodes: out}, nil
@@ -937,6 +1006,41 @@ func TestServiceSubscriptionPreviewCachesUntilForcedRefresh(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 2, fresh.AfterCount)
 	require.Equal(t, 2, calls)
+}
+
+func TestSavedRemoteFetchCacheIsResourceLocal(t *testing.T) {
+	ctx := context.Background()
+	calls := 0
+	subServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		_, _ = w.Write([]byte("ss://aes-128-gcm:secret@example.com:8388#node"))
+	}))
+	defer subServer.Close()
+
+	fs := afero.NewMemMapFs()
+	resourceStore := store.NewFSStore(fs)
+	svc := service.New(service.WithStore(resourceStore))
+	putProjectSettings(t, svc, ctx, func(update *domain.SettingsUpdate) {
+		update.CacheDefaults.RemoteFetchTTLSeconds = 60
+	})
+	for _, name := range []string{"A", "B"} {
+		require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+			Name: name, Type: domain.SubscriptionTypeRemote, Format: "uri-list",
+			Remote: &domain.RemoteInput{URL: subServer.URL},
+		}))
+	}
+
+	_, err := svc.PreviewSubscription(ctx, "A")
+	require.NoError(t, err)
+	_, err = svc.PreviewSubscription(ctx, "B")
+	require.NoError(t, err)
+	_, err = svc.PreviewSubscription(ctx, "A")
+	require.NoError(t, err)
+	require.Equal(t, 2, calls)
+	for _, name := range []string{"A", "B"} {
+		_, err := resourceStore.Stat(ctx, "cache/remote_fetch/subscriptions/"+name+".json")
+		require.NoError(t, err)
+	}
 }
 
 func TestServiceSubscriptionTrafficRuntimeTTLExpiresCache(t *testing.T) {

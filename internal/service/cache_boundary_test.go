@@ -2,21 +2,20 @@ package service_test
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
+	cachepkg "github.com/kuuvahki-labs/sandrone/internal/cache"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/service"
 )
 
-func TestServiceCacheDoesNotRequireResourceStore(t *testing.T) {
+func TestTransientInputDoesNotUsePersistentCache(t *testing.T) {
 	var requests int
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		requests++
@@ -24,7 +23,8 @@ func TestServiceCacheDoesNotRequireResourceStore(t *testing.T) {
 	}))
 	defer server.Close()
 
-	svc := service.New(service.WithCache(newTestCache()))
+	persistentCache := newTestCache()
+	svc := service.New(service.WithCache(persistentCache))
 	req := domain.ParseRequest{
 		Format: "uri-list",
 		Remote: &domain.RemoteInput{
@@ -39,52 +39,58 @@ func TestServiceCacheDoesNotRequireResourceStore(t *testing.T) {
 	second, err := svc.Parse(context.Background(), req)
 	require.NoError(t, err)
 	require.Len(t, second.Nodes, 1)
-	require.Equal(t, 1, requests)
+	require.Equal(t, 2, requests)
+	require.Empty(t, persistentCache.values)
+	require.Empty(t, persistentCache.deleted)
+	require.Zero(t, persistentCache.clearCount)
 }
 
 type testCache struct {
-	mu      sync.Mutex
-	values  map[string][]byte
-	deleted []string
+	mu         sync.Mutex
+	values     map[string]cachepkg.Item
+	deleted    []string
+	clearCount int
+	now        func() time.Time
 }
 
 func newTestCache() *testCache {
-	return &testCache{values: map[string][]byte{}}
+	return &testCache{values: map[string]cachepkg.Item{}, now: time.Now}
 }
 
-func (c *testCache) GetJSON(_ context.Context, key string, out any) bool {
+func (c *testCache) Get(_ context.Context, key string) (cachepkg.Item, bool, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	body, ok := c.values[key]
-	if !ok {
-		return false
+	item, found := c.values[key]
+	if !found || !c.now().Before(item.ExpiresAt) {
+		return cachepkg.Item{}, false, nil
 	}
-	return json.Unmarshal(body, out) == nil
+	item.Value = append([]byte(nil), item.Value...)
+	return item, true, nil
 }
 
-func (c *testCache) PutJSON(_ context.Context, key string, ttl time.Duration, value any) error {
+func (c *testCache) Set(_ context.Context, key string, value []byte, ttl time.Duration) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if ttl <= 0 {
+		delete(c.values, key)
 		return nil
 	}
-	body, err := json.Marshal(value)
-	if err != nil {
-		return err
-	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.values[key] = body
+	c.values[key] = cachepkg.Item{Value: append([]byte(nil), value...), ExpiresAt: c.now().Add(ttl)}
 	return nil
 }
 
-func (c *testCache) DeleteLayer(_ context.Context, layer string) error {
+func (c *testCache) Delete(_ context.Context, key string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.deleted = append(c.deleted, layer)
-	prefix := "cache/" + strings.TrimSpace(layer) + "/"
-	for key := range c.values {
-		if strings.HasPrefix(key, prefix) {
-			delete(c.values, key)
-		}
-	}
+	c.deleted = append(c.deleted, key)
+	delete(c.values, key)
+	return nil
+}
+
+func (c *testCache) Clear(_ context.Context) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.clearCount++
+	c.values = map[string]cachepkg.Item{}
 	return nil
 }

@@ -153,7 +153,7 @@ describe("SubscriptionPreviewPage", () => {
       statusCounts: { added: 0, modified: 0, removed: 0, unchanged: 1 },
       warnings: [],
       nodes: [{
-        identity: "sha256:probe",
+        runtimeId: "runtime-probe",
         status: "unchanged",
         before: {
           name: "node-a",
@@ -217,7 +217,7 @@ describe("SubscriptionPreviewPage", () => {
       warnings: [],
       nodes: [
         {
-          identity: "sha256:duration",
+          runtimeId: "runtime-duration",
           status: "unchanged",
           after: {
             name: "duration-node",
@@ -232,7 +232,7 @@ describe("SubscriptionPreviewPage", () => {
           },
         },
         {
-          identity: "sha256:available",
+          runtimeId: "runtime-available",
           status: "unchanged",
           after: {
             name: "available-node",
@@ -242,7 +242,7 @@ describe("SubscriptionPreviewPage", () => {
           },
         },
         {
-          identity: "sha256:failed",
+          runtimeId: "runtime-failed",
           status: "unchanged",
           after: {
             name: "failed-node",
@@ -252,7 +252,7 @@ describe("SubscriptionPreviewPage", () => {
           },
         },
         {
-          identity: "sha256:missing",
+          runtimeId: "runtime-missing",
           status: "unchanged",
           after: {
             name: "missing-node",
@@ -261,7 +261,7 @@ describe("SubscriptionPreviewPage", () => {
           },
         },
         {
-          identity: "sha256:removed",
+          runtimeId: "runtime-removed",
           status: "removed",
           before: {
             name: "removed-node",

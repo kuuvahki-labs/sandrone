@@ -7,7 +7,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net"
 	"sync"
 	"time"
@@ -113,7 +112,7 @@ func (b *SingBoxBackend) Probe(ctx context.Context, backendReq BackendRequest, n
 	}
 	wg.Wait()
 
-	report := reportForResults(b.Name(), b.Version(), string(req.Method), req.Core, nodes, results)
+	report := ReportForResults(b.Name(), b.Version(), string(req.Method), req.Core, nodes, results)
 	for i := range results {
 		results[i].Backend = b.Name()
 	}
@@ -126,7 +125,7 @@ func (b *SingBoxBackend) probeNode(ctx context.Context, req domain.ProbeRequest,
 	}
 	outbound, ok := instance.Outbound().Outbound(node.Name)
 	if !ok {
-		return resultForError(req, node, string(domain.CodeProbeInvalidTarget), fmt.Errorf("sing-box outbound %q not found", node.Name), b.now())
+		return resultForError(req, node, string(domain.CodeProbeInvalidTarget), errors.New("sing-box outbound was not found"), b.now())
 	}
 	var lastErr error
 	for attempt := 0; attempt < attempts; attempt++ {
@@ -228,7 +227,7 @@ func (b *SingBoxNTPBackend) Probe(ctx context.Context, backendReq BackendRequest
 	}
 	wg.Wait()
 
-	report := reportForResults(b.Name(), b.Version(), string(req.Method), req.Core, nodes, results)
+	report := ReportForResults(b.Name(), b.Version(), string(req.Method), req.Core, nodes, results)
 	for i := range results {
 		results[i].Backend = b.Name()
 	}
@@ -241,7 +240,7 @@ func (b *SingBoxNTPBackend) probeNode(ctx context.Context, req domain.ProbeReque
 	}
 	outbound, ok := instance.Outbound().Outbound(node.Name)
 	if !ok {
-		return resultForError(req, node, string(domain.CodeProbeInvalidTarget), fmt.Errorf("sing-box outbound %q not found", node.Name), b.now())
+		return resultForError(req, node, string(domain.CodeProbeInvalidTarget), errors.New("sing-box outbound was not found"), b.now())
 	}
 	destination := M.ParseSocksaddrHostPort(ntpServerFromRequest(req), 123)
 	var lastErr error

@@ -43,7 +43,7 @@ type SubscriptionPreviewRequest struct {
 }
 
 type SubscriptionPreviewNodeDiff struct {
-	Identity    string            `json:"identity" yaml:"identity"`
+	RuntimeID   string            `json:"runtime_id" yaml:"runtime_id"`
 	Status      string            `json:"status" yaml:"status"`
 	Before      *NodeIR           `json:"before,omitempty" yaml:"before,omitempty"`
 	After       *NodeIR           `json:"after,omitempty" yaml:"after,omitempty"`

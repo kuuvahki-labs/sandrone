@@ -674,7 +674,7 @@ describe("config editor derived validity", () => {
     const preview = configNodePreviewFromSubscription({
       subscriptionName: "provider",
       nodes: [{
-        identity: "node-1",
+        runtimeId: "node-1",
         after: {
           name: "HK-01",
           type: "ss",

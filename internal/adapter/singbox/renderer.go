@@ -31,14 +31,19 @@ func (r *Renderer) RenderWithReport(_ context.Context, nodes []domain.NodeIR, _ 
 	outbounds := make([]map[string]any, 0, len(nodes))
 	endpoints := make([]map[string]any, 0)
 	report := domain.RenderReport{}
-	for _, node := range nodes {
+	for index, node := range nodes {
 		doc, endpoint, skipRaw, warnings, err := nodeToSingBox(node)
 		if err != nil {
-			shared.MergeWarnings(&report, []domain.Warning{shared.RenderNodeSkippedWarning(node, r.Name(), err)})
+			warning := shared.RenderNodeSkippedWarning(node, r.Name(), err)
+			warning.NodeIndex = &index
+			shared.MergeWarnings(&report, []domain.Warning{warning})
 			continue
 		}
 		warnings = append(warnings, singBoxStructuredLossWarnings(node)...)
 		warnings = append(warnings, shared.RawWarnings(node, skipRaw, r.Name())...)
+		for warningIndex := range warnings {
+			warnings[warningIndex].NodeIndex = &index
+		}
 		shared.MergeWarnings(&report, warnings)
 		report.SuccessCount++
 		if endpoint {

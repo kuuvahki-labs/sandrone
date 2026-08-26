@@ -71,7 +71,7 @@ func TestServiceProbeNormalizesInlineHysteriaBandwidthWithoutMutatingInput(t *te
 				nodes[0].Hysteria.UpMbps = 999
 				nodes[0].Raw["caller"][1] = 'X'
 				nodes[0].Raw["engine"] = json.RawMessage(`true`)
-				return &domain.ProbeResult{}, nil
+				return &domain.ProbeResult{Results: []domain.NodeProbeResult{{Alive: true}}}, nil
 			}}))
 
 			result, err := svc.Probe(context.Background(), domain.ProbeRequest{
@@ -129,7 +129,7 @@ func TestServiceProbeNormalizesInlineHysteriaOverBoundMbps(t *testing.T) {
 	svc := service.New(service.WithProbeEngine(fakeProbeEngine{probe: func(_ context.Context, _ domain.ProbeRequest, nodes []domain.NodeIR, _ ...probe.Payload) (*domain.ProbeResult, error) {
 		require.Len(t, nodes, 1)
 		captured = nodes[0]
-		return &domain.ProbeResult{}, nil
+		return &domain.ProbeResult{Results: []domain.NodeProbeResult{{Alive: true}}}, nil
 	}}))
 
 	result, err := svc.Probe(context.Background(), domain.ProbeRequest{
@@ -209,7 +209,7 @@ func containsWarning(warnings []domain.Warning, code, field string) bool {
 	return false
 }
 
-func TestServiceProbeCache(t *testing.T) {
+func TestServiceTransientProbeDoesNotUsePersistentCache(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	resourceStore := store.NewFSStore(fs)
 	calls := 0
@@ -252,13 +252,183 @@ func TestServiceProbeCache(t *testing.T) {
 	require.False(t, first.Results[0].CacheHit)
 	second, err := svc.Probe(context.Background(), req)
 	require.NoError(t, err)
-	require.True(t, second.Results[0].CacheHit)
-	require.Equal(t, 1, second.Report.Probe.CacheHitCount)
+	require.False(t, second.Results[0].CacheHit)
+	require.Zero(t, second.Report.Probe.CacheHitCount)
 	require.Empty(t, second.Report.Warnings)
-	require.Equal(t, 1, calls)
+	require.Equal(t, 2, calls)
 }
 
-func TestServiceProbeUsesRuntimeDefaultsBeforeCache(t *testing.T) {
+func TestServiceTransientProbeDoesNotReuseNodesAcrossRequests(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	resourceStore := store.NewFSStore(fs)
+	var calls [][]string
+	svc := service.New(
+		service.WithStore(resourceStore),
+		service.WithClock(func() time.Time { return time.Date(2026, 5, 28, 1, 2, 3, 0, time.UTC) }),
+		service.WithProbeEngine(fakeProbeEngine{probe: func(_ context.Context, req domain.ProbeRequest, nodes []domain.NodeIR, _ ...probe.Payload) (*domain.ProbeResult, error) {
+			servers := make([]string, len(nodes))
+			results := make([]domain.NodeProbeResult, len(nodes))
+			for index, node := range nodes {
+				servers[index] = node.Server
+				results[index] = domain.NodeProbeResult{Method: string(req.Method), Alive: true, DurationMS: index + 1, CheckedAt: time.Date(2026, 5, 28, 1, 2, 3, 0, time.UTC)}
+			}
+			calls = append(calls, servers)
+			return &domain.ProbeResult{Results: results, Report: domain.Report{Probe: &domain.ProbeReport{Backend: "fake"}}}, nil
+		}}),
+	)
+	request := func(nodes []domain.NodeIR) *domain.ProbeResult {
+		result, err := svc.Probe(context.Background(), domain.ProbeRequest{
+			Input: domain.NodeInput{Type: "inline_nodes", Nodes: nodes}, Method: domain.ProbeTCPConnect, CacheTTLSeconds: 60,
+		})
+		require.NoError(t, err)
+		return result
+	}
+	base := []domain.NodeIR{
+		{Name: "a", Type: domain.NodeTypeShadowsocks, Server: "a.example", Port: 1, Cipher: "aes-128-gcm", Password: "p"},
+		{Name: "b", Type: domain.NodeTypeShadowsocks, Server: "b.example", Port: 2, Cipher: "aes-128-gcm", Password: "p"},
+		{Name: "c", Type: domain.NodeTypeShadowsocks, Server: "c.example", Port: 3, Cipher: "aes-128-gcm", Password: "p"},
+	}
+	first := request(base)
+	require.Equal(t, [][]string{{"a.example", "b.example", "c.example"}}, calls)
+	require.Zero(t, first.Report.Probe.CacheHitCount)
+
+	reordered := []domain.NodeIR{
+		{Name: "renamed-c", Type: domain.NodeTypeShadowsocks, Server: "c.example", Port: 3, Cipher: "aes-128-gcm", Password: "p", Meta: map[string]string{"probe.alive": "true"}},
+		{Name: "renamed-a", Type: domain.NodeTypeShadowsocks, Server: "a.example", Port: 1, Cipher: "aes-128-gcm", Password: "p"},
+		{Name: "renamed-b", Type: domain.NodeTypeShadowsocks, Server: "b.example", Port: 2, Cipher: "aes-128-gcm", Password: "p"},
+	}
+	second := request(reordered)
+	require.Len(t, calls, 2)
+	require.Zero(t, second.Report.Probe.CacheHitCount)
+	require.Equal(t, []string{"renamed-c", "renamed-a", "renamed-b"}, []string{second.Results[0].NodeName, second.Results[1].NodeName, second.Results[2].NodeName})
+	require.NotEmpty(t, second.Results[0].RuntimeID)
+	require.NotEqual(t, second.Results[0].RuntimeID, second.Results[1].RuntimeID)
+
+	reordered[2].Server = "changed.example"
+	third := request(reordered)
+	require.Equal(t, [][]string{{"a.example", "b.example", "c.example"}, {"c.example", "a.example", "b.example"}, {"c.example", "a.example", "changed.example"}}, calls)
+	require.Zero(t, third.Report.Probe.CacheHitCount)
+	require.False(t, third.Results[0].CacheHit)
+	require.False(t, third.Results[1].CacheHit)
+	require.False(t, third.Results[2].CacheHit)
+}
+
+func TestServiceTransientProbeStillNormalizesParametersOutsideEffectiveMethod(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	calls := 0
+	svc := service.New(
+		service.WithStore(store.NewFSStore(fs)),
+		service.WithProbeEngine(fakeProbeEngine{probe: func(_ context.Context, req domain.ProbeRequest, nodes []domain.NodeIR, _ ...probe.Payload) (*domain.ProbeResult, error) {
+			calls++
+			return &domain.ProbeResult{Results: []domain.NodeProbeResult{{Method: string(req.Method), Alive: true, CheckedAt: time.Now()}}}, nil
+		}}),
+	)
+	node := domain.NodeIR{Name: "one", Type: domain.NodeTypeShadowsocks, Server: "same.example", Port: 443, Cipher: "aes-128-gcm", Password: "p"}
+	first, err := svc.Probe(context.Background(), domain.ProbeRequest{
+		Input: domain.NodeInput{Type: "inline_nodes", Nodes: []domain.NodeIR{node}}, Method: domain.ProbeTCPConnect,
+		URL: "https://one.example", NTPServer: "one.example", ExpectedStatus: "204", CacheTTLSeconds: 60,
+	})
+	require.NoError(t, err)
+	require.False(t, first.Results[0].CacheHit)
+
+	second, err := svc.Probe(context.Background(), domain.ProbeRequest{
+		Input: domain.NodeInput{Type: "inline_nodes", Nodes: []domain.NodeIR{node}}, Method: domain.ProbeTCPConnect,
+		URL: "https://two.example", NTPServer: "two.example", ExpectedStatus: "200-299", CacheTTLSeconds: 60,
+	})
+	require.NoError(t, err)
+	require.False(t, second.Results[0].CacheHit)
+	require.Equal(t, 2, calls)
+}
+
+func TestServiceProbeAssociatesFreshResultsByRuntimeID(t *testing.T) {
+	svc := service.New(service.WithProbeEngine(fakeProbeEngine{probe: func(_ context.Context, req domain.ProbeRequest, nodes []domain.NodeIR, _ ...probe.Payload) (*domain.ProbeResult, error) {
+		return &domain.ProbeResult{Results: []domain.NodeProbeResult{
+			{RuntimeID: domain.NodeRuntimeID(nodes[1]), Method: string(req.Method), Alive: true, DurationMS: 22},
+			{RuntimeID: domain.NodeRuntimeID(nodes[0]), Method: string(req.Method), Alive: true, DurationMS: 11},
+		}}, nil
+	}}))
+	result, err := svc.Probe(context.Background(), domain.ProbeRequest{
+		Input: domain.NodeInput{Type: "inline_nodes", Nodes: []domain.NodeIR{
+			{Name: "one", Type: domain.NodeTypeShadowsocks, Server: "one.example", Port: 443, Cipher: "aes-128-gcm", Password: "p"},
+			{Name: "two", Type: domain.NodeTypeShadowsocks, Server: "two.example", Port: 443, Cipher: "aes-128-gcm", Password: "p"},
+		}},
+		Method: domain.ProbeTCPConnect,
+	})
+	require.NoError(t, err)
+	require.Equal(t, 11, result.Results[0].DurationMS)
+	require.Equal(t, 22, result.Results[1].DurationMS)
+}
+
+func TestServiceProbePartialCacheKeepsAllSkippedMissesNodeLocal(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	calls := 0
+	svc := service.New(
+		service.WithStore(store.NewFSStore(fs)),
+		service.WithProbeEngine(fakeProbeEngine{probe: func(_ context.Context, req domain.ProbeRequest, nodes []domain.NodeIR, _ ...probe.Payload) (*domain.ProbeResult, error) {
+			calls++
+			results := make([]domain.NodeProbeResult, len(nodes))
+			for index := range nodes {
+				results[index] = domain.NodeProbeResult{Method: string(req.Method), Core: req.Core, Alive: true, CheckedAt: time.Now()}
+			}
+			return &domain.ProbeResult{Results: results}, nil
+		}}),
+	)
+	supported := domain.NodeIR{Name: "supported", Type: domain.NodeTypeHTTP, Server: "supported.example", Port: 443}
+	request := func(nodes []domain.NodeIR) *domain.ProbeResult {
+		require.NoError(t, svc.PutSubscription(context.Background(), domain.Subscription{
+			Name: "probe/cache", Type: domain.SubscriptionTypeCollection, Nodes: nodes,
+		}))
+		result, err := svc.Probe(context.Background(), domain.ProbeRequest{
+			Input: domain.NodeInput{Type: "subscription", Ref: domain.ResourceRef{Kind: "subscription", Name: "probe/cache"}}, Method: domain.ProbeURLTest,
+			Core: "sing-box", URL: "https://example.com/generate_204", CacheTTLSeconds: 60,
+		})
+		require.NoError(t, err)
+		return result
+	}
+	request([]domain.NodeIR{supported})
+	unsupported := domain.NodeIR{
+		Name: "unsupported", Type: domain.NodeTypeSnell, Server: "unsupported.example", Port: 443,
+		Password: "p", Snell: &domain.SnellOptions{Version: 5},
+	}
+	result := request([]domain.NodeIR{supported, unsupported})
+	require.Equal(t, 1, calls)
+	require.True(t, result.Results[0].CacheHit)
+	require.False(t, result.Results[1].CacheHit)
+	require.False(t, result.Results[1].Alive)
+	require.Equal(t, string(domain.CodeProbeInvalidTarget), result.Results[1].ErrorCode)
+	require.True(t, containsWarning(result.Report.Warnings, "render_node_skipped", string(domain.NodeTypeSnell)))
+}
+
+func TestServiceProbeGroupsDuplicateConnectionsWithoutSharingRuntimeID(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	calls := 0
+	svc := service.New(
+		service.WithStore(store.NewFSStore(fs)),
+		service.WithProbeEngine(fakeProbeEngine{probe: func(_ context.Context, req domain.ProbeRequest, nodes []domain.NodeIR, _ ...probe.Payload) (*domain.ProbeResult, error) {
+			calls++
+			require.Len(t, nodes, 1)
+			return &domain.ProbeResult{Results: []domain.NodeProbeResult{{Method: string(req.Method), Alive: true, CheckedAt: time.Now()}}}, nil
+		}}),
+	)
+	req := domain.ProbeRequest{Input: domain.NodeInput{Type: "inline_nodes", Nodes: []domain.NodeIR{
+		{Name: "one", Type: domain.NodeTypeShadowsocks, Server: "same.example", Port: 443, Cipher: "aes-128-gcm", Password: "p"},
+		{Name: "two", Type: domain.NodeTypeShadowsocks, Server: "same.example", Port: 443, Cipher: "aes-128-gcm", Password: "p"},
+	}}, Method: domain.ProbeTCPConnect, CacheTTLSeconds: 60}
+	first, err := svc.Probe(context.Background(), req)
+	require.NoError(t, err)
+	require.Len(t, first.Results, 2)
+	require.Equal(t, 1, calls)
+	require.NotEqual(t, first.Results[0].RuntimeID, first.Results[1].RuntimeID)
+	require.False(t, first.Results[0].CacheHit)
+	require.False(t, first.Results[1].CacheHit)
+
+	second, err := svc.Probe(context.Background(), req)
+	require.NoError(t, err)
+	require.Equal(t, 2, calls)
+	require.Zero(t, second.Report.Probe.CacheHitCount)
+}
+
+func TestServiceTransientProbeUsesRuntimeDefaultsBeforeExecution(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	resourceStore := store.NewFSStore(fs)
 	seen := []domain.ProbeRequest{}
@@ -310,9 +480,9 @@ func TestServiceProbeUsesRuntimeDefaultsBeforeCache(t *testing.T) {
 	require.False(t, first.Results[0].CacheHit)
 	second, err := svc.Probe(context.Background(), req)
 	require.NoError(t, err)
-	require.True(t, second.Results[0].CacheHit)
+	require.False(t, second.Results[0].CacheHit)
 
-	require.Len(t, seen, 1)
+	require.Len(t, seen, 2)
 	require.Equal(t, domain.ProbeTCPConnect, seen[0].Method)
 	require.Empty(t, seen[0].Core)
 	require.Equal(t, 777, seen[0].TimeoutMS)
@@ -321,7 +491,7 @@ func TestServiceProbeUsesRuntimeDefaultsBeforeCache(t *testing.T) {
 	require.Equal(t, 60, seen[0].CacheTTLSeconds)
 }
 
-func TestServiceProbeCacheKeySeparatesHealthCheckTargets(t *testing.T) {
+func TestServiceTransientProbeExecutesEveryHealthCheckTarget(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	resourceStore := store.NewFSStore(fs)
 	var seen []domain.ProbeRequest
@@ -375,7 +545,7 @@ func TestServiceProbeCacheKeySeparatesHealthCheckTargets(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	require.Len(t, seen, len(requests)-1)
+	require.Len(t, seen, len(requests))
 }
 
 func withProbeMethod(req domain.ProbeRequest, method domain.ProbeMethod) domain.ProbeRequest {

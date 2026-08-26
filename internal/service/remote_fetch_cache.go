@@ -6,20 +6,25 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
-	cachepkg "github.com/kuuvahki-labs/sandrone/internal/cache"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/fetcher"
 )
 
 const (
-	cacheLayerRemoteFetch         = "remote_fetch"
-	cacheLayerProbe               = "probe"
-	cacheLayerSubscriptionTraffic = "subscription_traffic"
+	cacheKeyPrefixRemoteFetch         = "remote_fetch"
+	cacheKeyPrefixProbe               = "probe"
+	cacheKeyPrefixSubscriptionTraffic = "subscription_traffic"
 )
 
 type cacheReadBypassContextKey struct{}
+
+type cacheReadBypassState struct {
+	mu          sync.Mutex
+	initialized map[string]bool
+}
 
 type remoteFetchCacheRecord struct {
 	Body        []byte           `json:"body"`
@@ -30,12 +35,29 @@ type remoteFetchCacheRecord struct {
 }
 
 func withCacheReadBypass(ctx context.Context) context.Context {
-	return context.WithValue(ctx, cacheReadBypassContextKey{}, true)
+	if cacheReadBypass(ctx) {
+		return ctx
+	}
+	return context.WithValue(ctx, cacheReadBypassContextKey{}, &cacheReadBypassState{initialized: map[string]bool{}})
 }
 
 func cacheReadBypass(ctx context.Context) bool {
-	bypass, _ := ctx.Value(cacheReadBypassContextKey{}).(bool)
+	_, bypass := ctx.Value(cacheReadBypassContextKey{}).(*cacheReadBypassState)
 	return bypass
+}
+
+func cacheRefreshStartsKey(ctx context.Context, key string) bool {
+	state, bypass := ctx.Value(cacheReadBypassContextKey{}).(*cacheReadBypassState)
+	if !bypass {
+		return false
+	}
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	if state.initialized[key] {
+		return false
+	}
+	state.initialized[key] = true
+	return true
 }
 
 func (s *Service) fetchRemoteCached(ctx context.Context, input domain.RemoteInput) (*remoteInputResult, error) {
@@ -47,18 +69,19 @@ func (s *Service) fetchRemoteCached(ctx context.Context, input domain.RemoteInpu
 	}
 	input = s.remoteInputWithDefaults(input)
 	ttl := time.Duration(input.CacheTTLSeconds) * time.Second
-	cacheKey := ""
-	if ttl > 0 {
+	cacheKey, cacheScoped := persistentCacheKey(ctx, cacheKeyPrefixRemoteFetch)
+	cacheEntryID := ""
+	if ttl > 0 && cacheScoped {
 		var err error
-		cacheKey, err = remoteFetchCacheKey(input)
+		cacheEntryID, err = remoteFetchCacheEntryID(input)
 		if err != nil {
 			return nil, err
 		}
 		if !cacheReadBypass(ctx) {
-			if cached := s.readRemoteFetchCache(ctx, cacheKey); cached != nil {
+			if cached := s.readRemoteFetchCache(ctx, cacheKey, cacheEntryID, ttl); cached != nil {
 				s.log(ctx, slog.LevelInfo, "service remote fetch cache hit",
 					"operation", "remote_fetch",
-					"cache_layer", cacheLayerRemoteFetch,
+					"cache_key", cacheKey,
 					"cache_hit", true,
 					"cache_ttl_seconds", input.CacheTTLSeconds,
 					"url", input.URL,
@@ -83,11 +106,11 @@ func (s *Service) fetchRemoteCached(ctx context.Context, input domain.RemoteInpu
 		StatusCode:  result.StatusCode,
 		ContentHash: result.ContentHash,
 	}
-	if ttl > 0 && cacheKey != "" {
-		if err := s.writeRemoteFetchCache(ctx, cacheKey, ttl, out); err != nil {
+	if ttl > 0 && cacheEntryID != "" {
+		if err := s.writeRemoteFetchCache(ctx, cacheKey, cacheEntryID, ttl, out); err != nil {
 			s.log(ctx, slog.LevelWarn, "service remote fetch cache write failed",
 				"operation", "remote_fetch",
-				"cache_layer", cacheLayerRemoteFetch,
+				"cache_key", cacheKey,
 				"cache_hit", false,
 				"cache_ttl_seconds", input.CacheTTLSeconds,
 				"url", input.URL,
@@ -98,13 +121,13 @@ func (s *Service) fetchRemoteCached(ctx context.Context, input domain.RemoteInpu
 	return out, nil
 }
 
-func (s *Service) readRemoteFetchCache(ctx context.Context, key string) *remoteInputResult {
+func (s *Service) readRemoteFetchCache(ctx context.Context, key, entryID string, ttl time.Duration) *remoteInputResult {
 	c := s.cache
 	if c == nil {
 		return nil
 	}
 	var record remoteFetchCacheRecord
-	if !c.GetJSON(ctx, key, &record) {
+	if !s.readCacheJSON(ctx, key, entryID, ttl, &record) {
 		return nil
 	}
 	ref := record.SourceRef
@@ -118,12 +141,12 @@ func (s *Service) readRemoteFetchCache(ctx context.Context, key string) *remoteI
 	}
 }
 
-func (s *Service) writeRemoteFetchCache(ctx context.Context, key string, ttl time.Duration, result *remoteInputResult) error {
+func (s *Service) writeRemoteFetchCache(ctx context.Context, key, entryID string, ttl time.Duration, result *remoteInputResult) error {
 	c := s.cache
 	if c == nil || result == nil {
 		return nil
 	}
-	return c.PutJSON(ctx, key, ttl, remoteFetchCacheRecord{
+	return s.writeCacheJSON(ctx, key, entryID, ttl, remoteFetchCacheRecord{
 		Body:        append([]byte{}, result.Body...),
 		Headers:     result.Headers.Clone(),
 		StatusCode:  result.StatusCode,
@@ -132,8 +155,8 @@ func (s *Service) writeRemoteFetchCache(ctx context.Context, key string, ttl tim
 	})
 }
 
-func remoteFetchCacheKey(input domain.RemoteInput) (string, error) {
-	return cachepkg.HashKey(cacheLayerRemoteFetch, struct {
+func remoteFetchCacheEntryID(input domain.RemoteInput) (string, error) {
+	return cacheIdentity(struct {
 		URL       string `json:"url"`
 		UserAgent string `json:"user_agent,omitempty"`
 		Proxy     string `json:"proxy,omitempty"`

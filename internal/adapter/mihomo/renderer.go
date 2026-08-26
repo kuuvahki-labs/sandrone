@@ -40,6 +40,9 @@ func (r *Renderer) RenderWithReport(ctx context.Context, nodes []domain.NodeIR, 
 		}
 		warnings = append(warnings, mihomoStructuredLossWarnings(node)...)
 		warnings = append(warnings, shared.RawWarnings(node, skipRaw, r.Name())...)
+		for warningIndex := range warnings {
+			warnings[warningIndex].NodeIndex = &index
+		}
 		shared.MergeWarnings(&report, warnings)
 		report.SuccessCount++
 		docs = append(docs, doc)

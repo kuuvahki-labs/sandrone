@@ -373,7 +373,7 @@ function subscriptionPreview(
   return {
     subscriptionName,
     nodes: nodeNames.map((name, index) => ({
-      identity: `node-${index + 1}`,
+      runtimeId: `node-${index + 1}`,
       after: {
         name,
         type: "ss",

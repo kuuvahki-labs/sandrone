@@ -95,13 +95,13 @@ export const subscriptionPreview = {
   status_counts: { added: 0, modified: 1, removed: 1, unchanged: 0 },
   nodes: [
     {
-      identity: "sha256:one",
+      runtimeId: "runtime-one",
       status: "modified",
       before: { name: "node-a", type: "ss", server: "example.com", port: 8388 },
       after: { name: "source-node-a", type: "ss", server: "example.com", port: 8388 },
     },
     {
-      identity: "sha256:two",
+      runtimeId: "runtime-two",
       status: "removed",
       before: { name: "node-b", type: "ss", server: "example.org", port: 8389 },
     },

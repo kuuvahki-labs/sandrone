@@ -41,7 +41,7 @@ describe("subscription resource data", () => {
       before_count: 0,
       after_count: 1,
       status_counts: { added: 1 },
-      nodes: [{ identity: "node", status: "added", after: { name: "Node", server: "example.test", port: 443 } }],
+      nodes: [{ runtime_id: "node", status: "added", after: { name: "Node", server: "example.test", port: 443 } }],
     });
     const subscriptionTraffic = vi.fn().mockResolvedValue({
       subscription_name: "provider",
@@ -67,7 +67,7 @@ describe("subscription resource data", () => {
     expect(preview).toMatchObject({
       subscriptionName: "bundle",
       statusCounts: { added: 1, modified: 0, removed: 0, unchanged: 0 },
-      nodes: [expect.objectContaining({ identity: "node", status: "added" })],
+      nodes: [expect.objectContaining({ runtimeId: "node", status: "added" })],
     });
     expect(subscriptionTraffic).toHaveBeenCalledWith("provider", { refresh: true });
     expect(traffic).toMatchObject({

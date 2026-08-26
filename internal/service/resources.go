@@ -28,8 +28,6 @@ func (s *Service) PutSubscription(ctx context.Context, sub domain.Subscription) 
 	if err := s.metaStore.PutSubscription(ctx, normalized); err != nil {
 		return err
 	}
-	s.invalidateSubscriptionTrafficCache(ctx)
-	s.invalidateResultCaches(ctx)
 	s.logResource(ctx, "put", "subscription", normalized.Name)
 	return nil
 }
@@ -44,7 +42,6 @@ func (s *Service) PutFile(ctx context.Context, file domain.FileSpec) error {
 	if err := s.metaStore.PutFile(ctx, file); err != nil {
 		return err
 	}
-	s.invalidateResultCaches(ctx)
 	s.logResource(ctx, "put", "file", file.Name)
 	return nil
 }
@@ -56,8 +53,7 @@ func (s *Service) DeleteSubscription(ctx context.Context, name string) error {
 	if err := s.metaStore.DeleteSubscription(ctx, name); err != nil {
 		return err
 	}
-	s.invalidateSubscriptionTrafficCache(ctx)
-	s.invalidateResultCaches(ctx)
+	s.deletePersistentCacheScope(ctx, cacheResourceSubscriptions, name)
 	s.logResource(ctx, "delete", "subscription", name)
 	return nil
 }
@@ -69,7 +65,7 @@ func (s *Service) DeleteFile(ctx context.Context, name string) error {
 	if err := s.metaStore.DeleteFile(ctx, name); err != nil {
 		return err
 	}
-	s.invalidateResultCaches(ctx)
+	s.deletePersistentCacheScope(ctx, cacheResourceFiles, name)
 	s.logResource(ctx, "delete", "file", name)
 	return nil
 }
@@ -117,6 +113,7 @@ func (s *Service) GetFileSource(ctx context.Context, name string) (*domain.FileD
 	if err := s.validateFileSpecStructure(*spec); err != nil {
 		return nil, err
 	}
+	ctx = withFileCacheScope(ctx, spec.Name)
 	kind := spec.Kind
 	var doc domain.FileDocument
 	switch kind {

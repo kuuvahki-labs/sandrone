@@ -96,6 +96,10 @@ func (p *probeProc) ApplyNodes(ctx context.Context, in domain.NodeProcessInput) 
 			}},
 		}, nil
 	}
+	nodes := append([]domain.NodeIR{}, in.Nodes...)
+	if err := domain.AssignNodeRuntimeIDs(nodes); err != nil {
+		return domain.NodeProcessOutput{}, &domain.AppError{Code: domain.CodeNodeProcessorFailed, Message: "assign node runtime identity", Processor: "probe", Cause: err}
+	}
 	method := domain.ProbeMethod(p.params.Method)
 	core := strings.TrimSpace(p.params.Core)
 	url := strings.TrimSpace(p.params.URL)
@@ -103,7 +107,7 @@ func (p *probeProc) ApplyNodes(ctx context.Context, in domain.NodeProcessInput) 
 		Input: domain.NodeInput{
 			Name:  in.Context.InputName,
 			Type:  "inline_nodes",
-			Nodes: append([]domain.NodeIR{}, in.Nodes...),
+			Nodes: nodes,
 			Meta:  cloneStringMap(in.Context.Meta),
 		},
 		Method:          method,
@@ -128,18 +132,28 @@ func (p *probeProc) ApplyNodes(ctx context.Context, in domain.NodeProcessInput) 
 			Processor: "probe",
 		}
 	}
-	if len(result.Results) != len(in.Nodes) {
+	if len(result.Results) != len(nodes) {
 		return domain.NodeProcessOutput{}, &domain.AppError{
 			Code:      domain.CodeNodeProcessorFailed,
-			Message:   fmt.Sprintf("probe result count %d does not match node count %d", len(result.Results), len(in.Nodes)),
+			Message:   fmt.Sprintf("probe result count %d does not match node count %d", len(result.Results), len(nodes)),
 			Processor: "probe",
 		}
 	}
-	items := make([]probeItem, 0, len(in.Nodes))
-	for i, node := range in.Nodes {
-		probeResult := domain.NodeProbeResult{}
-		if i < len(result.Results) {
-			probeResult = result.Results[i]
+	resultsByRuntimeID := make(map[string]domain.NodeProbeResult, len(result.Results))
+	for _, probeResult := range result.Results {
+		if probeResult.RuntimeID == "" {
+			return domain.NodeProcessOutput{}, &domain.AppError{Code: domain.CodeNodeProcessorFailed, Message: "probe result is missing runtime_id", Processor: "probe"}
+		}
+		if _, exists := resultsByRuntimeID[probeResult.RuntimeID]; exists {
+			return domain.NodeProcessOutput{}, &domain.AppError{Code: domain.CodeNodeProcessorFailed, Message: fmt.Sprintf("duplicate probe result runtime_id %q", probeResult.RuntimeID), Processor: "probe"}
+		}
+		resultsByRuntimeID[probeResult.RuntimeID] = probeResult
+	}
+	items := make([]probeItem, 0, len(nodes))
+	for i, node := range nodes {
+		probeResult, ok := resultsByRuntimeID[domain.NodeRuntimeID(node)]
+		if !ok {
+			return domain.NodeProcessOutput{}, &domain.AppError{Code: domain.CodeNodeProcessorFailed, Message: fmt.Sprintf("probe result missing for node %q", node.Name), Processor: "probe"}
 		}
 		if p.params.FailMode == "error" && !probeResult.Alive {
 			return domain.NodeProcessOutput{}, &domain.AppError{

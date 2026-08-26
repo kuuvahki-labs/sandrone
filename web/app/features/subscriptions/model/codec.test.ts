@@ -68,14 +68,14 @@ describe("subscription model codec", () => {
       traffic: { used_bytes: 123 },
       nodes: [
         {
-          identity: "sha256:one",
+          runtime_id: "runtime-one",
           status: "modified",
           before: { name: "node-a", type: "ss", server: "example.com", port: 8388 },
           after: { name: "source-node-a", type: "ss", server: "example.com", port: 8388 },
           target_names: { shadowrocket: "source-node-a" },
         },
         {
-          identity: "sha256:two",
+          runtime_id: "runtime-two",
           status: "removed",
           before: { name: "node-b", type: "ss", server: "example.org", port: 8389 },
         },
@@ -99,14 +99,14 @@ describe("subscription model codec", () => {
       statusCounts: { added: 0, modified: 1, removed: 1, unchanged: 0 },
       nodes: [
         expect.objectContaining({
-          identity: "sha256:one",
+          runtimeId: "runtime-one",
           status: "modified",
           targetNames: { shadowrocket: "source-node-a" },
           before: expect.objectContaining({ name: "node-a", type: "ss", endpoint: "example.com:8388" }),
           after: expect.objectContaining({ name: "source-node-a", type: "ss", endpoint: "example.com:8388" }),
         }),
         expect.objectContaining({
-          identity: "sha256:two",
+          runtimeId: "runtime-two",
           status: "removed",
           before: expect.objectContaining({ name: "node-b", endpoint: "example.org:8389" }),
           after: undefined,
@@ -130,7 +130,7 @@ describe("subscription model codec", () => {
     const preview = subscriptionPreviewFromAPI({
       nodes: [
         {
-          identity: "sha256:alive",
+          runtime_id: "runtime-alive",
           status: "unchanged",
           after: {
             name: "alive",
@@ -143,7 +143,7 @@ describe("subscription model codec", () => {
           },
         },
         {
-          identity: "sha256:available",
+          runtime_id: "runtime-available",
           status: "unchanged",
           after: {
             name: "available",
@@ -151,7 +151,7 @@ describe("subscription model codec", () => {
           },
         },
         {
-          identity: "sha256:failed",
+          runtime_id: "runtime-failed",
           status: "unchanged",
           after: {
             name: "failed",
@@ -163,7 +163,7 @@ describe("subscription model codec", () => {
           },
         },
         {
-          identity: "sha256:invalid",
+          runtime_id: "runtime-invalid",
           status: "unchanged",
           after: {
             name: "invalid",

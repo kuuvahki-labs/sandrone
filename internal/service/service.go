@@ -67,6 +67,10 @@ type probeCoreSelector interface {
 	SelectCore(req domain.ProbeRequest, nodes []domain.NodeIR) (string, bool)
 }
 
+type probeBackendResolver interface {
+	ResolveBackend(req domain.ProbeRequest) (domain.ProbeBackendSummary, error)
+}
+
 // Service is the central orchestrator. It composes adapters and the
 // processor registry; consumers receive a value via New().
 type Service struct {

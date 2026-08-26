@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/processor"
@@ -42,15 +43,16 @@ func (s *Service) GetFile(ctx context.Context, req domain.FileRequest) (*domain.
 	if err != nil {
 		return nil, err
 	}
+	ctx = withFileCacheScope(ctx, spec.Name)
 	ttlSeconds := s.fileRenderTTLSeconds(spec.RenderCacheTTLSeconds)
-	cacheKey := ""
+	cacheEntryID := ""
 	if ttlSeconds > 0 {
-		cacheKey, err = fileRenderCacheKey(spec, req)
+		cacheEntryID, err = s.fileRenderCacheEntryID(spec, req)
 		if err != nil {
 			return nil, err
 		}
 		if !req.Refresh {
-			if cached := s.readFileRenderCache(ctx, cacheKey); cached != nil {
+			if cached := s.readFileRenderCache(ctx, cacheEntryID, time.Duration(ttlSeconds)*time.Second); cached != nil {
 				return cached, nil
 			}
 		}
@@ -61,14 +63,18 @@ func (s *Service) GetFile(ctx context.Context, req domain.FileRequest) (*domain.
 		return nil, err
 	}
 	result.Cached = false
-	s.writeFileRenderCache(ctx, cacheKey, ttlSeconds, result)
+	s.writeFileRenderCache(ctx, cacheEntryID, ttlSeconds, result)
 	return result, nil
 }
 
 func (s *Service) getFile(ctx context.Context, req domain.FileRequest, state *fileResolveState) (*domain.FileResult, error) {
+	storedRequest := req.Spec == nil && strings.TrimSpace(req.Name) != ""
 	spec, err := s.resolveSpec(ctx, req)
 	if err != nil {
 		return nil, err
+	}
+	if storedRequest {
+		ctx = withFileCacheScope(ctx, spec.Name)
 	}
 	ctx = processor.WithTraceScope(ctx, "file:"+firstNonEmptyString(spec.Name, req.Name, "inline"))
 	if spec.Name != "" {

@@ -137,6 +137,8 @@ processor 的 stage、声明顺序和 config 语义只见
 `content` 与 `remote` 必须且只能提供一个。格式名应先用
 [`GET /v1/inspect`](#get-v1inspect) 或
 [schema catalog](schemas.md)发现；字段兼容性见[格式与能力](../capabilities.md)。
+convert 属于临时输入；`remote.cache_ttl_seconds` 会被校验但不会创建或读取持久
+remote-fetch cache。持久缓存只用于已保存 Subscription/File 的执行作用域。
 
 ### 响应
 

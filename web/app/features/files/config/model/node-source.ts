@@ -3,7 +3,7 @@ import type { PreviewWarning } from "~/shared/resources/types";
 export interface ConfigNodePreviewInput {
   readonly subscriptionName: string;
   readonly nodes: readonly {
-    readonly identity: string;
+    readonly runtimeId: string;
     readonly after?: {
       readonly name: string;
       readonly type?: string;
@@ -55,11 +55,11 @@ export function configNodePreviewFromSubscription(
   const renderCandidates: ConfigNodeSummary[] = [];
   const targetOptions = new Map<string, { options: ConfigNodeSummary[]; presentCount: number }>();
   let unnamedCount = 0;
-  for (const [index, diff] of preview.nodes.entries()) {
+  for (const diff of preview.nodes) {
     const node = diff.after;
     if (!node) continue;
     const summary: ConfigNodeSummary = {
-      key: `${diff.identity}:${index}`,
+      key: diff.runtimeId,
       name: node.name,
       ...(node.type ? { type: node.type } : {}),
       endpoint: node.endpoint,

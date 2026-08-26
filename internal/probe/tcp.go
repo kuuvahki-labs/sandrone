@@ -58,7 +58,7 @@ func (b *TCPBackend) Probe(ctx context.Context, backendReq BackendRequest, nodes
 	}
 	wg.Wait()
 
-	report := reportForResults(b.Name(), b.Version(), string(req.Method), req.Core, nodes, results)
+	report := ReportForResults(b.Name(), b.Version(), string(req.Method), req.Core, nodes, results)
 	for i := range results {
 		results[i].Backend = b.Name()
 	}

@@ -18,7 +18,7 @@ const subscriptionPreview = {
   after_count: 1,
   status_counts: { added: 0, modified: 0, removed: 0, unchanged: 1 },
   nodes: [{
-    identity: "sha256:probe",
+    runtime_id: "probe-runtime-id",
     status: "unchanged",
     after: {
       name: longPreviewNode,

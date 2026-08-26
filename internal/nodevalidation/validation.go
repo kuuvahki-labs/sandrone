@@ -63,7 +63,7 @@ func validateNode(node domain.NodeIR, index int, stage Stage, target string) []d
 			Code:      code,
 			Message:   message,
 			NodeIndex: &nodeIndex,
-			NodeID:    node.ID,
+			RuntimeID: domain.NodeRuntimeID(node),
 			NodeName:  node.Name,
 			NodeType:  node.Type,
 			Field:     field,

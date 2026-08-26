@@ -96,7 +96,7 @@ function ProcessorParamsEditor({ draft, onChange, probeCacheTTLSeconds, probeDef
             options={[
               { value: "name", label: t("labels.name") },
               { value: "random_suffix", label: t("processors.dedup.randomSuffix") },
-              { value: "identity", label: t("processors.dedup.identity") },
+              { value: "connection", label: t("processors.dedup.connection") },
               { value: "fields", label: t("processors.dedup.fields") },
             ]}
             value={stringValue(params.strategy) || "name"}

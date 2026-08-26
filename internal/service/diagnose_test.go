@@ -264,7 +264,7 @@ type diagnoseProbeEngine struct{}
 func (diagnoseProbeEngine) Probe(_ context.Context, req domain.ProbeRequest, nodes []domain.NodeIR, _ ...probe.Payload) (*domain.ProbeResult, error) {
 	results := make([]domain.NodeProbeResult, len(nodes))
 	for i, node := range nodes {
-		results[i] = domain.NodeProbeResult{NodeID: node.ID, NodeName: node.Name, Method: string(req.Method), Alive: i != 0}
+		results[i] = domain.NodeProbeResult{RuntimeID: domain.NodeRuntimeID(node), NodeName: node.Name, Method: string(req.Method), Alive: i != 0}
 	}
 	return &domain.ProbeResult{Results: results, Report: domain.Report{Probe: &domain.ProbeReport{FailureCount: 1}}}, nil
 }
@@ -418,7 +418,7 @@ func TestDiagnoseTraceKeepsMultipleScriptProbeCalls(t *testing.T) {
 	require.Len(t, result.Stages[1].Probes, 2)
 }
 
-func TestDiagnoseTraceKeepsProbeCacheHits(t *testing.T) {
+func TestDiagnoseTransientTraceDoesNotUsePersistentProbeCache(t *testing.T) {
 	svc := New(WithFS(afero.NewMemMapFs()), WithProbeEngine(diagnoseProbeEngine{}))
 	req := domain.DiagnoseRequest{
 		Kind: domain.DiagnoseInputNodes, Format: "uri-list",
@@ -436,7 +436,7 @@ func TestDiagnoseTraceKeepsProbeCacheHits(t *testing.T) {
 
 	second, err := svc.Diagnose(context.Background(), req)
 	require.NoError(t, err)
-	require.True(t, second.Stages[1].Probes[0].Results[0].CacheHit)
+	require.False(t, second.Stages[1].Probes[0].Results[0].CacheHit)
 }
 
 func diagnoseParams(t *testing.T, values map[string]any) map[string]json.RawMessage {

@@ -21,7 +21,7 @@ NodeIR                    -> NodeProbeResult
 
 字段按语义分为几类：
 
-- 节点身份与连接端点，例如名称、类型、server 和 port。
+- 节点展示与连接端点，例如名称、类型、server 和 port。
 - 认证与协议参数，例如 UUID、password、cipher 和 flow。
 - 可跨目标表达的 TLS、transport、dialer、multiplex 和协议专属 options。
 - 标签与 metadata，用于处理链和调用方上下文。
@@ -29,6 +29,13 @@ NodeIR                    -> NodeProbeResult
 - `SourceFormat`、`Lossy` 和 `Warnings`，保留来源与兼容诊断。
 
 相似名称不会因为字符串相同就合并。字段只有在协议语义一致、且 capability catalog 有依据时才进入显式 IR；目标私有值保留在带来源前缀的 `Raw` key 中。
+
+节点完成规范化和校验后会附带一个不序列化的 `RuntimeID`。它标识本次物化链路中的
+一个节点实例，跨 processor 保留，但不跨独立请求承诺稳定，也不属于脚本或公开
+`NodeIR` 字段。连接相等性则按需从规范化节点计算 `ConnectionKey`；该 key
+覆盖完整连接语义，排除名称、标签、metadata、来源原文和诊断状态，不保存到节点，
+也不出现在公开响应中。preview 用前者追踪实例，连接去重和 probe cache 用后者判断
+连接语义，二者不再各自维护私有身份算法。
 
 `Raw` 是保留信息的边界，不是任意字段都能跨格式回填的承诺。renderer 仍须根据目标能力决定输出、报告字段损失或跳过节点。
 

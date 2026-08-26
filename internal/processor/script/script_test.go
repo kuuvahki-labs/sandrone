@@ -81,7 +81,7 @@ func TestScriptNodesFilterRename(t *testing.T) {
 	require.NotContains(t, warningCodes(out.Nodes[0].Warnings), "script_modified")
 }
 
-func TestScriptNodeLineageSurvivesObjectSpreadWithoutPublicField(t *testing.T) {
+func TestScriptNodeRuntimeIDSurvivesObjectSpreadWithoutPublicField(t *testing.T) {
 	r := processor.NewRegistry()
 	registerScript(r)
 	proc, err := r.BuildNode(domain.ProcessorSpec{
@@ -89,11 +89,11 @@ func TestScriptNodeLineageSurvivesObjectSpreadWithoutPublicField(t *testing.T) {
 		Params: params(t, map[string]any{
 			"source": inlineScriptSource(`function main(input) {
   const node = input.nodes[0];
-  if (Object.keys(node).some(function(key) { return key.includes("lineage"); })) {
-    throw new Error("lineage leaked through Object.keys");
+  if (Object.keys(node).some(function(key) { return key.includes("runtime"); })) {
+    throw new Error("runtime ID leaked through Object.keys");
   }
-  if (JSON.stringify(node).includes("origin-1")) {
-    throw new Error("lineage leaked through JSON");
+  if (JSON.stringify(node).includes("runtime-1")) {
+    throw new Error("runtime ID leaked through JSON");
   }
   input.nodes = [{...node, name: "renamed"}];
   return input;
@@ -105,17 +105,17 @@ func TestScriptNodeLineageSurvivesObjectSpreadWithoutPublicField(t *testing.T) {
 		Name: "original", Type: domain.NodeTypeShadowsocks, Server: "example.com",
 		Port: 443, Cipher: "aes-128-gcm", Password: "secret",
 	}
-	domain.SetNodeLineage(&node, "origin-1")
+	domain.SetNodeRuntimeID(&node, "runtime-1")
 
 	out, err := proc.ApplyNodes(context.Background(), domain.NodeProcessInput{Nodes: []domain.NodeIR{node}})
 
 	require.NoError(t, err)
 	require.Len(t, out.Nodes, 1)
 	require.Equal(t, "renamed", out.Nodes[0].Name)
-	require.Equal(t, "origin-1", domain.NodeLineage(out.Nodes[0]))
+	require.Equal(t, "runtime-1", domain.NodeRuntimeID(out.Nodes[0]))
 }
 
-func TestScriptRebuiltNodeDoesNotInheritLineage(t *testing.T) {
+func TestScriptRebuiltNodeDoesNotInheritRuntimeID(t *testing.T) {
 	r := processor.NewRegistry()
 	registerScript(r)
 	proc, err := r.BuildNode(domain.ProcessorSpec{
@@ -140,14 +140,14 @@ func TestScriptRebuiltNodeDoesNotInheritLineage(t *testing.T) {
 		Name: "original", Type: domain.NodeTypeShadowsocks, Server: "example.com",
 		Port: 443, Cipher: "aes-128-gcm", Password: "secret",
 	}
-	domain.SetNodeLineage(&node, "origin-1")
+	domain.SetNodeRuntimeID(&node, "runtime-1")
 
 	out, err := proc.ApplyNodes(context.Background(), domain.NodeProcessInput{Nodes: []domain.NodeIR{node}})
 
 	require.NoError(t, err)
 	require.Len(t, out.Nodes, 1)
 	require.Equal(t, "rebuilt", out.Nodes[0].Name)
-	require.Empty(t, domain.NodeLineage(out.Nodes[0]))
+	require.Empty(t, domain.NodeRuntimeID(out.Nodes[0]))
 }
 
 func TestScriptLoadsFileSourceAtExecutionWithContext(t *testing.T) {

@@ -109,9 +109,9 @@ describe("structured file driver orchestration strategies", () => {
     const preview: ConfigNodePreviewInput = {
       subscriptionName: "provider",
       nodes: [
-        { identity: "skipped", after: { name: "secret raw name", type: "ss", endpoint: "bad.example:1" }, targetNames: { shadowrocket: "" } },
-        { identity: "first", after: { name: "DIRECT", type: "http", endpoint: "one.example:2" }, targetNames: { shadowrocket: "DIRECT (Node)" } },
-        { identity: "second", after: { name: "DIRECT", type: "http", endpoint: "two.example:3" }, targetNames: { shadowrocket: "DIRECT (Node) (2)" } },
+        { runtimeId: "skipped", after: { name: "secret raw name", type: "ss", endpoint: "bad.example:1" }, targetNames: { shadowrocket: "" } },
+        { runtimeId: "first", after: { name: "DIRECT", type: "http", endpoint: "one.example:2" }, targetNames: { shadowrocket: "DIRECT (Node)" } },
+        { runtimeId: "second", after: { name: "DIRECT", type: "http", endpoint: "two.example:3" }, targetNames: { shadowrocket: "DIRECT (Node) (2)" } },
       ],
       warnings: [],
    };
@@ -174,7 +174,7 @@ describe("structured file driver orchestration strategies", () => {
     const preview = configNodePreviewFromSubscription({
       subscriptionName: "provider",
       nodes: names.map((name, index) => ({
-        identity: `sha256:${index}`,
+        runtimeId: `runtime-${index}`,
         after: { name, type: "ss", endpoint: `node-${index}.example:8388` },
       })),
       warnings: [],
@@ -272,7 +272,7 @@ function shadowrocketPreview(
   return {
     subscriptionName: "provider",
     nodes: targetNames.map((names, index) => ({
-      identity: `node-${index}`,
+      runtimeId: `node-${index}`,
       after: {
         name: index === 0 ? "raw one" : "raw two",
         type: "http",

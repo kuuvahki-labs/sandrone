@@ -50,7 +50,16 @@ type fakeProbeEngine struct {
 }
 
 func (e fakeProbeEngine) Probe(ctx context.Context, req domain.ProbeRequest, nodes []domain.NodeIR, payloads ...probe.Payload) (*domain.ProbeResult, error) {
-	return e.probe(ctx, req, nodes, payloads...)
+	result, err := e.probe(ctx, req, nodes, payloads...)
+	if err != nil || result == nil {
+		return result, err
+	}
+	for index := range result.Results {
+		if result.Results[index].RuntimeID == "" && index < len(nodes) {
+			result.Results[index].RuntimeID = domain.NodeRuntimeID(nodes[index])
+		}
+	}
+	return result, nil
 }
 
 type stubTagProcessor struct{}

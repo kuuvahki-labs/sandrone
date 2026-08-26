@@ -50,7 +50,7 @@ export function subscriptionPreviewFromAPI(value: unknown): SubscriptionPreview 
     beforeCount: numberField(item.before_count),
     afterCount: numberField(item.after_count),
     statusCounts: previewStatusCounts(item.status_counts),
-    nodes: arrayField(item.nodes).map(previewDiffFromAPI).filter((node) => node.identity),
+    nodes: arrayField(item.nodes).map(previewDiffFromAPI).filter((node) => node.runtimeId),
     warnings: previewWarningsFromAPI(item),
   };
 }
@@ -126,7 +126,7 @@ function previewDiffFromAPI(value: unknown): SubscriptionPreviewNodeDiff {
   const item = asRecord(value);
   const targetNames = stringMapField(item.target_names);
   return {
-    identity: stringField(item.identity),
+    runtimeId: stringField(item.runtime_id),
     status: previewStatus(item.status),
     before: previewNodeFromAPI(item.before),
     after: previewNodeFromAPI(item.after),

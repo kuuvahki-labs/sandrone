@@ -24,7 +24,8 @@ Subscription 或形成可列举产物。直接 render/convert 与 preview 不使
 - inline nodes 可以直接进入统一模型边界。
 - inline 内容按声明格式交给 parser。
 - local 输入只读取经过 Store key 校验的受控资源。
-- remote 输入通过统一 HTTP(S) fetcher，继承或覆盖超时、User-Agent、代理和缓存设置。
+- remote 输入通过统一 HTTP(S) fetcher，继承或覆盖超时、User-Agent、代理和缓存设置；
+  只有处在已保存资源作用域时才读写持久 remote-fetch cache。
 - subscription 引用在使用时物化；collection 可以组合多个输入并记录依赖。
 
 输入解析返回的不只是节点，还包括 `SourceInfo`、resource dependencies、warnings 和订阅级运行时 metadata。它们随 `NodeSet` 传播，由 service 汇总，processor 和 renderer 不自行重新读取来源。
@@ -48,7 +49,7 @@ parser 不访问 Store、不执行节点探测，也不根据最终客户端策�
 
 ## 3. Normalize 与语义校验
 
-normalize 是 adapter 把外部别名、默认语义和目标结构统一成 `NodeIR` 的边界。service 随后用共享的 node validation 检查协议必填项与结构约束。
+normalize 是 adapter 把外部别名、默认语义和目标结构统一成 `NodeIR` 的边界。service 随后用共享的 node validation 检查协议必填项与结构约束，并为保留的每个节点实例分配仅在本次物化链路内稳定的 `RuntimeID`。连接相等性需要时从规范化节点计算 `ConnectionKey`，不依赖数组位置，也不把该 key 保存进 `NodeIR`。
 
 ### 字段接纳与 warning 处置
 

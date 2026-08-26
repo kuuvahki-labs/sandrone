@@ -59,7 +59,7 @@ export interface SubscriptionPreviewNode {
 export type SubscriptionPreviewWarning = PreviewWarning;
 
 export interface SubscriptionPreviewNodeDiff {
-  identity: string;
+  runtimeId: string;
   status: SubscriptionPreviewStatus;
   before?: SubscriptionPreviewNode;
   after?: SubscriptionPreviewNode;

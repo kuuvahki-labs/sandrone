@@ -147,6 +147,23 @@ func (e *Engine) CheckAvailability(req domain.ProbeRequest) error {
 	return err
 }
 
+// ResolveBackend returns the concrete backend selected for a request without
+// starting it. Service uses this identity to scope per-node cache entries.
+func (e *Engine) ResolveBackend(req domain.ProbeRequest) (domain.ProbeBackendSummary, error) {
+	req = normalizeRequest(req)
+	backend, err := e.selectBackend(req)
+	if err != nil {
+		return domain.ProbeBackendSummary{}, err
+	}
+	resolved := requestForBackend(req, backend)
+	return domain.ProbeBackendSummary{
+		Method:  backend.Method(),
+		Name:    backend.Name(),
+		Version: backend.Version(),
+		Core:    resolved.Core,
+	}, nil
+}
+
 func (e *Engine) SelectCore(req domain.ProbeRequest, nodes []domain.NodeIR) (string, bool) {
 	req = normalizeRequest(req)
 	if req.Method != domain.ProbeURLTest && req.Method != domain.ProbeUDPNTP {

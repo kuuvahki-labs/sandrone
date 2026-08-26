@@ -102,49 +102,62 @@ Sandrone 不调用 AWS 默认凭据链，不读取 shared profile 或 instance m
 
 ## `Cache`
 
-`internal/cache.Cache` 是 service 使用的非权威缓存边界，只提供三个能力：
+`internal/cache.Cache` 是 service 使用的非权威缓存边界。它只处理 opaque key、opaque
+value 和整个 key 的 TTL，不解释 key 路径或 value 内容：
 
 | 操作 | 契约 |
 | --- | --- |
-| `GetJSON` | 读取仍在有效期内的 JSON 值；缺失、过期、损坏或后端失败都按 miss 处理 |
-| `PutJSON` | 写入值并在写入时确定到期时间；TTL 非正时不写入 |
-| `DeleteLayer` | 清空一个由 service 选择的 canonical 层，用于资源变更后的广泛失效 |
+| `Get` | 按单个 key 返回未过期 value 及其绝对过期时间；缺失和过期返回 miss |
+| `Set` | 按单个 key 写入 opaque value 和一个 TTL |
+| `Delete` | 删除单个 key |
+| `Clear` | 清空该 Cache 实例管理的全部 key |
 
 service 分别持有权威 `Store` 与非权威 `Cache`，因此自定义 Cache 不需要充当
-资源 Store。当前仓库只内建 Store-backed 实现：它把 envelope 写到
-`cache/<layer>/`，使用无缩进和尾随换行的紧凑 JSON；读取过期 entry 时
-best-effort 删除。没有运行时 backend registry 或第三方 cache 依赖；以后更换为
-内存或远程实现时，应保持相同的 miss/failure 语义，而不是让 cache 可用性影响
-业务结果。
+资源 Store。service 使用 `remote_fetch/subscriptions/A` 这类普通字符串作为 key；
+当前 Store-backed 实现把它映射为 `cache/remote_fetch/subscriptions/A.json`，以后
+替换为内存或 Redis 实现时可以直接把同一字符串作为缓存 key。Cache 接口没有
+layer、资源种类、JSON 或内部 entry 概念。Store-backed 实现会尝试用 gzip 压缩
+超过 4 KiB 的 opaque value，只有压缩结果更小时才在内部 envelope 标记并保存，
+`Get` 会透明解压；该存储选择不会进入 Cache 接口或 service 业务文档。
 
-持久 TTL 层共有五个：
+service 在单个 value 内保存无 TTL 的 JSON entry map，用于节点或请求变体的部分
+命中。读取或普通合并都采用现有绝对过期时间与 `now + effectiveTTL` 中较早者；
+较短的新策略会缩短整个 key，写入部分新结果也不会延长旧结果。整个 value 到期后
+全部 miss。`refresh` 对每个 key
+第一次写入时替换旧 value 并重建 TTL，同一 refresh 请求后续写入该 key 时继续合并
+本次 fresh entry。多个实例共享 Store-backed Cache 时，并发 read-modify-write
+可能最后写入覆盖并降低后续命中率，但不会影响权威资源或业务正确性。
 
-| canonical 层 | 缓存值 | TTL 来源 |
+持久缓存共有五类 key 前缀：
+
+| key 前缀 | 缓存值 | TTL 来源 |
 | --- | --- | --- |
 | `remote_fetch` | 受控 HTTP(S) 响应 | `RemoteInput.cache_ttl_seconds`，零值继承项目默认 |
-| `probe` | 完整批次 `ProbeResult` | probe 请求，零值继承项目 `cache_defaults.probe_ttl_seconds` |
+| `probe` | 按连接保存的节点观测 | probe 请求，零值继承项目 `cache_defaults.probe_ttl_seconds` |
 | `subscription_traffic` | 远程订阅用量 | 项目设置默认 |
 | `subscription_render` | 已保存订阅的完整 `RenderResult` | Subscription 三态覆盖或项目默认 |
 | `file_render` | 已保存文件的完整 `FileResult` | FileSpec 三态覆盖或项目默认 |
 
 Subscription/FileSpec 的 `render_cache_ttl_seconds` 是 nullable 三态字段：省略时
 继承对应项目默认，显式 `0` 关闭，正数覆盖。两个结果缓存的项目默认值
-均为 `0`，所以升级不会自动缓存生成结果。inline FileSpec、直接 parse/render/
-convert、preview 不使用结果缓存；share 没有独立缓存层，但生成已保存目标时可以
+均为 `0`，所以升级不会自动缓存生成结果。持久缓存只属于已保存的 Subscription
+或 File：inline FileSpec、直接 parse/render/convert、临时 diagnose 和未保存草稿
+不读写任何持久层，只保留请求内 memo。share 没有独立缓存层，但生成已保存目标时可以
 复用目标自身的结果缓存。超过 16 MiB 的最终正文不会写入结果缓存。
 
-结果 key 包含 cache schema、构建版本/revision、完整资源定义、目标格式和影响
-执行的请求参数。订阅、文件或项目设置变更后，service 会清空可能受
-影响的结果层；订阅变更还会清空 traffic 层。`refresh` 请求跳过结果、
+文档内部 entry identity 只包含影响对应结果的有效语义。结果缓存包含构建
+版本/revision、完整资源定义、目标格式、请求参数和影响执行的设置摘要，并记录
+上次执行实际使用的依赖资源定义摘要；命中前会重新验证这些依赖。资源更新不再
+广泛清空其它资源的结果层，未变化的 fetch、traffic 和节点观测可以继续复用。
+`refresh` 请求跳过结果、
 remote-fetch 和 probe 的缓存读取，成功执行后仍按当前 TTL 重新填充。
 `ValidateFile` 不读取 file-result cache。除此之外，订阅解析和文件递归各有一次
 请求内 memo，用于去重同一调用中的重复依赖；它们不持久化、没有 TTL，也不是
 可配置 cache 层。
 
-手动清理通过现有 `Cache.DeleteLayer` 依次删除上述五层，不扫描 envelope，也不
-提供分层操作或统计。清理不持有覆盖五层的全局锁；若某层失败，已完成的层不会
-回滚，并发请求也可能立即重新填充缓存。该操作不修改 TTL、`refresh`、请求内
-memo 或缓存 envelope 格式，也不由后台任务自动触发。HTTP 路径见
+手动清理调用一次 `Cache.Clear`，不扫描 value 内部 entry，也不提供按前缀操作或
+统计。并发请求可能在清理期间或之后重新填充缓存。该操作不修改 TTL、`refresh`、
+请求内 memo 或缓存 value 格式，也不由后台任务自动触发。HTTP 路径见
 [项目设置与缓存管理 API](../reference/http-api/settings.md#缓存管理)。
 
 ### 定时更新
@@ -182,11 +195,8 @@ subscriptions/<name>.json
 files/<name>.json
 settings.json
 shares/<id>.json
-cache/probe/<hash>.json
-cache/remote_fetch/<hash>.json
-cache/subscription_traffic/<hash>.json
-cache/subscription_render/<hash>.json
-cache/file_render/<hash>.json
+cache/<cache-key-prefix>/subscriptions/<name>.json
+cache/<cache-key-prefix>/files/<name>.json
 ```
 
 其中：
@@ -194,6 +204,10 @@ cache/file_render/<hash>.json
 - `subscriptions/`、`files/` 和 `shares/` 是领域资源；根部
   `settings.json` 是统一项目设置。
 - `cache/` 只用于可重建的内部加速，不是权威资源。
+- 每种适用缓存与保存资源组合最多一个 key；Store-backed Cache 将它保存成一个
+  文件。同一资源的不同请求变体或节点观测是 value 内 entry，全部共享该 key 的
+  单一绝对过期时间。资源名中的安全 `/` 与领域资源一样形成子目录。
+- 同一 URL 或连接出现在不同资源时分别缓存，不跨 Subscription/File 复用。
 - 未知安全 key 可以由自定义集成保存；raw Store 备份会保留非 cache key。
 
 文件正文、metadata 与运行时生成结果的关系见[文件管线](file-pipeline.md)。

@@ -21,11 +21,11 @@ const preview: ConfigNodePreviewInput = {
   subscriptionName: "provider",
   nodes: [
     {
-      identity: "sha256:current",
+      runtimeId: "runtime-current",
       after: { name: "hk", type: "ss", endpoint: "hk.example:8388" },
     },
     {
-      identity: "sha256:removed",
+      runtimeId: "runtime-removed",
     },
   ],
   warnings: [],
@@ -53,7 +53,7 @@ describe("config node source section", () => {
       ...preview,
       subscriptionName: "all",
       nodes: [{
-        identity: "sha256:all",
+        runtimeId: "runtime-all",
         after: { name: "all-node", type: "vmess", endpoint: "all.example:443" },
       }],
     };
@@ -108,9 +108,9 @@ describe("config node source section", () => {
     const warningPreview: ConfigNodePreviewInput = {
       ...preview,
       nodes: [
-        { identity: "one", after: { name: "duplicate", type: "ss", endpoint: "one.example:1" } },
-        { identity: "two", after: { name: "duplicate", type: "vmess", endpoint: "two.example:2" } },
-        { identity: "three", after: { name: " ", type: "ss", endpoint: "three.example:3" } },
+        { runtimeId: "one", after: { name: "duplicate", type: "ss", endpoint: "one.example:1" } },
+        { runtimeId: "two", after: { name: "duplicate", type: "vmess", endpoint: "two.example:2" } },
+        { runtimeId: "three", after: { name: " ", type: "ss", endpoint: "three.example:3" } },
       ],
       warnings: [{
         code: "parse_unknown_field",
@@ -203,7 +203,7 @@ describe("config node source section", () => {
     const refreshedPreview: ConfigNodePreviewInput = {
       ...preview,
       nodes: [{
-        identity: "sha256:fresh",
+        runtimeId: "runtime-fresh",
         after: { name: "fresh-hk", type: "ss", endpoint: "fresh.example:8388" },
       }],
     };
@@ -211,7 +211,7 @@ describe("config node source section", () => {
       ...preview,
       subscriptionName: "all",
       nodes: [{
-        identity: "sha256:all",
+        runtimeId: "runtime-all",
         after: { name: "all-node", type: "vmess", endpoint: "all.example:443" },
       }],
     };

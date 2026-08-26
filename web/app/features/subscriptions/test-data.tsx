@@ -75,7 +75,7 @@ export const subscriptionPreview: SubscriptionPreview = {
   warnings: [{ code: "quick_settings_warning", message: "left unchanged", node: "keep" }],
   nodes: [
     {
-      identity: "sha256:one",
+      runtimeId: "runtime-one",
       status: "modified",
       before: { name: "keep", type: "ss", server: "example.com", port: 8388, endpoint: "example.com:8388" },
       after: {
@@ -90,7 +90,7 @@ export const subscriptionPreview: SubscriptionPreview = {
       },
     },
     {
-      identity: "sha256:two",
+      runtimeId: "runtime-two",
       status: "removed",
       before: { name: "drop", type: "ss", server: "example.org", port: 8389, endpoint: "example.org:8389" },
     },
@@ -113,23 +113,23 @@ export const allStatusSubscriptionPreview: SubscriptionPreview = {
   warnings: [],
   nodes: [
     {
-      identity: "sha256:modified",
+      runtimeId: "runtime-modified",
       status: "modified",
       before: { name: "before-node", type: "ss", endpoint: "before.example.com:8388" },
       after: { name: "after-node", type: "ss", endpoint: "after.example.com:8388" },
     },
     {
-      identity: "sha256:removed",
+      runtimeId: "runtime-removed",
       status: "removed",
       before: { name: "removed-node", type: "vmess", endpoint: "removed.example.com:443" },
     },
     {
-      identity: "sha256:added",
+      runtimeId: "runtime-added",
       status: "added",
       after: { name: "added-node", type: "trojan", endpoint: "added.example.com:443" },
     },
     {
-      identity: "sha256:unchanged",
+      runtimeId: "runtime-unchanged",
       status: "unchanged",
       before: { name: "stable-node", type: "hysteria2", endpoint: "stable.example.com:8443" },
       after: { name: "stable-node", type: "hysteria2", endpoint: "stable.example.com:8443" },

@@ -74,27 +74,37 @@ probe engine 按规范化 method 执行整个节点批次。backend 负责单节
 
 ## Store-backed cache
 
-probe cache 是 service 管理的内部 TTL cache，用于复用完整批次结果。它不是写入 `NodeIR` 的状态，也不是逐节点历史数据库。
+probe cache 是 service 管理的逐节点内部 TTL cache。它只在已保存资源的执行作用域
+内持久化；临时 diagnose、inline convert 和未保存草稿会正常探测，但不读写持久
+cache。它不是写入 `NodeIR` 的状态，也不是长期历史数据库。
 
-cache key 基于：
+每个 cache key 基于：
 
-- 完整且有序的节点集合。
-- 规范化的 method 和 core。
-- 应用默认值后的目标参数。
+- 规范化节点按需计算的 `ConnectionKey`。
+- 规范化的 method、core，以及实际选择的 backend 名称和版本。
+- 应用默认值后的 URL、NTP server、预期状态等目标参数。
 - 影响单次探测语义的 timeout 与 attempts。
 
-concurrency 不改变探测目标，因此不进入 key；backend 名称和版本当前也不进入 key。部署方升级可选核心后如需强制刷新，应清理 cache 或使用新的有效 TTL 窗口。
+节点名称、标签、metadata、来源格式、数组顺序和 concurrency 不改变连接或探测目标，
+因此不进入 key。连接字段、有效探测参数或核心版本变化会形成新 key。
 
-命中语义是整批、全有或全无：
+命中语义按连接逐项组合：
 
-- 缓存值是完整 `ProbeResult`，不是各节点独立拼装。
-- 每个结果标记 `CacheHit`，report 记录命中数。
-- 原检查时间保留，避免把缓存读取时间误当成探测时间。
-- 当前请求的 dependencies 和 source refs 仍会附加到返回 report。
+- 同一批次可以同时包含命中与未命中节点，只对未命中的连接调用 backend。
+- 同批重复 `ConnectionKey` 只探测一次，再把观测绑定回各自的当前 `RuntimeID` 和名称。
+- 返回结果仍按当前输入顺序排列；每项独立标记 `CacheHit`，report 记录命中数。
+- 缓存观测保留原检查时间，避免把读取时间误当成探测时间。
+- 当前请求的 dependencies、source refs 和节点上下文仍按本次物化结果重建。
 
 过期、损坏或读取失败按 miss 处理。cache 写入失败不会把已经完成的探测改成失败，但会产生 `probe_cache_write_failed` warning。
 
-缓存 report 会复用原 backend warnings；它是内部加速数据，不会成为可列举、可分享的 report 资源。Store 备份也排除 cache 前缀，见[存储架构](storage.md)。
+缓存只保存单节点观测、backend 信息和可重新绑定的 renderer warning 模板；它是内部加速数据，不会成为可列举、可分享的 report 资源。Store 备份也排除 cache 前缀，见[存储架构](storage.md)。
+
+缓存 key 按保存资源隔离为 `probe/subscriptions/<name>`；Store-backed Cache 将其
+映射为 `cache/probe/subscriptions/<name>.json`。value 包含该资源自身发起的全部连接
+与探测参数组合，内部记录没有独立 TTL，整个 key 统一过期。普通部分更新不能延长
+已有绝对过期时间。组合订阅递归执行时，B、C 自身的处理结果仍分别写入自己的 key；
+只有 A 自己发起的组合后探测才写入 A，不跨资源复用相同连接。
 
 ## Report 与失败语义
 
@@ -109,7 +119,7 @@ service 在 cache miss 时合并：
 
 单节点失败保留在 results 中并对应结构化 warning。backend 未注册、核心启动失败、payload 无法安全渲染或引擎返回无效结果属于调用级错误，不伪装成成功的空结果集。
 
-report 随本次结果返回，不写回 subscription 或 file。内部 cache 可以暂存整个结果，但不提供长期审计、趋势或历史窗口；需要监控历史时应由外部可观测系统消费结果。
+report 随本次结果返回，不写回 subscription 或 file。内部 cache 可以暂存单节点观测，但不提供长期审计、趋势或历史窗口；需要监控历史时应由外部可观测系统消费结果。
 
 ## 安全与日志
 

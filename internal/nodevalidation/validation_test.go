@@ -13,9 +13,8 @@ import (
 func TestValidateKeepsValidNodesAndReportsInvalidNodesWithoutSecrets(t *testing.T) {
 	t.Parallel()
 
-	result := nodevalidation.Validate([]domain.NodeIR{
+	nodes := []domain.NodeIR{
 		{
-			ID:       "valid",
 			Name:     "valid",
 			Type:     domain.NodeTypeShadowsocks,
 			Server:   "example.com",
@@ -24,17 +23,18 @@ func TestValidateKeepsValidNodesAndReportsInvalidNodesWithoutSecrets(t *testing.
 			Password: "valid-secret",
 		},
 		{
-			ID:       "invalid",
 			Name:     "invalid",
 			Type:     domain.NodeTypeTrojan,
 			Server:   "https://bad.example/path",
 			Port:     0,
 			Password: "must-not-leak",
 		},
-	}, nodevalidation.StageNormalized, "mihomo-proxies")
+	}
+	require.NoError(t, domain.AssignNodeRuntimeIDs(nodes))
+	result := nodevalidation.Validate(nodes, nodevalidation.StageNormalized, "mihomo-proxies")
 
 	require.Len(t, result.Nodes, 1)
-	require.Equal(t, "valid", result.Nodes[0].ID)
+	require.NotEmpty(t, domain.NodeRuntimeID(result.Nodes[0]))
 	require.Equal(t, domain.ValidationCounts{
 		Input:   2,
 		Valid:   1,
@@ -42,7 +42,7 @@ func TestValidateKeepsValidNodesAndReportsInvalidNodesWithoutSecrets(t *testing.
 		Errors:  2,
 	}, result.Counts)
 	require.Len(t, result.Issues, 2)
-	require.Equal(t, "invalid", result.Issues[0].NodeID)
+	require.NotEmpty(t, result.Issues[0].RuntimeID)
 	require.Equal(t, domain.NodeTypeTrojan, result.Issues[0].NodeType)
 	require.Equal(t, "mihomo-proxies", result.Issues[0].Target)
 

@@ -90,7 +90,7 @@ func (b *MihomoBackend) Probe(ctx context.Context, backendReq BackendRequest, no
 			defer wg.Done()
 			defer recoverProbeWorkerPanic(&results[i], req, node, string(domain.CodeProbeCoreAPIFailed))
 			if proxyByNode[i] == nil {
-				results[i] = resultForError(req, node, string(domain.CodeProbeInvalidTarget), fmt.Errorf("mihomo proxy %q was skipped by renderer", node.Name), b.now())
+				results[i] = resultForError(req, node, string(domain.CodeProbeInvalidTarget), fmt.Errorf("mihomo proxy was skipped by renderer"), b.now())
 				return
 			}
 			select {
@@ -105,7 +105,7 @@ func (b *MihomoBackend) Probe(ctx context.Context, backendReq BackendRequest, no
 	}
 	wg.Wait()
 
-	report := reportForResults(b.Name(), b.Version(), string(req.Method), req.Core, nodes, results)
+	report := ReportForResults(b.Name(), b.Version(), string(req.Method), req.Core, nodes, results)
 	for i := range results {
 		results[i].Backend = b.Name()
 	}

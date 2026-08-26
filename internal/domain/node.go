@@ -22,8 +22,7 @@ const (
 )
 
 type NodeIR struct {
-	lineage        string
-	ID             string                     `json:"id,omitempty" yaml:"id,omitempty"`
+	runtimeID      string
 	Name           string                     `json:"name" yaml:"name"`
 	Type           NodeType                   `json:"type" yaml:"type"`
 	Server         string                     `json:"server" yaml:"server"`

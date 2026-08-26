@@ -21,7 +21,7 @@ type ValidationIssue struct {
 	Code      string   `json:"code" yaml:"code"`
 	Message   string   `json:"message" yaml:"message"`
 	NodeIndex *int     `json:"node_index,omitempty" yaml:"node_index,omitempty"`
-	NodeID    string   `json:"node_id,omitempty" yaml:"node_id,omitempty"`
+	RuntimeID string   `json:"runtime_id,omitempty" yaml:"runtime_id,omitempty"`
 	NodeName  string   `json:"node_name,omitempty" yaml:"node_name,omitempty"`
 	NodeType  NodeType `json:"node_type,omitempty" yaml:"node_type,omitempty"`
 	Field     string   `json:"field,omitempty" yaml:"field,omitempty"`

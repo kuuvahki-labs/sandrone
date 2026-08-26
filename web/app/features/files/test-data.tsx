@@ -25,7 +25,7 @@ export function configNodePreview(subscriptionName: string, names: string[]): Co
   return {
     subscriptionName,
     nodes: names.map((name, index) => ({
-      identity: `sha256:${index}`,
+      runtimeId: `runtime-${index}`,
       after: { name, type: "ss", endpoint: `node-${index}.example:8388` },
     })),
     warnings: [],

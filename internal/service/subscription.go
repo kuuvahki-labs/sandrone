@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/nodevalidation"
@@ -156,7 +157,6 @@ func (s *Service) subscriptionPreviewNodes(ctx context.Context, sub domain.Subsc
 		Traffic:      cloneSubscriptionTrafficItems(base.Traffic),
 		Meta:         cloneStringMap(base.Meta),
 	}
-	assignPreviewNodeLineage(before.Nodes)
 	processed, err := s.registry.RunNodes(ctx, sub.Processors, domain.NodeProcessInput{
 		Target: req.Target,
 		Nodes:  append([]domain.NodeIR{}, before.Nodes...),
@@ -310,15 +310,16 @@ func (s *Service) RenderSubscriptionRequest(ctx context.Context, request domain.
 	if err != nil {
 		return nil, err
 	}
+	ctx = withSubscriptionCacheScope(ctx, sub.Name)
 	ttlSeconds := s.subscriptionRenderTTLSeconds(sub.RenderCacheTTLSeconds)
-	cacheKey := ""
+	cacheEntryID := ""
 	if ttlSeconds > 0 {
-		cacheKey, err = subscriptionRenderCacheKey(sub, format, req)
+		cacheEntryID, err = s.subscriptionRenderCacheEntryID(sub, format, req)
 		if err != nil {
 			return nil, err
 		}
 		if !request.Refresh {
-			if cached := s.readSubscriptionRenderCache(ctx, cacheKey); cached != nil {
+			if cached := s.readSubscriptionRenderCache(ctx, cacheEntryID, time.Duration(ttlSeconds)*time.Second); cached != nil {
 				return cached, nil
 			}
 		}
@@ -348,7 +349,7 @@ func (s *Service) RenderSubscriptionRequest(ctx context.Context, request domain.
 	report = s.prepareReport("subscription_render", report)
 	rendered.Report = report
 	rendered.Cached = false
-	s.writeSubscriptionRenderCache(ctx, cacheKey, ttlSeconds, rendered)
+	s.writeSubscriptionRenderCache(ctx, cacheEntryID, ttlSeconds, rendered)
 	return rendered, nil
 }
 

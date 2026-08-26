@@ -159,7 +159,7 @@ func (r *runner) run(ctx context.Context, envelope ScriptEnvelope) (ScriptEnvelo
 	vm := goja.New()
 	vm.SetFieldNameMapper(goja.TagFieldNameMapper("json", true))
 	r.api.attach(vm)
-	nodeLineageSymbol := goja.NewSymbol("sandrone.node.lineage")
+	nodeRuntimeIDSymbol := goja.NewSymbol("sandrone.node.runtime_id")
 
 	done := make(chan struct{})
 	var timedOut atomic.Bool
@@ -203,7 +203,7 @@ func (r *runner) run(ctx context.Context, envelope ScriptEnvelope) (ScriptEnvelo
 		}
 	}
 
-	inputObj, err := envelopeToJSValue(vm, envelope, r.cfg.Args, nodeLineageSymbol)
+	inputObj, err := envelopeToJSValue(vm, envelope, r.cfg.Args, nodeRuntimeIDSymbol)
 	if err != nil {
 		return envelope, err
 	}
@@ -229,7 +229,7 @@ func (r *runner) run(ctx context.Context, envelope ScriptEnvelope) (ScriptEnvelo
 	if result == nil || goja.IsUndefined(result) || goja.IsNull(result) {
 		return r.appendAPIWarnings(envelope), nil
 	}
-	updated, err := jsValueToEnvelope(result, envelope, nodeLineageSymbol)
+	updated, err := jsValueToEnvelope(result, envelope, nodeRuntimeIDSymbol)
 	if err != nil {
 		return envelope, err
 	}
@@ -283,7 +283,7 @@ func (r *runner) appendAPIWarnings(envelope ScriptEnvelope) ScriptEnvelope {
 	return envelope
 }
 
-func envelopeToJSValue(vm *goja.Runtime, envelope ScriptEnvelope, args map[string]any, nodeLineageSymbol *goja.Symbol) (goja.Value, error) {
+func envelopeToJSValue(vm *goja.Runtime, envelope ScriptEnvelope, args map[string]any, nodeRuntimeIDSymbol *goja.Symbol) (goja.Value, error) {
 	body, err := json.Marshal(envelope)
 	if err != nil {
 		return nil, &domain.AppError{
@@ -321,13 +321,13 @@ func envelopeToJSValue(vm *goja.Runtime, envelope ScriptEnvelope, args map[strin
 			return nil, err
 		}
 	}
-	if err := attachNodeLineageSymbols(vm, value, envelope.Nodes, nodeLineageSymbol); err != nil {
+	if err := attachNodeRuntimeIDSymbols(vm, value, envelope.Nodes, nodeRuntimeIDSymbol); err != nil {
 		return nil, err
 	}
 	return value, nil
 }
 
-func attachNodeLineageSymbols(vm *goja.Runtime, value goja.Value, nodes []ScriptNode, symbol *goja.Symbol) error {
+func attachNodeRuntimeIDSymbols(vm *goja.Runtime, value goja.Value, nodes []ScriptNode, symbol *goja.Symbol) error {
 	if len(nodes) == 0 || symbol == nil {
 		return nil
 	}
@@ -340,15 +340,15 @@ func attachNodeLineageSymbols(vm *goja.Runtime, value goja.Value, nodes []Script
 		return &domain.AppError{Code: domain.CodeScriptRuntime, Message: "envelope nodes is not a JS array"}
 	}
 	for index, node := range nodes {
-		if node.lineage == "" {
+		if node.runtimeID == "" {
 			continue
 		}
 		jsNode, ok := jsNodes.Get(strconv.Itoa(index)).(*goja.Object)
 		if !ok {
 			return &domain.AppError{Code: domain.CodeScriptRuntime, Message: fmt.Sprintf("envelope node %d is not a JS object", index)}
 		}
-		if err := jsNode.DefineDataPropertySymbol(symbol, vm.ToValue(node.lineage), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE); err != nil {
-			return &domain.AppError{Code: domain.CodeScriptRuntime, Message: fmt.Sprintf("attach lineage to envelope node %d", index), Cause: err}
+		if err := jsNode.DefineDataPropertySymbol(symbol, vm.ToValue(node.runtimeID), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE); err != nil {
+			return &domain.AppError{Code: domain.CodeScriptRuntime, Message: fmt.Sprintf("attach runtime ID to envelope node %d", index), Cause: err}
 		}
 	}
 	return nil
@@ -384,7 +384,7 @@ func jsonParseInVM(vm *goja.Runtime, body []byte) (goja.Value, error) {
 	return parse(goja.Undefined(), vm.ToValue(string(body)))
 }
 
-func jsValueToEnvelope(value goja.Value, fallback ScriptEnvelope, nodeLineageSymbol *goja.Symbol) (ScriptEnvelope, error) {
+func jsValueToEnvelope(value goja.Value, fallback ScriptEnvelope, nodeRuntimeIDSymbol *goja.Symbol) (ScriptEnvelope, error) {
 	exported := value.Export()
 	body, err := json.Marshal(exported)
 	if err != nil {
@@ -402,11 +402,11 @@ func jsValueToEnvelope(value goja.Value, fallback ScriptEnvelope, nodeLineageSym
 			Cause:   err,
 		}
 	}
-	restoreNodeLineageSymbols(value, updated.Nodes, nodeLineageSymbol)
+	restoreNodeRuntimeIDSymbols(value, updated.Nodes, nodeRuntimeIDSymbol)
 	return updated, nil
 }
 
-func restoreNodeLineageSymbols(value goja.Value, nodes []ScriptNode, symbol *goja.Symbol) {
+func restoreNodeRuntimeIDSymbols(value goja.Value, nodes []ScriptNode, symbol *goja.Symbol) {
 	if len(nodes) == 0 || symbol == nil {
 		return
 	}
@@ -423,13 +423,13 @@ func restoreNodeLineageSymbols(value goja.Value, nodes []ScriptNode, symbol *goj
 		if !ok {
 			continue
 		}
-		lineageValue := jsNode.GetSymbol(symbol)
-		if lineageValue == nil || goja.IsUndefined(lineageValue) || goja.IsNull(lineageValue) {
+		runtimeIDValue := jsNode.GetSymbol(symbol)
+		if runtimeIDValue == nil || goja.IsUndefined(runtimeIDValue) || goja.IsNull(runtimeIDValue) {
 			continue
 		}
-		lineage, ok := lineageValue.Export().(string)
+		runtimeID, ok := runtimeIDValue.Export().(string)
 		if ok {
-			nodes[index].lineage = lineage
+			nodes[index].runtimeID = runtimeID
 		}
 	}
 }

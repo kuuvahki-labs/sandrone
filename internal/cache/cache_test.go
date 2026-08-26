@@ -1,9 +1,11 @@
 package cache_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"math/rand/v2"
 	"os"
 	"testing"
 	"time"
@@ -15,92 +17,156 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/store"
 )
 
-func TestCacheJSONHonorsTTLAndLayeredKeys(t *testing.T) {
+type storedCacheEnvelope struct {
+	ExpiresAt time.Time `json:"expires_at"`
+	Encoding  string    `json:"encoding,omitempty"`
+	Value     []byte    `json:"value"`
+}
+
+func TestCacheStoresOneOpaqueValueWithOneTTL(t *testing.T) {
 	ctx := context.Background()
 	now := time.Date(2026, 6, 30, 12, 0, 0, 0, time.UTC)
-	st := store.NewFSStore(afero.NewMemMapFs())
-	c := cache.New(st, func() time.Time { return now })
-	key, err := cache.HashKey("probe", map[string]any{"node": "a"})
+	resourceStore := store.NewFSStore(afero.NewMemMapFs())
+	c := cache.New(resourceStore, func() time.Time { return now })
+
+	require.NoError(t, c.Set(ctx, "probe/subscriptions/group/all", []byte(`{"entries":{"one":1}}`), time.Minute))
+	item, found, err := c.Get(ctx, "probe/subscriptions/group/all")
 	require.NoError(t, err)
-	require.Equal(t, "cache/probe/9ccceaef892eae566be2dd418e9bd0bcde57f11f5da24073defa1fba3c38ea98.json", key)
+	require.True(t, found)
+	require.Equal(t, []byte(`{"entries":{"one":1}}`), item.Value)
+	require.Equal(t, now.Add(time.Minute), item.ExpiresAt)
 
-	require.NoError(t, c.PutJSON(ctx, key, time.Minute, map[string]string{"value": "cached"}))
-	body, err := st.Read(ctx, key)
+	_, err = resourceStore.Stat(ctx, "cache/probe/subscriptions/group/all.json")
 	require.NoError(t, err)
-	require.NotContains(t, string(body), "\n")
-	require.NotContains(t, string(body), "  ")
-	require.True(t, json.Valid(body))
-
-	var got map[string]string
-	hit := c.GetJSON(ctx, key, &got)
-	require.True(t, hit)
-	require.Equal(t, "cached", got["value"])
-	require.Contains(t, key, "cache/probe/")
-
-	now = now.Add(2 * time.Minute)
-	got = nil
-	hit = c.GetJSON(ctx, key, &got)
-	require.False(t, hit)
-	require.Nil(t, got)
-	_, err = st.Stat(ctx, key)
-	require.True(t, errors.Is(err, os.ErrNotExist), "got %v", err)
+	now = now.Add(time.Minute)
+	_, found, err = c.Get(ctx, "probe/subscriptions/group/all")
+	require.NoError(t, err)
+	require.False(t, found)
 }
 
-func TestCacheJSONIgnoresMissingExpiredAndBadRecords(t *testing.T) {
+func TestCacheSetReplacesValueAndTTL(t *testing.T) {
 	ctx := context.Background()
 	now := time.Date(2026, 6, 30, 12, 0, 0, 0, time.UTC)
-	st := store.NewFSStore(afero.NewMemMapFs())
-	c := cache.New(st, func() time.Time { return now })
-	key, err := cache.HashKey("remote_fetch", "https://example.test/sub")
+	c := cache.New(store.NewFSStore(afero.NewMemMapFs()), func() time.Time { return now })
+	require.NoError(t, c.Set(ctx, "remote_fetch/files/config", []byte("old"), time.Minute))
+	now = now.Add(30 * time.Second)
+	require.NoError(t, c.Set(ctx, "remote_fetch/files/config", []byte("new"), 2*time.Minute))
+
+	item, found, err := c.Get(ctx, "remote_fetch/files/config")
 	require.NoError(t, err)
-
-	var got map[string]string
-	hit := c.GetJSON(ctx, key, &got)
-	require.False(t, hit)
-
-	require.NoError(t, st.Write(ctx, key, []byte(`{bad json`)))
-	hit = c.GetJSON(ctx, key, &got)
-	require.False(t, hit)
-
-	body, err := json.Marshal(map[string]any{
-		"stored_at":  now.Add(-time.Hour),
-		"expires_at": now.Add(-time.Minute),
-		"value":      map[string]string{"value": "old"},
-	})
-	require.NoError(t, err)
-	require.NoError(t, st.Write(ctx, key, body))
-	hit = c.GetJSON(ctx, key, &got)
-	require.False(t, hit)
+	require.True(t, found)
+	require.Equal(t, []byte("new"), item.Value)
+	require.Equal(t, now.Add(2*time.Minute), item.ExpiresAt)
 }
 
-func TestCacheDeleteLayerRemovesOnlyThatLayer(t *testing.T) {
+func TestCacheCompressesLargeCompressibleValuesTransparently(t *testing.T) {
 	ctx := context.Background()
-	st := store.NewFSStore(afero.NewMemMapFs())
-	c := cache.New(st, func() time.Time { return time.Date(2026, 6, 30, 12, 0, 0, 0, time.UTC) })
-	trafficKey, err := cache.HashKey("subscription_traffic", "remote/live")
-	require.NoError(t, err)
-	probeKey, err := cache.HashKey("probe", "node-a")
-	require.NoError(t, err)
-	require.NoError(t, c.PutJSON(ctx, trafficKey, time.Minute, "traffic"))
-	require.NoError(t, c.PutJSON(ctx, probeKey, time.Minute, "probe"))
+	resourceStore := store.NewFSStore(afero.NewMemMapFs())
+	c := cache.New(resourceStore, time.Now)
+	value := bytes.Repeat([]byte(`{"alive":false,"error":"connection refused"}`), 4096)
+	require.NoError(t, c.Set(ctx, "probe/subscriptions/all", value, time.Minute))
 
-	require.NoError(t, c.DeleteLayer(ctx, "subscription_traffic"))
-
-	_, err = st.Stat(ctx, trafficKey)
-	require.True(t, errors.Is(err, os.ErrNotExist), "got %v", err)
-	_, err = st.Stat(ctx, probeKey)
+	body, err := resourceStore.Read(ctx, "cache/probe/subscriptions/all.json")
 	require.NoError(t, err)
+	var envelope storedCacheEnvelope
+	require.NoError(t, json.Unmarshal(body, &envelope))
+	require.Equal(t, "gzip", envelope.Encoding)
+	require.Less(t, len(envelope.Value), len(value))
+	require.Less(t, len(body), len(value))
+
+	item, found, err := c.Get(ctx, "probe/subscriptions/all")
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Equal(t, value, item.Value)
 }
 
-func TestCacheJSONDoesNotStoreDisabledEntries(t *testing.T) {
+func TestCacheKeepsLargeIncompressibleValuesRaw(t *testing.T) {
 	ctx := context.Background()
-	st := store.NewFSStore(afero.NewMemMapFs())
-	c := cache.New(st, time.Now)
-	key, err := cache.HashKey("probe", "disabled")
+	resourceStore := store.NewFSStore(afero.NewMemMapFs())
+	c := cache.New(resourceStore, time.Now)
+	value := make([]byte, 16<<10)
+	random := rand.New(rand.NewPCG(1, 2))
+	for index := range value {
+		value[index] = byte(random.Uint32())
+	}
+	require.NoError(t, c.Set(ctx, "remote_fetch/subscriptions/random", value, time.Minute))
+
+	body, err := resourceStore.Read(ctx, "cache/remote_fetch/subscriptions/random.json")
 	require.NoError(t, err)
+	var envelope storedCacheEnvelope
+	require.NoError(t, json.Unmarshal(body, &envelope))
+	require.Empty(t, envelope.Encoding)
+	require.Equal(t, value, envelope.Value)
+}
 
-	require.NoError(t, c.PutJSON(ctx, key, 0, "ignored"))
+func TestCacheRejectsCorruptAndUnknownCompressedValues(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now()
+	resourceStore := store.NewFSStore(afero.NewMemMapFs())
+	c := cache.New(resourceStore, func() time.Time { return now })
+	writeEnvelope := func(key, encoding string, value []byte) {
+		t.Helper()
+		body, err := json.Marshal(storedCacheEnvelope{ExpiresAt: now.Add(time.Minute), Encoding: encoding, Value: value})
+		require.NoError(t, err)
+		require.NoError(t, resourceStore.Write(ctx, "cache/"+key+".json", body))
+	}
 
-	_, err = st.Stat(ctx, key)
+	writeEnvelope("probe/subscriptions/corrupt", "gzip", []byte("not gzip"))
+	_, _, err := c.Get(ctx, "probe/subscriptions/corrupt")
+	require.ErrorContains(t, err, "decode cache key")
+
+	writeEnvelope("probe/subscriptions/unknown", "brotli", []byte("value"))
+	_, _, err = c.Get(ctx, "probe/subscriptions/unknown")
+	require.ErrorContains(t, err, `unsupported cache encoding "brotli"`)
+}
+
+func TestCacheMissingCorruptAndInvalidKeys(t *testing.T) {
+	ctx := context.Background()
+	resourceStore := store.NewFSStore(afero.NewMemMapFs())
+	c := cache.New(resourceStore, time.Now)
+
+	_, found, err := c.Get(ctx, "remote_fetch/subscriptions/missing")
+	require.NoError(t, err)
+	require.False(t, found)
+	require.NoError(t, resourceStore.Write(ctx, "cache/remote_fetch/subscriptions/bad.json", []byte(`{bad json`)))
+	_, _, err = c.Get(ctx, "remote_fetch/subscriptions/bad")
+	require.Error(t, err)
+	require.Error(t, c.Set(ctx, "../escape", []byte("value"), time.Minute))
+}
+
+func TestCacheDeleteAndClear(t *testing.T) {
+	ctx := context.Background()
+	resourceStore := store.NewFSStore(afero.NewMemMapFs())
+	c := cache.New(resourceStore, time.Now)
+	require.NoError(t, c.Set(ctx, "probe/subscriptions/A", []byte("probe"), time.Minute))
+	require.NoError(t, c.Set(ctx, "file_render/files/B", []byte("file"), time.Minute))
+
+	require.NoError(t, c.Delete(ctx, "probe/subscriptions/A"))
+	_, err := resourceStore.Stat(ctx, "cache/probe/subscriptions/A.json")
 	require.True(t, errors.Is(err, os.ErrNotExist), "got %v", err)
+	require.NoError(t, c.Clear(ctx))
+	_, err = resourceStore.Stat(ctx, "cache/file_render/files/B.json")
+	require.True(t, errors.Is(err, os.ErrNotExist), "got %v", err)
+	require.NoError(t, c.Clear(ctx))
+}
+
+func TestCacheNonPositiveTTLDeletesExistingValue(t *testing.T) {
+	ctx := context.Background()
+	resourceStore := store.NewFSStore(afero.NewMemMapFs())
+	c := cache.New(resourceStore, time.Now)
+	require.NoError(t, c.Set(ctx, "probe/subscriptions/A", []byte("probe"), time.Minute))
+	require.NoError(t, c.Set(ctx, "probe/subscriptions/A", []byte("ignored"), 0))
+	_, found, err := c.Get(ctx, "probe/subscriptions/A")
+	require.NoError(t, err)
+	require.False(t, found)
+}
+
+func TestCacheAllowsEmptyOpaqueValue(t *testing.T) {
+	ctx := context.Background()
+	c := cache.New(store.NewFSStore(afero.NewMemMapFs()), time.Now)
+	require.NoError(t, c.Set(ctx, "empty/value", nil, time.Minute))
+	item, found, err := c.Get(ctx, "empty/value")
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Empty(t, item.Value)
 }

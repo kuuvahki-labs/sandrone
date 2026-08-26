@@ -3,8 +3,6 @@ package node
 import (
 	"context"
 	cryptorand "crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"math/big"
 	"strings"
@@ -15,7 +13,7 @@ import (
 
 // DedupParams chooses how duplicate nodes or names are handled.
 type DedupParams struct {
-	Strategy string   `json:"strategy,omitempty" jsonschema:"Strategy used to handle duplicates" enum:"identity,name,fields,random_suffix" default:"name"`
+	Strategy string   `json:"strategy,omitempty" jsonschema:"Strategy used to handle duplicates" enum:"connection,name,fields,random_suffix" default:"name"`
 	Fields   []string `json:"fields,omitempty" jsonschema:"Node fields used when strategy is fields"`
 }
 
@@ -34,7 +32,7 @@ func buildDedup(spec domain.ProcessorSpec) (domain.NodeProcessor, error) {
 		strategy = "name"
 	}
 	switch strategy {
-	case "identity", "name", "fields", "random_suffix":
+	case "connection", "name", "fields", "random_suffix":
 	default:
 		return nil, &domain.AppError{
 			Code:      domain.CodeProcessorConfigInvalid,
@@ -61,7 +59,10 @@ func (p *dedupProc) ApplyNodes(_ context.Context, in domain.NodeProcessInput) (d
 	seen := map[string]struct{}{}
 	out := make([]domain.NodeIR, 0, len(in.Nodes))
 	for _, n := range in.Nodes {
-		key := p.keyFor(n)
+		key, err := p.keyFor(n)
+		if err != nil {
+			return domain.NodeProcessOutput{}, &domain.AppError{Code: domain.CodeNodeProcessorFailed, Message: "compute node connection key", Processor: p.Name(), Cause: err}
+		}
 		if _, ok := seen[key]; ok {
 			continue
 		}
@@ -114,20 +115,19 @@ func uniqueRandomName(base string, used map[string]struct{}) (string, error) {
 	return "", fmt.Errorf("no four-digit random suffix is available for node name %q", base)
 }
 
-func (p *dedupProc) keyFor(n domain.NodeIR) string {
+func (p *dedupProc) keyFor(n domain.NodeIR) (string, error) {
 	switch p.strategy {
 	case "name":
-		return "name:" + n.Name
+		return "name:" + n.Name, nil
 	case "fields":
 		parts := make([]string, 0, len(p.fields))
 		for _, f := range p.fields {
 			parts = append(parts, fmt.Sprintf("%s=%s", f, fieldValueWide(n, f)))
 		}
-		return "fields:" + strings.Join(parts, "|")
+		return "fields:" + strings.Join(parts, "|"), nil
 	default:
-		seed := fmt.Sprintf("%s|%s|%d|%s|%s", n.Type, n.Server, n.Port, n.UUID, n.Password)
-		sum := sha256.Sum256([]byte(seed))
-		return "identity:" + hex.EncodeToString(sum[:])
+		key, err := domain.NodeConnectionKey(n)
+		return "connection:" + key, err
 	}
 }
 

@@ -37,7 +37,6 @@ func TestTCPConnectSuccessWithLocalListener(t *testing.T) {
 		Method:    domain.ProbeTCPConnect,
 		TimeoutMS: 1000,
 	}, []domain.NodeIR{{
-		ID:     "node-1",
 		Name:   "local",
 		Server: "127.0.0.1",
 		Port:   uint16(addr.Port),
@@ -104,7 +103,6 @@ func TestTCPConnectDialFailure(t *testing.T) {
 		Method:    domain.ProbeTCPConnect,
 		TimeoutMS: 100,
 	}, []domain.NodeIR{{
-		ID:           "node-failed",
 		Name:         "failed",
 		Type:         domain.NodeTypeVLESS,
 		Server:       "127.0.0.1",

@@ -143,7 +143,7 @@ JSON 中带 `omitempty` 的成员在无值时可能不存在。脚本应对 `arg
 
 `input.nodes` 是当前 processor 链传入的节点数组。节点字段使用 Sandrone `NodeIR` 的 JSON 名称，包括：
 
-- 身份与端点：`id`、`name`、`type`、`server`、`port`；
+- 展示与端点：`name`、`type`、`server`、`port`；
 - 认证与协议：`username`、`password`、`uuid`、`cipher`、`alter_id`、`flow`、`encryption`、`token`；
 - 网络与扩展选项：`network`、`packet_encoding`、`plugin`、`plugin_options`、`headers`、`path`、`tls`、`dialer`、`transport`、`multiplex`、`udp_over_tcp`；
 - 协议专属对象：`shadowsocksr`、`snell`、`anytls`、`hysteria`、`tuic`、`mieru`、`wireguard`；
@@ -152,8 +152,8 @@ JSON 中带 `omitempty` 的成员在无值时可能不存在。脚本应对 `arg
 
 返回转换时，每个节点都必须保留非空 `name` 和 `type`。`ext` 的每个键会存入节点的 `raw["script.ext."+key]`，并产生一个 `script_ext_field` warning；任意值无法 JSON 编码时转换失败。
 
-订阅 preview 会给输入节点附加一个不属于上述 JSON 字段的运行时来源标记。
-原地修改节点、筛选数组、排序以及用 `{...node}` 展开已有节点都会保留该标记；
+节点完成规范化和校验后会获得不属于上述 JSON 字段的 `RuntimeID`。
+原地修改节点、筛选数组、排序以及用 `{...node}` 展开已有节点都会保留它；
 它不会出现在 `Object.keys(node)`、`JSON.stringify(node)`、NodeIR JSON 或节点详情中。
 如果脚本只从上述公开字段手工构造一个新对象，preview 会把它视为新节点，同时把
 未返回的原节点视为已删除，不会再按连接字段猜测两者是同一个节点。
@@ -266,6 +266,8 @@ header；未知字段同样会使 `api.ini.stringify` 失败。输出统一使�
 ```
 
 返回对象含 `results` 与 `report`，形状与普通 probe 结果一致。probe report 中的 warnings 会追加到脚本输出 warning。调用服从脚本总超时；不可用、参数非法、后端错误或返回空结果会令脚本失败。
+脚本处于已保存 Subscription 的执行作用域时，`cache_ttl_seconds` 使用该资源的
+持久 probe cache；临时脚本管线不会读写持久缓存。
 
 ### `api.subscription.produce(name, options?)`
 

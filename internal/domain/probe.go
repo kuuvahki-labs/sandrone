@@ -41,7 +41,7 @@ type ProbeResult struct {
 }
 
 type NodeProbeResult struct {
-	NodeID     string    `json:"node_id,omitempty" yaml:"node_id,omitempty"`
+	RuntimeID  string    `json:"runtime_id" yaml:"runtime_id"`
 	NodeName   string    `json:"node_name" yaml:"node_name"`
 	Method     string    `json:"method" yaml:"method"`
 	Target     string    `json:"target,omitempty" yaml:"target,omitempty"`

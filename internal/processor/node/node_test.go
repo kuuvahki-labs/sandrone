@@ -49,6 +49,13 @@ type stubProbeRunner struct {
 
 func (s *stubProbeRunner) Probe(_ context.Context, req domain.ProbeRequest) (*domain.ProbeResult, error) {
 	s.requests = append(s.requests, req)
+	if s.result != nil {
+		for index := range s.result.Results {
+			if index < len(req.Input.Nodes) && s.result.Results[index].RuntimeID == "" {
+				s.result.Results[index].RuntimeID = domain.NodeRuntimeID(req.Input.Nodes[index])
+			}
+		}
+	}
 	return s.result, s.err
 }
 
@@ -155,9 +162,9 @@ func TestDedupDefaultsToName(t *testing.T) {
 	require.Equal(t, "c", out.Nodes[1].Name)
 }
 
-func TestDedupIdentity(t *testing.T) {
+func TestDedupConnection(t *testing.T) {
 	r := makeRegistry()
-	proc := buildNode(t, r, "dedup", map[string]any{"strategy": "identity"})
+	proc := buildNode(t, r, "dedup", map[string]any{"strategy": "connection"})
 	nodes := []domain.NodeIR{
 		{Name: "a", Type: "ss", Server: "x", Port: 1, Password: "p"},
 		{Name: "b", Type: "ss", Server: "x", Port: 1, Password: "p"},
@@ -168,6 +175,18 @@ func TestDedupIdentity(t *testing.T) {
 	require.Len(t, out.Nodes, 2)
 	require.Equal(t, "a", out.Nodes[0].Name)
 	require.Equal(t, "c", out.Nodes[1].Name)
+}
+
+func TestDedupConnectionKeepsDifferentTLSAndIgnoresMetadata(t *testing.T) {
+	proc := buildNode(t, makeRegistry(), "dedup", map[string]any{"strategy": "connection"})
+	nodes := []domain.NodeIR{
+		{Name: "one", Type: domain.NodeTypeVLESS, Server: "x", Port: 443, UUID: "id", TLS: &domain.TLSOptions{Enabled: true, ServerName: "one.example"}},
+		{Name: "renamed", Type: domain.NodeTypeVLESS, Server: "x", Port: 443, UUID: "id", TLS: &domain.TLSOptions{Enabled: true, ServerName: "one.example"}, Meta: map[string]string{"probe.alive": "true"}},
+		{Name: "other-tls", Type: domain.NodeTypeVLESS, Server: "x", Port: 443, UUID: "id", TLS: &domain.TLSOptions{Enabled: true, ServerName: "two.example"}},
+	}
+	out, err := proc.ApplyNodes(context.Background(), domain.NodeProcessInput{Nodes: nodes})
+	require.NoError(t, err)
+	require.Equal(t, []string{"one", "other-tls"}, []string{out.Nodes[0].Name, out.Nodes[1].Name})
 }
 
 func TestDedupAddsRandomSuffixToDuplicateNames(t *testing.T) {

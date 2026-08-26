@@ -136,7 +136,7 @@ endpoint 级限制以 [HTTP API 参考](http-api/README.md)为准。
 ## 显式验证：issue 不等于 error
 
 `ValidationIssue` 可带 `severity`、`stage`、`code`、`message`、
-`node_index`、`node_id`、`node_name`、`node_type`、`field` 和 `target`。
+`node_index`、`runtime_id`、`node_name`、`node_type`、`field` 和 `target`。
 公开 CLI 的 `diagnose` 会把这些 issue、counts、warnings 和结构化 `AppError`
 统一写入诊断结果。只要仍有有效最终结果，issue/warning 使状态成为 `partial`；
 输入无法解析、processor 失败或非空输入无最终结果时状态为 `failed`。

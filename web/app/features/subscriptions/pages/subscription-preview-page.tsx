@@ -104,7 +104,7 @@ export function SubscriptionPreviewPage({ backLabel, elapsedSeconds = 0, failed 
 
           <List aria-label={t("subscriptions.preview.nodeList")} className="grid gap-3 p-0">
             {visibleNodes.length ? visibleNodes.map((diff) => (
-              <PreviewNodeCard diff={diff} key={`${diff.identity}:${diff.status}:${diff.before?.name ?? ""}:${diff.after?.name ?? ""}`} />
+              <PreviewNodeCard diff={diff} key={diff.runtimeId} />
             )) : (
               <ListItem className="block" disablePadding>
                 <Card component="article" variant="outlined">

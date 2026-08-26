@@ -20,7 +20,11 @@ func (s *Service) ValidateNodes(ctx context.Context, req domain.ParseRequest) (*
 	for _, node := range parsed.Nodes {
 		report.Warnings = append(report.Warnings, node.Warnings...)
 	}
-	validated := nodevalidation.Validate(normalizeNodes(parsed.Nodes), nodevalidation.StageNormalized, req.Target)
+	prepared, err := prepareNodeBatch(parsed.Nodes)
+	if err != nil {
+		return nil, domain.WrapError(domain.CodeInvalidArgument, "assign node runtime identity", err)
+	}
+	validated := nodevalidation.Validate(prepared, nodevalidation.StageNormalized, req.Target)
 	issues := append([]domain.ValidationIssue{}, validated.Issues...)
 	counts := validated.Counts
 	nodes := validated.Nodes
@@ -37,7 +41,11 @@ func (s *Service) ValidateNodes(ctx context.Context, req domain.ParseRequest) (*
 			return nil, processErr
 		}
 		report.Warnings = append(report.Warnings, processed.Warnings...)
-		post := nodevalidation.Validate(normalizeNodes(processed.Nodes), nodevalidation.StageProcessed, req.Target)
+		postPrepared, prepareErr := prepareNodeBatch(processed.Nodes)
+		if prepareErr != nil {
+			return nil, domain.WrapError(domain.CodeInvalidArgument, "assign node runtime identity", prepareErr)
+		}
+		post := nodevalidation.Validate(postPrepared, nodevalidation.StageProcessed, req.Target)
 		issues = append(issues, post.Issues...)
 		counts.Valid = post.Counts.Valid
 		counts.Invalid += post.Counts.Invalid

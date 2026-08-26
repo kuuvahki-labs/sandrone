@@ -2,66 +2,62 @@ package service_test
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
+	cachepkg "github.com/kuuvahki-labs/sandrone/internal/cache"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/service"
 )
 
-func TestClearCacheDeletesAllPersistentLayersInCanonicalOrder(t *testing.T) {
+func TestClearCacheClearsConfiguredBackend(t *testing.T) {
 	cache := newTestCache()
-	cache.values["cache/probe/one.json"] = json.RawMessage(`"probe"`)
-	cache.values["cache/file_render/two.json"] = json.RawMessage(`"file"`)
+	cache.values["probe/subscriptions/A"] = cachepkg.Item{Value: []byte(`"probe"`), ExpiresAt: time.Now().Add(time.Hour)}
+	cache.values["file_render/files/B"] = cachepkg.Item{Value: []byte(`"file"`), ExpiresAt: time.Now().Add(time.Hour)}
 	svc := service.New(service.WithCache(cache))
 
 	require.NoError(t, svc.ClearCache(context.Background()))
-	require.Equal(t, []string{
-		"remote_fetch",
-		"probe",
-		"subscription_traffic",
-		"subscription_render",
-		"file_render",
-	}, cache.deleted)
+	require.Equal(t, 1, cache.clearCount)
 	require.Empty(t, cache.values)
 
 	require.NoError(t, svc.ClearCache(context.Background()))
+	require.Equal(t, 2, cache.clearCount)
 }
 
 func TestClearCacheWithoutPersistentCacheIsNoOp(t *testing.T) {
 	require.NoError(t, service.New().ClearCache(context.Background()))
 }
 
-func TestClearCacheStopsAfterLayerFailure(t *testing.T) {
+func TestClearCacheMapsBackendFailure(t *testing.T) {
 	want := errors.New("delete failed")
-	cache := &failingDeleteCache{failLayer: "probe", err: want}
+	cache := &failingClearCache{err: want}
 	svc := service.New(service.WithCache(cache))
 
 	err := svc.ClearCache(context.Background())
 	require.True(t, domain.IsCode(err, domain.CodeCacheOperationFailed), "error = %v", err)
 	require.ErrorIs(t, err, want)
-	require.Equal(t, []string{"remote_fetch", "probe"}, cache.deleted)
+	require.Equal(t, 1, cache.calls)
 }
 
-type failingDeleteCache struct {
-	failLayer string
-	err       error
-	deleted   []string
+type failingClearCache struct {
+	err   error
+	calls int
 }
 
-func (c *failingDeleteCache) GetJSON(context.Context, string, any) bool { return false }
+func (c *failingClearCache) Get(context.Context, string) (cachepkg.Item, bool, error) {
+	return cachepkg.Item{}, false, nil
+}
 
-func (c *failingDeleteCache) PutJSON(context.Context, string, time.Duration, any) error { return nil }
-
-func (c *failingDeleteCache) DeleteLayer(_ context.Context, layer string) error {
-	c.deleted = append(c.deleted, strings.TrimSpace(layer))
-	if layer == c.failLayer {
-		return c.err
-	}
+func (c *failingClearCache) Set(context.Context, string, []byte, time.Duration) error {
 	return nil
+}
+
+func (c *failingClearCache) Delete(context.Context, string) error { return nil }
+
+func (c *failingClearCache) Clear(context.Context) error {
+	c.calls++
+	return c.err
 }

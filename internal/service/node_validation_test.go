@@ -19,14 +19,14 @@ func TestServiceParseDropsSemanticallyInvalidNodes(t *testing.T) {
 	result, err := svc.Parse(context.Background(), domain.ParseRequest{
 		Format: "json-nodes",
 		Content: []byte(`{"nodes":[
-  {"id":"valid","name":"valid","type":"ss","server":"example.com","port":443,"cipher":"aes-128-gcm","password":"secret"},
-  {"id":"invalid","name":"invalid","type":"trojan","server":"https://bad.example/path","port":0,"password":"must-not-leak"}
+  {"name":"valid","type":"ss","server":"example.com","port":443,"cipher":"aes-128-gcm","password":"secret"},
+  {"name":"invalid","type":"trojan","server":"https://bad.example/path","port":0,"password":"must-not-leak"}
 ]}`),
 	})
 
 	require.NoError(t, err)
 	require.Len(t, result.Nodes, 1)
-	require.Equal(t, "valid", result.Nodes[0].ID)
+	require.NotEmpty(t, domain.NodeRuntimeID(result.Nodes[0]))
 	require.Len(t, result.Report.Warnings, 1)
 	require.Equal(t, "node_validation_dropped", result.Report.Warnings[0].Code)
 	require.Equal(t, "invalid", result.Report.Warnings[0].Node)
@@ -42,7 +42,7 @@ func TestServiceRenderValidatesDirectAndProcessorProducedNodes(t *testing.T) {
 		})
 	}))
 	valid := domain.NodeIR{
-		ID: "valid", Name: "valid", Type: domain.NodeTypeShadowsocks,
+		Name: "valid", Type: domain.NodeTypeShadowsocks,
 		Server: "example.com", Port: 443, Cipher: "aes-128-gcm", Password: "secret",
 	}
 
@@ -110,7 +110,7 @@ func TestServiceValidateNodesReturnsSemanticDiagnosticsWithoutDroppingToAnError(
 	svc := service.New()
 	result, err := svc.ValidateNodes(context.Background(), domain.ParseRequest{
 		Format:  "json-nodes",
-		Content: []byte(`{"nodes":[{"id":"bad","name":"bad","type":"trojan","server":"bad.example","port":0,"password":"secret"}]}`),
+		Content: []byte(`{"nodes":[{"name":"bad","type":"trojan","server":"bad.example","port":0,"password":"secret"}]}`),
 	})
 
 	require.NoError(t, err)

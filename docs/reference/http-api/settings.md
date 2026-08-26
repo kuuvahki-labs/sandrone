@@ -151,6 +151,7 @@ concurrency 归一化后必须为正数。`script_defaults.timeout_ms` 省略或
 `zh-CN`、`en-US`。
 
 远程、probe、script、cache、appearance、subscriptions 和 scheduled-refresh 组保存后立即生效。
+缓存默认值只控制已保存 Subscription/File 作用域；临时输入不创建持久缓存。
 HTTP listen、MCP 三个字段和日志级别属于启动组，保存后列入 `restart_required`；
 当前 listener、MCP 路径与 tool catalog、鉴权边界和其它启动组件不会热切换。
 
@@ -203,16 +204,14 @@ target 的 `kind` 只能是 `subscription` 或 `file`，`name` 去除首尾空�
 
 ### `DELETE /v1/cache`
 
-依次清空 `remote_fetch`、`probe`、`subscription_traffic`、
-`subscription_render` 和 `file_render` 五个持久缓存层，成功返回
+调用底层 Cache 的全量清理，删除 service 管理的全部持久缓存 key；成功返回
 `204 No Content` 和 `Cache-Control: no-store`。空缓存同样成功。
 
-若某层 Store 删除失败，接口返回 `500 cache_operation_failed`；此前层的删除不会
-回滚。并发请求可以在清理期间或之后重新写入缓存，因此成功响应不承诺缓存会持续
-为空。
+若 Cache 清理失败，接口返回 `500 cache_operation_failed`。并发请求可以在清理
+期间或之后重新写入缓存，因此成功响应不承诺缓存会持续为空。
 
 该接口不处理请求内 memo，不提供统计、分层清理、条目浏览或单项删除，也不修改
-TTL、`refresh=true` 语义或缓存 envelope。服务不会在启动或后台定时调用它。
+TTL、`refresh=true` 语义或缓存文档。服务不会在启动或后台定时调用它。
 
 ## 规则集目录
 

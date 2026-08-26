@@ -8,7 +8,11 @@ import (
 )
 
 func validateNodeBatch(nodes []domain.NodeIR, stage nodevalidation.Stage, target string) (nodevalidation.Result, []domain.Warning, error) {
-	nodes = normalizeNodes(nodes)
+	var err error
+	nodes, err = prepareNodeBatch(nodes)
+	if err != nil {
+		return nodevalidation.Result{}, nil, domain.WrapError(domain.CodeInvalidArgument, "assign node runtime identity", err)
+	}
 	result := nodevalidation.Validate(nodes, stage, target)
 	if result.Counts.Invalid == 0 {
 		return result, nil, nil
@@ -43,14 +47,10 @@ func validationDropWarnings(nodes []domain.NodeIR, issues []domain.ValidationIss
 			continue
 		}
 		nodeIndex := index
-		nodeID := node.ID
-		if nodeID == "" {
-			nodeID = node.Name
-		}
 		warnings = append(warnings, domain.Warning{
 			Code:      "node_validation_dropped",
 			Message:   fmt.Sprintf("node failed semantic validation and was dropped (%d issue(s))", count),
-			Node:      nodeID,
+			Node:      node.Name,
 			NodeIndex: &nodeIndex,
 			Field:     fields[index],
 			Source:    string(stage),
@@ -58,4 +58,12 @@ func validationDropWarnings(nodes []domain.NodeIR, issues []domain.ValidationIss
 		})
 	}
 	return warnings
+}
+
+func prepareNodeBatch(nodes []domain.NodeIR) ([]domain.NodeIR, error) {
+	prepared := normalizeNodes(nodes)
+	if err := domain.AssignNodeRuntimeIDs(prepared); err != nil {
+		return nil, err
+	}
+	return prepared, nil
 }

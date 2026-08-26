@@ -123,7 +123,7 @@ func TestServiceFileRemoteSourceFetchesEachRender(t *testing.T) {
 	require.Equal(t, server.URL, second.Report.SourceRefs[0].URL)
 }
 
-func TestServiceFileRemoteSourceUsesCacheTTL(t *testing.T) {
+func TestServiceInlineFileRemoteSourceDoesNotUsePersistentCache(t *testing.T) {
 	calls := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++
@@ -147,9 +147,9 @@ func TestServiceFileRemoteSourceUsesCacheTTL(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, "remote-1", string(first.File.Content))
-	require.Equal(t, "remote-1", string(second.File.Content))
-	require.Equal(t, 1, calls)
-	require.Contains(t, second.Report.SourceRefs[0].Note, "cache_hit=true")
+	require.Equal(t, "remote-2", string(second.File.Content))
+	require.Equal(t, 2, calls)
+	require.NotContains(t, second.Report.SourceRefs[0].Note, "cache_hit=true")
 }
 
 func TestServiceRemoteNodeInputUsesCacheTTL(t *testing.T) {

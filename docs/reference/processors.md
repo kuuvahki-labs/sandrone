@@ -76,8 +76,8 @@ processors:
 以下策略保留每个 key 首次出现的节点：
 
 - `strategy: name`（缺省）：只使用节点名；
-- `strategy: identity`：使用 `type`、`server`、`port`、`uuid`、
-  `password`；
+- `strategy: connection`：使用规范化 `NodeIR` 的完整连接语义；名称、标签、
+  metadata、来源原文与诊断字段不参与判断；
 - `strategy: fields`：按 `fields` 声明顺序组合 key，数组不能为空。
 
 同名节点也可以选择保留并改名：
@@ -141,6 +141,8 @@ processors:
 除 `expected_status` 外，省略值由 probe service 使用当前项目运行默认值处理；
 `timeout_ms`、`attempts`、`concurrency` 和 `cache_ttl_seconds` 的 `0` 与省略等价，
 其中缓存默认值来自 `cache_defaults.probe_ttl_seconds`。
+该 TTL 只在 processor 属于已保存 Subscription 的执行作用域时形成持久缓存；临时
+diagnose、inline convert 和未保存草稿仍会执行探测，但不会读写持久缓存。
 客户端不应把某次读取到的运行默认值写入新 processor，否则后续全局设置变化不会
 再传递到该 processor。
 method 只接受 `tcp_connect`、`udp_ntp` 和 `url_test`；默认 `url_test`。

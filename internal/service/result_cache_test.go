@@ -12,6 +12,7 @@ import (
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/service"
+	"github.com/kuuvahki-labs/sandrone/internal/store"
 )
 
 func TestServiceSubscriptionRenderResultCacheAndRefresh(t *testing.T) {
@@ -110,6 +111,50 @@ func TestServiceFileRenderResultCacheAndRefresh(t *testing.T) {
 	require.Equal(t, 2, calls)
 }
 
+func TestSubscriptionRenderCacheValidatesSavedDependencyRevisions(t *testing.T) {
+	ctx := context.Background()
+	fs := afero.NewMemMapFs()
+	resourceStore := store.NewFSStore(fs)
+	ttl := 60
+	svc := service.New(service.WithStore(resourceStore))
+	putLeaf := func(server string) {
+		require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+			Name: "B", Type: domain.SubscriptionTypeLocal, Format: "uri-list",
+			Content: "ss://aes-128-gcm:secret@" + server + ":8388#node-b",
+		}))
+	}
+	putLeaf("before.example")
+	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+		Name: "A", Type: domain.SubscriptionTypeCollection,
+		Inputs:                []domain.NodeInput{{Name: "b", Type: "subscription", Ref: domain.ResourceRef{Kind: "subscription", Name: "B"}, Required: true}},
+		RenderCacheTTLSeconds: &ttl,
+	}))
+
+	first, err := svc.RenderSubscriptionRequest(ctx, domain.SubscriptionRenderRequest{Name: "A", Format: "uri-list"})
+	require.NoError(t, err)
+	require.False(t, first.Cached)
+	second, err := svc.RenderSubscriptionRequest(ctx, domain.SubscriptionRenderRequest{Name: "A", Format: "uri-list"})
+	require.NoError(t, err)
+	require.True(t, second.Cached)
+
+	putLeaf("after.example")
+	third, err := svc.RenderSubscriptionRequest(ctx, domain.SubscriptionRenderRequest{Name: "A", Format: "uri-list"})
+	require.NoError(t, err)
+	require.False(t, third.Cached)
+	require.Contains(t, string(third.Body), "after.example")
+	require.NotContains(t, string(third.Body), "before.example")
+
+	entries, err := resourceStore.List(ctx, "cache/subscription_render/subscriptions")
+	require.NoError(t, err)
+	files := 0
+	for _, entry := range entries {
+		if !entry.IsDir {
+			files++
+		}
+	}
+	require.Equal(t, 1, files)
+}
+
 func TestServiceExplicitZeroDisablesInheritedFileRenderCache(t *testing.T) {
 	ctx := context.Background()
 	calls := 0
@@ -174,7 +219,7 @@ func TestServiceValidateFileBypassesFileRenderResultCache(t *testing.T) {
 	require.Equal(t, 2, calls)
 }
 
-func TestServiceResourceMutationsInvalidateResultCacheLayers(t *testing.T) {
+func TestServiceResourceMutationsKeepSemanticEntriesAndDeletesRemoveScope(t *testing.T) {
 	ctx := context.Background()
 	resultCache := newTestCache()
 	svc := service.New(
@@ -185,22 +230,33 @@ func TestServiceResourceMutationsInvalidateResultCacheLayers(t *testing.T) {
 	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
 		Name: "sub", Type: domain.SubscriptionTypeLocal,
 	}))
-	require.ElementsMatch(t, []string{
-		"subscription_traffic", "subscription_render", "file_render",
-	}, resultCache.deleted)
+	require.Empty(t, resultCache.deleted)
 
-	resultCache.deleted = nil
 	require.NoError(t, svc.PutFile(ctx, domain.FileSpec{
 		Name: "file", Kind: domain.FileKindStatic,
 		Source: domain.FileSource{Type: "inline", Content: "body"},
 	}))
+	require.Empty(t, resultCache.deleted)
+
+	putProjectSettings(t, svc, ctx, nil)
+	require.Empty(t, resultCache.deleted)
+
+	require.NoError(t, svc.DeleteSubscription(ctx, "sub"))
 	require.ElementsMatch(t, []string{
-		"subscription_render", "file_render",
+		"remote_fetch/subscriptions/sub",
+		"probe/subscriptions/sub",
+		"subscription_traffic/subscriptions/sub",
+		"subscription_render/subscriptions/sub",
+		"file_render/subscriptions/sub",
 	}, resultCache.deleted)
 
 	resultCache.deleted = nil
-	putProjectSettings(t, svc, ctx, nil)
+	require.NoError(t, svc.DeleteFile(ctx, "file"))
 	require.ElementsMatch(t, []string{
-		"subscription_render", "file_render",
+		"remote_fetch/files/file",
+		"probe/files/file",
+		"subscription_traffic/files/file",
+		"subscription_render/files/file",
+		"file_render/files/file",
 	}, resultCache.deleted)
 }

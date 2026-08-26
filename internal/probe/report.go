@@ -54,7 +54,7 @@ func successResult(req domain.ProbeRequest, node domain.NodeIR, durationMS int, 
 		durationMS = 1
 	}
 	return domain.NodeProbeResult{
-		NodeID:     node.ID,
+		RuntimeID:  domain.NodeRuntimeID(node),
 		NodeName:   node.Name,
 		Method:     string(req.Method),
 		Target:     targetFromRequest(req, node),
@@ -71,7 +71,7 @@ func resultForError(req domain.ProbeRequest, node domain.NodeIR, code string, er
 		msg = err.Error()
 	}
 	return domain.NodeProbeResult{
-		NodeID:    node.ID,
+		RuntimeID: domain.NodeRuntimeID(node),
 		NodeName:  node.Name,
 		Method:    string(req.Method),
 		Target:    targetFromRequest(req, node),
@@ -83,7 +83,9 @@ func resultForError(req domain.ProbeRequest, node domain.NodeIR, code string, er
 	}
 }
 
-func reportForResults(backend, version, method, core string, nodes []domain.NodeIR, results []domain.NodeProbeResult) domain.Report {
+// ReportForResults rebuilds aggregate probe diagnostics for an ordered node
+// result set. Service uses it after merging cached and freshly probed nodes.
+func ReportForResults(backend, version, method, core string, nodes []domain.NodeIR, results []domain.NodeProbeResult) domain.Report {
 	probeReport := &domain.ProbeReport{
 		Backend:      backend,
 		Method:       method,
@@ -96,6 +98,9 @@ func reportForResults(backend, version, method, core string, nodes []domain.Node
 		probeReport.BackendVersion = version
 	}
 	for _, result := range results {
+		if result.CacheHit {
+			probeReport.CacheHitCount++
+		}
 		if result.Alive {
 			probeReport.SuccessCount++
 			continue

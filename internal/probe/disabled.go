@@ -24,6 +24,10 @@ func (*DisabledEngine) SelectCore(domain.ProbeRequest, []domain.NodeIR) (string,
 	return "", false
 }
 
+func (*DisabledEngine) ResolveBackend(domain.ProbeRequest) (domain.ProbeBackendSummary, error) {
+	return domain.ProbeBackendSummary{}, domain.NewError(domain.CodeProbeBackendUnavailable, "probe backend is not available")
+}
+
 func (*DisabledEngine) Probe(context.Context, domain.ProbeRequest, []domain.NodeIR, ...Payload) (*domain.ProbeResult, error) {
 	return nil, domain.NewError(domain.CodeProbeBackendUnavailable, "probe backend is not available")
 }
