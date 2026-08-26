@@ -41,7 +41,7 @@ func TestServiceExampleNormalizeNodesRendersUniqueMihomoAndSingBoxNames(t *testi
 		} `yaml:"proxies"`
 	}
 	require.NoError(t, yaml.Unmarshal(mihomoResult.Body, &mihomoDocument))
-	require.Equal(t, []string{"🇭🇰 香港 01 SS", "🇭🇰 香港 02 VLESS"}, []string{mihomoDocument.Proxies[0].Name, mihomoDocument.Proxies[1].Name})
+	require.Equal(t, []string{"🇭🇰 香港 01", "🇭🇰 香港 02"}, []string{mihomoDocument.Proxies[0].Name, mihomoDocument.Proxies[1].Name})
 
 	singBoxResult, err := svc.Render(context.Background(), domain.RenderRequest{
 		Format: "sing-box-outbounds", Target: "sing-box", Nodes: nodes, Processors: []domain.ProcessorSpec{processorSpec},
@@ -54,5 +54,5 @@ func TestServiceExampleNormalizeNodesRendersUniqueMihomoAndSingBoxNames(t *testi
 		} `json:"outbounds"`
 	}
 	require.NoError(t, json.Unmarshal(singBoxResult.Body, &singBoxDocument))
-	require.Equal(t, []string{"🇭🇰 香港 01 SS", "🇭🇰 香港 02 VLESS"}, []string{singBoxDocument.Outbounds[0].Tag, singBoxDocument.Outbounds[1].Tag})
+	require.Equal(t, []string{"🇭🇰 香港 01", "🇭🇰 香港 02"}, []string{singBoxDocument.Outbounds[0].Tag, singBoxDocument.Outbounds[1].Tag})
 }

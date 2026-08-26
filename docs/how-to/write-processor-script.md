@@ -105,7 +105,8 @@ curl -fsS -X POST "$SANDRONE_API/v1/files" \
 }
 ```
 
-默认名称类似 `🇭🇰 香港 01 IPLC 家宽 2× VLESS`。将 `separator` 设为
+上述显式启用 `protocol_mode: "main"` 的配置会生成类似
+`🇭🇰 香港 01 IPLC 家宽 2× VLESS` 的名称。将 `separator` 设为
 `" · "` 可改用圆点分隔；将 `protocol_mode` 设为 `detailed` 可输出
 `VLESS Reality gRPC Vision` 一类详细协议组合。最终名称仍然重复时，默认保留
 排序后的第一个节点并直接删除其余节点，从而保证 Mihomo proxy name 与 sing-box

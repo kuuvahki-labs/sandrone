@@ -62,7 +62,7 @@ func TestExampleNormalizeNodesPipelineWithMetadataIsIdempotent(t *testing.T) {
 			UUID: "22222222-2222-2222-2222-222222222222", Encryption: "none", TLS: reality,
 		},
 		{
-			Name: "另一个名字", Type: domain.NodeTypeVLESS, Server: "one.example.com", Port: 443,
+			Name: "香港 另一个名字", Type: domain.NodeTypeVLESS, Server: "one.example.com", Port: 443,
 			UUID: "11111111-1111-1111-1111-111111111111", Encryption: "none", TLS: reality,
 		},
 		{
@@ -74,8 +74,8 @@ func TestExampleNormalizeNodesPipelineWithMetadataIsIdempotent(t *testing.T) {
 	args := map[string]any{"write_meta": true}
 	first := applyExampleNormalizer(t, args, nodes)
 	require.Equal(t, []string{
-		"🇭🇰 香港 01 IPLC 家宽 2× VLESS",
-		"🇭🇰 香港 02 IPLC 家宽 2× VLESS",
+		"🇭🇰 香港 01 IPLC 家宽 2×",
+		"🇭🇰 香港 02 IPLC 家宽 2×",
 	}, []string{first.Nodes[0].Name, first.Nodes[1].Name})
 	require.Equal(t, []string{"one.example.com", "two.example.com"}, []string{first.Nodes[0].Server, first.Nodes[1].Server})
 	require.Equal(t, map[string]string{
@@ -190,6 +190,7 @@ func TestExampleNormalizeNodesFilteringUnknownAndCustomTags(t *testing.T) {
 		"exclude_regex":     "测试专用",
 		"multiplier_filter": "high",
 		"unknown_region":    "drop",
+		"protocol_mode":     "main",
 		"custom_tags":       map[string]string{"自建": "Private"},
 	}, []domain.NodeIR{
 		{Name: "香港 自建 3倍", Type: domain.NodeTypeVLESS, Server: "one.example.com", Port: 443, UUID: "11111111-1111-1111-1111-111111111111", Encryption: "none"},
@@ -209,6 +210,8 @@ func TestExampleNormalizeNodesFormattingAliasesAndMultiplierVariants(t *testing.
 		"region_style":     "en",
 		"show_flag":        false,
 		"always_index":     false,
+		"unknown_region":   "keep",
+		"protocol_mode":    "main",
 		"unknown_template": "{original}{separator}{protocol}",
 	}, []domain.NodeIR{
 		{Name: "Hong Kong x0.2", Type: domain.NodeTypeShadowsocks, Server: "one.example.com", Port: 8388, Cipher: "aes-128-gcm", Password: "one"},
@@ -231,6 +234,8 @@ func TestExampleNormalizeNodesFormattingAliasesAndMultiplierVariants(t *testing.
 		"region_style":     "en",
 		"show_flag":        false,
 		"always_index":     false,
+		"unknown_region":   "keep",
+		"protocol_mode":    "main",
 		"unknown_template": "{original}{separator}{protocol}",
 	}, out.Nodes)
 	require.Equal(t, out.Nodes, second.Nodes)
@@ -257,7 +262,7 @@ func TestExampleNormalizeNodesRegionRegistryAndAllProtocols(t *testing.T) {
 			Cipher: "aes-128-gcm", Password: fmt.Sprintf("secret-%d", index),
 		})
 	}
-	regionOutput := applyExampleNormalizer(t, map[string]any{"sort": false}, regionNodes)
+	regionOutput := applyExampleNormalizer(t, map[string]any{"sort": false, "unknown_region": "keep"}, regionNodes)
 	require.Len(t, regionOutput.Nodes, 189)
 	for index, region := range regions {
 		require.Contains(t, regionOutput.Nodes[index].Name, region.ZH)
@@ -282,14 +287,16 @@ func TestExampleNormalizeNodesRegionRegistryAndAllProtocols(t *testing.T) {
 			Server: fmt.Sprintf("protocol-%d.example.com", index), Port: uint16(2000 + index),
 		})
 	}
-	protocolOutput := applyExampleNormalizer(t, map[string]any{"sort": false}, protocolNodes)
+	protocolOutput := applyExampleNormalizer(t, map[string]any{"sort": false, "protocol_mode": "main"}, protocolNodes)
 	for index, protocol := range protocols {
 		require.Contains(t, protocolOutput.Nodes[index].Name, protocol.label)
 	}
 }
 
 func TestExampleNormalizeNodesRegionIndexPreservesMatchingSemantics(t *testing.T) {
-	out := applyExampleNormalizer(t, map[string]any{"sort": false}, []domain.NodeIR{
+	out := applyExampleNormalizer(t, map[string]any{
+		"sort": false, "unknown_region": "keep", "protocol_mode": "main",
+	}, []domain.NodeIR{
 		{Name: "Hysteria2-SG-07", Type: domain.NodeTypeHysteria2, Server: "one.example.com", Port: 443},
 		{Name: "US 香港", Type: domain.NodeTypeShadowsocks, Server: "two.example.com", Port: 8388, Cipher: "aes-128-gcm", Password: "two"},
 		{Name: "edge-SingaporePremium", Type: domain.NodeTypeShadowsocks, Server: "three.example.com", Port: 8388, Cipher: "aes-128-gcm", Password: "three"},
@@ -333,7 +340,7 @@ func TestExampleNormalizeNodesRegionIndexAcceptsNumberedShortAliases(t *testing.
 		})
 	}
 
-	out := applyExampleNormalizer(t, map[string]any{"sort": false}, []domain.NodeIR{{
+	out := applyExampleNormalizer(t, map[string]any{"sort": false, "protocol_mode": "main"}, []domain.NodeIR{{
 		Name: "[Hy2]CCS US1", Type: domain.NodeTypeHysteria2, Server: "us.example.com", Port: 443,
 	}})
 	require.Len(t, out.Nodes, 1)
@@ -381,5 +388,6 @@ func TestExampleNormalizeNodesHandlesLargeSubscriptionWithinTimeout(t *testing.T
 	}
 
 	out := applyExampleNormalizer(t, nil, nodes)
-	require.Len(t, out.Nodes, nodeCount)
+	require.Len(t, out.Nodes, nodeCount-otherCount)
+	require.Contains(t, warningCodes(out.Warnings), "node_normalize_filtered")
 }

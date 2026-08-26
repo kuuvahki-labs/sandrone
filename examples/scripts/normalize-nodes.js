@@ -6,7 +6,7 @@
  * 编号、协议标注、规范化元数据写入和最终名称去重。
  *
  * 默认输出示例：
- *   🇭🇰 香港 01 IPLC 家宽 2× VLESS
+ *   🇭🇰 香港 01 IPLC 家宽 2×
  *
  * 处理顺序：提取元数据 -> 过滤 -> 连接去重 -> 稳定排序 -> 命名 -> 名称去重
  * -> 写入 normalize.* 元数据。
@@ -17,7 +17,7 @@
  *   include_regex=[]             至少匹配一个正则才保留，字符串或字符串数组
  *   exclude_regex=[]             匹配任一正则即删除，字符串或字符串数组
  *   multiplier_filter=all        all / normal / high
- *   unknown_region=keep          keep / drop
+ *   unknown_region=drop          keep / drop
  *   dedupe_connection=true       删除连接配置完全相同的节点
  *   name_conflict=drop           drop / error
  *   write_meta=false             是否给保留节点写入 normalize.* 元数据
@@ -30,7 +30,7 @@
  *   tag_separator="/"            同类线路或特征之间的分隔符
  *   index_width=2                序号宽度，范围 1 到 4
  *   always_index=true            单节点地区是否仍显示 01
- *   protocol_mode=main           none / main / detailed
+ *   protocol_mode=none           none / main / detailed
  *   custom_tags={}               自定义关键词映射，如 {"GPT":"AI","NF":"Netflix"}
  *   template=...                 已识别地区的名称模板
  *   unknown_template=...         未识别地区的名称模板
@@ -484,7 +484,7 @@ function readOptions(args, context) {
         includePatterns: readPatterns(args.include_regex, "include_regex"),
         excludePatterns: readPatterns(args.exclude_regex, "exclude_regex"),
         multiplierFilter: readEnum(args.multiplier_filter, "all", ["all", "normal", "high"], "multiplier_filter"),
-        unknownRegion: readEnum(args.unknown_region, "keep", ["keep", "drop"], "unknown_region"),
+        unknownRegion: readEnum(args.unknown_region, "drop", ["keep", "drop"], "unknown_region"),
         dedupeConnection: readBoolean(args.dedupe_connection, true, "dedupe_connection"),
         nameConflict: readEnum(args.name_conflict, "drop", ["drop", "error"], "name_conflict"),
         writeMeta: readBoolean(args.write_meta, false, "write_meta"),
@@ -497,7 +497,7 @@ function readOptions(args, context) {
         tagSeparator: readString(args.tag_separator, "/"),
         indexWidth: readInteger(args.index_width, 2, 1, 4, "index_width"),
         alwaysIndex: readBoolean(args.always_index, true, "always_index"),
-        protocolMode: readEnum(args.protocol_mode, "main", ["none", "main", "detailed"], "protocol_mode"),
+        protocolMode: readEnum(args.protocol_mode, "none", ["none", "main", "detailed"], "protocol_mode"),
         customTags: readCustomTags(args.custom_tags),
         template: readTemplate(args.template, DEFAULT_TEMPLATE, "template"),
         unknownTemplate: readTemplate(args.unknown_template, DEFAULT_UNKNOWN_TEMPLATE, "unknown_template")
