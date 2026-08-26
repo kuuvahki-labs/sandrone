@@ -521,6 +521,7 @@ export const enUS: Record<TranslationKey, string> = {
   "subscriptions.preview.probeStatusAccessible": "Probe status: {status}",
   "subscriptions.preview.refresh": "Refresh subscription preview",
   "subscriptions.preview.remainingChanges": "{count} more changes",
+  "subscriptions.preview.search": "Search preview nodes",
   "subscriptions.preview.statusAdded": "Added",
   "subscriptions.preview.statusAll": "All",
   "subscriptions.preview.statusModified": "Modified",

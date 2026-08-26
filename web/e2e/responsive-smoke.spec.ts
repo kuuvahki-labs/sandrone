@@ -256,6 +256,15 @@ for (const route of routes) {
     }
     if (route.path === "/subscriptions/remote/provider/preview") {
       await expect(page.getByText("42 ms")).toBeVisible();
+      const searchbox = page.getByRole("searchbox", { name: "搜索预览节点" });
+      await searchbox.fill("not-found");
+      await expect(page.getByRole("heading", { name: "没有匹配节点" })).toBeVisible();
+      await expect(page.getByText(longPreviewNode)).toBeHidden();
+      await searchbox.fill("example.com");
+      await expect(page.getByText(longPreviewNode)).toBeVisible();
+    }
+    if (route.path === "/files") {
+      await expect(page.getByText("main config")).toBeHidden();
     }
 
     const pageMetrics = await page.evaluate(() => ({

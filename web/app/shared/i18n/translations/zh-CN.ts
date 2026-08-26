@@ -519,6 +519,7 @@ export const zhCN = {
   "subscriptions.preview.probeStatusAccessible": "测活状态：{status}",
   "subscriptions.preview.refresh": "刷新订阅预览",
   "subscriptions.preview.remainingChanges": "还有 {count} 处变化",
+  "subscriptions.preview.search": "搜索预览节点",
   "subscriptions.preview.statusAdded": "新增",
   "subscriptions.preview.statusAll": "全部",
   "subscriptions.preview.statusModified": "已修改",

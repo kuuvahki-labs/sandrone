@@ -26,6 +26,23 @@ const previewPageActions = {
 };
 
 describe("SubscriptionPreviewPage", () => {
+  it("searches preview nodes and composes with the status filter", async () => {
+    const user = userEvent.setup();
+    render(<SubscriptionPreviewPage {...previewPageActions} item={subscriptions[0]} preview={subscriptionPreview} />);
+
+    const searchbox = screen.getByRole("searchbox", { name: "搜索预览节点" });
+    await user.type(searchbox, "EXAMPLE.ORG:8389");
+    expect(screen.getByText("drop")).toBeInTheDocument();
+    expect(screen.queryByText("source-keep")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "已修改 1" }));
+    expect(screen.getByRole("heading", { name: "没有匹配节点" })).toBeInTheDocument();
+
+    await user.clear(searchbox);
+    expect(screen.getByText("source-keep")).toBeInTheDocument();
+    expect(screen.queryByText("drop")).not.toBeInTheDocument();
+  });
+
   it("shows the grouped warning count in the summary and warning list", async () => {
     const user = userEvent.setup();
     const repeatedWarnings: SubscriptionPreview = {

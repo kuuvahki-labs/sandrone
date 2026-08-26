@@ -1,15 +1,18 @@
-import { useId, useState } from "react";
+import { useDeferredValue, useId, useMemo, useState } from "react";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import SearchIcon from "@mui/icons-material/Search";
 import ShareOutlinedIcon from "@mui/icons-material/ShareOutlined";
 import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
 import CardActionArea from "@mui/material/CardActionArea";
 import CardContent from "@mui/material/CardContent";
 import Collapse from "@mui/material/Collapse";
+import InputAdornment from "@mui/material/InputAdornment";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
+import TextField from "@mui/material/TextField";
 import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Tooltip from "@mui/material/Tooltip";
@@ -45,8 +48,16 @@ export interface SubscriptionPreviewPageProps {
 export function SubscriptionPreviewPage({ backLabel, elapsedSeconds = 0, failed = false, pending = false, preview, onBack, onRefresh, onShare }: SubscriptionPreviewPageProps) {
   const { t } = useI18n();
   const [filter, setFilter] = useState<PreviewFilter>("all");
-  const nodes = preview?.nodes ?? [];
-  const visibleNodes = filter === "all" ? nodes : nodes.filter((node) => node.status === filter);
+  const [query, setQuery] = useState("");
+  const deferredQuery = useDeferredValue(query);
+  const previewNodes = preview?.nodes;
+  const visibleNodes = useMemo(() => {
+    const normalizedQuery = deferredQuery.trim().toLowerCase();
+    return (previewNodes ?? []).filter((node) => {
+      if (filter !== "all" && node.status !== filter) return false;
+      return !normalizedQuery || previewNodeSearchText(node).includes(normalizedQuery);
+    });
+  }, [deferredQuery, filter, previewNodes]);
   const warningGroupCount = preview ? groupPreviewWarnings(preview.warnings).length : undefined;
 
   return (
@@ -84,18 +95,37 @@ export function SubscriptionPreviewPage({ backLabel, elapsedSeconds = 0, failed 
 
       {preview ? (
         <>
-          <div aria-label={t("subscriptions.preview.filter")} className="flex flex-wrap gap-2">
-            {previewFilters(preview, t).map((option) => (
-              <Button
-                key={option.value}
-                color={filterColor(option.value)}
-                type="button"
-                variant={filter === option.value ? "contained" : "outlined"}
-                onClick={() => setFilter(option.value)}
-              >
-                {option.label} {option.count}
-              </Button>
-            ))}
+          <div className="grid gap-3">
+            <TextField
+              fullWidth
+              label={t("actions.search")}
+              type="search"
+              value={query}
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon aria-hidden fontSize="small" />
+                    </InputAdornment>
+                  ),
+                },
+                htmlInput: { "aria-label": t("subscriptions.preview.search") },
+              }}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+            <div aria-label={t("subscriptions.preview.filter")} className="flex flex-wrap gap-2">
+              {previewFilters(preview, t).map((option) => (
+                <Button
+                  key={option.value}
+                  color={filterColor(option.value)}
+                  type="button"
+                  variant={filter === option.value ? "contained" : "outlined"}
+                  onClick={() => setFilter(option.value)}
+                >
+                  {option.label} {option.count}
+                </Button>
+              ))}
+            </div>
           </div>
 
           {preview.warnings.length ? (
@@ -121,6 +151,21 @@ export function SubscriptionPreviewPage({ backLabel, elapsedSeconds = 0, failed 
       ) : null}
     </section>
   );
+}
+
+function previewNodeSearchText(diff: SubscriptionPreviewNodeDiff): string {
+  const values: unknown[] = [
+    diff.before?.name,
+    diff.before?.type,
+    diff.before?.server,
+    diff.before?.endpoint,
+    diff.after?.name,
+    diff.after?.type,
+    diff.after?.server,
+    diff.after?.endpoint,
+    ...Object.values(diff.targetNames ?? {}),
+  ];
+  return values.filter((value) => value !== undefined && value !== null).join(" ").toLowerCase();
 }
 
 function PreviewNodeCard({ diff }: { diff: SubscriptionPreviewNodeDiff }) {

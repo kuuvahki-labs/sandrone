@@ -105,12 +105,6 @@ export function FilesPage({ createActions, items, loaded = true, onCopy, onDelet
         <List aria-label={t("files.list")} className="grid gap-3 p-0">
           {filtered.map((item) => {
             const secondaryName = resourceSecondaryName(item);
-            const subtitle = secondaryName || item.description ? (
-              <span className="grid gap-1">
-                {secondaryName ? <span>{secondaryName}</span> : null}
-                {item.description ? <span>{item.description}</span> : null}
-              </span>
-            ) : undefined;
             return (
               <DestinationListItem
                 actions={fileActions(item, { onCopy, onDelete, onExport, onPreview, onShare }, t)}
@@ -123,7 +117,7 @@ export function FilesPage({ createActions, items, loaded = true, onCopy, onDelet
                   </>
                 )}
                 primaryLabel={t("actions.edit")}
-                subtitle={subtitle}
+                subtitle={secondaryName}
                 title={item.title}
                 onPrimaryAction={() => onEdit(item)}
               />

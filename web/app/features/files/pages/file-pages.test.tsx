@@ -145,7 +145,7 @@ describe("FilesPage", () => {
   it("searches files and dispatches list actions", async () => {
     const user = userEvent.setup();
     const items: FileItem[] = [
-      { ...files[0], displayName: "移动端配置", title: "移动端配置", processorCount: 1 },
+      { ...files[0], displayName: "移动端配置", title: "移动端配置", description: "不应显示的描述", processorCount: 1 },
       { name: "inline.yaml", title: "inline.yaml", kind: "static", sourceType: "inline", sourceSummary: "本地" },
       { name: "summary-only.yaml", title: "summary-only.yaml", kind: "static", sourceSummary: "远程" },
       { name: "client.yaml", title: "client.yaml", kind: "mihomo", sourceType: "inline", sourceSummary: "本地" },
@@ -174,6 +174,7 @@ describe("FilesPage", () => {
 
     expect(screen.getByText("移动端配置")).toBeInTheDocument();
     expect(screen.getByText("default.yaml")).toBeInTheDocument();
+    expect(screen.queryByText("不应显示的描述")).not.toBeInTheDocument();
     const searchbox = screen.getByRole("searchbox", { name: "搜索文件" });
     fireEvent.change(searchbox, { target: { value: "移动端" } });
     expect(screen.getByText("移动端配置")).toBeInTheDocument();
