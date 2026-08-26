@@ -57,200 +57,284 @@ type probeCacheValue struct {
 	Groups map[string]probeCacheGroup `json:"groups"`
 }
 
+type probeExecution struct {
+	service         *Service
+	ctx             context.Context
+	req             domain.ProbeRequest
+	start           time.Time
+	nodeSet         *domain.NodeSet
+	backend         domain.ProbeBackendSummary
+	groups          []probeNodeGroup
+	misses          []domain.NodeIR
+	cacheSelector   probeCacheSelector
+	results         []domain.NodeProbeResult
+	renderWarnings  []domain.Warning
+	backendWarnings []domain.Warning
+	hasCachedGroup  bool
+}
+
+type freshProbeBatch struct {
+	result         *domain.ProbeResult
+	renderWarnings []domain.Warning
+	cacheable      bool
+}
+
 func (s *Service) Probe(ctx context.Context, req domain.ProbeRequest) (out *domain.ProbeResult, err error) {
 	ctx = withProbeInputCacheOwner(ctx, req.Input.Type, req.Input.Ref.Kind, req.Input.Ref.Name)
-	start := time.Now()
-	nodeCount := 0
+	execution := &probeExecution{service: s, ctx: ctx, req: req, start: time.Now()}
 	defer func() {
-		if err == nil {
-			return
-		}
-		s.log(ctx, slog.LevelError, "service probe failed",
-			"operation", "probe",
-			"method", string(probe.NormalizeMethod(req.Method)),
-			"core", probe.NormalizeCore(req.Core),
-			"node_count", nodeCount,
-			"cache_ttl_seconds", req.CacheTTLSeconds,
-			"duration_ms", elapsedMillis(start),
-			"error", err.Error(),
-		)
+		execution.logFailure(err)
 	}()
-	if s.prober == nil {
-		return nil, domain.NewError(domain.CodeNotImplemented, "probe engine is not configured")
+	if err := execution.prepareRequest(); err != nil {
+		return nil, err
 	}
-	if availability, ok := s.prober.(probeAvailability); ok && !availability.ProbeAvailable() {
-		return nil, domain.NewError(domain.CodeProbeBackendUnavailable, "probe backend is not available")
+	if err := execution.resolveInput(); err != nil {
+		return nil, err
 	}
-	req = s.probeRequestWithDefaults(req)
-	req.Method = probe.NormalizeMethod(req.Method)
-	switch req.Method {
+	if err := execution.resolveBackendAndCache(); err != nil {
+		return nil, err
+	}
+	execution.bindCachedGroups()
+	if err := execution.executeMisses(); err != nil {
+		return nil, err
+	}
+	return execution.finish(), nil
+}
+
+func (e *probeExecution) prepareRequest() error {
+	if e.service.prober == nil {
+		return domain.NewError(domain.CodeNotImplemented, "probe engine is not configured")
+	}
+	if availability, ok := e.service.prober.(probeAvailability); ok && !availability.ProbeAvailable() {
+		return domain.NewError(domain.CodeProbeBackendUnavailable, "probe backend is not available")
+	}
+	e.req = e.service.probeRequestWithDefaults(e.req)
+	e.req.Method = probe.NormalizeMethod(e.req.Method)
+	switch e.req.Method {
 	case domain.ProbeTCPConnect:
-		req.Core = ""
+		e.req.Core = ""
 	case domain.ProbeUDPNTP, domain.ProbeURLTest:
 	default:
-		return nil, domain.NewError(domain.CodeInvalidArgument, fmt.Sprintf("unsupported probe method %q", req.Method))
+		return domain.NewError(domain.CodeInvalidArgument, fmt.Sprintf("unsupported probe method %q", e.req.Method))
 	}
-	if availability, ok := s.prober.(probeRequestAvailability); ok {
-		if err := availability.CheckAvailability(req); err != nil {
-			return nil, err
-		}
+	if availability, ok := e.service.prober.(probeRequestAvailability); ok {
+		return availability.CheckAvailability(e.req)
 	}
+	return nil
+}
 
-	nodeSet, err := s.resolveNodeInput(ctx, req.Input, domain.FileRequest{
-		Request: domain.RequestInfo{Meta: req.Meta},
-		Meta:    req.Meta,
+func (e *probeExecution) resolveInput() error {
+	nodeSet, err := e.service.resolveNodeInput(e.ctx, e.req.Input, domain.FileRequest{
+		Request: domain.RequestInfo{Meta: e.req.Meta},
+		Meta:    e.req.Meta,
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
-	validated, validationWarnings, err := validateNodeBatch(nodeSet.Nodes, nodevalidation.StageProbe, req.Core)
+	validated, validationWarnings, err := validateNodeBatch(nodeSet.Nodes, nodevalidation.StageProbe, e.req.Core)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	nodeSet.Nodes = validated.Nodes
 	nodeSet.Warnings = append(nodeSet.Warnings, validationWarnings...)
-	nodeCount = len(nodeSet.Nodes)
+	e.nodeSet = nodeSet
+	e.results = make([]domain.NodeProbeResult, len(nodeSet.Nodes))
+	return nil
+}
 
-	backend, err := s.resolveProbeBackend(&req, nodeSet.Nodes)
+func (e *probeExecution) resolveBackendAndCache() error {
+	backend, err := e.service.resolveProbeBackend(&e.req, e.nodeSet.Nodes)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	groups, misses, cacheSelector, err := s.resolveProbeNodeGroups(ctx, req, backend, nodeSet.Nodes)
+	groups, misses, selector, err := e.service.resolveProbeNodeGroups(e.ctx, e.req, backend, e.nodeSet.Nodes)
 	if err != nil {
-		return nil, err
+		return err
 	}
+	e.backend = backend
+	e.groups = groups
+	e.misses = misses
+	e.cacheSelector = selector
+	return nil
+}
 
-	results := make([]domain.NodeProbeResult, len(nodeSet.Nodes))
-	renderWarnings := make([]domain.Warning, 0)
-	backendWarnings := make([]domain.Warning, 0)
-	hasCachedGroup := false
-	for groupIndex := range groups {
-		group := &groups[groupIndex]
+func (e *probeExecution) bindCachedGroups() {
+	for groupIndex := range e.groups {
+		group := &e.groups[groupIndex]
 		if group.Cached == nil {
 			continue
 		}
-		hasCachedGroup = true
-		if backend.Name == "" {
-			backend.Name = group.Cached.Backend
-			backend.Version = group.Cached.BackendVersion
+		e.hasCachedGroup = true
+		if e.backend.Name == "" {
+			e.backend.Name = group.Cached.Backend
+			e.backend.Version = group.Cached.BackendVersion
 		}
 		for _, nodeIndex := range group.Indexes {
-			results[nodeIndex] = bindProbeResult(group.Cached.Result, nodeSet.Nodes[nodeIndex], true)
-			renderWarnings = append(renderWarnings, bindProbeWarnings(group.Cached.RenderWarnings, nodeSet.Nodes[nodeIndex], nodeIndex)...)
+			e.results[nodeIndex] = bindProbeResult(group.Cached.Result, e.nodeSet.Nodes[nodeIndex], true)
+			e.renderWarnings = append(e.renderWarnings, bindProbeWarnings(group.Cached.RenderWarnings, e.nodeSet.Nodes[nodeIndex], nodeIndex)...)
 		}
 	}
+}
 
-	if len(misses) > 0 {
-		payloads, freshRenderWarnings, renderErr := s.renderProbePayloads(ctx, &req, misses)
-		cacheFreshResults := renderErr == nil
-		var fresh *domain.ProbeResult
-		if renderErr != nil {
-			if !hasCachedGroup || !allProbeNodesSkipped(freshRenderWarnings, len(misses)) {
-				return nil, renderErr
-			}
-			fresh = s.unrenderableProbeResult(req, backend, misses, freshRenderWarnings)
-		} else {
-			var probeErr error
-			fresh, probeErr = s.prober.Probe(ctx, req, misses, payloads...)
-			if probeErr != nil {
-				return nil, probeErr
-			}
-		}
-		if fresh == nil {
-			return nil, domain.NewError(domain.CodeNotImplemented, "probe engine returned nil result")
-		}
-		if len(fresh.Results) != len(misses) {
-			return nil, domain.NewError(domain.CodeProbeInvalidTarget, fmt.Sprintf("probe result count %d does not match miss count %d", len(fresh.Results), len(misses)))
-		}
-		freshByRuntimeID, resultErr := probeResultsByRuntimeID(fresh.Results)
-		if resultErr != nil {
-			return nil, resultErr
-		}
-		if fresh.Report.Probe != nil {
-			if backend.Name == "" {
-				backend.Name = fresh.Report.Probe.Backend
-			}
-			if backend.Version == "" {
-				backend.Version = fresh.Report.Probe.BackendVersion
-			}
-		}
-		for _, warning := range fresh.Report.Warnings {
-			if warning.NodeIndex == nil {
-				backendWarnings = append(backendWarnings, warning)
-			}
-		}
+func (e *probeExecution) executeMisses() error {
+	if len(e.misses) == 0 {
+		return nil
+	}
+	batch, err := e.runFreshBatch()
+	if err != nil {
+		return err
+	}
+	freshByRuntimeID, err := probeResultsByRuntimeID(batch.result.Results)
+	if err != nil {
+		return err
+	}
+	e.absorbFreshReport(batch.result.Report)
+	warningTemplates, unscopedWarnings := probeRenderWarningTemplates(batch.renderWarnings, len(e.misses))
+	e.renderWarnings = append(e.renderWarnings, unscopedWarnings...)
+	if err := e.bindFreshGroups(freshByRuntimeID, warningTemplates); err != nil {
+		return err
+	}
+	if batch.cacheable {
+		e.writeFreshCache()
+	}
+	return nil
+}
 
-		warningTemplates, unscopedWarnings := probeRenderWarningTemplates(freshRenderWarnings, len(misses))
-		renderWarnings = append(renderWarnings, unscopedWarnings...)
-		for groupIndex := range groups {
-			group := &groups[groupIndex]
-			if group.Cached != nil {
-				continue
-			}
-			freshResult, exists := freshByRuntimeID[domain.NodeRuntimeID(group.Node)]
-			if !exists {
-				return nil, domain.NewError(domain.CodeProbeInvalidTarget, fmt.Sprintf("probe result missing for runtime_id %q", domain.NodeRuntimeID(group.Node)))
-			}
-			freshResult = bindProbeResult(freshResult, group.Node, false)
-			templates := warningTemplates[group.MissIndex]
-			for _, nodeIndex := range group.Indexes {
-				results[nodeIndex] = bindProbeResult(freshResult, nodeSet.Nodes[nodeIndex], false)
-				renderWarnings = append(renderWarnings, bindProbeWarnings(templates, nodeSet.Nodes[nodeIndex], nodeIndex)...)
-			}
-			group.Cached = &cachedNodeProbe{
-				Result:         cacheableProbeResult(freshResult),
-				Backend:        backend.Name,
-				BackendVersion: backend.Version,
-				RenderWarnings: templates,
-			}
+func (e *probeExecution) runFreshBatch() (*freshProbeBatch, error) {
+	payloads, renderWarnings, renderErr := e.service.renderProbePayloads(e.ctx, &e.req, e.misses)
+	batch := &freshProbeBatch{renderWarnings: renderWarnings, cacheable: renderErr == nil}
+	if renderErr != nil {
+		if !e.hasCachedGroup || !allProbeNodesSkipped(renderWarnings, len(e.misses)) {
+			return nil, renderErr
 		}
-		if cacheFreshResults {
-			if writeErr := s.writeProbeNodeGroups(ctx, req, cacheSelector, groups); writeErr != nil {
-				renderWarnings = append(renderWarnings, domain.Warning{Code: "probe_cache_write_failed", Message: writeErr.Error()})
-				s.log(ctx, slog.LevelWarn, "service probe cache write failed",
-					"operation", "probe",
-					"method", string(req.Method),
-					"core", req.Core,
-					"node_count", nodeCount,
-					"cache_key_prefix", cacheKeyPrefixProbe,
-					"cache_ttl_seconds", req.CacheTTLSeconds,
-					"duration_ms", elapsedMillis(start),
-					"error", writeErr.Error(),
-				)
-			}
+		batch.result = e.service.unrenderableProbeResult(e.req, e.backend, e.misses, renderWarnings)
+	} else {
+		fresh, err := e.service.prober.Probe(e.ctx, e.req, e.misses, payloads...)
+		if err != nil {
+			return nil, err
+		}
+		batch.result = fresh
+	}
+	if batch.result == nil {
+		return nil, domain.NewError(domain.CodeNotImplemented, "probe engine returned nil result")
+	}
+	if len(batch.result.Results) != len(e.misses) {
+		return nil, domain.NewError(domain.CodeProbeInvalidTarget, fmt.Sprintf("probe result count %d does not match miss count %d", len(batch.result.Results), len(e.misses)))
+	}
+	return batch, nil
+}
+
+func (e *probeExecution) absorbFreshReport(report domain.Report) {
+	if report.Probe != nil {
+		if e.backend.Name == "" {
+			e.backend.Name = report.Probe.Backend
+		}
+		if e.backend.Version == "" {
+			e.backend.Version = report.Probe.BackendVersion
 		}
 	}
+	for _, warning := range report.Warnings {
+		if warning.NodeIndex == nil {
+			e.backendWarnings = append(e.backendWarnings, warning)
+		}
+	}
+}
 
-	report := probe.ReportForResults(backend.Name, backend.Version, string(req.Method), req.Core, nodeSet.Nodes, results)
-	report.Dependencies = append(report.Dependencies, nodeSet.Dependencies...)
-	for _, source := range nodeSet.Sources {
+func (e *probeExecution) bindFreshGroups(freshByRuntimeID map[string]domain.NodeProbeResult, warningTemplates map[int][]domain.Warning) error {
+	for groupIndex := range e.groups {
+		group := &e.groups[groupIndex]
+		if group.Cached != nil {
+			continue
+		}
+		freshResult, exists := freshByRuntimeID[domain.NodeRuntimeID(group.Node)]
+		if !exists {
+			return domain.NewError(domain.CodeProbeInvalidTarget, fmt.Sprintf("probe result missing for runtime_id %q", domain.NodeRuntimeID(group.Node)))
+		}
+		freshResult = bindProbeResult(freshResult, group.Node, false)
+		templates := warningTemplates[group.MissIndex]
+		for _, nodeIndex := range group.Indexes {
+			e.results[nodeIndex] = bindProbeResult(freshResult, e.nodeSet.Nodes[nodeIndex], false)
+			e.renderWarnings = append(e.renderWarnings, bindProbeWarnings(templates, e.nodeSet.Nodes[nodeIndex], nodeIndex)...)
+		}
+		group.Cached = &cachedNodeProbe{
+			Result:         cacheableProbeResult(freshResult),
+			Backend:        e.backend.Name,
+			BackendVersion: e.backend.Version,
+			RenderWarnings: templates,
+		}
+	}
+	return nil
+}
+
+func (e *probeExecution) writeFreshCache() {
+	writeErr := e.service.writeProbeNodeGroups(e.ctx, e.req, e.cacheSelector, e.groups)
+	if writeErr == nil {
+		return
+	}
+	e.renderWarnings = append(e.renderWarnings, domain.Warning{Code: "probe_cache_write_failed", Message: writeErr.Error()})
+	e.service.log(e.ctx, slog.LevelWarn, "service probe cache write failed",
+		"operation", "probe",
+		"method", string(e.req.Method),
+		"core", e.req.Core,
+		"node_count", len(e.nodeSet.Nodes),
+		"cache_key_prefix", cacheKeyPrefixProbe,
+		"cache_ttl_seconds", e.req.CacheTTLSeconds,
+		"duration_ms", elapsedMillis(e.start),
+		"error", writeErr.Error(),
+	)
+}
+
+func (e *probeExecution) finish() *domain.ProbeResult {
+	report := probe.ReportForResults(e.backend.Name, e.backend.Version, string(e.req.Method), e.req.Core, e.nodeSet.Nodes, e.results)
+	report.Dependencies = append(report.Dependencies, e.nodeSet.Dependencies...)
+	for _, source := range e.nodeSet.Sources {
 		report.SourceRefs = append(report.SourceRefs, source.SourceRefs...)
 	}
-	warnings := append([]domain.Warning{}, nodeSet.Warnings...)
-	warnings = append(warnings, renderWarnings...)
-	warnings = append(warnings, backendWarnings...)
+	warnings := append([]domain.Warning{}, e.nodeSet.Warnings...)
+	warnings = append(warnings, e.renderWarnings...)
+	warnings = append(warnings, e.backendWarnings...)
 	warnings = append(warnings, report.Warnings...)
 	report.Warnings = warnings
-	report = s.prepareReport("probe", report)
-	result := &domain.ProbeResult{Results: results, Report: report}
-	processor.RecordProbe(ctx, result)
+	report = e.service.prepareReport("probe", report)
+	result := &domain.ProbeResult{Results: e.results, Report: report}
+	processor.RecordProbe(e.ctx, result)
 
 	success, failure, cacheHits := probeCounts(result)
-	s.log(ctx, slog.LevelInfo, "service probe completed",
+	nodeCount := len(e.nodeSet.Nodes)
+	e.service.log(e.ctx, slog.LevelInfo, "service probe completed",
 		"operation", "probe",
-		"method", string(req.Method),
-		"core", req.Core,
+		"method", string(e.req.Method),
+		"core", e.req.Core,
 		"node_count", nodeCount,
 		"success_count", success,
 		"failure_count", failure,
 		"cache_hit_count", cacheHits,
 		"cache_hit", nodeCount > 0 && cacheHits == nodeCount,
 		"cache_key_prefix", cacheKeyPrefixProbe,
-		"cache_ttl_seconds", req.CacheTTLSeconds,
+		"cache_ttl_seconds", e.req.CacheTTLSeconds,
 		"warning_count", len(result.Report.Warnings),
-		"duration_ms", elapsedMillis(start),
+		"duration_ms", elapsedMillis(e.start),
 	)
-	return result, nil
+	return result
+}
+
+func (e *probeExecution) logFailure(err error) {
+	if err == nil {
+		return
+	}
+	nodeCount := 0
+	if e.nodeSet != nil {
+		nodeCount = len(e.nodeSet.Nodes)
+	}
+	e.service.log(e.ctx, slog.LevelError, "service probe failed",
+		"operation", "probe",
+		"method", string(probe.NormalizeMethod(e.req.Method)),
+		"core", probe.NormalizeCore(e.req.Core),
+		"node_count", nodeCount,
+		"cache_ttl_seconds", e.req.CacheTTLSeconds,
+		"duration_ms", elapsedMillis(e.start),
+		"error", err.Error(),
+	)
 }
 
 func probeResultsByRuntimeID(results []domain.NodeProbeResult) (map[string]domain.NodeProbeResult, error) {

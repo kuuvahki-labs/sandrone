@@ -183,44 +183,9 @@ func sanitizedTrafficSourceURL(raw string) string {
 }
 
 func subscriptionTrafficItem(items []domain.SubscriptionTrafficItem) *domain.SubscriptionTrafficItem {
-	cloned := cloneSubscriptionTrafficItems(items)
+	cloned := domain.CloneSubscriptionTrafficItems(items)
 	if len(cloned) == 0 {
 		return nil
 	}
 	return &cloned[0]
-}
-
-func cloneSubscriptionTrafficItem(item *domain.SubscriptionTrafficItem) *domain.SubscriptionTrafficItem {
-	if item == nil {
-		return nil
-	}
-	cloned := cloneSubscriptionTrafficItems([]domain.SubscriptionTrafficItem{*item})
-	return &cloned[0]
-}
-
-func cloneSubscriptionTrafficItems(items []domain.SubscriptionTrafficItem) []domain.SubscriptionTrafficItem {
-	if len(items) == 0 {
-		return nil
-	}
-	out := make([]domain.SubscriptionTrafficItem, len(items))
-	for i, item := range items {
-		out[i] = item
-		if item.TotalBytes != nil {
-			total := *item.TotalBytes
-			out[i].TotalBytes = &total
-		}
-		if item.RemainingBytes != nil {
-			remaining := *item.RemainingBytes
-			out[i].RemainingBytes = &remaining
-		}
-		if item.RemainingDays != nil {
-			remainingDays := *item.RemainingDays
-			out[i].RemainingDays = &remainingDays
-		}
-		if item.ResetDay != nil {
-			resetDay := *item.ResetDay
-			out[i].ResetDay = &resetDay
-		}
-	}
-	return out
 }

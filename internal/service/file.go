@@ -86,7 +86,7 @@ func (s *Service) getFile(ctx context.Context, req domain.FileRequest, state *fi
 			}
 		}
 		if cached, ok := state.memo[fileMemoKey(spec.Name, req.Request.Args)]; ok {
-			return cloneFileResult(cached), nil
+			return cached.Clone(), nil
 		}
 		state.stack[spec.Name] = true
 		defer delete(state.stack, spec.Name)
@@ -124,7 +124,7 @@ func (s *Service) getFile(ctx context.Context, req domain.FileRequest, state *fi
 		Report:      report,
 	}
 	if spec.Name != "" {
-		state.memo[fileMemoKey(spec.Name, req.Request.Args)] = cloneFileResult(result)
+		state.memo[fileMemoKey(spec.Name, req.Request.Args)] = result.Clone()
 	}
 	return result, nil
 }

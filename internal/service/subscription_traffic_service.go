@@ -61,7 +61,7 @@ func (s *Service) SubscriptionTraffic(ctx context.Context, req domain.Subscripti
 		Traffic:          subscriptionTrafficItem(base.Traffic),
 	}
 	s.writeSubscriptionTrafficCache(ctx, entryID, ttlSeconds, result)
-	return cloneSubscriptionTrafficResult(result), nil
+	return result.Clone(), nil
 }
 
 func (s *Service) subscriptionTrafficTTLSeconds() int {
@@ -85,7 +85,7 @@ func (s *Service) readSubscriptionTrafficCache(ctx context.Context, entryID stri
 	if !found || item.Value.EntryID != entryID {
 		return nil
 	}
-	return cloneSubscriptionTrafficValue(item.Value.Result)
+	return (&item.Value.Result).Clone()
 }
 
 func (s *Service) writeSubscriptionTrafficCache(ctx context.Context, entryID string, ttlSeconds int, result *domain.SubscriptionTrafficResult) {
@@ -103,7 +103,7 @@ func (s *Service) writeSubscriptionTrafficCache(ctx context.Context, entryID str
 	if !ok {
 		return
 	}
-	cloned := cloneSubscriptionTrafficResult(result)
+	cloned := result.Clone()
 	_ = cachepkg.SetJSON(ctx, s.cache, key, subscriptionTrafficCacheValue{EntryID: entryID, Result: *cloned}, remaining)
 }
 
@@ -113,17 +113,4 @@ func subscriptionTrafficCacheEntryID(input domain.RemoteInput) (string, error) {
 		UserAgent string `json:"user_agent,omitempty"`
 		Proxy     string `json:"proxy,omitempty"`
 	}{URL: input.URL, UserAgent: input.UserAgent, Proxy: input.Proxy})
-}
-
-func cloneSubscriptionTrafficResult(result *domain.SubscriptionTrafficResult) *domain.SubscriptionTrafficResult {
-	if result == nil {
-		return nil
-	}
-	return cloneSubscriptionTrafficValue(*result)
-}
-
-func cloneSubscriptionTrafficValue(result domain.SubscriptionTrafficResult) *domain.SubscriptionTrafficResult {
-	out := result
-	out.Traffic = cloneSubscriptionTrafficItem(result.Traffic)
-	return &out
 }

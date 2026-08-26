@@ -121,7 +121,7 @@ func (s *Service) readSubscriptionRenderCache(ctx context.Context, entryID strin
 	if !found || !s.cacheDependenciesCurrent(ctx, cached.Dependencies) {
 		return nil
 	}
-	out := cloneRenderResult(&cached.Result)
+	out := cached.Result.Clone()
 	out.Cached = true
 	return out
 }
@@ -135,7 +135,7 @@ func (s *Service) writeSubscriptionRenderCache(ctx context.Context, entryID stri
 	if err != nil {
 		return
 	}
-	out := cloneRenderResult(result)
+	out := result.Clone()
 	out.Cached = false
 	ttl := time.Duration(ttlSeconds) * time.Second
 	value, remaining, ok := prepareCacheValueWrite[subscriptionRenderCacheValue](s, ctx, key, ttl)
@@ -164,7 +164,7 @@ func (s *Service) readFileRenderCache(ctx context.Context, entryID string, ttl t
 	if !found || !s.cacheDependenciesCurrent(ctx, cached.Dependencies) {
 		return nil
 	}
-	out := cloneFileResult(&cached.Result)
+	out := cached.Result.Clone()
 	out.Cached = true
 	return out
 }
@@ -178,7 +178,7 @@ func (s *Service) writeFileRenderCache(ctx context.Context, entryID string, ttlS
 	if err != nil {
 		return
 	}
-	out := cloneFileResult(result)
+	out := result.Clone()
 	out.Cached = false
 	ttl := time.Duration(ttlSeconds) * time.Second
 	value, remaining, ok := prepareCacheValueWrite[fileRenderCacheValue](s, ctx, key, ttl)

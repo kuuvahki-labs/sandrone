@@ -74,7 +74,7 @@ func (s *Service) materializeSubscription(ctx context.Context, sub domain.Subscr
 			return nil, domain.NewError(domain.CodeInvalidArgument, fmt.Sprintf("subscription dependency cycle at %q", sub.Name))
 		}
 		if cached, ok := state.memo[sub.Name]; ok {
-			return cloneNodeSet(cached), nil
+			return cached.Clone(), nil
 		}
 		state.stack[sub.Name] = true
 		defer delete(state.stack, sub.Name)
@@ -114,11 +114,11 @@ func (s *Service) materializeSubscription(ctx context.Context, sub domain.Subscr
 		Dependencies: append([]domain.ResourceRef{}, base.Dependencies...),
 		Sources:      append([]domain.SourceInfo{}, base.Sources...),
 		Warnings:     append(append([]domain.Warning{}, base.Warnings...), processed.Warnings...),
-		Traffic:      cloneSubscriptionTrafficItems(base.Traffic),
+		Traffic:      domain.CloneSubscriptionTrafficItems(base.Traffic),
 		Meta:         cloneStringMap(base.Meta),
 	}
 	if sub.Name != "" {
-		state.memo[sub.Name] = cloneNodeSet(out)
+		state.memo[sub.Name] = out.Clone()
 	}
 	return out, nil
 }
@@ -154,7 +154,7 @@ func (s *Service) subscriptionPreviewNodes(ctx context.Context, sub domain.Subsc
 		Dependencies: append([]domain.ResourceRef{}, base.Dependencies...),
 		Sources:      append([]domain.SourceInfo{}, base.Sources...),
 		Warnings:     append([]domain.Warning{}, base.Warnings...),
-		Traffic:      cloneSubscriptionTrafficItems(base.Traffic),
+		Traffic:      domain.CloneSubscriptionTrafficItems(base.Traffic),
 		Meta:         cloneStringMap(base.Meta),
 	}
 	processed, err := s.registry.RunNodes(ctx, sub.Processors, domain.NodeProcessInput{
@@ -182,7 +182,7 @@ func (s *Service) subscriptionPreviewNodes(ctx context.Context, sub domain.Subsc
 		Dependencies: append([]domain.ResourceRef{}, before.Dependencies...),
 		Sources:      append([]domain.SourceInfo{}, before.Sources...),
 		Warnings:     append(append([]domain.Warning{}, before.Warnings...), processed.Warnings...),
-		Traffic:      cloneSubscriptionTrafficItems(before.Traffic),
+		Traffic:      domain.CloneSubscriptionTrafficItems(before.Traffic),
 		Meta:         cloneStringMap(before.Meta),
 	}
 	return before, after, nil
@@ -234,7 +234,7 @@ func (s *Service) parseSubscriptionBaseNodes(ctx context.Context, sub domain.Sub
 		Nodes:    append([]domain.NodeIR{}, parsed.Nodes...),
 		Sources:  sourcesSlice(parsed.Source),
 		Warnings: warnings,
-		Traffic:  cloneSubscriptionTrafficItems(traffic),
+		Traffic:  domain.CloneSubscriptionTrafficItems(traffic),
 		Meta:     cloneStringMap(sub.Meta),
 		Source:   parsed.Source,
 	}, nil
@@ -280,7 +280,7 @@ func (s *Service) collectionSubscriptionBaseNodes(ctx context.Context, sub domai
 		Dependencies: deps,
 		Sources:      sources,
 		Warnings:     warnings,
-		Traffic:      cloneSubscriptionTrafficItems(traffic),
+		Traffic:      domain.CloneSubscriptionTrafficItems(traffic),
 		Meta:         meta,
 	}, nil
 }
@@ -359,20 +359,6 @@ func sourceRefsFromSources(sources []domain.SourceInfo) []domain.SourceRef {
 		refs = append(refs, source.SourceRefs...)
 	}
 	return refs
-}
-
-func cloneNodeSet(set *domain.NodeSet) *domain.NodeSet {
-	if set == nil {
-		return nil
-	}
-	out := *set
-	out.Nodes = append([]domain.NodeIR{}, set.Nodes...)
-	out.Dependencies = append([]domain.ResourceRef{}, set.Dependencies...)
-	out.Sources = append([]domain.SourceInfo{}, set.Sources...)
-	out.Warnings = append([]domain.Warning{}, set.Warnings...)
-	out.Traffic = cloneSubscriptionTrafficItems(set.Traffic)
-	out.Meta = cloneStringMap(set.Meta)
-	return &out
 }
 
 func isSubscriptionCycleError(err error) bool {

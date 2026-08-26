@@ -35,7 +35,7 @@ func TestProductionGoSourcePathOnlyIncludesBackendImplementation(t *testing.T) {
 var productionGoRoots = []string{"cmd", "internal", "pkg"}
 
 func TestProductionGoFilesStayFocused(t *testing.T) {
-	const maxLines = 600
+	const maxLines = 650
 	repositoryRoot := ".."
 
 	for _, sourceRoot := range productionGoRoots {

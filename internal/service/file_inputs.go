@@ -109,7 +109,7 @@ func (s *Service) resolveSubscriptionNodeInput(ctx context.Context, input domain
 	if err != nil {
 		return nil, err
 	}
-	out := cloneNodeSet(nodeSet)
+	out := nodeSet.Clone()
 	out.Dependencies = append([]domain.ResourceRef{{Kind: "subscription", Name: name}}, out.Dependencies...)
 	out.Meta = mergeStringMaps(out.Meta, input.Meta)
 	return out, nil
