@@ -36,13 +36,15 @@
  *   unknown_template=...         未识别地区的名称模板
  *
  * 默认 template：
- *   {prefix}{separator}{flag}{separator}{region}{separator}{index}
+ *   {prefix}{separator}{airport}{separator}{flag}{separator}{region}{separator}{index}
  *   {separator}{entry}{separator}{city}{separator}{line}{separator}{features}
  *   {separator}{multiplier}{separator}{protocol}
  *
- * 模板变量：prefix、flag、region、region_code、region_en、index、entry、city、
+ * 模板变量：prefix、airport、flag、region、region_code、region_en、index、entry、city、
  * line、features、multiplier、protocol、protocol_base、security、transport、
  * flow、ip_stack、source、original、separator。
+ * airport 取已识别地区国旗之前的原名称内容；若该内容以固定 prefix 开头，会先
+ * 去掉 prefix，避免重复执行时叠加。
  *
  * 脚本运行在 Sandrone 的受控同步 JavaScript sandbox 中，不使用 require、文件系统、
  * 子进程、环境变量、DNS、IP/ASN 查询或任意网络访问。
@@ -54,11 +56,11 @@
  *   https://gist.github.com/Tleon-H/336610b0973205ef633446c7438631d8
  */
 
-var DEFAULT_TEMPLATE = "{prefix}{separator}{flag}{separator}{region}{separator}{index}{separator}{entry}{separator}{city}{separator}{line}{separator}{features}{separator}{multiplier}{separator}{protocol}";
+var DEFAULT_TEMPLATE = "{prefix}{separator}{airport}{separator}{flag}{separator}{region}{separator}{index}{separator}{entry}{separator}{city}{separator}{line}{separator}{features}{separator}{multiplier}{separator}{protocol}";
 var DEFAULT_UNKNOWN_TEMPLATE = "{prefix}{separator}{original}{separator}{protocol}";
 
 var NORMALIZE_META_KEYS = [
-    "normalize.version", "normalize.original_name", "normalize.region_code",
+    "normalize.version", "normalize.original_name", "normalize.airport", "normalize.region_code",
     "normalize.region", "normalize.region_en", "normalize.index", "normalize.entry",
     "normalize.city", "normalize.line", "normalize.features", "normalize.multiplier",
     "normalize.protocol", "normalize.protocol_detail", "normalize.security",
@@ -388,7 +390,7 @@ var NON_CONNECTION_FIELDS = {
 };
 
 var TEMPLATE_VARIABLES = {
-    prefix: true, flag: true, region: true, region_code: true, region_en: true,
+    prefix: true, airport: true, flag: true, region: true, region_code: true, region_en: true,
     index: true, entry: true, city: true, line: true, features: true,
     multiplier: true, protocol: true, protocol_base: true, security: true,
     transport: true, flow: true, ip_stack: true, source: true, original: true,
@@ -629,6 +631,7 @@ function countryFlag(code) {
 
 function extractMetadata(node, original, options) {
     var region = detectRegion(original);
+    var airport = detectAirport(original, region, options.prefix);
     var lines = detectTags(original, LINE_TAGS);
     var features = detectTags(original, FEATURE_TAGS);
     appendUnique(features, detectCustomTags(original, options.customTags));
@@ -642,6 +645,7 @@ function extractMetadata(node, original, options) {
         protocol.base, protocol.security, protocol.transport, protocol.flow, ipStack];
     return {
         original: original,
+        airport: airport,
         region: region,
         entry: entry,
         city: city,
@@ -684,6 +688,18 @@ function detectRegion(name) {
         }
     }
     return best;
+}
+
+function detectAirport(name, region, prefix) {
+    if (!region) return "";
+    var flagStart = String(name).indexOf(region.flag);
+    if (flagStart <= 0) return "";
+    var airport = cleanChunk(String(name).slice(0, flagStart));
+    if (prefix && airport.indexOf(prefix) === 0 &&
+        (airport.length === prefix.length || isNameSeparator(airport.charAt(prefix.length)))) {
+        airport = cleanChunk(airport.slice(prefix.length));
+    }
+    return airport;
 }
 
 function detectTokenRegion(token) {
@@ -889,6 +905,7 @@ function templateValues(item, options, regionCounts, regionIndexes) {
     var original = stripGeneratedParts(metadata.original, options.prefix, metadata.protocol);
     return {
         prefix: options.prefix,
+        airport: metadata.airport,
         flag: region && options.showFlag ? region.flag : "",
         region: regionName,
         region_code: region ? region.code : "",
@@ -922,6 +939,7 @@ function writeNodeMetadata(node, metadata, values) {
     }
     putNodeMetadata(nodeMeta, "normalize.version", "1");
     putNodeMetadata(nodeMeta, "normalize.original_name", originalName);
+    putNodeMetadata(nodeMeta, "normalize.airport", values.airport);
     putNodeMetadata(nodeMeta, "normalize.region_code", metadata.region && metadata.region.code);
     putNodeMetadata(nodeMeta, "normalize.region", metadata.region && metadata.region.zh);
     putNodeMetadata(nodeMeta, "normalize.region_en", metadata.region && metadata.region.en);

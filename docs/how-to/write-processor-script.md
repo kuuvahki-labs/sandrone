@@ -112,6 +112,11 @@ curl -fsS -X POST "$SANDRONE_API/v1/files" \
 排序后的第一个节点并直接删除其余节点，从而保证 Mihomo proxy name 与 sing-box
 outbound tag 唯一；设为 `name_conflict: "error"` 可改成显式失败。
 
+默认模板还支持 `{airport}`。它从已识别地区国旗之前提取原名称内容，例如
+`ProviderA 🇭🇰 香港 02` 中的 `ProviderA`；该值不依赖组合订阅额外提供来源标签。
+`{prefix}` 仍是当前脚本参数提供的统一固定前缀，两者可以同时使用。没有地区国旗
+时 `{airport}` 为空，避免把协议或线路文字误判成机场名称。
+
 `write_meta` 默认为 `false`，关闭时不会改写节点 `meta`。设为 `true` 后，最终保留
 节点会写入 `normalize.*` 元数据，包括首次处理前的名称、地区、编号、线路、特征、
 倍率、协议、安全层、传输层、Flow、IP 栈和来源标签。脚本保留其他已有 `meta`；
@@ -120,6 +125,59 @@ outbound tag 唯一；设为 `name_conflict: "error"` 可改成显式失败。
 
 脚本支持的全部参数、模板变量和默认值写在文件头部。连接去重发生在命名之前，
 因此两个原始名称相同但连接不同的节点仍会被编号成不同名称，不会被提前误删。
+
+## 按当前顺序重编规范化节点序号
+
+当节点名称已经由 `normalize-nodes.js` 规范化，而后续合并、筛选或排序改变了节点
+顺序时，使用
+[`examples/scripts/reindex-normalized-nodes.js`](../../examples/scripts/reindex-normalized-nodes.js)，
+不必再次运行完整名称规范化。该脚本不排序、不增删节点，只按当前输入顺序替换
+规范化模板中 `{index}` 对应的内容；同一地区的所有匹配节点共享 `01`、`02`、
+`03` 序列，其他名称内容保持不变。
+
+脚本通过 `template` 定位 `{index}`，通过 `{region_code}`、`{flag}`、`{region}` 或
+`{region_en}` 确定地区分组，不要求这些变量连续，也不限制 `{index}` 的位置。
+`template` 和 `separator` 必须与 `normalize-nodes.js` 完全相同；省略 `template` 时
+使用相同的默认模板。模板必须包含且只能包含一个 `{index}`，并至少包含一个地区
+分组变量，否则脚本会报告配置错误。
+
+`exclude_regex` 可以是一个正则或正则数组；匹配的个人节点原样保留，也不占用地区
+序号。无法匹配模板的节点同样保持原样并产生汇总 warning。
+
+推荐让需要规范化的子订阅先运行 `normalize-nodes.js`，不需要规范化的子订阅可以
+直接进入组合；完成所有可能改变节点顺序的处理后，再运行本脚本。先将脚本登记成
+文件资源：
+
+```sh
+jq -Rs '{
+  name: "reindex-normalized-nodes.js",
+  kind: "static",
+  source: {type: "inline", content: .}
+}' examples/scripts/reindex-normalized-nodes.js |
+curl -fsS -X POST "$SANDRONE_API/v1/files" \
+  -H "Authorization: Bearer $SANDRONE_TOKEN" \
+  -H "Content-Type: application/json" \
+  --data-binary @-
+```
+
+在 subscription 的 processors 中引用本脚本，并将它放在所有可能改变节点顺序的
+processor 之后：
+
+```json
+{
+  "type": "script",
+  "stage": "nodes",
+  "params": {
+    "source": {"type": "file", "name": "reindex-normalized-nodes.js"},
+    "args": {
+      "index_width": 2,
+      "separator": " ",
+      "template": "{prefix}{separator}{airport}{separator}{flag}{separator}{region}{separator}{index}{separator}{entry}{separator}{city}{separator}{line}{separator}{features}{separator}{multiplier}{separator}{protocol}",
+      "exclude_regex": ["^Personal(?: | · )"]
+    }
+  }
+}
+```
 
 引用文件脚本时，Sandrone 会先渲染目标文件资源，再把最终正文作为脚本执行。
 脚本文件资源自身的 processors 使用各自配置的参数，不继承当前 script processor

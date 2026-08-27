@@ -113,6 +113,35 @@ func TestExampleNormalizeNodesMetadataDefaultsToDisabled(t *testing.T) {
 	require.Equal(t, map[string]string{"keep": "yes"}, out.Nodes[0].Meta)
 }
 
+func TestExampleNormalizeNodesPreservesAirportBeforeRegionFlag(t *testing.T) {
+	nodes := []domain.NodeIR{
+		{Name: "ProviderA 🇭🇰 香港 02", Type: domain.NodeTypeShadowsocks, Server: "hk.example.com", Port: 8388, Cipher: "aes-128-gcm", Password: "hk"},
+		{Name: "ProviderB 🇯🇵 日本 05", Type: domain.NodeTypeShadowsocks, Server: "jp.example.com", Port: 8388, Cipher: "aes-128-gcm", Password: "jp"},
+	}
+	args := map[string]any{"prefix": "Global", "sort": false, "write_meta": true}
+
+	first := applyExampleNormalizer(t, args, nodes)
+	require.Equal(t, []string{
+		"Global ProviderA 🇭🇰 香港 01",
+		"Global ProviderB 🇯🇵 日本 01",
+	}, []string{first.Nodes[0].Name, first.Nodes[1].Name})
+	require.Equal(t, "ProviderA", first.Nodes[0].Meta["normalize.airport"])
+	require.Equal(t, "ProviderB", first.Nodes[1].Meta["normalize.airport"])
+
+	second := applyExampleNormalizer(t, args, first.Nodes)
+	require.Equal(t, first.Nodes, second.Nodes)
+}
+
+func TestExampleNormalizeNodesAirportRequiresRegionFlag(t *testing.T) {
+	out := applyExampleNormalizer(t, map[string]any{
+		"sort": false, "template": "{airport}{separator}{region}{separator}{index}",
+	}, []domain.NodeIR{
+		{Name: "Hysteria2-SG-07", Type: domain.NodeTypeHysteria2, Server: "sg.example.com", Port: 443},
+	})
+
+	require.Equal(t, "新加坡 01", out.Nodes[0].Name)
+}
+
 func TestExampleNormalizeNodesConnectionDedupPreservesSemanticRawFields(t *testing.T) {
 	out := applyExampleNormalizer(t, nil, []domain.NodeIR{
 		{
