@@ -115,8 +115,12 @@ func TestExampleReindexNormalizedNodesUsesDefaultTemplateWithSpaceInsideValues(t
 	}, []string{out.Nodes[0].Name, out.Nodes[1].Name})
 }
 
-func TestExampleReindexNormalizedNodesRejectsTemplateWithoutIndexOrRegion(t *testing.T) {
-	for _, template := range []string{"{flag}{separator}{region}", "{airport}{separator}{index}"} {
+func TestExampleReindexNormalizedNodesRejectsInvalidTemplate(t *testing.T) {
+	for _, template := range []string{
+		"{flag}{separator}{region}",
+		"{airport}{separator}{index}",
+		"{unsupported}{separator}{index}{separator}{flag}",
+	} {
 		t.Run(template, func(t *testing.T) {
 			proc := buildExampleReindexNormalizedNodes(t, map[string]any{"template": template})
 			_, err := proc.ApplyNodes(context.Background(), domain.NodeProcessInput{Nodes: []domain.NodeIR{{Name: "ProviderA 01"}}})

@@ -24,8 +24,8 @@ var TEMPLATE_VARIABLES = {
     prefix: true, airport: true, flag: true, region: true, region_code: true,
     region_en: true, index: true, entry: true, city: true, line: true,
     features: true, multiplier: true, protocol: true, protocol_base: true,
-    security: true, transport: true, flow: true, ip_stack: true, source: true,
-    original: true, separator: true
+    security: true, transport: true, flow: true, ip_stack: true, original: true,
+    separator: true
 };
 
 var REGION_GROUP_VARIABLES = ["region_code", "flag", "region", "region_en"];

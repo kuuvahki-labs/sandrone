@@ -25,7 +25,6 @@
  *   region_style=zh              zh / code / en
  *   show_flag=true               是否显示国旗
  *   prefix=""                    固定名称前缀
- *   source_label=""              模板来源标签；省略时取 input.context.input_name
  *   separator=" "                名称分隔符，可设置为 " · "
  *   tag_separator="/"            同类线路或特征之间的分隔符
  *   index_width=2                序号宽度，范围 1 到 4
@@ -42,7 +41,7 @@
  *
  * 模板变量：prefix、airport、flag、region、region_code、region_en、index、entry、city、
  * line、features、multiplier、protocol、protocol_base、security、transport、
- * flow、ip_stack、source、original、separator。
+ * flow、ip_stack、original、separator。
  * airport 取已识别地区国旗之前的原名称内容；若该内容以固定 prefix 开头，会先
  * 去掉 prefix，避免重复执行时叠加。
  *
@@ -64,7 +63,7 @@ var NORMALIZE_META_KEYS = [
     "normalize.region", "normalize.region_en", "normalize.index", "normalize.entry",
     "normalize.city", "normalize.line", "normalize.features", "normalize.multiplier",
     "normalize.protocol", "normalize.protocol_detail", "normalize.security",
-    "normalize.transport", "normalize.flow", "normalize.ip_stack", "normalize.source"
+    "normalize.transport", "normalize.flow", "normalize.ip_stack"
 ];
 
 var PROTOCOL_NAMES = {
@@ -393,7 +392,7 @@ var TEMPLATE_VARIABLES = {
     prefix: true, airport: true, flag: true, region: true, region_code: true, region_en: true,
     index: true, entry: true, city: true, line: true, features: true,
     multiplier: true, protocol: true, protocol_base: true, security: true,
-    transport: true, flow: true, ip_stack: true, source: true, original: true,
+    transport: true, flow: true, ip_stack: true, original: true,
     separator: true
 };
 
@@ -402,7 +401,7 @@ var REGION_INDEX = buildRegionIndex(REGIONS);
 
 function main(input, api) {
     input = input || {};
-    var options = readOptions(input.args || {}, input.context || {});
+    var options = readOptions(input.args || {});
     var sourceNodes = Array.isArray(input.nodes) ? input.nodes : [];
     var items = [];
     var seenConnections = Object.create(null);
@@ -480,7 +479,7 @@ function main(input, api) {
     return input;
 }
 
-function readOptions(args, context) {
+function readOptions(args) {
     return {
         filterInfo: readBoolean(args.filter_info, true, "filter_info"),
         includePatterns: readPatterns(args.include_regex, "include_regex"),
@@ -494,7 +493,6 @@ function readOptions(args, context) {
         regionStyle: readEnum(args.region_style, "zh", ["zh", "code", "en"], "region_style"),
         showFlag: readBoolean(args.show_flag, true, "show_flag"),
         prefix: cleanText(readString(args.prefix, "")),
-        sourceLabel: cleanText(readString(args.source_label, context.input_name || "")),
         separator: readString(args.separator, " "),
         tagSeparator: readString(args.tag_separator, "/"),
         indexWidth: readInteger(args.index_width, 2, 1, 4, "index_width"),
@@ -922,7 +920,6 @@ function templateValues(item, options, regionCounts, regionIndexes) {
         transport: metadata.protocol.transport,
         flow: metadata.protocol.flow,
         ip_stack: metadata.ipStack,
-        source: options.sourceLabel,
         original: original,
         separator: options.separator
     };
@@ -955,7 +952,6 @@ function writeNodeMetadata(node, metadata, values) {
     putNodeMetadata(nodeMeta, "normalize.transport", metadata.protocol.transport);
     putNodeMetadata(nodeMeta, "normalize.flow", metadata.protocol.flow);
     putNodeMetadata(nodeMeta, "normalize.ip_stack", metadata.ipStack);
-    putNodeMetadata(nodeMeta, "normalize.source", values.source);
     node.meta = nodeMeta;
 }
 

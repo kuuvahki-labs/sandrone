@@ -92,7 +92,6 @@ func TestExampleNormalizeNodesPipelineWithMetadataIsIdempotent(t *testing.T) {
 		"normalize.protocol":        "VLESS",
 		"normalize.protocol_detail": "VLESS Reality",
 		"normalize.security":        "Reality",
-		"normalize.source":          "example-source",
 	}, first.Nodes[0].Meta)
 	require.ElementsMatch(t, []string{
 		"node_normalize_information_filtered",
@@ -211,6 +210,15 @@ func TestExampleNormalizeNodesCanFailOnFinalNameConflicts(t *testing.T) {
 	require.Error(t, err)
 	require.True(t, domain.IsCode(err, domain.CodeScriptRuntime))
 	require.ErrorContains(t, err, "最终节点名称重复")
+}
+
+func TestExampleNormalizeNodesRejectsUnknownTemplateVariable(t *testing.T) {
+	proc := buildExampleNormalizer(t, map[string]any{"template": "{unsupported}{separator}{region}"})
+	_, err := proc.ApplyNodes(context.Background(), domain.NodeProcessInput{})
+
+	require.Error(t, err)
+	require.True(t, domain.IsCode(err, domain.CodeScriptRuntime))
+	require.ErrorContains(t, err, "template 包含未知变量: unsupported")
 }
 
 func TestExampleNormalizeNodesFilteringUnknownAndCustomTags(t *testing.T) {
