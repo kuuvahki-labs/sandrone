@@ -333,7 +333,7 @@ func decodeFileSpecDefinition(content []byte) (*domain.FileSpec, error) {
 	return &spec, nil
 }
 
-func decodeJSONDefinition(content []byte, out any) error {
+func decodeJSONDefinition[T any](content []byte, out *T) error {
 	trimmed := bytes.TrimSpace(content)
 	if len(trimmed) == 0 {
 		return errors.New("empty input")

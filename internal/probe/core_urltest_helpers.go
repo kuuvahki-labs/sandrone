@@ -9,13 +9,7 @@ import (
 	"net"
 	"net/url"
 	"strconv"
-
-	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
-
-func urlFromRequest(req domain.ProbeRequest) string {
-	return urlTestURLFromRequest(req)
-}
 
 func parseURLTestTarget(rawURL string) (urlTestTarget, error) {
 	parsed, err := url.Parse(rawURL)

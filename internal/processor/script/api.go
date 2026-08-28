@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"strings"
 
 	"github.com/dop251/goja"
@@ -151,7 +152,7 @@ func (a *scriptAPI) jsProbe(vm *goja.Runtime) func(call goja.FunctionCall) goja.
 				Name:  "script",
 				Type:  "inline_nodes",
 				Nodes: nodes,
-				Meta:  cloneStringMap(options.Meta),
+				Meta:  maps.Clone(options.Meta),
 			},
 			Method:          domain.ProbeMethod(options.Method),
 			Core:            options.Core,
@@ -162,7 +163,7 @@ func (a *scriptAPI) jsProbe(vm *goja.Runtime) func(call goja.FunctionCall) goja.
 			Attempts:        options.Attempts,
 			Concurrency:     options.Concurrency,
 			CacheTTLSeconds: options.CacheTTLSeconds,
-			Meta:            cloneStringMap(options.Meta),
+			Meta:            maps.Clone(options.Meta),
 		}
 		ctx := a.ctx
 		if ctx == nil {
@@ -265,7 +266,7 @@ func jsJSONValue(vm *goja.Runtime, value any) goja.Value {
 	return result
 }
 
-func exportJSValue(value goja.Value, out any) error {
+func exportJSValue[T any](value goja.Value, out *T) error {
 	body, err := json.Marshal(value.Export())
 	if err != nil {
 		return err
@@ -273,7 +274,7 @@ func exportJSValue(value goja.Value, out any) error {
 	return json.Unmarshal(body, out)
 }
 
-func exportJSValueStrict(value goja.Value, out any) error {
+func exportJSValueStrict[T any](value goja.Value, out *T) error {
 	body, err := json.Marshal(value.Export())
 	if err != nil {
 		return err

@@ -268,14 +268,6 @@ func NormalizeMethod(method domain.ProbeMethod) domain.ProbeMethod {
 	}
 }
 
-func NTPServerFromRequest(req domain.ProbeRequest) string {
-	return ntpServerFromRequest(req)
-}
-
-func URLTestTarget(req domain.ProbeRequest) string {
-	return urlTestURLFromRequest(req)
-}
-
 func NormalizeCore(core string) string {
 	raw := strings.ToLower(strings.TrimSpace(core))
 	raw = strings.ReplaceAll(raw, "_", "-")
@@ -315,15 +307,15 @@ func targetFromRequest(req domain.ProbeRequest, node domain.NodeIR) string {
 		}
 		return net.JoinHostPort(node.Server, strconv.Itoa(int(node.Port)))
 	case domain.ProbeUDPNTP:
-		return net.JoinHostPort(ntpServerFromRequest(req), "123")
+		return net.JoinHostPort(NTPServerFromRequest(req), "123")
 	case domain.ProbeURLTest:
-		return urlTestURLFromRequest(req)
+		return URLTestTarget(req)
 	default:
 		return ""
 	}
 }
 
-func ntpServerFromRequest(req domain.ProbeRequest) string {
+func NTPServerFromRequest(req domain.ProbeRequest) string {
 	server := strings.TrimSpace(req.NTPServer)
 	if server == "" {
 		return defaultNTPServer
@@ -331,7 +323,7 @@ func ntpServerFromRequest(req domain.ProbeRequest) string {
 	return server
 }
 
-func urlTestURLFromRequest(req domain.ProbeRequest) string {
+func URLTestTarget(req domain.ProbeRequest) string {
 	if strings.TrimSpace(req.URL) != "" {
 		return strings.TrimSpace(req.URL)
 	}

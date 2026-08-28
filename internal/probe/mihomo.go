@@ -50,7 +50,7 @@ func (b *MihomoBackend) Version() string { return mihomoconstant.Version }
 
 func (b *MihomoBackend) Probe(ctx context.Context, backendReq BackendRequest, nodes []domain.NodeIR) (*domain.ProbeResult, error) {
 	req := backendReq.Probe
-	testURL := urlFromRequest(req)
+	testURL := URLTestTarget(req)
 	target, err := parseURLTestTarget(testURL)
 	if err != nil {
 		return nil, domain.WrapError(domain.CodeProbeInvalidTarget, "invalid url_test url", err)

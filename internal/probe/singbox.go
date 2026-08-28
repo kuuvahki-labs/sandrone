@@ -54,7 +54,7 @@ func (b *SingBoxBackend) Version() string { return constant.Version }
 
 func (b *SingBoxBackend) Probe(ctx context.Context, backendReq BackendRequest, nodes []domain.NodeIR) (*domain.ProbeResult, error) {
 	req := backendReq.Probe
-	testURL := urlFromRequest(req)
+	testURL := URLTestTarget(req)
 	target, err := parseURLTestTarget(testURL)
 	if err != nil {
 		return nil, domain.WrapError(domain.CodeProbeInvalidTarget, "invalid url_test url", err)
@@ -236,7 +236,7 @@ func (b *SingBoxNTPBackend) probeNode(ctx context.Context, req domain.ProbeReque
 	if !ok {
 		return resultForError(req, node, string(domain.CodeProbeInvalidTarget), errors.New("sing-box outbound was not found"), b.now())
 	}
-	destination := M.ParseSocksaddrHostPort(ntpServerFromRequest(req), 123)
+	destination := M.ParseSocksaddrHostPort(NTPServerFromRequest(req), 123)
 	var lastErr error
 	for attempt := 0; attempt < attempts; attempt++ {
 		attemptCtx, cancel := context.WithTimeout(ctx, timeout)

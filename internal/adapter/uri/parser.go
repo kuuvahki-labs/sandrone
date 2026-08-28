@@ -313,7 +313,7 @@ func parseYAMLNodeLine(line string) ([]domain.NodeIR, error) {
 	return normalizeLineNodes([]domain.NodeIR{node}, "yaml-node")
 }
 
-func decodeJSONLine(line string, target any) error {
+func decodeJSONLine[T any](line string, target *T) error {
 	decoder := json.NewDecoder(bytes.NewReader([]byte(line)))
 	decoder.UseNumber()
 	if err := decoder.Decode(target); err != nil {

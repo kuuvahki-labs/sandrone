@@ -6,6 +6,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/kuuvahki-labs/sandrone/internal/agentcatalog"
 	"github.com/kuuvahki-labs/sandrone/internal/app"
 )
 
@@ -32,7 +33,7 @@ func registerManagementTools(server *mcp.Server, rt *app.Runtime) {
 	addTool(server, &mcp.Tool{
 		Name:        "sandrone_put_subscription",
 		Description: "Store a named subscription resource.",
-		InputSchema: putSubscriptionInputSchema(),
+		InputSchema: agentcatalog.SubscriptionSchema(),
 		Annotations: annotations,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in putSubscriptionInput) (*mcp.CallToolResult, putResourceOutput, error) {
 		if err := validateRequiredPublicResourceName("subscription name", in.Name); err != nil {
@@ -70,7 +71,7 @@ func registerManagementTools(server *mcp.Server, rt *app.Runtime) {
 	addTool(server, &mcp.Tool{
 		Name:        "sandrone_put_file",
 		Description: "Store a named FileSpec.",
-		InputSchema: putFileInputSchema(),
+		InputSchema: agentcatalog.FileSpecSchema(true),
 		Annotations: annotations,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in putFileInput) (*mcp.CallToolResult, putResourceOutput, error) {
 		if err := validateRequiredPublicResourceName("file name", in.Name); err != nil {

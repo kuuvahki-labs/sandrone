@@ -103,7 +103,7 @@ func applyToolSchema(raw json.RawMessage, resolved *jsonschema.Resolved) (json.R
 	return validated, value, nil
 }
 
-func decodeToolJSON(raw []byte, output any) error {
+func decodeToolJSON[T any](raw []byte, output *T) error {
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(output); err != nil {

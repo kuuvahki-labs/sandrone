@@ -80,7 +80,7 @@ func decodeSingBoxFileSettings(raw json.RawMessage) (SingBoxFileSettings, error)
 	return settings, nil
 }
 
-func decodeTypedFileSettings(kind domain.FileKind, raw json.RawMessage, out any) error {
+func decodeTypedFileSettings[T any](kind domain.FileKind, raw json.RawMessage, out *T) error {
 	if len(bytes.TrimSpace(raw)) == 0 {
 		raw = json.RawMessage(`{}`)
 	}

@@ -3,6 +3,7 @@ package node
 import (
 	"context"
 	"fmt"
+	"maps"
 	"sort"
 	"strconv"
 	"strings"
@@ -106,7 +107,7 @@ func (p *probeProc) ApplyNodes(ctx context.Context, in domain.NodeProcessInput) 
 			Name:  in.Context.InputName,
 			Type:  "inline_nodes",
 			Nodes: nodes,
-			Meta:  cloneStringMap(in.Context.Meta),
+			Meta:  maps.Clone(in.Context.Meta),
 		},
 		Method:          method,
 		Core:            core,
@@ -117,7 +118,7 @@ func (p *probeProc) ApplyNodes(ctx context.Context, in domain.NodeProcessInput) 
 		Attempts:        p.params.Attempts,
 		Concurrency:     p.params.Concurrency,
 		CacheTTLSeconds: p.params.CacheTTLSeconds,
-		Meta:            cloneStringMap(in.Request.Meta),
+		Meta:            maps.Clone(in.Request.Meta),
 	}
 	result, err := p.prober.Probe(ctx, req)
 	if err != nil {
@@ -168,7 +169,7 @@ func (p *probeProc) ApplyNodes(ctx context.Context, in domain.NodeProcessInput) 
 		if p.params.Annotate {
 			outNode.Meta = annotateProbeMeta(outNode.Meta, probeResult)
 		} else if outNode.Meta != nil {
-			outNode.Meta = cloneStringMap(outNode.Meta)
+			outNode.Meta = maps.Clone(outNode.Meta)
 		}
 		items = append(items, probeItem{
 			node:   outNode,
@@ -221,7 +222,7 @@ type probeItem struct {
 }
 
 func annotateProbeMeta(meta map[string]string, result domain.NodeProbeResult) map[string]string {
-	out := cloneStringMap(meta)
+	out := maps.Clone(meta)
 	if out == nil {
 		out = map[string]string{}
 	}
@@ -252,15 +253,4 @@ func annotateProbeMeta(meta map[string]string, result domain.NodeProbeResult) ma
 
 func probeMethod(value string) domain.ProbeMethod {
 	return domain.ProbeMethod(strings.ReplaceAll(strings.ToLower(strings.TrimSpace(value)), "-", "_"))
-}
-
-func cloneStringMap(in map[string]string) map[string]string {
-	if in == nil {
-		return nil
-	}
-	out := make(map[string]string, len(in))
-	for k, v := range in {
-		out[k] = v
-	}
-	return out
 }

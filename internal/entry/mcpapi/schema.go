@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 
 	"github.com/google/jsonschema-go/jsonschema"
-
-	"github.com/kuuvahki-labs/sandrone/internal/agentcatalog"
 )
 
 func convertInputSchema() *jsonschema.Schema {
@@ -65,18 +63,10 @@ func subscriptionTrafficInputSchema() *jsonschema.Schema {
 	}, []string{"name"})
 }
 
-func putSubscriptionInputSchema() *jsonschema.Schema {
-	return agentcatalog.SubscriptionSchema()
-}
-
 func deleteSubscriptionInputSchema() *jsonschema.Schema {
 	return closedObject(map[string]*jsonschema.Schema{
 		"name": stringSchema(),
 	}, []string{"name"})
-}
-
-func putFileInputSchema() *jsonschema.Schema {
-	return agentcatalog.FileSpecSchema(true)
 }
 
 func deleteFileInputSchema() *jsonschema.Schema {

@@ -14,7 +14,7 @@ import (
 //
 // Decoding rejects unknown fields so a typo in the spec surfaces as
 // processor_config_invalid instead of being silently ignored.
-func UnmarshalParams(spec domain.ProcessorSpec, target any) error {
+func UnmarshalParams[T any](spec domain.ProcessorSpec, target *T) error {
 	if len(spec.Params) == 0 {
 		return nil
 	}

@@ -7,14 +7,6 @@ import (
 	"uuid"
 )
 
-// NodeIdentity exposes the two identity dimensions of a normalized node.
-// RuntimeID follows one node occurrence through a subscription execution pipeline;
-// ConnectionKey identifies its current canonical connection semantics.
-type NodeIdentity struct {
-	RuntimeID     string
-	ConnectionKey string
-}
-
 // AssignNodeRuntimeIDs ensures every node occurrence has a unique runtime ID.
 // Existing unique IDs survive processor passes; missing or copied IDs are new.
 func AssignNodeRuntimeIDs(nodes []NodeIR) {
@@ -72,13 +64,4 @@ func NodeConnectionKey(node NodeIR) (string, error) {
 	}
 	sum := sha256.Sum256(body)
 	return fmt.Sprintf("%x", sum[:]), nil
-}
-
-// IdentifyNode returns both identity dimensions from the node's current state.
-func IdentifyNode(node NodeIR) (NodeIdentity, error) {
-	key, err := NodeConnectionKey(node)
-	if err != nil {
-		return NodeIdentity{}, err
-	}
-	return NodeIdentity{RuntimeID: node.runtimeID, ConnectionKey: key}, nil
 }

@@ -11,22 +11,6 @@ import (
 // Convert composes Parse and Render for the common node conversion flow. Entry
 // points should call this instead of piping json-nodes themselves.
 func (s *Service) Convert(ctx context.Context, req domain.ConvertRequest) (*domain.RenderResult, error) {
-	return s.convert(ctx, req)
-}
-
-// ConvertPublic runs the processor-free conversion flow and applies the public
-// network policy to request-level remote inputs.
-func (s *Service) ConvertPublic(ctx context.Context, req domain.ConvertRequest) (*domain.RenderResult, error) {
-	if len(req.ParseProcessors) > 0 || len(req.RenderProcessors) > 0 || len(req.Meta) > 0 || req.Options.Format != "" {
-		return nil, domain.NewError(domain.CodeInvalidArgument, "public convert does not support processors, meta, or render options")
-	}
-	if req.Remote != nil && (req.Remote.UserAgent != "" || req.Remote.Proxy != "" || req.Remote.TimeoutMS != 0 || req.Remote.CacheTTLSeconds != 0) {
-		return nil, domain.NewError(domain.CodeInvalidArgument, "public convert remote input only supports url")
-	}
-	return s.convert(withPublicRemoteFetch(ctx), req)
-}
-
-func (s *Service) convert(ctx context.Context, req domain.ConvertRequest) (*domain.RenderResult, error) {
 	start := time.Now()
 	parsed, err := s.parse(ctx, domain.ParseRequest{
 		Format:     req.FromFormat,
@@ -92,4 +76,16 @@ func (s *Service) convert(ctx context.Context, req domain.ConvertRequest) (*doma
 		"duration_ms", elapsedMillis(start),
 	)
 	return rendered, nil
+}
+
+// ConvertPublic runs the processor-free conversion flow and applies the public
+// network policy to request-level remote inputs.
+func (s *Service) ConvertPublic(ctx context.Context, req domain.ConvertRequest) (*domain.RenderResult, error) {
+	if len(req.ParseProcessors) > 0 || len(req.RenderProcessors) > 0 || len(req.Meta) > 0 || req.Options.Format != "" {
+		return nil, domain.NewError(domain.CodeInvalidArgument, "public convert does not support processors, meta, or render options")
+	}
+	if req.Remote != nil && (req.Remote.UserAgent != "" || req.Remote.Proxy != "" || req.Remote.TimeoutMS != 0 || req.Remote.CacheTTLSeconds != 0) {
+		return nil, domain.NewError(domain.CodeInvalidArgument, "public convert remote input only supports url")
+	}
+	return s.Convert(withPublicRemoteFetch(ctx), req)
 }

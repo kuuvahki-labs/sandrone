@@ -7,10 +7,6 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
 
-func ParseUnknownWarnings(node domain.NodeIR, raw map[string]json.RawMessage, source string) []domain.Warning {
-	return ParseUnknownWarningsWithContext(node, raw, source, nil, nil)
-}
-
 func ParseUnknownWarningsWithContext(node domain.NodeIR, raw map[string]json.RawMessage, source string, nodeIndex *int, nodeContext *domain.WarningNodeContext) []domain.Warning {
 	if len(raw) == 0 {
 		return nil

@@ -50,7 +50,7 @@ func reportWarnings(report domain.Report) []domain.Warning {
 	return report.Warnings
 }
 
-func decodeJSON(w http.ResponseWriter, r *http.Request, out any) bool {
+func decodeJSON[T any](w http.ResponseWriter, r *http.Request, out *T) bool {
 	defer func() { _ = r.Body.Close() }()
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 16<<20))
 	if err != nil {
@@ -68,7 +68,7 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, out any) bool {
 	return true
 }
 
-func decodeOptionalJSON(w http.ResponseWriter, r *http.Request, out any) bool {
+func decodeOptionalJSON[T any](w http.ResponseWriter, r *http.Request, out *T) bool {
 	defer func() { _ = r.Body.Close() }()
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 16<<20))
 	if err != nil {

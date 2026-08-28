@@ -170,19 +170,15 @@ func decodeSSUserInfo(s string) (ssCredentials, error) {
 		if !ok || method == "" {
 			return ssCredentials{}, domain.NewError(domain.CodeParseFailed, "invalid ss credentials")
 		}
-		return ssCredentials{Method: normalizeSSCipher(method), Password: password}, nil
+		return ssCredentials{Method: shared.NormalizeShadowsocksCipher(method), Password: password}, nil
 	}
 	if unescaped, unescapeErr := url.PathUnescape(s); unescapeErr == nil && strings.Contains(unescaped, ":") {
 		method, password, ok := strings.Cut(unescaped, ":")
 		if ok && method != "" {
-			return ssCredentials{Method: normalizeSSCipher(method), Password: password}, nil
+			return ssCredentials{Method: shared.NormalizeShadowsocksCipher(method), Password: password}, nil
 		}
 	}
 	return ssCredentials{}, domain.NewError(domain.CodeParseFailed, "decode ss userinfo")
-}
-
-func normalizeSSCipher(method string) string {
-	return shared.NormalizeShadowsocksCipher(method)
 }
 
 func applySIP002Plugin(node *domain.NodeIR, plugin string) {

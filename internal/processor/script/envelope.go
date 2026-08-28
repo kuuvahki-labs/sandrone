@@ -6,6 +6,7 @@ package script
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
@@ -183,7 +184,7 @@ func fileToScript(doc domain.FileDocument) *ScriptFile {
 		MediaType: doc.MediaType,
 		Encoding:  doc.Encoding,
 		Content:   string(doc.Content),
-		Meta:      cloneStringMap(doc.Meta),
+		Meta:      maps.Clone(doc.Meta),
 		Warnings:  append([]domain.Warning{}, doc.Warnings...),
 	}
 }
@@ -223,21 +224,10 @@ func scriptToFile(s *ScriptFile, base domain.FileDocument) domain.FileDocument {
 	}
 	out.Content = []byte(s.Content)
 	if s.Meta != nil {
-		out.Meta = cloneStringMap(s.Meta)
+		out.Meta = maps.Clone(s.Meta)
 	}
 	if s.Warnings != nil {
 		out.Warnings = append([]domain.Warning{}, s.Warnings...)
-	}
-	return out
-}
-
-func cloneStringMap(in map[string]string) map[string]string {
-	if in == nil {
-		return nil
-	}
-	out := make(map[string]string, len(in))
-	for k, v := range in {
-		out[k] = v
 	}
 	return out
 }

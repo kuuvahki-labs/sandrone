@@ -148,9 +148,3 @@ func TestPartsToScript(t *testing.T) {
 	require.Len(t, parts, 1)
 	require.Len(t, parts[0].Nodes, 1)
 }
-
-func TestCloneStringMapNil(t *testing.T) {
-	require.Nil(t, cloneStringMap(nil))
-	m := cloneStringMap(map[string]string{"a": "b"})
-	require.Equal(t, "b", m["a"])
-}

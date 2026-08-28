@@ -150,7 +150,7 @@ func strictJSONArray(raw json.RawMessage, path string) ([]json.RawMessage, error
 	return items, nil
 }
 
-func decodeStrictJSONObject(raw json.RawMessage, path string, out any, allowedNames ...string) error {
+func decodeStrictJSONObject[T any](raw json.RawMessage, path string, out *T, allowedNames ...string) error {
 	fields, err := strictJSONObject(raw, path)
 	if err != nil {
 		return err

@@ -162,7 +162,7 @@ func optionalRequestArgs(argSets ...map[string]string) map[string]string {
 
 func requestWithExplicitArgs(base domain.RequestInfo, args map[string]string) domain.RequestInfo {
 	out := base
-	out.Args = cloneArgs(args)
+	out.Args = cloneStringMap(args)
 	if base.Meta != nil {
 		out.Meta = cloneStringMap(base.Meta)
 	}
@@ -180,7 +180,7 @@ func (s *Service) ProduceSubscription(ctx context.Context, name string, opts dom
 	renderTarget := strings.TrimSpace(opts.Target)
 	req := subscriptionExecutionRequest{
 		Name:    name,
-		Request: domain.RequestInfo{Args: cloneArgs(opts.Args)},
+		Request: domain.RequestInfo{Args: cloneStringMap(opts.Args)},
 	}
 	state := newSubscriptionExecutionState()
 	parentExecution, hasParentExecution := subscriptionExecutionContextFrom(ctx)
@@ -262,10 +262,6 @@ func (s *Service) FileContent(ctx context.Context, name string, opts domain.Scri
 		return "", err
 	}
 	return string(result.Content), nil
-}
-
-func cloneArgs(args map[string]string) map[string]string {
-	return cloneStringMap(args)
 }
 
 func appendResourceRef(refs []domain.ResourceRef, ref domain.ResourceRef) []domain.ResourceRef {

@@ -53,12 +53,9 @@ type Runtime struct {
 	Logger  *slog.Logger
 }
 
-type StoreFactory func(context.Context, string, StorageConfig) (store.Store, error)
-
 type runtimeOptions struct {
 	schedulerEnabled bool
 	probeEngine      service.ProbeEngine
-	storeFactory     StoreFactory
 }
 
 type RuntimeOption func(*runtimeOptions)
@@ -72,14 +69,6 @@ func WithSchedulerEnabled(enabled bool) RuntimeOption {
 func WithProbeEngine(engine service.ProbeEngine) RuntimeOption {
 	return func(options *runtimeOptions) {
 		options.probeEngine = engine
-	}
-}
-
-func WithStoreFactory(factory StoreFactory) RuntimeOption {
-	return func(options *runtimeOptions) {
-		if factory != nil {
-			options.storeFactory = factory
-		}
 	}
 }
 
@@ -99,12 +88,12 @@ func NewRuntimeContext(ctx context.Context, cfg Config, logger *slog.Logger, opt
 	if cfg.Storage.Backend == "" {
 		cfg.Storage.Backend = StorageFilesystem
 	}
-	options := runtimeOptions{schedulerEnabled: true, storeFactory: NewStore}
+	options := runtimeOptions{schedulerEnabled: true}
 	for _, option := range opts {
 		option(&options)
 	}
 	cfg = withProgrammaticOverrideSources(cfg)
-	rawStore, err := options.storeFactory(ctx, cfg.DataDir, cfg.Storage)
+	rawStore, err := NewStore(ctx, cfg.DataDir, cfg.Storage)
 	if err != nil {
 		return nil, err
 	}

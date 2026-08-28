@@ -122,7 +122,7 @@ func readFileSpec(specPath string) (*sandrone.FileSpec, error) {
 	return &spec, nil
 }
 
-func decodeJSONResourceDefinition(body []byte, out any) error {
+func decodeJSONResourceDefinition[T any](body []byte, out *T) error {
 	trimmed := bytes.TrimSpace(body)
 	if len(trimmed) == 0 {
 		return fmt.Errorf("JSON resource definition is empty")

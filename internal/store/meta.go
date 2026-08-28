@@ -31,9 +31,7 @@ func (s *MetaStore) PutSubscription(ctx context.Context, sub domain.Subscription
 }
 
 func (s *MetaStore) GetSubscription(ctx context.Context, name string) (domain.Subscription, error) {
-	var sub domain.Subscription
-	err := s.readJSON(ctx, "subscriptions", name, &sub)
-	return sub, err
+	return s.readJSON[domain.Subscription](ctx, "subscriptions", name)
 }
 
 func (s *MetaStore) ListSubscriptions(ctx context.Context) ([]domain.ResourceSummary, error) {
@@ -59,9 +57,7 @@ func (s *MetaStore) PutFile(ctx context.Context, file domain.FileSpec) error {
 }
 
 func (s *MetaStore) GetFile(ctx context.Context, name string) (domain.FileSpec, error) {
-	var file domain.FileSpec
-	err := s.readJSON(ctx, "files", name, &file)
-	return file, err
+	return s.readJSON[domain.FileSpec](ctx, "files", name)
 }
 
 func (s *MetaStore) ListFiles(ctx context.Context) ([]domain.ResourceSummary, error) {
@@ -83,31 +79,11 @@ func (s *MetaStore) PutShare(ctx context.Context, share domain.Share) error {
 	if share.ID == "" {
 		return fmt.Errorf("%w: share id is required", ErrInvalidKey)
 	}
-	key, err := resourceKey("shares", share.ID)
-	if err != nil {
-		return err
-	}
-	body, err := marshalStoreJSON(share)
-	if err != nil {
-		return err
-	}
-	return s.store.Write(ctx, key, body)
+	return s.writeJSON(ctx, "shares", share.ID, share)
 }
 
 func (s *MetaStore) GetShare(ctx context.Context, id string) (domain.Share, error) {
-	key, err := resourceKey("shares", id)
-	if err != nil {
-		return domain.Share{}, err
-	}
-	body, err := s.store.Read(ctx, key)
-	if err != nil {
-		return domain.Share{}, err
-	}
-	var share domain.Share
-	if err := json.Unmarshal(body, &share); err != nil {
-		return domain.Share{}, err
-	}
-	return share, nil
+	return s.readJSON[domain.Share](ctx, "shares", id)
 }
 
 func (s *MetaStore) ListShares(ctx context.Context) ([]domain.Share, error) {
@@ -155,10 +131,6 @@ func (s *MetaStore) DeleteShare(ctx context.Context, id string) error {
 }
 
 func (s *MetaStore) writeJSON(ctx context.Context, prefix string, name string, value any) error {
-	return writeJSON(ctx, s.store, prefix, name, value)
-}
-
-func writeJSON(ctx context.Context, resourceStore Store, prefix string, name string, value any) error {
 	key, err := resourceKey(prefix, name)
 	if err != nil {
 		return err
@@ -167,7 +139,7 @@ func writeJSON(ctx context.Context, resourceStore Store, prefix string, name str
 	if err != nil {
 		return err
 	}
-	return resourceStore.Write(ctx, key, body)
+	return s.store.Write(ctx, key, body)
 }
 
 func marshalStoreJSON(value any) ([]byte, error) {
@@ -181,32 +153,28 @@ func marshalStoreJSON(value any) ([]byte, error) {
 	return body.Bytes(), nil
 }
 
-func (s *MetaStore) readJSON(ctx context.Context, prefix string, name string, out any) error {
-	return readJSON(ctx, s.store, prefix, name, out)
-}
-
-func readJSON(ctx context.Context, resourceStore Store, prefix string, name string, out any) error {
+func (s *MetaStore) readJSON[T any](ctx context.Context, prefix string, name string) (T, error) {
+	var out T
 	key, err := resourceKey(prefix, name)
 	if err != nil {
-		return err
+		return out, err
 	}
-	body, err := resourceStore.Read(ctx, key)
+	body, err := s.store.Read(ctx, key)
 	if err != nil {
-		return err
+		return out, err
 	}
-	return json.Unmarshal(body, out)
+	if err := json.Unmarshal(body, &out); err != nil {
+		return out, err
+	}
+	return out, nil
 }
 
 func (s *MetaStore) deleteResource(ctx context.Context, prefix string, name string) error {
-	return deleteResource(ctx, s.store, prefix, name)
-}
-
-func deleteResource(ctx context.Context, resourceStore Store, prefix string, name string) error {
 	key, err := resourceKey(prefix, name)
 	if err != nil {
 		return err
 	}
-	return resourceStore.Delete(ctx, key)
+	return s.store.Delete(ctx, key)
 }
 
 func (s *MetaStore) list(ctx context.Context, kind, prefix string, enrich func([]byte, *domain.ResourceSummary)) ([]domain.ResourceSummary, error) {
