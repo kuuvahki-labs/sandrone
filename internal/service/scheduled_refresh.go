@@ -154,8 +154,7 @@ func (s *Service) refreshScheduledTarget(ctx context.Context, target domain.Sche
 }
 
 func scheduledRefreshErrorCode(err error) string {
-	var appErr *domain.AppError
-	if errors.As(err, &appErr) {
+	if appErr, ok := errors.AsType[*domain.AppError](err); ok {
 		return string(appErr.Code)
 	}
 	return "scheduled_refresh_failed"

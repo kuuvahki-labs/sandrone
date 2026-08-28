@@ -427,8 +427,7 @@ func (s Snapshot) Restore(ctx context.Context, resourceStore store.Store) error 
 
 // StoreOperation returns the failed Store operation for structured logging.
 func StoreOperation(err error) string {
-	var operationErr *backupStoreOperationError
-	if errors.As(err, &operationErr) {
+	if operationErr, ok := errors.AsType[*backupStoreOperationError](err); ok {
 		return operationErr.operation
 	}
 	return "unknown Store operation"

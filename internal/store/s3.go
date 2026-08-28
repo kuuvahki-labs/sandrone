@@ -259,16 +259,15 @@ func (s *S3Store) operationError(operation, key string, err error) error {
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return fmt.Errorf("s3 %s %s: %w", operation, key, err)
 	}
-	var apiErr smithy.APIError
-	if errors.As(err, &apiErr) {
+	if apiErr, ok := errors.AsType[smithy.APIError](err); ok {
 		return fmt.Errorf("s3 %s %s: provider error %s", operation, key, apiErr.ErrorCode())
 	}
 	return fmt.Errorf("s3 %s %s: provider request failed", operation, key)
 }
 
 func isS3NotFound(err error) bool {
-	var apiErr smithy.APIError
-	if !errors.As(err, &apiErr) {
+	apiErr, ok := errors.AsType[smithy.APIError](err)
+	if !ok {
 		return false
 	}
 	switch apiErr.ErrorCode() {

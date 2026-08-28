@@ -89,8 +89,7 @@ func readBackupBody(w http.ResponseWriter, r *http.Request) ([]byte, bool) {
 	defer func() { _ = r.Body.Close() }()
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBackupRestoreBodyBytes))
 	if err != nil {
-		var maxBytesErr *http.MaxBytesError
-		if errors.As(err, &maxBytesErr) {
+		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
 			writeError(w, domain.NewError(domain.CodeBackupTooLarge, "backup archive is too large"), http.StatusRequestEntityTooLarge)
 			return nil, false
 		}
@@ -139,8 +138,7 @@ func writeServiceError(w http.ResponseWriter, err error) {
 
 func writeError(w http.ResponseWriter, err error, status int) {
 	body := errorBody{Code: "internal_error", Message: err.Error()}
-	var appErr *domain.AppError
-	if errors.As(err, &appErr) {
+	if appErr, ok := errors.AsType[*domain.AppError](err); ok {
 		body.Code = string(appErr.Code)
 		body.Message = appErr.Message
 	}

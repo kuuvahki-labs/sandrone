@@ -216,8 +216,7 @@ func (r *runner) run(ctx context.Context, envelope ScriptEnvelope) (ScriptEnvelo
 				Message: fmt.Sprintf("script %s timed out", id),
 			}
 		}
-		var appErr *domain.AppError
-		if errors.As(err, &appErr) {
+		if appErr, ok := errors.AsType[*domain.AppError](err); ok {
 			return envelope, appErr
 		}
 		return envelope, &domain.AppError{

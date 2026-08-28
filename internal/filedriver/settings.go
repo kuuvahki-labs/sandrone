@@ -133,8 +133,7 @@ func settingsDecodeErrorPath(err error) string {
 		name := strings.Trim(message[len(unknownPrefix):], `"`)
 		return "unknown field config.settings." + name
 	}
-	var typeErr *json.UnmarshalTypeError
-	if errors.As(err, &typeErr) {
+	if typeErr, ok := errors.AsType[*json.UnmarshalTypeError](err); ok {
 		path := "config.settings"
 		if typeErr.Field != "" {
 			path += "." + typeErr.Field

@@ -110,8 +110,8 @@ func TestMergePartsYAMLOverrideReportsPartAndPathOnTypeError(t *testing.T) {
 
 	require.Error(t, err)
 	require.True(t, domain.IsCode(err, domain.CodeFileMergeFailed))
-	var appErr *domain.AppError
-	require.True(t, errors.As(err, &appErr))
+	appErr, ok := errors.AsType[*domain.AppError](err)
+	require.True(t, ok)
 	require.Equal(t, "sniffer-preset", appErr.Part)
 	require.Equal(t, "/dns/fake-ip-filter", appErr.Path)
 }
@@ -130,8 +130,8 @@ func TestMergeProcessorYAMLOverrideFailsAtomically(t *testing.T) {
 	require.Error(t, err)
 	require.True(t, domain.IsCode(err, domain.CodeFileMergeFailed))
 	require.Equal(t, original, out.File)
-	var appErr *domain.AppError
-	require.True(t, errors.As(err, &appErr))
+	appErr, ok := errors.AsType[*domain.AppError](err)
+	require.True(t, ok)
 	require.Equal(t, "overlay", appErr.Part)
 	require.Equal(t, "/dns/fake-ip-filter", appErr.Path)
 }
@@ -229,8 +229,8 @@ func TestMergePartsJSONOverrideRejectsNonJSONInput(t *testing.T) {
 
 	require.Error(t, err)
 	require.True(t, domain.IsCode(err, domain.CodeFileMergeFailed))
-	var appErr *domain.AppError
-	require.True(t, errors.As(err, &appErr))
+	appErr, ok := errors.AsType[*domain.AppError](err)
+	require.True(t, ok)
 	require.Equal(t, "preset", appErr.Part)
 	require.Empty(t, appErr.Path)
 }
@@ -338,8 +338,8 @@ func TestMergeProcessorJSONOverrideFailsAtomicallyWithPartAndPath(t *testing.T) 
 	require.Error(t, err)
 	require.True(t, domain.IsCode(err, domain.CodeFileMergeFailed))
 	require.Equal(t, original, out.File)
-	var appErr *domain.AppError
-	require.True(t, errors.As(err, &appErr))
+	appErr, ok := errors.AsType[*domain.AppError](err)
+	require.True(t, ok)
 	require.Equal(t, "overlay", appErr.Part)
 	require.Equal(t, "/dns/fake-ip-filter", appErr.Path)
 }

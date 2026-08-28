@@ -104,8 +104,7 @@ func (r *TraceRecorder) Snapshot() []domain.DiagnoseStage {
 }
 
 func appError(err error) *domain.AppError {
-	var existing *domain.AppError
-	if errors.As(err, &existing) {
+	if existing, ok := errors.AsType[*domain.AppError](err); ok {
 		cloned := *existing
 		cloned.Cause = nil
 		return &cloned

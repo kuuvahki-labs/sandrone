@@ -531,8 +531,7 @@ func diagnoseStatus(result *domain.DiagnoseResult) domain.DiagnoseStatus {
 }
 
 func diagnoseAppError(err error) *domain.AppError {
-	var appErr *domain.AppError
-	if errors.As(err, &appErr) {
+	if appErr, ok := errors.AsType[*domain.AppError](err); ok {
 		cloned := *appErr
 		cloned.Cause = nil
 		return &cloned

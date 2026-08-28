@@ -119,8 +119,7 @@ func wrapStageErr(code domain.ErrorCode, processor string, err error) error {
 	if err == nil {
 		return nil
 	}
-	var appErr *domain.AppError
-	if errors.As(err, &appErr) {
+	if appErr, ok := errors.AsType[*domain.AppError](err); ok {
 		if appErr.Processor == "" {
 			appErr.Processor = processor
 		}

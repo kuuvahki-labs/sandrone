@@ -70,8 +70,7 @@ func WrapError(code ErrorCode, message string, cause error) *AppError {
 }
 
 func IsCode(err error, code ErrorCode) bool {
-	var appErr *AppError
-	if errors.As(err, &appErr) {
+	if appErr, ok := errors.AsType[*AppError](err); ok {
 		return appErr.Code == code
 	}
 	return false

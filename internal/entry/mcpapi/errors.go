@@ -53,9 +53,9 @@ func newToolErrorResult(err error, context toolErrorContext) *mcp.CallToolResult
 		ResourceKind: context.ResourceKind,
 		ResourceName: context.ResourceName,
 	}
-	var appErr *domain.AppError
+	appErr, hasAppErr := errors.AsType[*domain.AppError](err)
 	switch {
-	case errors.As(err, &appErr):
+	case hasAppErr:
 		detail.Code = string(appErr.Code)
 		detail.Message = appErr.Message
 		detail.Source = publicErrorSource(appErr.Source)
@@ -184,8 +184,8 @@ func schemaErrorItemIndex(message string, current any, remaining [][]string) int
 }
 
 func contextualizeToolError(err error, context toolErrorContext, toolName string, input map[string]any) toolErrorContext {
-	var appErr *domain.AppError
-	if !errors.As(err, &appErr) {
+	appErr, ok := errors.AsType[*domain.AppError](err)
+	if !ok {
 		return context
 	}
 	if context.Field == "" && appErr.Path != "" {

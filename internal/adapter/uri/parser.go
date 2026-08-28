@@ -167,8 +167,8 @@ func safeListLineScheme(line string) string {
 }
 
 func safeListLineCause(err error) string {
-	var appErr *domain.AppError
-	if !errors.As(err, &appErr) || strings.TrimSpace(appErr.Message) == "" {
+	appErr, ok := errors.AsType[*domain.AppError](err)
+	if !ok || strings.TrimSpace(appErr.Message) == "" {
 		return "URI parse failed"
 	}
 	message := strings.Map(func(value rune) rune {

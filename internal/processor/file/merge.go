@@ -102,8 +102,7 @@ func mergeINIOverride(parts []domain.FilePart) ([]byte, error) {
 
 func iniOverridePartError(part, message string, cause error) error {
 	path := ""
-	var iniErr *inidoc.Error
-	if errors.As(cause, &iniErr) && iniErr.Section != "" {
+	if iniErr, ok := errors.AsType[*inidoc.Error](cause); ok && iniErr.Section != "" {
 		path = "/" + strings.NewReplacer("~", "~0", "/", "~1").Replace(iniErr.Section)
 	}
 	return &domain.AppError{

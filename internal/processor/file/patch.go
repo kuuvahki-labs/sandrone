@@ -140,8 +140,7 @@ func applyPatchOps(root any, ops []PatchOp, processorName string) (any, error) {
 	for i, op := range ops {
 		updated, err := applyPatchOp(current, op)
 		if err != nil {
-			var appErr *domain.AppError
-			if errors.As(err, &appErr) {
+			if appErr, ok := errors.AsType[*domain.AppError](err); ok {
 				appErr.Processor = processorName
 				return current, appErr
 			}

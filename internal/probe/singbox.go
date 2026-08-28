@@ -309,8 +309,7 @@ func errorCodeForUDPNTP(err error) string {
 	if errors.Is(err, context.Canceled) {
 		return "probe_context_canceled"
 	}
-	var netErr net.Error
-	if errors.As(err, &netErr) && netErr.Timeout() {
+	if netErr, ok := errors.AsType[net.Error](err); ok && netErr.Timeout() {
 		return string(domain.CodeProbeTimeout)
 	}
 	return string(domain.CodeProbeUDPNTPFailed)
