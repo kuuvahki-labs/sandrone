@@ -1,10 +1,10 @@
 package service
 
 import (
+	"crypto/sha1" //nolint:gosec // UUIDv5 is defined in terms of SHA-1; this is not used for security.
 	"fmt"
 	"strings"
-
-	"github.com/gofrs/uuid/v5"
+	"uuid"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
@@ -34,11 +34,11 @@ func normalizeNodeUUID(node *domain.NodeIR) {
 	if node == nil || strings.TrimSpace(node.UUID) == "" {
 		return
 	}
-	parsed, err := uuid.FromString(node.UUID)
+	parsed, err := uuid.Parse(node.UUID)
 	switch node.Type {
 	case domain.NodeTypeVMess, domain.NodeTypeVLESS:
 		if err != nil {
-			parsed = uuid.NewV5(uuid.Nil, node.UUID)
+			parsed = uuidV5NilNamespace(node.UUID)
 		}
 		node.UUID = parsed.String()
 	case domain.NodeTypeTUIC:
@@ -46,6 +46,15 @@ func normalizeNodeUUID(node *domain.NodeIR) {
 			node.UUID = parsed.String()
 		}
 	}
+}
+
+func uuidV5NilNamespace(name string) uuid.UUID {
+	digest := sha1.Sum(append(make([]byte, len(uuid.UUID{})), name...))
+	var id uuid.UUID
+	copy(id[:], digest[:len(id)])
+	id[6] = id[6]&0x0f | 0x50
+	id[8] = id[8]&0x3f | 0x80
+	return id
 }
 
 func normalizeNodeRealityClientFingerprints(node *domain.NodeIR) {

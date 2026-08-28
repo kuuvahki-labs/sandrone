@@ -62,8 +62,6 @@ func validationDropWarnings(nodes []domain.NodeIR, issues []domain.ValidationIss
 
 func prepareNodeBatch(nodes []domain.NodeIR) ([]domain.NodeIR, error) {
 	prepared := normalizeNodes(nodes)
-	if err := domain.AssignNodeRuntimeIDs(prepared); err != nil {
-		return nil, err
-	}
+	domain.AssignNodeRuntimeIDs(prepared)
 	return prepared, nil
 }

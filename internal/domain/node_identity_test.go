@@ -13,7 +13,7 @@ import (
 
 func TestNodeRuntimeIDIsUniqueAndRuntimeOnly(t *testing.T) {
 	nodes := []domain.NodeIR{{Name: "one"}, {Name: "two"}}
-	require.NoError(t, domain.AssignNodeRuntimeIDs(nodes))
+	domain.AssignNodeRuntimeIDs(nodes)
 	require.NotEmpty(t, domain.NodeRuntimeID(nodes[0]))
 	require.NotEqual(t, domain.NodeRuntimeID(nodes[0]), domain.NodeRuntimeID(nodes[1]))
 
@@ -69,10 +69,10 @@ func TestNodeConnectionKeyClassifiesEveryExportedNodeField(t *testing.T) {
 
 func TestAssignNodeRuntimeIDsPreservesUniqueAndReplacesCopies(t *testing.T) {
 	nodes := []domain.NodeIR{{Name: "one"}}
-	require.NoError(t, domain.AssignNodeRuntimeIDs(nodes))
+	domain.AssignNodeRuntimeIDs(nodes)
 	original := domain.NodeRuntimeID(nodes[0])
 	nodes = append(nodes, nodes[0])
-	require.NoError(t, domain.AssignNodeRuntimeIDs(nodes))
+	domain.AssignNodeRuntimeIDs(nodes)
 	require.Equal(t, original, domain.NodeRuntimeID(nodes[0]))
 	require.NotEqual(t, original, domain.NodeRuntimeID(nodes[1]))
 }

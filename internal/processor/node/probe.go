@@ -97,9 +97,7 @@ func (p *probeProc) ApplyNodes(ctx context.Context, in domain.NodeProcessInput) 
 		}, nil
 	}
 	nodes := append([]domain.NodeIR{}, in.Nodes...)
-	if err := domain.AssignNodeRuntimeIDs(nodes); err != nil {
-		return domain.NodeProcessOutput{}, &domain.AppError{Code: domain.CodeNodeProcessorFailed, Message: "assign node runtime identity", Processor: "probe", Cause: err}
-	}
+	domain.AssignNodeRuntimeIDs(nodes)
 	method := domain.ProbeMethod(p.params.Method)
 	core := strings.TrimSpace(p.params.Core)
 	url := strings.TrimSpace(p.params.URL)

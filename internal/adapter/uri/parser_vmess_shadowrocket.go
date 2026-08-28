@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gofrs/uuid/v5"
+	"uuid"
 
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/shared"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
@@ -140,7 +140,7 @@ func parseShadowrocketAuthority(payload, requiredCipher string) (string, string,
 	if !shadowrocketCipherToken(cipher) || requiredCipher != "" && cipher != requiredCipher {
 		return "", "", "", 0, true, domain.NewError(domain.CodeParseFailed, "unexpected encoded cipher")
 	}
-	if _, err := uuid.FromString(id); err != nil {
+	if _, err := uuid.Parse(id); err != nil {
 		return "", "", "", 0, true, domain.NewError(domain.CodeParseFailed, "invalid encoded uuid")
 	}
 	u, err := url.Parse("compat://" + authority)

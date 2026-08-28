@@ -8,7 +8,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/gofrs/uuid/v5"
+	"uuid"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
@@ -357,7 +357,7 @@ func validateTUIC(node domain.NodeIR, add func(string, string, string)) {
 }
 
 func validUUID(value string) bool {
-	_, err := uuid.FromString(value)
+	_, err := uuid.Parse(value)
 	return err == nil
 }
 

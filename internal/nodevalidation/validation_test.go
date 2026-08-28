@@ -30,7 +30,7 @@ func TestValidateKeepsValidNodesAndReportsInvalidNodesWithoutSecrets(t *testing.
 			Password: "must-not-leak",
 		},
 	}
-	require.NoError(t, domain.AssignNodeRuntimeIDs(nodes))
+	domain.AssignNodeRuntimeIDs(nodes)
 	result := nodevalidation.Validate(nodes, nodevalidation.StageNormalized, "mihomo-proxies")
 
 	require.Len(t, result.Nodes, 1)

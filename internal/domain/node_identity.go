@@ -4,8 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-
-	"github.com/gofrs/uuid/v5"
+	"uuid"
 )
 
 // NodeIdentity exposes the two identity dimensions of a normalized node.
@@ -18,7 +17,7 @@ type NodeIdentity struct {
 
 // AssignNodeRuntimeIDs ensures every node occurrence has a unique runtime ID.
 // Existing unique IDs survive processor passes; missing or copied IDs are new.
-func AssignNodeRuntimeIDs(nodes []NodeIR) error {
+func AssignNodeRuntimeIDs(nodes []NodeIR) {
 	seen := make(map[string]struct{}, len(nodes))
 	for index := range nodes {
 		id := nodes[index].runtimeID
@@ -29,11 +28,7 @@ func AssignNodeRuntimeIDs(nodes []NodeIR) error {
 			}
 		}
 		for {
-			generated, err := uuid.NewV4()
-			if err != nil {
-				return fmt.Errorf("generate runtime ID for node %d: %w", index, err)
-			}
-			id = generated.String()
+			id = uuid.New().String()
 			if _, exists := seen[id]; !exists {
 				break
 			}
@@ -41,7 +36,6 @@ func AssignNodeRuntimeIDs(nodes []NodeIR) error {
 		nodes[index].runtimeID = id
 		seen[id] = struct{}{}
 	}
-	return nil
 }
 
 // NodeRuntimeID returns the runtime-only occurrence ID attached to a node.
