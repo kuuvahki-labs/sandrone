@@ -60,7 +60,7 @@ export default defineConfig({
     host: "127.0.0.1",
   },
   ssr: {
-    noExternal: ["@mui/material", "@mui/icons-material", "react-transition-group"],
+    noExternal: ["@mui/material", "@mui/icons-material"],
   },
   test: {
     exclude: ["**/node_modules/**", "**/e2e/**"],
