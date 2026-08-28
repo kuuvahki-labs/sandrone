@@ -22,7 +22,7 @@ import {
   persistedResourceActionBlocker,
   persistedResourceActionDisabledReason,
 } from "~/shared/resources/persisted-resource-actions";
-import type { ResourceOption } from "~/shared/resources/types";
+import type { RemoteInputDefaults, ResourceOption } from "~/shared/resources/types";
 import { CodeBlock } from "~/shared/ui/code-editor";
 import { DiscardChangesDialog } from "~/shared/ui/dialogs";
 import { PageHeader } from "~/shared/ui/page";
@@ -37,12 +37,13 @@ export interface FileEditPageProps {
   onPreview: () => void;
   onSave: (form: FormData) => void | Promise<void>;
   onShare: () => void;
+  remoteDefaults?: RemoteInputDefaults;
   scriptFiles?: ResourceOption[];
   scriptTimeoutMS?: number;
   subscriptions?: ResourceOption[];
 }
 
-export function FileEditPage({ detail, detailPending = false, item, loadRuleSetCatalog, loadSubscriptionPreview, onBack, onPreview, onSave, onShare, scriptFiles, scriptTimeoutMS, subscriptions }: FileEditPageProps) {
+export function FileEditPage({ detail, detailPending = false, item, loadRuleSetCatalog, loadSubscriptionPreview, onBack, onPreview, onSave, onShare, remoteDefaults, scriptFiles, scriptTimeoutMS, subscriptions }: FileEditPageProps) {
   const { t } = useI18n();
   const [editSession, setEditSession] = useState(createEditSession);
   const [confirmLeave, setConfirmLeave] = useState(false);
@@ -142,6 +143,7 @@ export function FileEditPage({ detail, detailPending = false, item, loadRuleSetC
           onDirty={markDirty}
           onValidityChange={setValid}
           processorsDefault={detail?.processors}
+          remoteDefaults={remoteDefaults}
           scriptFiles={scriptFiles}
           scriptTimeoutMS={scriptTimeoutMS}
           sourceDefault={detail?.source}

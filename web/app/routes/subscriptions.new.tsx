@@ -8,6 +8,7 @@ import { createSubscriptionActions } from "~/features/subscriptions/data/create-
 import { useSubscriptionResources } from "~/features/subscriptions/data/use-subscription-resources";
 import { SubscriptionNewPage } from "~/features/subscriptions/pages/subscription-new-page";
 import { useI18n } from "~/shared/i18n/context";
+import { remoteInputDefaultsFromSettings } from "~/shared/resources/remote-input-defaults";
 import type { SubscriptionCreateType } from "~/shared/routing/paths";
 import { subscriptionNewPath } from "~/shared/routing/paths";
 
@@ -36,6 +37,7 @@ export default function NewSubscriptionRoute() {
     <SubscriptionNewPage
       probeCacheTTLSeconds={app.effectiveSettings.cache_defaults.probe_ttl_seconds}
       probeDefaults={app.effectiveSettings.probe_defaults}
+      remoteDefaults={remoteInputDefaultsFromSettings(app.effectiveSettings)}
       scriptFiles={files.items.map(({ name, title }) => ({ name, title }))}
       scriptTimeoutMS={app.effectiveSettings.script_defaults.timeout_ms}
       sources={subscriptions.items}

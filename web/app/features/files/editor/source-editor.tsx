@@ -6,7 +6,12 @@ import Typography from "@mui/material/Typography";
 
 import type { FileInputValidationCode } from "~/features/files/model/input-validation";
 import type { FileSourceDetail } from "~/features/files/model/types";
+import {
+  millisecondsToSecondsInput,
+  secondsInputToMilliseconds,
+} from "~/shared/api/duration";
 import { type Translator, useI18n } from "~/shared/i18n/context";
+import type { RemoteInputDefaults } from "~/shared/resources/types";
 import { HighlightedTextarea } from "~/shared/ui/code-editor";
 
 type SourceType = "inline" | "remote";
@@ -22,6 +27,7 @@ export function FileSourceEditor({
   onDirty,
   onValidityChange,
   placeholder,
+  remoteDefaults = emptyRemoteDefaults,
   remoteURLPlaceholder = "https://example.com/file.yaml",
   validateSource,
 }: {
@@ -33,6 +39,7 @@ export function FileSourceEditor({
   onDirty?: () => void;
   onValidityChange?: (valid: boolean) => void;
   placeholder?: string;
+  remoteDefaults?: RemoteInputDefaults;
   remoteURLPlaceholder?: string;
   validateSource?: (source: FileSourceDetail) => FileInputValidationCode | null;
 }) {
@@ -44,11 +51,11 @@ export function FileSourceEditor({
   const [url, setURL] = useState(initial?.remote?.url ?? "");
   const [userAgent, setUserAgent] = useState(initial?.remote?.user_agent ?? "");
   const [proxy, setProxy] = useState(initial?.remote?.proxy ?? "");
-  const [timeoutMS, setTimeoutMS] = useState(numberInputValue(initial?.remote?.timeout_ms));
-  const [cacheTTLSeconds, setCacheTTLSeconds] = useState(numberInputValue(initial?.remote?.cache_ttl_seconds));
+  const [timeoutSeconds, setTimeoutSeconds] = useState(millisecondsToSecondsInput(initial?.remote?.timeout_ms));
+  const [cacheTTLSeconds, setCacheTTLSeconds] = useState(positiveNumberInput(initial?.remote?.cache_ttl_seconds));
   const serialized = useMemo(
-    () => JSON.stringify(preserveImplicitSource ? {} : serializeSource({ cacheTTLSeconds, content, proxy, sourceType, timeoutMS, url, userAgent })),
-    [cacheTTLSeconds, content, preserveImplicitSource, proxy, sourceType, timeoutMS, url, userAgent],
+    () => JSON.stringify(preserveImplicitSource ? {} : serializeSource({ cacheTTLSeconds, content, proxy, sourceType, timeoutSeconds, url, userAgent })),
+    [cacheTTLSeconds, content, preserveImplicitSource, proxy, sourceType, timeoutSeconds, url, userAgent],
   );
   const validationError = validateSource ? validateSource(preserveImplicitSource
     ? {}
@@ -107,14 +114,11 @@ export function FileSourceEditor({
         <div className="grid gap-4">
           <TextField error={Boolean(validationError)} fullWidth helperText={validationError ? sourceValidationMessage(validationError, t) : undefined} label={t("files.form.remoteUrl")} placeholder={remoteURLPlaceholder} value={url} onChange={(event) => { onDirty?.(); setURL(event.target.value); }} />
           <div className="grid gap-4 md:grid-cols-2">
-            <TextField fullWidth label="User-Agent" value={userAgent} onChange={(event) => { onDirty?.(); setUserAgent(event.target.value); }} />
-            <TextField fullWidth label={t("files.form.proxy")} placeholder="http://127.0.0.1:7890" value={proxy} onChange={(event) => { onDirty?.(); setProxy(event.target.value); }} />
-            <TextField fullWidth label={t("files.form.timeoutMs")} type="number" value={timeoutMS} onChange={(event) => { onDirty?.(); setTimeoutMS(event.target.value); }} />
-            <TextField fullWidth label={t("cache.remoteFetchTTLSeconds")} type="number" value={cacheTTLSeconds} onChange={(event) => { onDirty?.(); setCacheTTLSeconds(event.target.value); }} />
+            <TextField fullWidth label="User-Agent" placeholder={remoteDefaults.userAgent} value={userAgent} onChange={(event) => { onDirty?.(); setUserAgent(event.target.value); }} />
+            <TextField fullWidth label={t("files.form.proxy")} placeholder={remoteDefaults.proxy || "http://127.0.0.1:7890"} value={proxy} onChange={(event) => { onDirty?.(); setProxy(event.target.value); }} />
+            <TextField fullWidth label={t("files.form.timeoutMs")} placeholder={millisecondsToSecondsInput(remoteDefaults.timeoutMS)} slotProps={{ htmlInput: durationInputProps }} type="number" value={timeoutSeconds} onChange={(event) => { onDirty?.(); setTimeoutSeconds(event.target.value); }} />
+            <TextField fullWidth label={t("cache.remoteFetchTTLSeconds")} placeholder={String(remoteDefaults.cacheTTLSeconds)} type="number" value={cacheTTLSeconds} onChange={(event) => { onDirty?.(); setCacheTTLSeconds(event.target.value); }} />
           </div>
-          <Typography color="text.secondary" variant="body2">
-            {t("files.form.remoteDescription")}
-          </Typography>
         </div>
       ) : null}
     </div>
@@ -134,7 +138,7 @@ type SourceDraft = {
   content: string;
   proxy: string;
   sourceType: SourceType;
-  timeoutMS: string;
+  timeoutSeconds: string;
   url: string;
   userAgent: string;
 };
@@ -158,8 +162,8 @@ function serializeSource(draft: SourceDraft): Record<string, unknown> {
       url: draft.url,
       user_agent: draft.userAgent,
       proxy: draft.proxy,
-      timeout_ms: numberOrUndefined(draft.timeoutMS),
-      cache_ttl_seconds: numberOrUndefined(draft.cacheTTLSeconds),
+      timeout_ms: positiveNumber(secondsInputToMilliseconds(draft.timeoutSeconds)),
+      cache_ttl_seconds: positiveNumber(numberOrUndefined(draft.cacheTTLSeconds)),
     }),
   });
 }
@@ -172,8 +176,8 @@ function cleanSource(source: Record<string, unknown>): Record<string, unknown> {
   }));
 }
 
-function numberInputValue(value: unknown): string {
-  return typeof value === "number" && Number.isFinite(value) ? String(value) : "";
+function positiveNumberInput(value: unknown): string {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? String(value) : "";
 }
 
 function numberOrUndefined(value: string): number | undefined {
@@ -181,3 +185,12 @@ function numberOrUndefined(value: string): number | undefined {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
 }
+
+function positiveNumber(value: number | undefined): number | undefined {
+  return value !== undefined && value > 0 ? value : undefined;
+}
+
+const emptyRemoteDefaults: RemoteInputDefaults = {
+  cacheTTLSeconds: 0,
+};
+const durationInputProps = { min: 0, step: "any" } as const;

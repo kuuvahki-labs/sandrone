@@ -6,17 +6,20 @@ import TextField from "@mui/material/TextField";
 import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 
+import {
+  millisecondsToSecondsInput,
+  secondsInputToMilliseconds,
+} from "~/shared/api/duration";
 import { useI18n } from "~/shared/i18n/context";
 import {
   cleanParams,
   keyValueTextToObject,
-  numberInputValue,
   numberOrEmpty,
   objectToKeyValueText,
   stringValue,
 } from "~/shared/processors/model";
 import { resourceOptionText } from "~/shared/resources/labels";
-import type { ResourceOption } from "~/shared/resources/types";
+import type { RemoteInputDefaults, ResourceOption } from "~/shared/resources/types";
 import { HighlightedTextarea } from "~/shared/ui/code-editor";
 
 type ScriptSourceMode = "inline" | "file" | "remote";
@@ -27,11 +30,13 @@ export function ScriptProcessorParamsEditor({
   defaultTimeoutMS,
   onChange,
   params,
+  remoteDefaults,
   scriptFiles = [],
 }: {
   defaultTimeoutMS?: number;
   onChange: (patch: Record<string, unknown>) => void;
   params: Record<string, unknown>;
+  remoteDefaults: RemoteInputDefaults;
   scriptFiles?: ResourceOption[];
 }) {
   const { t } = useI18n();
@@ -85,11 +90,12 @@ export function ScriptProcessorParamsEditor({
         />
       ) : null}
       {mode === "inline" ? (
-        <HighlightedTextarea showLineNumbers className="md:col-span-2" label={t("script.inline")} language="javascript" minRows={8} value={source.type === "inline" ? source.content : ""} onChange={(event) => onChange(sourcePatch({ type: "inline", content: event.target.value }))} />
+        <HighlightedTextarea showLineNumbers className="md:col-span-2" label={t("script.code")} language="javascript" minRows={8} value={source.type === "inline" ? source.content : ""} onChange={(event) => onChange(sourcePatch({ type: "inline", content: event.target.value }))} />
       ) : null}
       {mode === "remote" ? (
         <RemoteScriptFields
           source={source.type === "remote" ? source : { type: "remote", remote: {}, sha256: "" }}
+          remoteDefaults={remoteDefaults}
           t={t}
           onChange={(nextSource) => onChange(sourcePatch(nextSource))}
         />
@@ -99,10 +105,11 @@ export function ScriptProcessorParamsEditor({
         fullWidth
         helperText={t("script.executionTimeoutHint")}
         label={t("script.executionTimeoutMs")}
-        placeholder={defaultTimeoutMS === undefined ? undefined : String(defaultTimeoutMS)}
+        placeholder={millisecondsToSecondsInput(defaultTimeoutMS)}
+        slotProps={{ htmlInput: durationInputProps }}
         type="number"
-        value={numberInputValue(params.timeout_ms)}
-        onChange={(event) => onChange({ timeout_ms: numberOrEmpty(event.target.value) })}
+        value={millisecondsToSecondsInput(params.timeout_ms)}
+        onChange={(event) => onChange({ timeout_ms: secondsInputToMilliseconds(event.target.value) ?? "" })}
       />
     </>
   );
@@ -115,6 +122,9 @@ export function defaultScriptParams(): Record<string, unknown> {
 export function sanitizeScriptParams(params: Record<string, unknown>): Record<string, unknown> {
   const cleaned = cleanParams(params);
   const sanitized = Object.fromEntries(Object.entries(cleaned).filter(([key]) => scriptParamFields.has(key)));
+  if (!(typeof sanitized.timeout_ms === "number" && sanitized.timeout_ms > 0)) {
+    delete sanitized.timeout_ms;
+  }
   const source = sanitizeScriptSource(scriptSourceFromParams(params));
   if (source) {
     sanitized.source = source;
@@ -147,7 +157,7 @@ function ScriptFileSelect({ onChange, options, t, value }: { onChange: (value: s
   );
 }
 
-function RemoteScriptFields({ onChange, source, t }: { onChange: (source: RemoteScriptSourceDraft) => void; source: RemoteScriptSourceDraft; t: ReturnType<typeof useI18n>["t"] }) {
+function RemoteScriptFields({ onChange, remoteDefaults, source, t }: { onChange: (source: RemoteScriptSourceDraft) => void; remoteDefaults: RemoteInputDefaults; source: RemoteScriptSourceDraft; t: ReturnType<typeof useI18n>["t"] }) {
   const remote = source.remote ?? {};
   function updateRemote(patch: Partial<RemoteScriptDraft>) {
     onChange({ type: "remote", remote: cleanRemoteScriptDraft({ ...remote, ...patch }), sha256: source.sha256 });
@@ -155,10 +165,10 @@ function RemoteScriptFields({ onChange, source, t }: { onChange: (source: Remote
   return (
     <>
       <TextField className="md:col-span-2" fullWidth label={t("script.remoteUrl")} value={remote.url ?? ""} onChange={(event) => updateRemote({ url: event.target.value })} />
-      <TextField fullWidth label={t("script.remoteUserAgent")} value={remote.user_agent ?? ""} onChange={(event) => updateRemote({ user_agent: event.target.value })} />
-      <TextField fullWidth label={t("script.remoteProxy")} value={remote.proxy ?? ""} onChange={(event) => updateRemote({ proxy: event.target.value })} />
-      <TextField fullWidth label={t("script.remoteTimeoutMs")} type="number" value={numberInputValue(remote.timeout_ms)} onChange={(event) => updateRemote({ timeout_ms: numberOrEmpty(event.target.value) })} />
-      <TextField fullWidth label={t("cache.remoteFetchTTLSeconds")} type="number" value={numberInputValue(remote.cache_ttl_seconds)} onChange={(event) => updateRemote({ cache_ttl_seconds: numberOrEmpty(event.target.value) })} />
+      <TextField fullWidth label={t("script.remoteUserAgent")} placeholder={remoteDefaults.userAgent} value={remote.user_agent ?? ""} onChange={(event) => updateRemote({ user_agent: event.target.value })} />
+      <TextField fullWidth label={t("script.remoteProxy")} placeholder={remoteDefaults.proxy || "http://127.0.0.1:7890"} value={remote.proxy ?? ""} onChange={(event) => updateRemote({ proxy: event.target.value })} />
+      <TextField fullWidth label={t("script.remoteTimeoutMs")} placeholder={millisecondsToSecondsInput(remoteDefaults.timeoutMS)} slotProps={{ htmlInput: durationInputProps }} type="number" value={millisecondsToSecondsInput(remote.timeout_ms)} onChange={(event) => updateRemote({ timeout_ms: secondsInputToMilliseconds(event.target.value) ?? "" })} />
+      <TextField fullWidth label={t("cache.remoteFetchTTLSeconds")} placeholder={String(remoteDefaults.cacheTTLSeconds)} type="number" value={positiveNumberInput(remote.cache_ttl_seconds)} onChange={(event) => updateRemote({ cache_ttl_seconds: numberOrEmpty(event.target.value) })} />
       <TextField fullWidth label="SHA-256" value={source.sha256 ?? ""} onChange={(event) => onChange({ type: "remote", remote, sha256: event.target.value.trim() })} />
     </>
   );
@@ -252,8 +262,21 @@ function remoteScriptDraftFrom(value: unknown): RemoteScriptDraft {
 }
 
 function cleanRemoteScriptDraft(remote: RemoteScriptDraft): RemoteScriptDraft {
-  return cleanParams(remote as Record<string, unknown>) as RemoteScriptDraft;
+  const cleaned = cleanParams(remote as Record<string, unknown>) as RemoteScriptDraft;
+  if (!(typeof cleaned.timeout_ms === "number" && cleaned.timeout_ms > 0)) {
+    delete cleaned.timeout_ms;
+  }
+  if (!(typeof cleaned.cache_ttl_seconds === "number" && cleaned.cache_ttl_seconds > 0)) {
+    delete cleaned.cache_ttl_seconds;
+  }
+  return cleaned;
 }
+
+function positiveNumberInput(value: number | "" | undefined): string | number {
+  return typeof value === "number" && value > 0 ? value : "";
+}
+
+const durationInputProps = { min: 0, step: "any" } as const;
 
 function objectValue(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : {};

@@ -2,6 +2,7 @@ import type { NavigateFunction } from "react-router";
 
 import type { SubscriptionDefinition, SubscriptionItem } from "~/features/subscriptions/model/types";
 import type { ApiClient, SubscriptionInput } from "~/shared/api/client";
+import { secondsInputToMilliseconds } from "~/shared/api/duration";
 import { defaultTranslator, type Translator } from "~/shared/i18n/context";
 import { snapshotTTLFromForm } from "~/shared/resources/snapshot-cache-policy";
 import { sourceNameFromUrl, subscriptionEditPath } from "~/shared/routing/paths";
@@ -213,14 +214,14 @@ function sourceRemoteFromInput(form: FormData, sourceInput: string) {
   if (!isRemoteSubscriptionInput(sourceInput)) {
     return undefined;
   }
-  const timeout = optionalNumber(String(form.get("timeout_ms") ?? "").trim());
+  const timeout = secondsInputToMilliseconds(String(form.get("timeout_ms") ?? ""));
   const cacheTTLSeconds = optionalNumber(String(form.get("cache_ttl_seconds") ?? "").trim());
   return {
     url: sourceInput,
     user_agent: optionalString(form, "user_agent"),
     proxy: optionalString(form, "proxy"),
-    timeout_ms: timeout,
-    ...(cacheTTLSeconds === undefined ? {} : { cache_ttl_seconds: cacheTTLSeconds }),
+    ...(timeout !== undefined && timeout > 0 ? { timeout_ms: timeout } : {}),
+    ...(cacheTTLSeconds !== undefined && cacheTTLSeconds > 0 ? { cache_ttl_seconds: cacheTTLSeconds } : {}),
   };
 }
 

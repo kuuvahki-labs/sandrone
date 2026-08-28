@@ -116,7 +116,7 @@ describe("SubscriptionEditPage", () => {
     expect(screen.queryByRole("textbox", { name: "订阅地址" })).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "User-Agent" })).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "代理" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("spinbutton", { name: "超时毫秒" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("spinbutton", { name: "超时（秒）" })).not.toBeInTheDocument();
 
     fireEvent.change(localContentInput, { target: { value: "ss://converted" } });
     await user.click(screen.getByRole("button", { name: "保存订阅" }));
@@ -172,10 +172,10 @@ describe("SubscriptionEditPage", () => {
     expect(screen.getByRole("textbox", { name: "订阅地址" })).toHaveValue("https://example.com/sub");
     expect(screen.getByRole("textbox", { name: "User-Agent" })).toHaveValue("Sandrone Test");
     expect(screen.getByRole("textbox", { name: "代理" })).toHaveValue("http://127.0.0.1:7890");
-    expect(screen.getByRole("spinbutton", { name: "超时毫秒" })).toHaveValue(10000);
+    expect(screen.getByRole("spinbutton", { name: "超时（秒）" })).toHaveValue(10);
     expect(screen.getByRole("spinbutton", { name: "远程请求缓存（秒）" })).toHaveValue(45);
-    expect(screen.getByRole("combobox", { name: "订阅执行快照缓存" })).toHaveValue("custom");
-    expect(screen.getByRole("spinbutton", { name: "订阅执行快照缓存时长（秒）" })).toHaveValue(300);
+    expect(screen.getByRole("combobox", { name: "快照缓存" })).toHaveValue("custom");
+    expect(screen.getByRole("spinbutton", { name: "缓存时间（秒）" })).toHaveValue(300);
     expect(screen.queryByRole("textbox", { name: "SHA-256" })).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "期望状态" })).not.toBeInTheDocument();
     expect(screen.queryByRole("spinbutton", { name: "最大字节" })).not.toBeInTheDocument();
@@ -203,7 +203,7 @@ describe("SubscriptionEditPage", () => {
     expect(within(sourceInfo).getByRole("textbox", { name: "名称" })).toHaveValue("provider");
     expect(within(sourceInfo).getByRole("textbox", { name: "名称" })).toBeDisabled();
     expect(within(sourceInfo).getByRole("textbox", { name: "订阅地址" })).toHaveValue("https://example.com/sub");
-    expect(within(sourceInfo).getByRole("spinbutton", { name: "超时毫秒" })).toHaveValue(10000);
+    expect(within(sourceInfo).getByRole("spinbutton", { name: "超时（秒）" })).toHaveValue(10);
     const formatSelect = within(sourceInfo).getByRole("combobox", { name: "格式" });
     expect(formatSelect).toHaveValue("base64");
     expect(within(formatSelect).getByRole("option", { name: "自动" })).toHaveValue("auto");

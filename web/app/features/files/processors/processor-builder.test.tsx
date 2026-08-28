@@ -15,6 +15,7 @@ describe("FileProcessorBuilder", () => {
     render(
       <FileProcessorBuilder
         kind="mihomo"
+        remoteDefaults={{ cacheTTLSeconds: 120, proxy: "http://proxy.test", timeoutMS: 15000, userAgent: "Sandrone Global" }}
         defaultValue={[
           { name: "Remote script", type: "script", stage: "file", params: { source: { type: "remote", remote: { url: "https://example.com/process.js", cache_ttl_seconds: 300 } }, timeout_ms: 2000 } },
           { type: "merge", stage: "file", params: { mode: "yaml_override", content: "dns:\n  enable: true" } },
@@ -28,6 +29,16 @@ describe("FileProcessorBuilder", () => {
     ]);
 
     const remoteScript = screen.getByRole("group", { name: "处理器 Remote script" });
+    expect(within(remoteScript).getByRole("textbox", { name: "User-Agent" })).toHaveAttribute("placeholder", "Sandrone Global");
+    expect(within(remoteScript).getByRole("textbox", { name: "代理" })).toHaveAttribute("placeholder", "http://proxy.test");
+    expect(within(remoteScript).getByRole("spinbutton", { name: "拉取超时（秒）" })).toHaveAttribute("placeholder", "15");
+    fireEvent.change(within(remoteScript).getByRole("spinbutton", { name: "远程请求缓存（秒）" }), {
+      target: { value: "0" },
+    });
+    expect(currentProcessors()[0]).toMatchObject({
+      params: { source: { remote: { url: "https://example.com/process.js" } } },
+    });
+    expect((currentProcessors()[0].params?.source as { remote?: Record<string, unknown> }).remote).not.toHaveProperty("cache_ttl_seconds");
     fireEvent.change(within(remoteScript).getByRole("spinbutton", { name: "远程请求缓存（秒）" }), {
       target: { value: "450" },
     });
@@ -84,7 +95,7 @@ describe("FileProcessorBuilder", () => {
         },
       },
     });
-    expect(screen.getAllByRole("textbox", { name: "内联脚本" })).toHaveLength(2);
+    expect(screen.getAllByRole("textbox", { name: "代码" })).toHaveLength(2);
 
     await user.click(screen.getByRole("button", { name: "添加处理器" }));
     expect(currentProcessors()).toHaveLength(2);

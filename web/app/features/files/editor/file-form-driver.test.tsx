@@ -136,11 +136,49 @@ describe("FileSourceEditor", () => {
         cache_ttl_seconds: 45,
       },
     });
+    expect(screen.getByRole("spinbutton", { name: "超时（秒）" })).toHaveValue(2.5);
+
+    fireEvent.change(screen.getByRole("spinbutton", { name: "超时（秒）" }), { target: { value: "0" } });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "远程请求缓存（秒）" }), { target: { value: "0" } });
+    expect(currentSource()).toEqual({
+      type: "remote",
+      remote: {
+        url: "https://example.com/config.yaml",
+        user_agent: "Sandrone Tests",
+        proxy: "http://127.0.0.1:7890",
+      },
+    });
 
     await user.click(screen.getByRole("button", { name: "本地" }));
     fireEvent.change(screen.getByRole("textbox", { name: "内容" }), { target: { value: "port: 7890" } });
 
     expect(currentSource()).toEqual({ type: "inline", content: "port: 7890" });
+  });
+
+  it("shows inherited remote defaults as placeholders without serializing them", async () => {
+    const user = userEvent.setup();
+    render(
+      <FileSourceEditor
+        defaultValue={{ type: "remote", remote: { url: "https://example.com/config.yaml" } }}
+        remoteDefaults={{
+          cacheTTLSeconds: 300,
+          proxy: "http://127.0.0.1:7890",
+          timeoutMS: 15000,
+          userAgent: "Sandrone Global",
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("textbox", { name: "User-Agent" })).toHaveAttribute("placeholder", "Sandrone Global");
+    expect(screen.getByRole("textbox", { name: "代理" })).toHaveAttribute("placeholder", "http://127.0.0.1:7890");
+    expect(screen.getByRole("spinbutton", { name: "超时（秒）" })).toHaveAttribute("placeholder", "15");
+    expect(screen.getByRole("spinbutton", { name: "远程请求缓存（秒）" })).toHaveAttribute("placeholder", "300");
+    expect(currentSource()).toEqual({
+      type: "remote",
+      remote: { url: "https://example.com/config.yaml" },
+    });
+
+    await user.click(screen.getByRole("button", { name: "本地" }));
   });
 
   it("shows the driver base for an implicit source while preserving the empty source object", () => {

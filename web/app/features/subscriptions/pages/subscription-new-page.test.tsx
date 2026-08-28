@@ -11,7 +11,24 @@ describe("SubscriptionNewPage", () => {
     const user = userEvent.setup();
     const onCopySource = vi.fn(async (_value: string, _target: "content" | "url") => undefined);
 
-    render(<SubscriptionNewPage probeCacheTTLSeconds={probeCacheTTLSeconds} probeDefaults={probeDefaults} sources={subscriptions} type="remote" onBack={noop} onCopySource={onCopySource} onSave={noop} onTypeChange={noop} />);
+    render(
+      <SubscriptionNewPage
+        probeCacheTTLSeconds={probeCacheTTLSeconds}
+        probeDefaults={probeDefaults}
+        remoteDefaults={{ cacheTTLSeconds: 300, proxy: "http://proxy.test", timeoutMS: 15000, userAgent: "Sandrone Global" }}
+        sources={subscriptions}
+        type="remote"
+        onBack={noop}
+        onCopySource={onCopySource}
+        onSave={noop}
+        onTypeChange={noop}
+      />,
+    );
+
+    expect(screen.getByRole("textbox", { name: "User-Agent" })).toHaveAttribute("placeholder", "Sandrone Global");
+    expect(screen.getByRole("textbox", { name: "代理" })).toHaveAttribute("placeholder", "http://proxy.test");
+    expect(screen.getByRole("spinbutton", { name: "超时（秒）" })).toHaveAttribute("placeholder", "15");
+    expect(screen.getByRole("spinbutton", { name: "远程请求缓存（秒）" })).toHaveAttribute("placeholder", "300");
 
     fireEvent.change(screen.getByRole("textbox", { name: "订阅地址" }), {
       target: { value: "https://example.com/sub" },

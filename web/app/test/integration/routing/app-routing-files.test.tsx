@@ -142,7 +142,7 @@ describe("React Router app file workflows", () => {
     expect(within(contentSource).getByRole("textbox", { name: "远程地址" })).toHaveValue("https://example.com/base.yaml");
     expect(within(contentSource).getByRole("textbox", { name: "User-Agent" })).toHaveValue("Sandrone Tests");
     expect(within(contentSource).getByRole("textbox", { name: "代理" })).toHaveValue("http://127.0.0.1:7890");
-    expect(within(contentSource).getByRole("spinbutton", { name: "超时毫秒" })).toHaveValue(2500);
+    expect(within(contentSource).getByRole("spinbutton", { name: "超时（秒）" })).toHaveValue(2.5);
 
     await user.click(screen.getByRole("button", { name: "保存文件" }));
     await waitFor(() => {

@@ -5,6 +5,13 @@ export interface ResourceOption {
   title: string;
 }
 
+export interface RemoteInputDefaults {
+  cacheTTLSeconds: number;
+  proxy?: string;
+  timeoutMS?: number;
+  userAgent?: string;
+}
+
 export interface RemoteInputDetail {
   url?: string;
   user_agent?: string;

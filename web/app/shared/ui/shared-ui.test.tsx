@@ -398,12 +398,12 @@ describe("SnapshotCachePolicyField", () => {
   it("preserves explicit disable and exposes custom TTL input on demand", () => {
     render(<SnapshotCachePolicyField defaultValue={0} />);
 
-    const policy = screen.getByRole("combobox", { name: "订阅执行快照缓存" });
+    const policy = screen.getByRole("combobox", { name: "快照缓存" });
     expect(policy).toHaveValue("disabled");
-    expect(screen.queryByRole("spinbutton", { name: "订阅执行快照缓存时长（秒）" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("spinbutton", { name: "缓存时间（秒）" })).not.toBeInTheDocument();
 
     fireEvent.change(policy, { target: { value: "custom" } });
-    expect(screen.getByRole("spinbutton", { name: "订阅执行快照缓存时长（秒）" })).toBeInTheDocument();
+    expect(screen.getByRole("spinbutton", { name: "缓存时间（秒）" })).toBeInTheDocument();
   });
 });
 

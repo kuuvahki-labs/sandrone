@@ -32,7 +32,7 @@ import {
   processorLabel as modelProcessorLabel,
   stringValue,
 } from "~/shared/processors/model";
-import type { ProcessorDetail, ResourceOption } from "~/shared/resources/types";
+import type { ProcessorDetail, RemoteInputDefaults, ResourceOption } from "~/shared/resources/types";
 import type { SelectOption } from "~/shared/ui/form-fields";
 
 import { FileMergeParamsEditor } from "./merge-params-editor";
@@ -58,7 +58,7 @@ type PresetNotice = {
   removedLabels: string[];
 };
 
-export function FileProcessorBuilder({ defaultValue = [], kind, onDirty, onValidityChange, scriptFiles = [], scriptTimeoutMS }: { defaultValue?: ProcessorDetail[]; kind: FileKind; onDirty?: () => void; onValidityChange?: (valid: boolean) => void; scriptFiles?: ResourceOption[]; scriptTimeoutMS?: number }) {
+export function FileProcessorBuilder({ defaultValue = [], kind, onDirty, onValidityChange, remoteDefaults = emptyRemoteDefaults, scriptFiles = [], scriptTimeoutMS }: { defaultValue?: ProcessorDetail[]; kind: FileKind; onDirty?: () => void; onValidityChange?: (valid: boolean) => void; remoteDefaults?: RemoteInputDefaults; scriptFiles?: ResourceOption[]; scriptTimeoutMS?: number }) {
   const { t } = useI18n();
   const [presetNotice, setPresetNotice] = useState<PresetNotice | null>(null);
   const [validationIssueCount, setValidationIssueCount] = useState(0);
@@ -81,7 +81,7 @@ export function FileProcessorBuilder({ defaultValue = [], kind, onDirty, onValid
   ];
 
   function ParamsEditor(props: ProcessorParamsEditorProps) {
-    return <FileProcessorParamsEditor {...props} kind={kind} scriptFiles={scriptFiles} scriptTimeoutMS={scriptTimeoutMS} />;
+    return <FileProcessorParamsEditor {...props} kind={kind} remoteDefaults={remoteDefaults} scriptFiles={scriptFiles} scriptTimeoutMS={scriptTimeoutMS} />;
   }
 
   const serializeProcessorDraft = useCallback(
@@ -155,7 +155,7 @@ export function FileProcessorBuilder({ defaultValue = [], kind, onDirty, onValid
   );
 }
 
-function FileProcessorParamsEditor({ draft, kind, onChange, scriptFiles, scriptTimeoutMS }: ProcessorParamsEditorProps & { kind: FileKind; scriptFiles: ResourceOption[]; scriptTimeoutMS?: number }) {
+function FileProcessorParamsEditor({ draft, kind, onChange, remoteDefaults, scriptFiles, scriptTimeoutMS }: ProcessorParamsEditorProps & { kind: FileKind; remoteDefaults: RemoteInputDefaults; scriptFiles: ResourceOption[]; scriptTimeoutMS?: number }) {
 	const { t } = useI18n();
 	if (draft.opaque) {
 		return <Alert severity="info">{t("files.processor.opaquePreserved")}</Alert>;
@@ -163,13 +163,15 @@ function FileProcessorParamsEditor({ draft, kind, onChange, scriptFiles, scriptT
   const params = draft.params;
   switch (draft.type) {
     case "script":
-      return <ScriptProcessorParamsEditor defaultTimeoutMS={scriptTimeoutMS} params={params} scriptFiles={scriptFiles} onChange={onChange} />;
+      return <ScriptProcessorParamsEditor defaultTimeoutMS={scriptTimeoutMS} params={params} remoteDefaults={remoteDefaults} scriptFiles={scriptFiles} onChange={onChange} />;
     case "merge":
       return <FileMergeParamsEditor kind={kind} params={params} onChange={onChange} />;
     default:
       return <KeyValueParamsEditor params={params} onChange={onChange} />;
   }
 }
+
+const emptyRemoteDefaults: RemoteInputDefaults = { cacheTTLSeconds: 0 };
 
 function draftProcessors(processors: ProcessorDetail[]): ProcessorDraft[] {
 	return processors.map((processor, index) => {

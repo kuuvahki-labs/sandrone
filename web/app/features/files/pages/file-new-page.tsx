@@ -7,7 +7,7 @@ import type { LoadRuleSetCatalog } from "~/features/files/config/components/rule
 import { FILE_DRIVER_REGISTRY } from "~/features/files/drivers/registry";
 import { FileFormFields } from "~/features/files/editor/file-form";
 import { useI18n } from "~/shared/i18n/context";
-import type { ResourceOption } from "~/shared/resources/types";
+import type { RemoteInputDefaults, ResourceOption } from "~/shared/resources/types";
 import type { FileCreateSource } from "~/shared/routing/paths";
 import { DiscardChangesDialog } from "~/shared/ui/dialogs";
 import { PageHeader } from "~/shared/ui/page";
@@ -18,12 +18,13 @@ export interface FileNewPageProps {
   source: FileCreateSource;
   onBack: () => void;
   onSave: (kind: string, form: FormData) => void | Promise<void>;
+  remoteDefaults?: RemoteInputDefaults;
   scriptFiles?: ResourceOption[];
   scriptTimeoutMS?: number;
   subscriptions?: ResourceOption[];
 }
 
-export function FileNewPage({ loadRuleSetCatalog, loadSubscriptionPreview, source, onBack, onSave, scriptFiles, scriptTimeoutMS, subscriptions }: FileNewPageProps) {
+export function FileNewPage({ loadRuleSetCatalog, loadSubscriptionPreview, source, onBack, onSave, remoteDefaults, scriptFiles, scriptTimeoutMS, subscriptions }: FileNewPageProps) {
   const { t } = useI18n();
   const [dirty, setDirty] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
@@ -70,6 +71,7 @@ export function FileNewPage({ loadRuleSetCatalog, loadSubscriptionPreview, sourc
           mode="create"
           onDirty={() => setDirty(true)}
           onValidityChange={setValid}
+          remoteDefaults={remoteDefaults}
           scriptFiles={scriptFiles}
           scriptTimeoutMS={scriptTimeoutMS}
           sourceDefault={createPreset.sourceType === "remote" ? { type: "remote", remote: {} } : { type: "inline", content: "" }}

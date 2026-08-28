@@ -9,6 +9,10 @@ import {
   sanitizeProbeParams,
 } from "~/features/subscriptions/model/probe-processor";
 import type { ProbeDefaultsInput } from "~/shared/api/client";
+import {
+  millisecondsToSecondsInput,
+  secondsInputToMilliseconds,
+} from "~/shared/api/duration";
 import { useUICapabilities } from "~/shared/capabilities/context";
 import { type Translator, useI18n } from "~/shared/i18n/context";
 import {
@@ -35,7 +39,7 @@ import {
   stringValue,
   textToList,
 } from "~/shared/processors/model";
-import type { ProcessorDetail, ResourceOption } from "~/shared/resources/types";
+import type { ProcessorDetail, RemoteInputDefaults, ResourceOption } from "~/shared/resources/types";
 import { SelectField } from "~/shared/ui/form-fields";
 import { ProbeURLField } from "~/shared/ui/probe-url-field";
 
@@ -44,13 +48,13 @@ const fieldOptions = fields.map((field) => ({ value: field, label: field }));
 const informationNodePattern =
   "(?i)(网址|官网|流量|剩余|时间|应急|套餐|订阅|公告|重置|过期|到期|bandwidth|traffic|quota|reset|expire|expiry|expiration)";
 
-export function ProcessorBuilder({ defaultValue = [], onDirty, probeCacheTTLSeconds, probeDefaults, scriptFiles = [], scriptTimeoutMS }: { defaultValue?: ProcessorDetail[]; onDirty?: () => void; probeCacheTTLSeconds: number; probeDefaults: ProbeDefaultsInput; scriptFiles?: ResourceOption[]; scriptTimeoutMS?: number }) {
+export function ProcessorBuilder({ defaultValue = [], onDirty, probeCacheTTLSeconds, probeDefaults, remoteDefaults = emptyRemoteDefaults, scriptFiles = [], scriptTimeoutMS }: { defaultValue?: ProcessorDetail[]; onDirty?: () => void; probeCacheTTLSeconds: number; probeDefaults: ProbeDefaultsInput; remoteDefaults?: RemoteInputDefaults; scriptFiles?: ResourceOption[]; scriptTimeoutMS?: number }) {
   const { t } = useI18n();
   const { hasFeature } = useUICapabilities();
   const options = processorOptions(t, hasFeature("probe.enabled"));
 
   function ParamsEditor(props: ProcessorParamsEditorProps) {
-    return <ProcessorParamsEditor {...props} probeCacheTTLSeconds={probeCacheTTLSeconds} probeDefaults={probeDefaults} scriptFiles={scriptFiles} scriptTimeoutMS={scriptTimeoutMS} />;
+    return <ProcessorParamsEditor {...props} probeCacheTTLSeconds={probeCacheTTLSeconds} probeDefaults={probeDefaults} remoteDefaults={remoteDefaults} scriptFiles={scriptFiles} scriptTimeoutMS={scriptTimeoutMS} />;
   }
 
   return (
@@ -69,7 +73,7 @@ export function ProcessorBuilder({ defaultValue = [], onDirty, probeCacheTTLSeco
   );
 }
 
-function ProcessorParamsEditor({ draft, onChange, probeCacheTTLSeconds, probeDefaults, scriptFiles, scriptTimeoutMS }: ProcessorParamsEditorProps & { probeCacheTTLSeconds: number; probeDefaults: ProbeDefaultsInput; scriptFiles: ResourceOption[]; scriptTimeoutMS?: number }) {
+function ProcessorParamsEditor({ draft, onChange, probeCacheTTLSeconds, probeDefaults, remoteDefaults, scriptFiles, scriptTimeoutMS }: ProcessorParamsEditorProps & { probeCacheTTLSeconds: number; probeDefaults: ProbeDefaultsInput; remoteDefaults: RemoteInputDefaults; scriptFiles: ResourceOption[]; scriptTimeoutMS?: number }) {
   const { t } = useI18n();
   const params = draft.params;
   switch (draft.type) {
@@ -159,7 +163,7 @@ function ProcessorParamsEditor({ draft, onChange, probeCacheTTLSeconds, probeDef
               <TextField fullWidth label={t("processors.probe.expectedStatus")} placeholder="200-299" value={stringValue(params.expected_status)} onChange={(event) => onChange({ expected_status: event.target.value })} />
             </>
           ) : null}
-          <TextField fullWidth label={t("files.form.timeoutMs")} placeholder={String(probeDefaults.timeout_ms)} type="number" value={numberInputValue(params.timeout_ms)} onChange={(event) => onChange({ timeout_ms: numberOrEmpty(event.target.value) })} />
+          <TextField fullWidth label={t("files.form.timeoutMs")} placeholder={millisecondsToSecondsInput(probeDefaults.timeout_ms)} slotProps={{ htmlInput: durationInputProps }} type="number" value={millisecondsToSecondsInput(params.timeout_ms)} onChange={(event) => onChange({ timeout_ms: secondsInputToMilliseconds(event.target.value) ?? "" })} />
           <TextField fullWidth label={t("processors.probe.attempts")} placeholder={String(probeDefaults.attempts)} type="number" value={numberInputValue(params.attempts)} onChange={(event) => onChange({ attempts: numberOrEmpty(event.target.value) })} />
           <TextField fullWidth label={t("processors.probe.concurrency")} placeholder={String(probeDefaults.concurrency)} type="number" value={numberInputValue(params.concurrency)} onChange={(event) => onChange({ concurrency: numberOrEmpty(event.target.value) })} />
           <TextField fullWidth label={t("processors.probe.cacheTTLSeconds")} placeholder={String(probeCacheTTLSeconds)} type="number" value={numberInputValue(params.cache_ttl_seconds)} onChange={(event) => onChange({ cache_ttl_seconds: numberOrEmpty(event.target.value) })} />
@@ -183,11 +187,14 @@ function ProcessorParamsEditor({ draft, onChange, probeCacheTTLSeconds, probeDef
       );
     }
     case "script":
-      return <ScriptProcessorParamsEditor defaultTimeoutMS={scriptTimeoutMS} params={params} scriptFiles={scriptFiles} onChange={onChange} />;
+      return <ScriptProcessorParamsEditor defaultTimeoutMS={scriptTimeoutMS} params={params} remoteDefaults={remoteDefaults} scriptFiles={scriptFiles} onChange={onChange} />;
     default:
       return <KeyValueParamsEditor params={params} onChange={onChange} />;
   }
 }
+
+const emptyRemoteDefaults: RemoteInputDefaults = { cacheTTLSeconds: 0 };
+const durationInputProps = { min: 0, step: "any" } as const;
 
 function processorLabel(type: string, t: Translator): string {
   return processorOptions(t).find((option) => option.value === type)?.label ?? type;

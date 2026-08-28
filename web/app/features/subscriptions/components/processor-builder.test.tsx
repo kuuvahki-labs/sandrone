@@ -134,7 +134,7 @@ describe("ProcessorBuilder", () => {
     expect(probeGroup).not.toHaveTextContent(/sing-box|mihomo/);
     expect(within(probeGroup).getByRole("combobox", { name: "URL" })).toHaveValue("https://www.gstatic.com/generate_204");
     expect(within(probeGroup).getByRole("textbox", { name: "期望状态" })).toHaveValue("204");
-    expect(within(probeGroup).getByRole("spinbutton", { name: "超时毫秒" })).toHaveValue(5000);
+    expect(within(probeGroup).getByRole("spinbutton", { name: "超时（秒）" })).toHaveValue(5);
     expect(within(probeGroup).getByRole("spinbutton", { name: "尝试次数" })).toHaveValue(2);
     expect(within(probeGroup).getByRole("spinbutton", { name: "并发数" })).toHaveValue(3);
     expect(within(probeGroup).getByRole("spinbutton", { name: "测活结果缓存（秒）" })).toHaveValue(300);
@@ -214,8 +214,8 @@ describe("ProcessorBuilder", () => {
     const probeURL = within(probeGroup).getByRole("combobox", { name: "URL" });
     expect(probeURL).toHaveValue("");
     expect(probeURL).toHaveAttribute("placeholder", "https://cp.cloudflare.com");
-    expect(within(probeGroup).getByRole("spinbutton", { name: "超时毫秒" })).toHaveValue(null);
-    expect(within(probeGroup).getByRole("spinbutton", { name: "超时毫秒" })).toHaveAttribute("placeholder", "5000");
+    expect(within(probeGroup).getByRole("spinbutton", { name: "超时（秒）" })).toHaveValue(null);
+    expect(within(probeGroup).getByRole("spinbutton", { name: "超时（秒）" })).toHaveAttribute("placeholder", "5");
     expect(within(probeGroup).getByRole("spinbutton", { name: "尝试次数" })).toHaveValue(null);
     expect(within(probeGroup).getByRole("spinbutton", { name: "尝试次数" })).toHaveAttribute("placeholder", "1");
     expect(within(probeGroup).getByRole("spinbutton", { name: "并发数" })).toHaveValue(null);
@@ -358,22 +358,22 @@ describe("ProcessorBuilder", () => {
       scriptTimeoutMS: 3500,
     });
 
-    const scriptGroup = screen.getByRole("group", { name: "处理器 脚本处理" });
+    const scriptGroup = screen.getByRole("group", { name: "处理器 脚本" });
     expect(within(scriptGroup).queryByRole("combobox", { name: "第 2 个处理器类型" })).not.toBeInTheDocument();
-    expect(within(scriptGroup).getByRole("group", { name: "脚本来源" })).toBeInTheDocument();
-    expect(within(scriptGroup).getByRole("button", { name: "内联脚本" })).toHaveAttribute("aria-pressed", "true");
-    const contentInput = within(scriptGroup).getByRole("textbox", { name: "内联脚本" });
+    expect(within(scriptGroup).getByRole("group", { name: "来源" })).toBeInTheDocument();
+    expect(within(scriptGroup).getByRole("button", { name: "内联" })).toHaveAttribute("aria-pressed", "true");
+    const contentInput = within(scriptGroup).getByRole("textbox", { name: "代码" });
     expect(contentInput).toHaveValue("return input;");
     const contentEditor = contentInput.closest("[data-highlighted-textarea]");
     expect(contentEditor).toHaveAttribute("data-highlighted-textarea", "javascript");
     expect(contentEditor?.querySelector('[data-line-number="1"]')).toHaveTextContent("1");
     expect(contentInput.closest(".md\\:col-span-2")).toBeInTheDocument();
     expect(within(scriptGroup).queryByRole("textbox", { name: "脚本路径" })).not.toBeInTheDocument();
-    const argsInput = within(scriptGroup).getByRole("textbox", { name: "脚本参数" });
+    const argsInput = within(scriptGroup).getByRole("textbox", { name: "参数" });
     expect(argsInput.closest("[data-highlighted-textarea]")).toHaveAttribute("data-highlighted-textarea", "text");
     expect(argsInput).toHaveValue("flag=true\nin=zh");
-    expect(within(scriptGroup).getByRole("spinbutton", { name: "脚本执行超时（毫秒）" })).toHaveValue(5000);
-    expect(within(scriptGroup).getByRole("spinbutton", { name: "脚本执行超时（毫秒）" })).toHaveAttribute("placeholder", "3500");
+    expect(within(scriptGroup).getByRole("spinbutton", { name: "执行超时（秒）" })).toHaveValue(5);
+    expect(within(scriptGroup).getByRole("spinbutton", { name: "执行超时（秒）" })).toHaveAttribute("placeholder", "3.5");
     expect(within(scriptGroup).queryByRole("textbox", { name: "脚本 ID" })).not.toBeInTheDocument();
 
     const customGroup = screen.getByRole("group", { name: "处理器 custom" });
@@ -382,9 +382,9 @@ describe("ProcessorBuilder", () => {
     expect(paramsInput.closest("[data-highlighted-textarea]")).toHaveAttribute("data-highlighted-textarea", "text");
     fireEvent.change(paramsInput, { target: { value: "enabled=false\nthreshold=3" } });
 
-    await user.click(within(scriptGroup).getByRole("button", { name: "文件脚本" }));
-    expect(within(scriptGroup).queryByRole("textbox", { name: "内联脚本" })).not.toBeInTheDocument();
-    const scriptFileSelect = within(scriptGroup).getByRole("combobox", { name: "脚本文件" });
+    await user.click(within(scriptGroup).getByRole("button", { name: "文件" }));
+    expect(within(scriptGroup).queryByRole("textbox", { name: "代码" })).not.toBeInTheDocument();
+    const scriptFileSelect = within(scriptGroup).getByRole("combobox", { name: "文件" });
     expect(scriptFileSelect).toHaveValue("rename.js");
     expect(within(scriptFileSelect).getByRole("option", { name: "Rename Nodes (rename.js)" })).toBeInTheDocument();
     expect(within(scriptGroup).queryByRole("textbox", { name: "脚本路径" })).not.toBeInTheDocument();

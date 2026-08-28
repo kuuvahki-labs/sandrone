@@ -16,8 +16,9 @@ import Typography from "@mui/material/Typography";
 
 import type { SubscriptionDefinition, SubscriptionItem } from "~/features/subscriptions/model/types";
 import type { ProbeDefaultsInput } from "~/shared/api/client";
+import { millisecondsToSecondsInput } from "~/shared/api/duration";
 import { useI18n } from "~/shared/i18n/context";
-import type { ResourceOption } from "~/shared/resources/types";
+import type { RemoteInputDefaults, ResourceOption } from "~/shared/resources/types";
 import type { SubscriptionCreateType } from "~/shared/routing/paths";
 import { HighlightedTextarea } from "~/shared/ui/code-editor";
 import { SnapshotCachePolicyField } from "~/shared/ui/snapshot-cache-policy-field";
@@ -34,6 +35,7 @@ export interface SubscriptionFormFieldsProps {
   onTypeChange: (type: SubscriptionCreateType) => void;
   probeCacheTTLSeconds: number;
   probeDefaults: ProbeDefaultsInput;
+  remoteDefaults?: RemoteInputDefaults;
   scriptFiles?: ResourceOption[];
   scriptTimeoutMS?: number;
   sources: SubscriptionItem[];
@@ -44,7 +46,7 @@ export type SubscriptionCopyTarget = "content" | "url";
 
 const emptySourceRefs: string[] = [];
 
-export function SubscriptionFormFields({ definition, item, mode, onCopySource, onDirty, onTypeChange, probeCacheTTLSeconds, probeDefaults, scriptFiles, scriptTimeoutMS, sources, type }: SubscriptionFormFieldsProps) {
+export function SubscriptionFormFields({ definition, item, mode, onCopySource, onDirty, onTypeChange, probeCacheTTLSeconds, probeDefaults, remoteDefaults = emptyRemoteDefaults, scriptFiles, scriptTimeoutMS, sources, type }: SubscriptionFormFieldsProps) {
   const { t } = useI18n();
   const meta = definition?.meta ?? (item?.description ? { description: item.description } : {});
   const description = meta.description ?? item?.description ?? "";
@@ -117,10 +119,10 @@ export function SubscriptionFormFields({ definition, item, mode, onCopySource, o
                 onChange={(event) => setSourceInputValue(event.target.value)}
               />
               <SubscriptionFormatField defaultValue={formatDefaultValue(type, item, definition)} />
-              <TextField fullWidth defaultValue={remote?.user_agent ?? ""} label="User-Agent" name="user_agent" />
-              <TextField fullWidth defaultValue={remote?.proxy ?? ""} label={t("subscriptions.form.proxy")} name="proxy" placeholder="http://127.0.0.1:7890" />
-              <TextField fullWidth defaultValue={remote?.timeout_ms ?? ""} label={t("subscriptions.form.timeoutMs")} name="timeout_ms" type="number" />
-              <TextField fullWidth defaultValue={remote?.cache_ttl_seconds ?? ""} label={t("cache.remoteFetchTTLSeconds")} name="cache_ttl_seconds" type="number" />
+              <TextField fullWidth defaultValue={remote?.user_agent ?? ""} label="User-Agent" name="user_agent" placeholder={remoteDefaults.userAgent} />
+              <TextField fullWidth defaultValue={remote?.proxy ?? ""} label={t("subscriptions.form.proxy")} name="proxy" placeholder={remoteDefaults.proxy || "http://127.0.0.1:7890"} />
+              <TextField fullWidth defaultValue={millisecondsToSecondsInput(remote?.timeout_ms)} label={t("subscriptions.form.timeoutMs")} name="timeout_ms" placeholder={millisecondsToSecondsInput(remoteDefaults.timeoutMS)} slotProps={{ htmlInput: durationInputProps }} type="number" />
+              <TextField fullWidth defaultValue={positiveNumberInput(remote?.cache_ttl_seconds)} label={t("cache.remoteFetchTTLSeconds")} name="cache_ttl_seconds" placeholder={String(remoteDefaults.cacheTTLSeconds)} type="number" />
               {mode === "edit" ? <input name="meta" type="hidden" defaultValue={formatJSONForForm(meta)} /> : null}
             </>
           ) : null}
@@ -167,11 +169,18 @@ export function SubscriptionFormFields({ definition, item, mode, onCopySource, o
         <Typography className="px-1 font-semibold" component="legend">
           {t("subscriptions.form.processors")}
         </Typography>
-        <ProcessorBuilder defaultValue={processorDefaultValue} onDirty={onDirty} probeCacheTTLSeconds={probeCacheTTLSeconds} probeDefaults={probeDefaults} scriptFiles={scriptFiles} scriptTimeoutMS={scriptTimeoutMS} />
+        <ProcessorBuilder defaultValue={processorDefaultValue} onDirty={onDirty} probeCacheTTLSeconds={probeCacheTTLSeconds} probeDefaults={probeDefaults} remoteDefaults={remoteDefaults} scriptFiles={scriptFiles} scriptTimeoutMS={scriptTimeoutMS} />
       </Paper>
     </div>
   );
 }
+
+function positiveNumberInput(value: number | undefined): string | number {
+  return value !== undefined && value > 0 ? value : "";
+}
+
+const emptyRemoteDefaults: RemoteInputDefaults = { cacheTTLSeconds: 0 };
+const durationInputProps = { min: 0, step: "any" } as const;
 
 function SubscriptionTypeOptions({ active, ariaLabel, onSelect }: { active: SubscriptionCreateType; ariaLabel: string; onSelect: (type: SubscriptionCreateType) => void }) {
   const { t } = useI18n();

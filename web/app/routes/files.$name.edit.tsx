@@ -12,6 +12,7 @@ import { useShareDialog } from "~/features/shares/components/share-dialog-contex
 import { useSubscriptionResources } from "~/features/subscriptions/data/use-subscription-resources";
 import { subscriptionPreviewFromAPI } from "~/features/subscriptions/model/codec";
 import { useI18n } from "~/shared/i18n/context";
+import { remoteInputDefaultsFromSettings } from "~/shared/resources/remote-input-defaults";
 import { decodeResourceRouteParam, filePreviewPath } from "~/shared/routing/paths";
 import { ResourceLoadingCard } from "~/shared/ui/feedback";
 import { MissingResource } from "~/shared/ui/missing-resource";
@@ -89,6 +90,7 @@ export default function FileEditRoute() {
       onPreview={() => navigate(filePreviewPath(item.name, "edit"))}
       onSave={(form) => fileActions.saveFileEdit(item, form, detail)}
       onShare={() => shareDialog.open({ kind: "file", name: item.name })}
+      remoteDefaults={remoteInputDefaultsFromSettings(app.effectiveSettings)}
       scriptFiles={files.items.map(({ name, title }) => ({ name, title }))}
       scriptTimeoutMS={app.effectiveSettings.script_defaults.timeout_ms}
       subscriptions={subscriptions.items.map(({ name, title }) => ({ name, title }))}

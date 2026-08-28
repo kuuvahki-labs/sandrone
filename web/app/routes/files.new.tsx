@@ -13,6 +13,7 @@ import { useShareDialog } from "~/features/shares/components/share-dialog-contex
 import { useSubscriptionResources } from "~/features/subscriptions/data/use-subscription-resources";
 import { subscriptionPreviewFromAPI } from "~/features/subscriptions/model/codec";
 import { useI18n } from "~/shared/i18n/context";
+import { remoteInputDefaultsFromSettings } from "~/shared/resources/remote-input-defaults";
 import type { FileCreateSource } from "~/shared/routing/paths";
 
 export default function NewFileRoute() {
@@ -47,6 +48,7 @@ export default function NewFileRoute() {
       source={source}
       onBack={() => navigate("/files")}
       onSave={fileActions.createFile}
+      remoteDefaults={remoteInputDefaultsFromSettings(app.effectiveSettings)}
       scriptFiles={files.items.map(({ name, title }) => ({ name, title }))}
       scriptTimeoutMS={app.effectiveSettings.script_defaults.timeout_ms}
       subscriptions={subscriptions.items.map(({ name, title }) => ({ name, title }))}

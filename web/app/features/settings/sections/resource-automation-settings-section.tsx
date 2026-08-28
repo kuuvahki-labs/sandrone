@@ -48,14 +48,9 @@ export function ResourceAutomationSettingsSection({
         <Typography component="h3" variant="h6">{t("settings.automation.title")}</Typography>
         <section aria-labelledby="subscription-traffic-heading" className="grid gap-2">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="grid gap-1">
-              <Typography component="h4" id="subscription-traffic-heading" variant="subtitle1">
-                {t("settings.subscriptionTraffic.title")}
-              </Typography>
-              <Typography color="text.secondary" variant="body2">
-                {t("settings.subscriptionTraffic.description")}
-              </Typography>
-            </div>
+            <Typography component="h4" id="subscription-traffic-heading" variant="subtitle1">
+              {t("settings.subscriptionTraffic.title")}
+            </Typography>
             <FormControlLabel
               className="m-0 shrink-0"
               control={(
@@ -73,14 +68,9 @@ export function ResourceAutomationSettingsSection({
             <Divider />
             <section aria-labelledby="scheduled-refresh-heading" className="grid gap-4">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div className="grid gap-1">
-                  <Typography component="h4" id="scheduled-refresh-heading" variant="subtitle1">
-                    {t("settings.scheduledRefresh.title")}
-                  </Typography>
-                  <Typography color="text.secondary" variant="body2">
-                    {t("settings.scheduledRefresh.description")}
-                  </Typography>
-                </div>
+                <Typography component="h4" id="scheduled-refresh-heading" variant="subtitle1">
+                  {t("settings.scheduledRefresh.title")}
+                </Typography>
                 <FormControlLabel
                   className="m-0 shrink-0"
                   control={(

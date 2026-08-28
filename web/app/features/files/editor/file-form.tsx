@@ -10,7 +10,7 @@ import type { FileDriverDefinition } from "~/features/files/drivers/core/file-dr
 import type { FileConfigDetail, FileSourceDetail } from "~/features/files/model/types";
 import { FileProcessorBuilder } from "~/features/files/processors/processor-builder";
 import { useI18n } from "~/shared/i18n/context";
-import type { ProcessorDetail, ResourceOption } from "~/shared/resources/types";
+import type { ProcessorDetail, RemoteInputDefaults, ResourceOption } from "~/shared/resources/types";
 
 import { requireFileDriverUI } from "./file-driver-ui-registry";
 import { FileTypeSummary } from "./file-type-summary";
@@ -29,6 +29,7 @@ export interface FileFormFieldsProps {
   onDirty?: () => void;
   onValidityChange?: (valid: boolean) => void;
   processorsDefault?: ProcessorDetail[];
+  remoteDefaults?: RemoteInputDefaults;
   scriptFiles?: ResourceOption[];
   scriptTimeoutMS?: number;
   sourceDefault?: FileSourceDetail;
@@ -36,7 +37,7 @@ export interface FileFormFieldsProps {
   subscriptions?: ResourceOption[];
 }
 
-export function FileFormFields({ configDefault, defaultName, description = "", displayName = "", driver, loadRuleSetCatalog, loadSubscriptionPreview, mode, onDirty, onValidityChange, processorsDefault, scriptFiles, scriptTimeoutMS, sourceDefault, sourceEditorKey, subscriptions = [] }: FileFormFieldsProps) {
+export function FileFormFields({ configDefault, defaultName, description = "", displayName = "", driver, loadRuleSetCatalog, loadSubscriptionPreview, mode, onDirty, onValidityChange, processorsDefault, remoteDefaults, scriptFiles, scriptTimeoutMS, sourceDefault, sourceEditorKey, subscriptions = [] }: FileFormFieldsProps) {
   const { locale, t } = useI18n();
   const initialConfigDraft = driver.configuration.mode === "structured"
     ? driver.configuration.adapter.decode(configDefault, locale)
@@ -96,6 +97,7 @@ export function FileFormFields({ configDefault, defaultName, description = "", d
                 onValidityChange={setSourceValid}
                 placeholder={driver.source.basePlaceholder}
                 preserveImplicit={driver.source.strategy === "optional-base"}
+                remoteDefaults={remoteDefaults}
                 remoteURLPlaceholder={driver.source.remoteURLPlaceholder}
                 validateSource={driver.source.validate}
               />
@@ -114,11 +116,11 @@ export function FileFormFields({ configDefault, defaultName, description = "", d
         </section>
       ) : (
         <WorkbenchGroupSection collapsible={false} id="file-content-source" label={t("files.form.contentSource")}>
-          <FileSourceEditor defaultValue={sourceDefault} key={sourceEditorKey} onDirty={onDirty} />
+          <FileSourceEditor defaultValue={sourceDefault} key={sourceEditorKey} onDirty={onDirty} remoteDefaults={remoteDefaults} />
         </WorkbenchGroupSection>
       )}
       <WorkbenchGroupSection keepMounted defaultExpanded id="file-processors" label={t("files.form.processors")}>
-        <FileProcessorBuilder defaultValue={processors} key={driver.kind} kind={driver.kind} onDirty={onDirty} onValidityChange={setProcessorsValid} scriptFiles={scriptFiles} scriptTimeoutMS={scriptTimeoutMS} />
+        <FileProcessorBuilder defaultValue={processors} key={driver.kind} kind={driver.kind} onDirty={onDirty} onValidityChange={setProcessorsValid} remoteDefaults={remoteDefaults} scriptFiles={scriptFiles} scriptTimeoutMS={scriptTimeoutMS} />
       </WorkbenchGroupSection>
     </div>
   );

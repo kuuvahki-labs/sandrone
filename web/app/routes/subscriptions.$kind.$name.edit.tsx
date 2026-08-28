@@ -10,6 +10,7 @@ import { useSubscriptionDetailsResource, useSubscriptionResources } from "~/feat
 import type { SubscriptionDefinition, SubscriptionItem } from "~/features/subscriptions/model/types";
 import { SubscriptionEditPage } from "~/features/subscriptions/pages/subscription-edit-page";
 import { useI18n } from "~/shared/i18n/context";
+import { remoteInputDefaultsFromSettings } from "~/shared/resources/remote-input-defaults";
 import { decodeResourceRouteParam, subscriptionKind, subscriptionPreviewPath } from "~/shared/routing/paths";
 import { ResourceLoadingCard } from "~/shared/ui/feedback";
 import { MissingResource } from "~/shared/ui/missing-resource";
@@ -103,6 +104,7 @@ export default function SubscriptionEditRoute() {
       onShare={() => shareDialog.open({ kind: "subscription", name: item.name })}
       probeCacheTTLSeconds={app.effectiveSettings.cache_defaults.probe_ttl_seconds}
       probeDefaults={app.effectiveSettings.probe_defaults}
+      remoteDefaults={remoteInputDefaultsFromSettings(app.effectiveSettings)}
       scriptFiles={files.items.map(({ name, title }) => ({ name, title }))}
       scriptTimeoutMS={app.effectiveSettings.script_defaults.timeout_ms}
       sources={sourceItems}

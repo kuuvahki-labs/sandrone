@@ -8,6 +8,10 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 
 import type { SettingsView } from "~/shared/api/client";
+import {
+  millisecondsToSecondsInput,
+  secondsInputToMillisecondsOrZero,
+} from "~/shared/api/duration";
 import { useUICapabilities } from "~/shared/capabilities/context";
 import { useI18n } from "~/shared/i18n/context";
 import { ProbeURLField } from "~/shared/ui/probe-url-field";
@@ -62,7 +66,7 @@ export function RuntimeSettingsSection({
           {t("settings.runtime.title")}
         </Typography>
         <Typography color="text.secondary" variant="body2">
-          {t("settings.runtime.description")}
+          {t("settings.runtime.cacheZeroHint")}
         </Typography>
       </div>
       <div className="grid gap-3">
@@ -88,13 +92,13 @@ export function RuntimeSettingsSection({
           <TextField
             fullWidth
             label={t("settings.runtime.remoteTimeoutMs")}
+            slotProps={{ htmlInput: durationInputProps }}
             type="number"
-            value={numberInputValue(value.remote_defaults.timeout_ms)}
-            onChange={(event) => updateRemoteDefaults({ timeout_ms: numberOrZero(event.target.value) })}
+            value={millisecondsToSecondsInput(value.remote_defaults.timeout_ms)}
+            onChange={(event) => updateRemoteDefaults({ timeout_ms: secondsInputToMillisecondsOrZero(event.target.value) })}
           />
           <TextField
             fullWidth
-            helperText={t("settings.runtime.cacheZeroHint")}
             label={t("settings.runtime.remoteFetchCacheTTLSeconds")}
             type="number"
             value={numberInputValue(value.cache_defaults.remote_fetch_ttl_seconds)}
@@ -104,11 +108,11 @@ export function RuntimeSettingsSection({
         <RuntimeSettingsGroup id="runtime-script-defaults" title={t("settings.runtime.group.script")}>
           <TextField
             fullWidth
-            helperText={t("settings.runtime.scriptTimeoutHint")}
             label={t("settings.runtime.scriptTimeoutMs")}
+            slotProps={{ htmlInput: durationInputProps }}
             type="number"
-            value={numberInputValue(value.script_defaults.timeout_ms)}
-            onChange={(event) => updateScriptDefaults({ timeout_ms: numberOrZero(event.target.value) })}
+            value={millisecondsToSecondsInput(value.script_defaults.timeout_ms)}
+            onChange={(event) => updateScriptDefaults({ timeout_ms: secondsInputToMillisecondsOrZero(event.target.value) })}
           />
         </RuntimeSettingsGroup>
         {hasFeature("probe.enabled") ? (
@@ -145,9 +149,10 @@ export function RuntimeSettingsSection({
             <TextField
               fullWidth
               label={t("settings.runtime.probeTimeoutMs")}
+              slotProps={{ htmlInput: durationInputProps }}
               type="number"
-              value={numberInputValue(value.probe_defaults.timeout_ms)}
-              onChange={(event) => updateProbeDefaults({ timeout_ms: numberOrZero(event.target.value) })}
+              value={millisecondsToSecondsInput(value.probe_defaults.timeout_ms)}
+              onChange={(event) => updateProbeDefaults({ timeout_ms: secondsInputToMillisecondsOrZero(event.target.value) })}
             />
             <TextField
               fullWidth
@@ -165,7 +170,6 @@ export function RuntimeSettingsSection({
             />
             <TextField
               fullWidth
-              helperText={t("settings.runtime.cacheZeroHint")}
               label={t("settings.runtime.probeResultCacheTTLSeconds")}
               type="number"
               value={numberInputValue(value.cache_defaults.probe_ttl_seconds)}
@@ -174,12 +178,8 @@ export function RuntimeSettingsSection({
           </RuntimeSettingsGroup>
         ) : null}
         <RuntimeSettingsGroup id="runtime-cache-defaults" title={t("settings.runtime.group.cache")}>
-          <Typography className="md:col-span-3" color="text.secondary" variant="body2">
-            {t("settings.runtime.cacheDescription")}
-          </Typography>
           <TextField
             fullWidth
-            helperText={t("settings.runtime.cacheZeroHint")}
             label={t("settings.runtime.subscriptionSnapshotTTLSeconds")}
             type="number"
             value={numberInputValue(value.cache_defaults.subscription_snapshot_ttl_seconds)}
@@ -233,3 +233,5 @@ function numberOrZero(value: string): number {
   const parsed = Number(trimmed);
   return Number.isFinite(parsed) ? parsed : 0;
 }
+
+const durationInputProps = { min: 0, step: "any" } as const;

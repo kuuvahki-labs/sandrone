@@ -60,6 +60,7 @@ describe("settings service page", () => {
     expect(screen.getByRole("heading", { name: "脚本", level: 4 })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "测活", level: 4 })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "缓存", level: 4 })).toBeInTheDocument();
+    expect(screen.getAllByText("缓存时间设为 0 时关闭。")).toHaveLength(1);
 
     expect(screen.getByRole("textbox", { name: "监听地址" })).toHaveValue("127.0.0.1:1137");
     expect(screen.queryByRole("textbox", { name: "Web UI 静态目录" })).not.toBeInTheDocument();
@@ -74,19 +75,19 @@ describe("settings service page", () => {
     fireEvent.change(within(remoteGroup).getByRole("textbox", { name: "User-Agent" }), {
       target: { value: "Sandrone Global" },
     });
-    fireEvent.change(within(remoteGroup).getByRole("spinbutton", { name: "远程请求缓存（秒）" }), {
+    fireEvent.change(within(remoteGroup).getByRole("spinbutton", { name: "缓存（秒）" }), {
       target: { value: "120" },
     });
 
     const scriptGroup = screen.getByRole("region", { name: "脚本" });
-    fireEvent.change(within(scriptGroup).getByRole("spinbutton", { name: "脚本执行超时（毫秒）" }), {
-      target: { value: "3500" },
+    fireEvent.change(within(scriptGroup).getByRole("spinbutton", { name: "超时（秒）" }), {
+      target: { value: "3.5" },
     });
 
     const probeGroup = screen.getByRole("region", { name: "测活" });
     expect(within(probeGroup).getAllByRole("combobox")).toHaveLength(2);
-    expect(within(probeGroup).getByRole("combobox", { name: "默认测活方式" })).toHaveTextContent("URL 测试");
-    fireEvent.change(within(probeGroup).getByRole("spinbutton", { name: "测活结果缓存（秒）" }), {
+    expect(within(probeGroup).getByRole("combobox", { name: "测活方式" })).toHaveTextContent("URL 测试");
+    fireEvent.change(within(probeGroup).getByRole("spinbutton", { name: "结果缓存（秒）" }), {
       target: { value: "300" },
     });
     const probeURL = within(probeGroup).getByRole("combobox", { name: "URL" });
@@ -95,7 +96,7 @@ describe("settings service page", () => {
     await user.click(await screen.findByRole("option", {
       name: "Cloudflare http://cp.cloudflare.com/generate_204",
     }));
-    const probeMethod = within(probeGroup).getByRole("combobox", { name: "默认测活方式" });
+    const probeMethod = within(probeGroup).getByRole("combobox", { name: "测活方式" });
     await user.click(probeMethod);
     await user.click(await screen.findByRole("option", { name: "UDP NTP" }));
     expect(within(probeGroup).queryByRole("combobox", { name: "URL" })).not.toBeInTheDocument();
@@ -105,7 +106,7 @@ describe("settings service page", () => {
     expect(within(probeGroup).getByRole("combobox", { name: "URL" })).toHaveValue("http://cp.cloudflare.com/generate_204");
 
     const cacheGroup = screen.getByRole("region", { name: "缓存" });
-  fireEvent.change(within(cacheGroup).getByRole("spinbutton", { name: "订阅执行快照缓存（秒）" }), {
+    fireEvent.change(within(cacheGroup).getByRole("spinbutton", { name: "订阅快照（秒）" }), {
       target: { value: "300" },
     });
 
@@ -127,7 +128,7 @@ describe("settings service page", () => {
       cache_defaults: expect.objectContaining({
         remote_fetch_ttl_seconds: 120,
         probe_ttl_seconds: 300,
-     subscription_snapshot_ttl_seconds: 300,
+        subscription_snapshot_ttl_seconds: 300,
       }),
       mcp: expect.objectContaining({ path: "/agent" }),
       subscriptions: { auto_load_traffic: true },

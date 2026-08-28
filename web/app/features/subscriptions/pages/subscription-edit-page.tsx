@@ -19,7 +19,7 @@ import {
   persistedResourceActionBlocker,
   persistedResourceActionDisabledReason,
 } from "~/shared/resources/persisted-resource-actions";
-import type { ResourceOption } from "~/shared/resources/types";
+import type { RemoteInputDefaults, ResourceOption } from "~/shared/resources/types";
 import type { SubscriptionCreateType } from "~/shared/routing/paths";
 import { DiscardChangesDialog } from "~/shared/ui/dialogs";
 import { PageHeader } from "~/shared/ui/page";
@@ -38,6 +38,7 @@ export interface SubscriptionEditPageProps {
   onShare?: () => void;
   probeCacheTTLSeconds: number;
   probeDefaults: ProbeDefaultsInput;
+  remoteDefaults?: RemoteInputDefaults;
 }
 
 export function SubscriptionEditPage({
@@ -54,6 +55,7 @@ export function SubscriptionEditPage({
   onShare,
   probeCacheTTLSeconds,
   probeDefaults,
+  remoteDefaults,
 }: SubscriptionEditPageProps) {
   const { t } = useI18n();
   const [editSession, setEditSession] = useState(createEditSession);
@@ -133,6 +135,7 @@ export function SubscriptionEditPage({
             mode="edit"
             probeCacheTTLSeconds={probeCacheTTLSeconds}
             probeDefaults={probeDefaults}
+            remoteDefaults={remoteDefaults}
             scriptFiles={scriptFiles}
             scriptTimeoutMS={scriptTimeoutMS}
             sources={sources}

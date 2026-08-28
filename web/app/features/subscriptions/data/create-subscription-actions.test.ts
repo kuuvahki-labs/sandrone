@@ -109,11 +109,13 @@ describe("subscription actions", () => {
     expect(navigate).not.toHaveBeenCalled();
   });
 
-  it("omits blank remote timeout so runtime defaults can apply", async () => {
+  it("omits blank and zero remote overrides so runtime defaults can apply", async () => {
     const { client, createSubscription } = setupActions();
     const form = new FormData();
     form.set("subscription_type", "remote");
     form.set("source_input", "https://www.example.com/sub");
+    form.set("timeout_ms", "0");
+    form.set("cache_ttl_seconds", "0");
     form.set("processors", "[]");
 
     await createSubscription(form);
@@ -216,7 +218,7 @@ describe("subscription actions", () => {
     form.set("source_input", "https://example.com/updated");
     form.set("user_agent", "Sandrone Tests");
     form.set("proxy", "http://127.0.0.1:7890");
-    form.set("timeout_ms", "2500");
+    form.set("timeout_ms", "2.5");
     form.set("cache_ttl_seconds", "60");
     form.set("processors", JSON.stringify(submittedProcessors));
     form.set("meta", JSON.stringify({ owner: "ops" }));

@@ -6,7 +6,7 @@ import { type SubscriptionCopyTarget, SubscriptionFormFields } from "~/features/
 import type { SubscriptionItem } from "~/features/subscriptions/model/types";
 import type { ProbeDefaultsInput } from "~/shared/api/client";
 import { useI18n } from "~/shared/i18n/context";
-import type { ResourceOption } from "~/shared/resources/types";
+import type { RemoteInputDefaults, ResourceOption } from "~/shared/resources/types";
 import type { SubscriptionCreateType } from "~/shared/routing/paths";
 import { DiscardChangesDialog } from "~/shared/ui/dialogs";
 import { PageHeader } from "~/shared/ui/page";
@@ -20,11 +20,12 @@ export interface SubscriptionNewPageProps {
   onTypeChange: (type: SubscriptionCreateType) => void;
   probeCacheTTLSeconds: number;
   probeDefaults: ProbeDefaultsInput;
+  remoteDefaults?: RemoteInputDefaults;
   scriptFiles?: ResourceOption[];
   scriptTimeoutMS?: number;
 }
 
-export function SubscriptionNewPage({ sources, type, onBack, onCopySource, onSave, onTypeChange, probeCacheTTLSeconds, probeDefaults, scriptFiles, scriptTimeoutMS }: SubscriptionNewPageProps) {
+export function SubscriptionNewPage({ sources, type, onBack, onCopySource, onSave, onTypeChange, probeCacheTTLSeconds, probeDefaults, remoteDefaults, scriptFiles, scriptTimeoutMS }: SubscriptionNewPageProps) {
   const { t } = useI18n();
   const [dirty, setDirty] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
@@ -59,7 +60,7 @@ export function SubscriptionNewPage({ sources, type, onBack, onCopySource, onSav
           title={t("subscriptions.create")}
         />
 
-        <SubscriptionFormFields mode="create" probeCacheTTLSeconds={probeCacheTTLSeconds} probeDefaults={probeDefaults} scriptFiles={scriptFiles} scriptTimeoutMS={scriptTimeoutMS} sources={sources} type={type} onCopySource={onCopySource} onTypeChange={onTypeChange} />
+        <SubscriptionFormFields mode="create" probeCacheTTLSeconds={probeCacheTTLSeconds} probeDefaults={probeDefaults} remoteDefaults={remoteDefaults} scriptFiles={scriptFiles} scriptTimeoutMS={scriptTimeoutMS} sources={sources} type={type} onCopySource={onCopySource} onTypeChange={onTypeChange} />
         {error ? <Alert severity="error">{error}</Alert> : null}
       </form>
       {confirmLeave ? <DiscardChangesDialog onCancel={() => setConfirmLeave(false)} onConfirm={onBack} /> : null}
