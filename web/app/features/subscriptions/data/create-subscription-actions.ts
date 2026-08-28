@@ -3,7 +3,7 @@ import type { NavigateFunction } from "react-router";
 import type { SubscriptionDefinition, SubscriptionItem } from "~/features/subscriptions/model/types";
 import type { ApiClient, SubscriptionInput } from "~/shared/api/client";
 import { defaultTranslator, type Translator } from "~/shared/i18n/context";
-import { renderCacheTTLFromForm } from "~/shared/resources/render-cache-policy";
+import { snapshotTTLFromForm } from "~/shared/resources/snapshot-cache-policy";
 import { sourceNameFromUrl, subscriptionEditPath } from "~/shared/routing/paths";
 
 type SubscriptionNotice = (
@@ -100,10 +100,10 @@ function subscriptionInputFromForm(
     return null;
   }
   const description = String(form.get("description") ?? "").trim();
-  const renderCacheTTLSeconds = renderCacheTTLFromForm(form);
-  const renderCachePolicy = renderCacheTTLSeconds === undefined
-    ? {}
-    : { render_cache_ttl_seconds: renderCacheTTLSeconds };
+  const snapshotTTLSeconds = snapshotTTLFromForm(form);
+  const snapshotPolicy = snapshotTTLSeconds === undefined
+  ? {}
+  : { snapshot_ttl_seconds: snapshotTTLSeconds };
   if (description) {
     meta.description = description;
   }
@@ -122,7 +122,7 @@ function subscriptionInputFromForm(
       type,
       format,
       ...timestamps,
-      ...renderCachePolicy,
+    ...snapshotPolicy,
       remote,
       processors: processors.length ? processors : undefined,
       meta,
@@ -142,7 +142,7 @@ function subscriptionInputFromForm(
       format,
       content,
       ...timestamps,
-      ...renderCachePolicy,
+    ...snapshotPolicy,
       processors: processors.length ? processors : undefined,
       meta,
     };
@@ -158,7 +158,7 @@ function subscriptionInputFromForm(
     display_name: displayName || undefined,
     type,
     ...timestamps,
-    ...renderCachePolicy,
+  ...snapshotPolicy,
     inputs: refs.map((ref) => ({ name: ref, type: "subscription", ref: { kind: "subscription", name: ref } })),
     processors: processors.length ? processors : undefined,
     meta,

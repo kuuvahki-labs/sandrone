@@ -28,7 +28,6 @@ type renderOutput struct {
 	Source         *fileSourceOutput `json:"source,omitempty"`
 	Report         domain.Report     `json:"report,omitempty"`
 	ResourceURI    string            `json:"resource_uri,omitempty"`
-	Cached         *bool             `json:"cached,omitempty"`
 }
 
 type inspectOutput struct {

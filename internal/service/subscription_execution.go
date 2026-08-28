@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/nodevalidation"
@@ -19,18 +20,20 @@ type subscriptionExecutionRequest struct {
 }
 
 // subscriptionExecutionResult keeps the normalized input and final processed
-// node sets together so preview and materialization cannot execute divergent
+// node sets together so preview and other consumers cannot execute divergent
 // copies of the subscription pipeline.
 type subscriptionExecutionResult struct {
 	Before *domain.NodeSet
 	After  *domain.NodeSet
+
+	snapshotCacheStatus string
 }
 
 func (r *subscriptionExecutionResult) clone() *subscriptionExecutionResult {
 	if r == nil {
 		return nil
 	}
-	out := &subscriptionExecutionResult{}
+	out := &subscriptionExecutionResult{snapshotCacheStatus: r.snapshotCacheStatus}
 	if r.Before != nil {
 		out.Before = r.Before.Clone()
 	}
@@ -92,10 +95,11 @@ func (c *subscriptionExecutionContext) addDependency(ref domain.ResourceRef) {
 
 func subscriptionExecutionMemoKey(sub domain.Subscription, req subscriptionExecutionRequest) (string, error) {
 	return cacheIdentity(struct {
-		Name    string             `json:"name"`
-		Request domain.RequestInfo `json:"request,omitempty"`
+		SubscriptionName string             `json:"subscription_name"`
+		InputName        string             `json:"input_name,omitempty"`
+		Request          domain.RequestInfo `json:"request,omitempty"`
 	}{
-		Name: sub.Name, Request: req.Request,
+		SubscriptionName: sub.Name, InputName: req.Name, Request: req.Request,
 	})
 }
 
@@ -133,6 +137,28 @@ func (s *Service) executeSubscription(
 		}
 		state.stack[sub.Name] = true
 		defer delete(state.stack, sub.Name)
+	}
+
+	snapshotStatus := snapshotCacheStatusDisabled
+	snapshotTTLSeconds := s.subscriptionSnapshotTTLSeconds(sub.SnapshotTTLSeconds)
+	snapshotEntryID := ""
+	_, cacheOwned := ownedCacheKey(ctx, cacheKeyPrefixSubscriptionSnapshot)
+	if sub.Name != "" && snapshotTTLSeconds > 0 && s.cache != nil && cacheOwned {
+		snapshotEntryID, err = s.subscriptionSnapshotCacheEntryID(sub, req)
+		if err != nil {
+			return nil, err
+		}
+		if cacheReadBypass(ctx) {
+			snapshotStatus = snapshotCacheStatusBypass
+		} else {
+			snapshotStatus = snapshotCacheStatusMiss
+			if cached := s.readSubscriptionSnapshotCache(ctx, snapshotEntryID, time.Duration(snapshotTTLSeconds)*time.Second); cached != nil {
+				if memoKey != "" {
+					state.memo[memoKey] = cached.clone()
+				}
+				return cached, nil
+			}
+		}
 	}
 
 	dynamicDependencies := []domain.ResourceRef{}
@@ -187,9 +213,13 @@ func (s *Service) executeSubscription(
 		Traffic:      domain.CloneSubscriptionTrafficItems(before.Traffic),
 		Meta:         cloneStringMap(before.Meta),
 	}
-	result := &subscriptionExecutionResult{Before: before, After: after}
+	result := &subscriptionExecutionResult{
+		Before: before, After: after,
+		snapshotCacheStatus: snapshotStatus,
+	}
 	if memoKey != "" {
 		state.memo[memoKey] = result.clone()
 	}
+	s.writeSubscriptionSnapshotCache(ctx, sub.Name, snapshotEntryID, snapshotTTLSeconds, result)
 	return result, nil
 }

@@ -139,13 +139,13 @@ func TestCacheDeleteAndClear(t *testing.T) {
 	resourceStore := store.NewFSStore(afero.NewMemMapFs())
 	c := cache.New(resourceStore, time.Now)
 	require.NoError(t, c.Set(ctx, "probe/subscriptions/A", []byte("probe"), time.Minute))
-	require.NoError(t, c.Set(ctx, "file_render/files/B", []byte("file"), time.Minute))
+	require.NoError(t, c.Set(ctx, "example/files/B", []byte("file"), time.Minute))
 
 	require.NoError(t, c.Delete(ctx, "probe/subscriptions/A"))
 	_, err := resourceStore.Stat(ctx, "cache/probe/subscriptions/A.json")
 	require.True(t, errors.Is(err, os.ErrNotExist), "got %v", err)
 	require.NoError(t, c.Clear(ctx))
-	_, err = resourceStore.Stat(ctx, "cache/file_render/files/B.json")
+	_, err = resourceStore.Stat(ctx, "cache/example/files/B.json")
 	require.True(t, errors.Is(err, os.ErrNotExist), "got %v", err)
 	require.NoError(t, c.Clear(ctx))
 }

@@ -88,17 +88,9 @@ func (s *Server) getFile(w http.ResponseWriter, r *http.Request) {
 			Body:        string(result.Content),
 			Response:    result.Response,
 			Warnings:    reportWarnings(result.Report),
-			Cached:      result.Cached,
 		})
 		return
 	}
-	cacheStatus := "miss"
-	if refresh {
-		cacheStatus = "bypass"
-	} else if result.Cached {
-		cacheStatus = "hit"
-	}
-	w.Header().Set("X-Sandrone-Cache", cacheStatus)
 	writeFileContent(w, result)
 }
 

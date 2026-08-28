@@ -14,9 +14,8 @@ import (
 )
 
 const (
-	cacheKeyPrefixRemoteFetch         = "remote_fetch"
-	cacheKeyPrefixProbe               = "probe"
-	cacheKeyPrefixSubscriptionTraffic = "subscription_traffic"
+	cacheKeyPrefixRemoteFetch = "remote_fetch"
+	cacheKeyPrefixProbe       = "probe"
 )
 
 type remoteFetchCacheRecord struct {

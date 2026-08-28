@@ -128,20 +128,21 @@ describe("subscription actions", () => {
     }));
   });
 
-  it("submits remote-fetch and tri-state render cache settings", async () => {
+  it("submits remote-fetch and snapshot cache settings", async () => {
     const { client, createSubscription } = setupActions();
     const form = new FormData();
     form.set("subscription_type", "remote");
     form.set("source_input", "https://www.example.com/sub");
     form.set("cache_ttl_seconds", "45");
-    form.set("render_cache_mode", "disabled");
+  form.set("snapshot_mode", "custom");
+  form.set("snapshot_ttl_seconds", "300");
     form.set("processors", "[]");
 
     await createSubscription(form);
 
-    expect(client.createSubscription).toHaveBeenCalledWith(expect.objectContaining({
-      render_cache_ttl_seconds: 0,
-      remote: expect.objectContaining({ cache_ttl_seconds: 45 }),
+  expect(client.createSubscription).toHaveBeenCalledWith(expect.objectContaining({
+    snapshot_ttl_seconds: 300,
+    remote: expect.objectContaining({ cache_ttl_seconds: 45 }),
     }));
   });
 

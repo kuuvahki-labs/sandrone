@@ -26,11 +26,9 @@ type ScriptDefaults struct {
 }
 
 type CacheDefaults struct {
-	RemoteFetchTTLSeconds         int `json:"remote_fetch_ttl_seconds,omitempty" yaml:"remote_fetch_ttl_seconds,omitempty"`
-	ProbeTTLSeconds               int `json:"probe_ttl_seconds,omitempty" yaml:"probe_ttl_seconds,omitempty"`
-	SubscriptionTrafficTTLSeconds int `json:"subscription_traffic_ttl_seconds,omitempty" yaml:"subscription_traffic_ttl_seconds,omitempty"`
-	SubscriptionRenderTTLSeconds  int `json:"subscription_render_ttl_seconds,omitempty" yaml:"subscription_render_ttl_seconds,omitempty"`
-	FileRenderTTLSeconds          int `json:"file_render_ttl_seconds,omitempty" yaml:"file_render_ttl_seconds,omitempty"`
+	RemoteFetchTTLSeconds          int `json:"remote_fetch_ttl_seconds,omitempty" yaml:"remote_fetch_ttl_seconds,omitempty"`
+	ProbeTTLSeconds                int `json:"probe_ttl_seconds,omitempty" yaml:"probe_ttl_seconds,omitempty"`
+	SubscriptionSnapshotTTLSeconds int `json:"subscription_snapshot_ttl_seconds,omitempty" yaml:"subscription_snapshot_ttl_seconds,omitempty"`
 }
 
 type Settings struct {
@@ -72,9 +70,7 @@ func (s Settings) CacheDefaultsSpecified() bool {
 	return s.cacheDefaultsSet ||
 		s.CacheDefaults.RemoteFetchTTLSeconds != 0 ||
 		s.CacheDefaults.ProbeTTLSeconds != 0 ||
-		s.CacheDefaults.SubscriptionTrafficTTLSeconds != 0 ||
-		s.CacheDefaults.SubscriptionRenderTTLSeconds != 0 ||
-		s.CacheDefaults.FileRenderTTLSeconds != 0
+		s.CacheDefaults.SubscriptionSnapshotTTLSeconds != 0
 }
 
 func (s *Settings) SpecifyCacheDefaults(value CacheDefaults) {

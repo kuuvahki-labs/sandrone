@@ -122,9 +122,9 @@ schema 为准；未知字段会被拒绝。与 Go/持久化表示不同，MCP wi
 | `sandrone_inspect` | 无参数。 | 轻量运行时摘要与 capability/schema catalog URI；不内嵌字段详情。 |
 | `sandrone_convert` | `to_format`，以及 inline `content` + `from_format` 或受控 `remote`；可带 parse/render processors、render options 和 metadata。 | `content_type`、可选 `body` 与 `report`。 |
 | `sandrone_preview_subscription` | 已保存的 subscription `name` 与可选字符串 `args`。 | processor 前后的节点、数量与 `report`。 |
-| `sandrone_render_subscription` | 已保存的 subscription `name`、目标 `format`、可选字符串 `args` 与 `refresh`。 | `content_type`、可选 `body`、`cached` 与 `report`。 |
-| `sandrone_get_subscription_traffic` | 已保存的 remote subscription `name`；可用 `refresh` 强制刷新。 | 流量 metadata 与 `report`。 |
-| `sandrone_get_file` | 已保存的 `file` 名称、可选 `target`/字符串 `args`/`refresh`；`mode` 为 `render`、`source` 或 `spec`，省略时默认 `render`。 | render 返回正文、`cached` 与 report；source 返回 `FileDocument`；spec 返回完整定义与 `resource_uri`。 |
+| `sandrone_render_subscription` | 已保存的 subscription `name`、目标 `format`、可选字符串 `args` 与 `refresh`。 | `content_type`、可选 `body` 与 `report`。 |
+| `sandrone_get_subscription_traffic` | 已保存的 remote subscription `name`；可用 `refresh` 强制刷新。 | 流量 metadata。 |
+| `sandrone_get_file` | 已保存的 `file` 名称、可选 `target`/字符串 `args`/`refresh`；`mode` 为 `render`、`source` 或 `spec`，省略时默认 `render`。 | render 返回正文与 report；source 返回 `FileDocument`；spec 返回完整定义与 `resource_uri`。 |
 
 `sandrone_convert` 的格式与有损边界见[格式与能力参考](capabilities.md)；
 processor 声明见 [Processors](processors.md)。文件 source、typed config 与完整

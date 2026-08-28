@@ -104,15 +104,13 @@ JSON envelope：
   "content_type": "text/plain; charset=utf-8",
   "body": "hello demo",
   "response": {},
-  "warnings": [],
-  "cached": false
+  "warnings": []
 }
 ```
 
 `response` 是保留的响应元数据，当前内建文件流程通常返回 `{}`；`warnings`
-汇总本次编译、渲染及处理链诊断，无 warning 时仍为 `[]`；`cached` 表示是否
-直接命中 `file_render`。直接正文模式不另行附带 warning envelope，并通过
-`X-Sandrone-Cache: hit|miss|bypass` 表示命中、执行后未命中或显式刷新。
+汇总本次编译、渲染及处理链诊断，无 warning 时仍为 `[]`。直接正文模式不另行
+附带 warning envelope。
 warning 结构见[错误与诊断参考](../errors.md)。
 
 三个 mode 的边界是固定的：
@@ -133,9 +131,9 @@ typed render 的完整阶段顺序见[文件管线](../../architecture/file-pipe
   [FileSpec 参考](../file-spec.md)。
 - source 可能包含凭据、脚本或未处理配置；`mode=source` 与 `mode=spec`
   响应应按敏感数据处理。
-- render 在未命中结果缓存时执行完整生成。引用缺失、远程抓取失败、typed
+- render 每次执行目标文件生成，但可以复用 remote-fetch、probe 和订阅执行快照。引用缺失、远程抓取失败、typed
   配置无效或 processor 失败都会使本次请求失败，不会保存部分生成结果。
-- 文件生成结果只随本次读取返回；可选内部缓存不是独立的持久化下载资源。
+- 文件生成结果只随本次读取返回，不是独立的持久化下载资源。
 - handler 级错误码、状态映射和 warning 字段见[错误与诊断参考](../errors.md)；
   router 的 plain-text `404`/`405` 边界见[通用约定](README.md#响应与失败)。
 

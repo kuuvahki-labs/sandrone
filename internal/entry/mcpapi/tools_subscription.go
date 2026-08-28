@@ -28,7 +28,6 @@ type subscriptionRenderOutput struct {
 	BodyBytes      int           `json:"body_bytes,omitempty"`
 	MaxOutputBytes int           `json:"max_output_bytes,omitempty"`
 	Report         domain.Report `json:"report,omitempty"`
-	Cached         bool          `json:"cached"`
 }
 
 type subscriptionTrafficInput struct {
@@ -81,7 +80,6 @@ func registerSubscriptionTools(server *mcp.Server, rt *app.Runtime) {
 			ContentType: result.ContentType,
 			Body:        string(result.Body),
 			Report:      result.Report,
-			Cached:      result.Cached,
 		}), nil
 	})
 

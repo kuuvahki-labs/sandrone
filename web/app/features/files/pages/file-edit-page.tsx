@@ -142,7 +142,6 @@ export function FileEditPage({ detail, detailPending = false, item, loadRuleSetC
           onDirty={markDirty}
           onValidityChange={setValid}
           processorsDefault={detail?.processors}
-          renderCacheTTLSeconds={detail?.renderCacheTTLSeconds}
           scriptFiles={scriptFiles}
           scriptTimeoutMS={scriptTimeoutMS}
           sourceDefault={detail?.source}

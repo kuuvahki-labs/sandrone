@@ -43,11 +43,10 @@ describe("subscription resource data", () => {
       status_counts: { added: 1 },
       nodes: [{ runtime_id: "node", status: "added", after: { name: "Node", server: "example.test", port: 443 } }],
     });
-    const subscriptionTraffic = vi.fn().mockResolvedValue({
-      subscription_name: "provider",
-      type: "remote",
-      cached: false,
-      traffic: { upload_bytes: 1, download_bytes: 2, used_bytes: 3 },
+  const subscriptionTraffic = vi.fn().mockResolvedValue({
+    subscription_name: "provider",
+    type: "remote",
+    traffic: { upload_bytes: 1, download_bytes: 2, used_bytes: 3 },
     });
     const client = apiClient({ getSubscription, previewSubscription, subscriptionTraffic });
     const { result } = renderHook(() => useSubscriptionDetailsResource({ client, showNotice: ignoreNotice, t }));
@@ -70,11 +69,10 @@ describe("subscription resource data", () => {
       nodes: [expect.objectContaining({ runtimeId: "node", status: "added" })],
     });
     expect(subscriptionTraffic).toHaveBeenCalledWith("provider", { refresh: true });
-    expect(traffic).toMatchObject({
-      subscriptionName: "provider",
-      kind: "remote",
-      cached: false,
-      traffic: { uploadBytes: 1, downloadBytes: 2, usedBytes: 3 },
+  expect(traffic).toMatchObject({
+    subscriptionName: "provider",
+    kind: "remote",
+    traffic: { uploadBytes: 1, downloadBytes: 2, usedBytes: 3 },
     });
   });
 

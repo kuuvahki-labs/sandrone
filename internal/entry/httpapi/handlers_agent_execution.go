@@ -45,6 +45,5 @@ func writeAgentRenderResult(w http.ResponseWriter, result *domain.RenderResult, 
 		ContentType: result.ContentType,
 		Body:        string(result.Body),
 		Report:      result.Report,
-		Cached:      result.Cached,
 	})
 }

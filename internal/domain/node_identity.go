@@ -9,7 +9,7 @@ import (
 )
 
 // NodeIdentity exposes the two identity dimensions of a normalized node.
-// RuntimeID follows one node occurrence through a materialization pipeline;
+// RuntimeID follows one node occurrence through a subscription execution pipeline;
 // ConnectionKey identifies its current canonical connection semantics.
 type NodeIdentity struct {
 	RuntimeID     string

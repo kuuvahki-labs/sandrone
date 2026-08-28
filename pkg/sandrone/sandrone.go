@@ -69,6 +69,7 @@ type (
 	ValidationIssue             = domain.ValidationIssue
 	DiagnoseStatus              = domain.DiagnoseStatus
 	DiagnoseInputKind           = domain.DiagnoseInputKind
+	DiagnoseCacheMode           = domain.DiagnoseCacheMode
 	DiagnoseInput               = domain.DiagnoseInput
 	DiagnoseStage               = domain.DiagnoseStage
 	DiagnoseRequest             = domain.DiagnoseRequest
@@ -141,6 +142,9 @@ const (
 	DiagnoseInputNodes        = domain.DiagnoseInputNodes
 	DiagnoseInputSubscription = domain.DiagnoseInputSubscription
 	DiagnoseInputFile         = domain.DiagnoseInputFile
+
+	DiagnoseCacheModeRefresh = domain.DiagnoseCacheModeRefresh
+	DiagnoseCacheModeReuse   = domain.DiagnoseCacheModeReuse
 
 	FileKindStatic       = domain.FileKindStatic
 	FileKindMihomo       = domain.FileKindMihomo

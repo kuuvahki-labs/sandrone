@@ -69,8 +69,7 @@ export function fileDetailFromAPI(value: unknown): FileDetail {
     updatedAt: stringField(item.updated_at) || undefined,
     source: fileSourceFromAPI(item.source),
     config: fileConfigFromAPI(item.config),
-    processors,
-    renderCacheTTLSeconds: optionalNumberField(item.render_cache_ttl_seconds),
+  processors,
     meta: Object.keys(meta).length ? meta : undefined,
     rawSpec: { ...item },
   };

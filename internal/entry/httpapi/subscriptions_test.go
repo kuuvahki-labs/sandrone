@@ -241,6 +241,45 @@ func TestSubscriptionActionEndpointsPassRequestArgs(t *testing.T) {
 	require.Contains(t, w.Body.String(), "subscription traffic requires remote subscription")
 }
 
+func TestSubscriptionPreviewReturnsSnapshotCacheStatusHeader(t *testing.T) {
+	ctx := context.Background()
+	rt := testRuntime(t, app.Config{})
+	update := settingsUpdate()
+	update.CacheDefaults.SubscriptionSnapshotTTLSeconds = 60
+	_, err := rt.Service.PutSettings(ctx, update)
+	require.NoError(t, err)
+	require.NoError(t, rt.Service.PutSubscription(ctx, domain.Subscription{
+		Name: "provider", Type: domain.SubscriptionTypeLocal, Format: "uri-list",
+		Content: "ss://aes-128-gcm:secret@example.com:8388#node",
+	}))
+	server := httpapi.New(rt)
+
+	request := func(refresh bool) *httptest.ResponseRecorder {
+		body := `{}`
+		if refresh {
+			body = `{"refresh":true}`
+		}
+		response := httptest.NewRecorder()
+		server.Handler().ServeHTTP(response, httptest.NewRequest(
+			http.MethodPost, "/v1/subscriptions/provider/preview", bytes.NewBufferString(body),
+		))
+		require.Equal(t, http.StatusOK, response.Code)
+		return response
+	}
+
+	first := request(false)
+	require.Equal(t, "miss", first.Header().Get("X-Sandrone-Subscription-Snapshot"))
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(first.Body.Bytes(), &body))
+	require.NotContains(t, body, "snapshot_cache_status")
+
+	second := request(false)
+	require.Equal(t, "hit", second.Header().Get("X-Sandrone-Subscription-Snapshot"))
+
+	refreshed := request(true)
+	require.Equal(t, "bypass", refreshed.Header().Get("X-Sandrone-Subscription-Snapshot"))
+}
+
 func TestSubscriptionsEndpointUsesPlainTextContent(t *testing.T) {
 	rt := testRuntime(t, app.Config{})
 	server := httpapi.New(rt)

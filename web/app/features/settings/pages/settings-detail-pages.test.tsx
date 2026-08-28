@@ -9,31 +9,31 @@ import { SettingsDataPage } from "./settings-data-page";
 import { SettingsServicePage } from "./settings-service-page";
 
 describe("settings service page", () => {
-	it("hides probe defaults and scheduled refresh when capabilities are unavailable", () => {
-		render(
-			<UICapabilityProvider value={{
-				capabilities: [
-					{ key: "probe.enabled", enabled: false },
-					{ key: "scheduler.enabled", enabled: false },
-				],
-				loaded: true,
-				hasFeature: () => false,
-				getFeature: (key) => ({ key, enabled: false }),
-			}}>
-				<SettingsServicePage
-					overrides={{}}
-					restartRequired={[]}
-					scheduledRefreshResources={[]}
-					settings={defaultProjectSettings}
-					onBack={vi.fn()}
-					onSave={vi.fn()}
-				/>
-			</UICapabilityProvider>,
-		);
+  it("hides probe defaults and scheduled refresh when capabilities are unavailable", () => {
+    render(
+      <UICapabilityProvider value={{
+        capabilities: [
+          { key: "probe.enabled", enabled: false },
+          { key: "scheduler.enabled", enabled: false },
+        ],
+        loaded: true,
+        hasFeature: () => false,
+        getFeature: (key) => ({ key, enabled: false }),
+      }}>
+        <SettingsServicePage
+          overrides={{}}
+          restartRequired={[]}
+          scheduledRefreshResources={[]}
+          settings={defaultProjectSettings}
+          onBack={vi.fn()}
+          onSave={vi.fn()}
+        />
+      </UICapabilityProvider>,
+    );
 
-		expect(screen.queryByRole("heading", { name: "测活" })).not.toBeInTheDocument();
-		expect(screen.queryByRole("heading", { name: "定时更新" })).not.toBeInTheDocument();
-	});
+    expect(screen.queryByRole("heading", { name: "测活" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "定时更新" })).not.toBeInTheDocument();
+  });
 
   it("edits the complete service settings page and saves every group before returning", async () => {
     const user = userEvent.setup();
@@ -59,7 +59,7 @@ describe("settings service page", () => {
     expect(screen.getByRole("heading", { name: "远程请求", level: 4 })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "脚本", level: 4 })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "测活", level: 4 })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "渲染与流量缓存", level: 4 })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "缓存", level: 4 })).toBeInTheDocument();
 
     expect(screen.getByRole("textbox", { name: "监听地址" })).toHaveValue("127.0.0.1:1137");
     expect(screen.queryByRole("textbox", { name: "Web UI 静态目录" })).not.toBeInTheDocument();
@@ -104,15 +104,9 @@ describe("settings service page", () => {
     await user.click(await screen.findByRole("option", { name: "URL 测试" }));
     expect(within(probeGroup).getByRole("combobox", { name: "URL" })).toHaveValue("http://cp.cloudflare.com/generate_204");
 
-    const cacheGroup = screen.getByRole("region", { name: "渲染与流量缓存" });
-    fireEvent.change(within(cacheGroup).getByRole("spinbutton", { name: "订阅流量缓存（秒）" }), {
-      target: { value: "15" },
-    });
-    fireEvent.change(within(cacheGroup).getByRole("spinbutton", { name: "订阅渲染缓存（秒）" }), {
-      target: { value: "180" },
-    });
-    fireEvent.change(within(cacheGroup).getByRole("spinbutton", { name: "文件渲染缓存（秒）" }), {
-      target: { value: "240" },
+    const cacheGroup = screen.getByRole("region", { name: "缓存" });
+  fireEvent.change(within(cacheGroup).getByRole("spinbutton", { name: "订阅执行快照缓存（秒）" }), {
+      target: { value: "300" },
     });
 
     const pageHeader = screen.getByRole("heading", { name: "服务设置" }).closest("header");
@@ -133,9 +127,7 @@ describe("settings service page", () => {
       cache_defaults: expect.objectContaining({
         remote_fetch_ttl_seconds: 120,
         probe_ttl_seconds: 300,
-        subscription_traffic_ttl_seconds: 15,
-        subscription_render_ttl_seconds: 180,
-        file_render_ttl_seconds: 240,
+     subscription_snapshot_ttl_seconds: 300,
       }),
       mcp: expect.objectContaining({ path: "/agent" }),
       subscriptions: { auto_load_traffic: true },

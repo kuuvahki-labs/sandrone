@@ -60,9 +60,7 @@ SettingsEnvelope {
   "cache_defaults": {
     "remote_fetch_ttl_seconds": 0,
     "probe_ttl_seconds": 0,
-    "subscription_traffic_ttl_seconds": 60,
-    "subscription_render_ttl_seconds": 0,
-    "file_render_ttl_seconds": 0
+    "subscription_snapshot_ttl_seconds": 0
   },
   "appearance": {"theme_mode": "dark", "locale": "auto"},
   "subscriptions": {"auto_load_traffic": false},
@@ -125,9 +123,7 @@ SettingsEnvelope {
   "cache_defaults": {
     "remote_fetch_ttl_seconds": 120,
     "probe_ttl_seconds": 300,
-    "subscription_traffic_ttl_seconds": 60,
-    "subscription_render_ttl_seconds": 300,
-    "file_render_ttl_seconds": 300
+    "subscription_snapshot_ttl_seconds": 300
   },
   "appearance": {"theme_mode": "system", "locale": "auto"},
   "subscriptions": {"auto_load_traffic": false},
@@ -147,6 +143,8 @@ SettingsEnvelope {
 `sing-box`。TTL 必须非负；远程、probe 与 script 默认 timeout 以及 attempts 和
 concurrency 归一化后必须为正数。`script_defaults.timeout_ms` 省略或为 `0` 时使用
 2000 ms；正数作为没有显式 `params.timeout_ms` 的 script processor 的执行时限。
+`subscription_snapshot_ttl_seconds` 独立控制订阅执行快照；它可以大于 remote
+或 probe TTL，此时表示用户选择在更长时间内冻结节点、测活观测和处理器排序结果。
 主题接受 `system`、`light`、`dark`，语言接受 `auto`、
 `zh-CN`、`en-US`。
 

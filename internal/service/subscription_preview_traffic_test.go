@@ -919,6 +919,26 @@ func TestServiceSubscriptionTrafficIncludesRemoteHeadersAndPreviewStillWorks(t *
 	require.Equal(t, 1, preview.AfterCount)
 }
 
+func TestServiceSubscriptionTrafficDoesNotParseNodeBody(t *testing.T) {
+	ctx := context.Background()
+	subServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Subscription-Userinfo", "upload=1024; download=2048; total=10240")
+		_, _ = w.Write([]byte("not a node subscription"))
+	}))
+	defer subServer.Close()
+
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+		Name: "remote/headers", Type: domain.SubscriptionTypeRemote, Format: "uri-list",
+		Remote: &domain.RemoteInput{URL: subServer.URL},
+	}))
+
+	result, err := svc.SubscriptionTraffic(ctx, domain.SubscriptionTrafficRequest{Name: "remote/headers", Refresh: true})
+	require.NoError(t, err)
+	require.NotNil(t, result.Traffic)
+	require.Equal(t, int64(3072), result.Traffic.UsedBytes)
+}
+
 func TestServiceSubscriptionTrafficNoFlowFragmentSuppressesTraffic(t *testing.T) {
 	ctx := context.Background()
 	subServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -985,7 +1005,7 @@ func TestServiceSubscriptionTrafficDoesNotPersistNodesReportsOrLastReport(t *tes
 	require.Equal(t, "remote", stored.Meta["origin"])
 }
 
-func TestServiceSubscriptionTrafficCachesUntilForcedRefresh(t *testing.T) {
+func TestServiceSubscriptionTrafficReusesRemoteFetchUntilForcedRefresh(t *testing.T) {
 	ctx := context.Background()
 	body := "ss://aes-128-gcm:secret@example.com:8388#first"
 	upload := "1024"
@@ -999,10 +1019,7 @@ func TestServiceSubscriptionTrafficCachesUntilForcedRefresh(t *testing.T) {
 
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
 	putProjectSettings(t, svc, ctx, func(update *domain.SettingsUpdate) {
-		update.CacheDefaults = domain.CacheDefaults{
-			RemoteFetchTTLSeconds:         3600,
-			SubscriptionTrafficTTLSeconds: 60,
-		}
+		update.CacheDefaults.RemoteFetchTTLSeconds = 3600
 	})
 	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
 		Name:   "remote/live",
@@ -1018,16 +1035,14 @@ func TestServiceSubscriptionTrafficCachesUntilForcedRefresh(t *testing.T) {
 
 	body = "ss://aes-128-gcm:secret@example.com:8388#first\nss://aes-128-gcm:secret@example.org:8389#second"
 	upload = "4096"
-	cached, err := svc.SubscriptionTraffic(ctx, domain.SubscriptionTrafficRequest{Name: "remote/live"})
+	reused, err := svc.SubscriptionTraffic(ctx, domain.SubscriptionTrafficRequest{Name: "remote/live"})
 	require.NoError(t, err)
-	require.Equal(t, int64(1024), cached.Traffic.UploadBytes)
-	require.True(t, cached.Cached)
+	require.Equal(t, int64(1024), reused.Traffic.UploadBytes)
 	require.Equal(t, 1, calls)
 
 	fresh, err := svc.SubscriptionTraffic(ctx, domain.SubscriptionTrafficRequest{Name: "remote/live", Refresh: true})
 	require.NoError(t, err)
 	require.Equal(t, int64(4096), fresh.Traffic.UploadBytes)
-	require.False(t, fresh.Cached)
 	require.Equal(t, 2, calls)
 }
 
@@ -1101,41 +1116,4 @@ func TestSavedRemoteFetchCacheIsResourceLocal(t *testing.T) {
 		_, err := resourceStore.Stat(ctx, "cache/remote_fetch/subscriptions/"+name+".json")
 		require.NoError(t, err)
 	}
-}
-
-func TestServiceSubscriptionTrafficRuntimeTTLExpiresCache(t *testing.T) {
-	ctx := context.Background()
-	upload := "1024"
-	calls := 0
-	subServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls++
-		w.Header().Set("Subscription-Userinfo", "upload="+upload+"; download=2048; total=10240")
-		_, _ = w.Write([]byte("ss://aes-128-gcm:secret@example.com:8388#first"))
-	}))
-	defer subServer.Close()
-
-	now := time.Date(2026, 6, 30, 12, 0, 0, 0, time.UTC)
-	svc := service.New(service.WithFS(afero.NewMemMapFs()), service.WithClock(func() time.Time { return now }))
-	putProjectSettings(t, svc, ctx, func(update *domain.SettingsUpdate) {
-		update.CacheDefaults = domain.CacheDefaults{
-			SubscriptionTrafficTTLSeconds: 1,
-		}
-	})
-	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
-		Name:   "remote/live",
-		Type:   domain.SubscriptionTypeRemote,
-		Format: "uri-list",
-		Remote: &domain.RemoteInput{URL: subServer.URL},
-	}))
-
-	first, err := svc.SubscriptionTraffic(ctx, domain.SubscriptionTrafficRequest{Name: "remote/live"})
-	require.NoError(t, err)
-	require.Equal(t, int64(1024), first.Traffic.UploadBytes)
-	upload = "4096"
-	now = now.Add(2 * time.Second)
-	second, err := svc.SubscriptionTraffic(ctx, domain.SubscriptionTrafficRequest{Name: "remote/live"})
-	require.NoError(t, err)
-	require.Equal(t, int64(4096), second.Traffic.UploadBytes)
-	require.False(t, second.Cached)
-	require.Equal(t, 2, calls)
 }

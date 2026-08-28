@@ -14,7 +14,6 @@
 | `source` | object | `FileSource`。typed 文件可以用空对象选择内建 base；`static` 必须给出可读取的 source。 |
 | `config` | object | 仅供 typed 文件使用；`static` 出现此字段即报错。 |
 | `processors` | array | `ProcessorSpec` 列表，按声明顺序选择并执行对应 stage。 |
-| `render_cache_ttl_seconds` | nullable integer | 最终文件结果缓存策略：省略继承项目默认，`0` 关闭，正数覆盖。 |
 | `meta` | object<string,string> | 随文件保留的调用方元数据。 |
 | `created_at`、`updated_at` | RFC 3339 time | 可选资源时间戳，由存储层原样往返。 |
 
@@ -51,11 +50,6 @@
 保存文件时，完整 `FileSpec` 作为单个 JSON record 写入 Store。`inline`
 正文继续保存在 `source.content` 中；`remote` 只保存远程描述，不预先抓取。
 读取 `mode=spec` 或 MCP definition resource 会返回这一完整定义。
-
-`render_cache_ttl_seconds` 与 source 内的 `remote.cache_ttl_seconds` 是不同层：
-前者缓存完整 `FileResult`，后者只缓存远程抓取响应。结果缓存仅用于已保存的
-具名文件；inline spec 和 `ValidateFile` 不读取它。`refresh`、大小限制及失效
-契约见[存储架构](../architecture/storage.md#cache)。
 
 对 typed kind，`source.type` 为空表示使用该 driver 的内建 base。若给出
 `inline` 或 `remote`，读取结果就是自定义 base，并必须能按该 kind

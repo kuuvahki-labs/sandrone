@@ -131,32 +131,34 @@ miss。`refresh` 对每个 key 第一次写入时丢弃旧 value 并重建 TTL�
 并发 read-modify-write 可能最后写入覆盖并降低后续命中率，但不会影响权威资源或业务
 正确性。
 
-持久缓存共有五类 key 前缀：
+持久缓存共有三类 key 前缀：
 
 | key 前缀 | 缓存值 | TTL 来源 |
 | --- | --- | --- |
 | `remote_fetch` | 受控 HTTP(S) 响应 | `RemoteInput.cache_ttl_seconds`，零值继承项目默认 |
 | `probe` | 按连接保存的节点观测 | probe 请求，零值继承项目 `cache_defaults.probe_ttl_seconds` |
-| `subscription_traffic` | 远程订阅用量 | 项目设置默认 |
-| `subscription_render` | 已保存订阅的完整 `RenderResult` | Subscription 三态覆盖或项目默认 |
-| `file_render` | 已保存文件的完整 `FileResult` | FileSpec 三态覆盖或项目默认 |
+| `subscription_snapshot` | 已保存订阅处理前后的 canonical `NodeSet` 与依赖 revision | Subscription 三态覆盖或项目默认 |
 
-Subscription/FileSpec 的 `render_cache_ttl_seconds` 是 nullable 三态字段：省略时
-继承对应项目默认，显式 `0` 关闭，正数覆盖。两个结果缓存的项目默认值
-均为 `0`，所以升级不会自动缓存生成结果。持久缓存只属于已保存的 Subscription
+Subscription 的 `snapshot_ttl_seconds` 是 nullable 三态字段：省略时
+继承项目默认，显式 `0` 关闭，正数覆盖；项目默认值为 `0`。持久缓存只属于已保存的 Subscription
 或 File：inline FileSpec、直接 parse/render/convert、临时 diagnose 和未保存草稿
-不读写任何持久层，只保留请求内 memo。share 没有独立缓存层，但生成已保存目标时可以
-复用目标自身的结果缓存。超过 16 MiB 的最终正文不会写入结果缓存。
+不读写任何持久层，只保留请求内 memo。share 没有独立缓存层，但生成已保存订阅目标时
+可以复用订阅执行快照。
+单个序列化后超过 16 MiB 的 subscription-snapshot 同样不会写入缓存。
 
-各业务缓存记录的 identity 只包含影响对应结果的有效语义。结果缓存包含构建
-版本/revision、完整资源定义、目标格式、请求参数和影响执行的设置摘要，并记录
-上次执行实际使用的依赖资源定义摘要；命中前会重新验证这些依赖。资源更新不再
-广泛清空其它资源的结果层，未变化的 fetch、traffic 和节点观测可以继续复用。
-`refresh` 请求跳过结果、
-remote-fetch 和 probe 的缓存读取，成功执行后仍按当前 TTL 重新填充。
-`ValidateFile` 不读取 file-result cache。除此之外，订阅解析和文件递归各有一次
+各业务缓存记录的 identity 只包含影响对应结果的有效语义。subscription-snapshot
+包含构建身份、完整 Subscription、请求 args/meta 和 remote/probe/script 设置，
+不包含输出 target；它保存 `Before`、`After` 和 RuntimeID 私有 sidecar，因此多个
+renderer、typed file、preview、share、定时更新及 `api.subscription.produce` 可以共享
+同一次 nodes-stage 执行。订阅执行快照记录实际使用资源的 definition revision，命中前逐项验证；资源
+变化立即 miss，不等待 TTL。remote 内容和 probe 观测不使用资源 revision 失效，
+snapshot TTL 可以有意冻结较旧的观测。`refresh` 请求跳过 subscription-snapshot、
+remote-fetch 和 probe 的缓存读取，成功执行后仍按当前 TTL 重新填充。订阅 render 与
+FileSpec 每次都会从 canonical NodeSet 执行目标渲染或文件编译，不持久化最终正文。
+除此之外，订阅解析和文件递归各有一次
 请求内 memo，用于去重同一调用中的重复依赖；它们不持久化、没有 TTL，也不是
-可配置 cache 层。
+可配置 cache 层。当前不做跨请求 singleflight；两个同时发生的冷 miss 可以各自
+执行，但不会改变缓存和资源的正确性。
 
 手动清理调用一次 `Cache.Clear`，不解析业务 value，也不提供按前缀操作或
 统计。并发请求可能在清理期间或之后重新填充缓存。该操作不修改 TTL、`refresh`、
@@ -174,12 +176,10 @@ remote-fetch 和 probe 的缓存读取，成功执行后仍按当前 TTL 重新�
 - file 目标执行不带 args、`refresh=true` 的完整文件 render，最终格式由
   `FileSpec.kind` 决定。
 
-两类操作都跳过本次 remote-fetch、probe 和适用的最终结果缓存读取，并在成功时
-按资源与项目现有 TTL 填充缓存。调度器不覆盖 TTL，不保存 preview、report、
-历史记录或额外产物。subscription preview 没有 subscription-render 结果缓存；
-它预热的是物化过程中实际使用的 remote-fetch 与 probe 层。file render 还可
-预热 no-args 请求对应的 file-render 层；带 args 的请求具有不同 cache key，
-不会命中该最终结果。
+两类操作都跳过本次 remote-fetch、probe 与 subscription-snapshot 缓存读取，
+并在成功时按资源与项目现有 TTL 填充适用缓存。调度器不覆盖 TTL，不保存 preview、
+report、最终正文、历史记录或额外产物。subscription preview 预热订阅执行快照及其实际
+使用的 remote-fetch 与 probe 层；file render 可预热所引用订阅的快照层。
 
 一个进程只运行一个调度任务；上次触发尚未结束时，新触发会被计数并跳过，不会
 排队。单个目标失败只记录错误并继续后续目标，不立即重试。启动和计划热更新都

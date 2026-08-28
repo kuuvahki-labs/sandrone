@@ -12,10 +12,9 @@ source -> parse -> normalize -> process(nodes) -> render -> serve
 
 `serve` 表示调用方或入口交付本次结果，不表示生成内容会被持久化。完整 Mihomo、sing-box 或 Shadowrocket 配置属于[文件管线](file-pipeline.md)，不是节点 renderer 的输出职责。
 
-已保存 Subscription 的最终 render 可以按资源三态 TTL 使用
-`subscription_render` 内部结果缓存；它仍是可重建加速数据，不会改写
-Subscription 或形成可列举产物。直接 render/convert 与 preview 不使用该层。
-完整缓存层、key、刷新和失效契约见[存储架构](storage.md#cache)。
+已保存 Subscription 可以按资源三态 TTL 缓存处理前后的 canonical `NodeSet`；preview、
+不同 renderer 和 typed file 共用这一执行快照边界。最终目标正文每次从 NodeSet 生成，
+不会持久化。完整缓存层、key、刷新和失效契约见[存储架构](storage.md#cache)。
 
 ## 1. Source：解析输入来源
 
@@ -34,6 +33,9 @@ Subscription 或形成可列举产物。直接 render/convert 与 preview 不使
 `NodeSet`。preview、subscription render、typed file、diagnose、定时更新和脚本中的
 订阅子调用复用同一条 normalize、校验和 nodes-stage processor 链；执行同时返回
 处理前与处理后结果，并显式汇总声明式引用、脚本文件和脚本动态订阅依赖。
+已保存 Subscription 可以把这对 target 无关的 `NodeSet` 作为
+`subscription_snapshot` 缓存；输出格式不进入 identity，因此 preview、
+不同 renderer 和 typed file 可以共享同一次 probe、排序、drop 与重排执行。
 
 远程输入的自动识别是 service 的受控策略。显式格式只调用对应 parser；允许自动识别的输入先判断受支持的完整配置结构，再使用严格订阅格式兜底。adapter 不应各自形成不一致的隐式 fallback 链。
 

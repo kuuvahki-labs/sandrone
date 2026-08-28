@@ -36,8 +36,8 @@ describe("subscription model codec", () => {
       display_name: "Default Collection",
       type: "collection",
       created_at: "2026-06-27T01:02:03.000Z",
-      updated_at: "2026-06-27T04:05:06.000Z",
-      render_cache_ttl_seconds: 0,
+    updated_at: "2026-06-27T04:05:06.000Z",
+    snapshot_ttl_seconds: 300,
       inputs: [
         { name: "provider", type: "subscription", ref: { kind: "subscription", name: "provider" } },
         { name: "ignored-file", type: "ref", ref: { kind: "file", name: "default.yaml" } },
@@ -50,8 +50,8 @@ describe("subscription model codec", () => {
       displayName: "Default Collection",
       kind: "collection",
       createdAt: "2026-06-27T01:02:03.000Z",
-      updatedAt: "2026-06-27T04:05:06.000Z",
-      renderCacheTTLSeconds: 0,
+    updatedAt: "2026-06-27T04:05:06.000Z",
+    snapshotTTLSeconds: 300,
       sourceRefs: ["provider", "warn"],
       processors: [{ name: "only hk", type: "filter", stage: "nodes", params: { action: "keep", field: "name", match: "regex", pattern: "HK" } }],
       meta: { description: "main group" },
@@ -191,10 +191,9 @@ describe("subscription model codec", () => {
 
   it("maps subscription traffic", () => {
     expect(subscriptionTrafficFromAPI({
-      subscription_name: "provider",
-      type: "remote",
-      format: "uri-list",
-      cached: true,
+    subscription_name: "provider",
+    type: "remote",
+    format: "uri-list",
       traffic: {
         source_name: "provider",
         source_url: "https://example.test/sub",
@@ -211,10 +210,9 @@ describe("subscription model codec", () => {
         plan_name: "VIP 1",
       },
     })).toEqual({
-      subscriptionName: "provider",
-      kind: "remote",
-      format: "uri-list",
-      cached: true,
+    subscriptionName: "provider",
+    kind: "remote",
+    format: "uri-list",
       traffic: expect.objectContaining({
         sourceName: "provider",
         sourceUrl: "https://example.test/sub",

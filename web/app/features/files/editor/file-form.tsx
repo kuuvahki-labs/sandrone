@@ -11,7 +11,6 @@ import type { FileConfigDetail, FileSourceDetail } from "~/features/files/model/
 import { FileProcessorBuilder } from "~/features/files/processors/processor-builder";
 import { useI18n } from "~/shared/i18n/context";
 import type { ProcessorDetail, ResourceOption } from "~/shared/resources/types";
-import { RenderCachePolicyField } from "~/shared/ui/render-cache-policy-field";
 
 import { requireFileDriverUI } from "./file-driver-ui-registry";
 import { FileTypeSummary } from "./file-type-summary";
@@ -30,7 +29,6 @@ export interface FileFormFieldsProps {
   onDirty?: () => void;
   onValidityChange?: (valid: boolean) => void;
   processorsDefault?: ProcessorDetail[];
-  renderCacheTTLSeconds?: number;
   scriptFiles?: ResourceOption[];
   scriptTimeoutMS?: number;
   sourceDefault?: FileSourceDetail;
@@ -38,7 +36,7 @@ export interface FileFormFieldsProps {
   subscriptions?: ResourceOption[];
 }
 
-export function FileFormFields({ configDefault, defaultName, description = "", displayName = "", driver, loadRuleSetCatalog, loadSubscriptionPreview, mode, onDirty, onValidityChange, processorsDefault, renderCacheTTLSeconds, scriptFiles, scriptTimeoutMS, sourceDefault, sourceEditorKey, subscriptions = [] }: FileFormFieldsProps) {
+export function FileFormFields({ configDefault, defaultName, description = "", displayName = "", driver, loadRuleSetCatalog, loadSubscriptionPreview, mode, onDirty, onValidityChange, processorsDefault, scriptFiles, scriptTimeoutMS, sourceDefault, sourceEditorKey, subscriptions = [] }: FileFormFieldsProps) {
   const { locale, t } = useI18n();
   const initialConfigDraft = driver.configuration.mode === "structured"
     ? driver.configuration.adapter.decode(configDefault, locale)
@@ -60,11 +58,11 @@ export function FileFormFields({ configDefault, defaultName, description = "", d
   ));
   const [sourceValid, setSourceValid] = useState(true);
   const [processorsValid, setProcessorsValid] = useState(true);
-	const isConfig = driver.configuration.mode !== "none";
+  const isConfig = driver.configuration.mode !== "none";
   const defaultBase = driver.source.defaultBase(stableNamingLocale);
   const processors = mode === "create"
-		? driver.processors.defaults(t)
-		: processorsDefault;
+    ? driver.processors.defaults(t)
+    : processorsDefault;
 
   useEffect(() => {
     onValidityChange?.((!isConfig || configValid && sourceValid) && processorsValid);
@@ -82,7 +80,6 @@ export function FileFormFields({ configDefault, defaultName, description = "", d
             label={t(driver.presentation.labelKey)}
             title={t("files.form.fileType")}
           />
-          <RenderCachePolicyField defaultValue={renderCacheTTLSeconds} />
         </div>
       </WorkbenchGroupSection>
       {isConfig ? (
@@ -91,8 +88,8 @@ export function FileFormFields({ configDefault, defaultName, description = "", d
             baseEditor={(
               <FileSourceEditor
                 contentLabel={t("files.form.content")}
-				defaultValue={mode === "create" ? { type: "inline", content: defaultBase } : sourceDefault}
-				inlineFallback={defaultBase}
+        defaultValue={mode === "create" ? { type: "inline", content: defaultBase } : sourceDefault}
+        inlineFallback={defaultBase}
                 key={`${sourceEditorKey ?? "file"}-${driver.kind}-base`}
                 language={driver.source.syntax}
                 onDirty={onDirty}

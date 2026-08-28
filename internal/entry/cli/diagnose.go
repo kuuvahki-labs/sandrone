@@ -117,6 +117,7 @@ func newDiagnoseURLCommand(cfg *config) *cobra.Command {
 
 func newDiagnoseSubscriptionCommand(cfg *config) *cobra.Command {
 	var output string
+	var cacheMode string
 	cmd := &cobra.Command{
 		Use:   "subscription <name>",
 		Short: "Diagnose a stored Subscription and its dependencies",
@@ -125,12 +126,19 @@ func newDiagnoseSubscriptionCommand(cfg *config) *cobra.Command {
 			if err := validateRequiredPublicResourceName("subscription name", args[0]); err != nil {
 				return err
 			}
+			cacheMode = strings.ToLower(strings.TrimSpace(cacheMode))
+			switch sandrone.DiagnoseCacheMode(cacheMode) {
+			case sandrone.DiagnoseCacheModeRefresh, sandrone.DiagnoseCacheModeReuse:
+			default:
+				return fmt.Errorf("--cache-mode must be refresh or reuse")
+			}
 			return runDiagnose(cmd, cfg, sandrone.DiagnoseRequest{
-				Kind: sandrone.DiagnoseInputSubscription, SubscriptionName: args[0],
+				Kind: sandrone.DiagnoseInputSubscription, SubscriptionName: args[0], CacheMode: sandrone.DiagnoseCacheMode(cacheMode),
 			}, output)
 		},
 	}
 	cmd.Flags().StringVar(&output, "output", "", "diagnostic JSON path, or stdout when empty or -")
+	cmd.Flags().StringVar(&cacheMode, "cache-mode", string(sandrone.DiagnoseCacheModeRefresh), "cache mode: refresh or reuse")
 	return cmd
 }
 

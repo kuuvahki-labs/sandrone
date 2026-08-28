@@ -37,7 +37,7 @@ export function subscriptionDefinitionFromAPI(value: unknown): SubscriptionDefin
     remote,
     sourceRefs: uniqueStrings(arrayField(item.inputs).map(collectionInputSourceName).filter(Boolean)),
     processors: processors.length ? processors : undefined,
-    renderCacheTTLSeconds: optionalNumberField(item.render_cache_ttl_seconds),
+    snapshotTTLSeconds: optionalNumberField(item.snapshot_ttl_seconds),
     meta: Object.keys(meta).length ? meta : undefined,
   };
 }
@@ -61,7 +61,6 @@ export function subscriptionTrafficFromAPI(value: unknown): SubscriptionTraffic 
     subscriptionName: stringField(item.subscription_name),
     kind: subscriptionKindFromAPI(item.type),
     format: stringField(item.format) || undefined,
-    cached: Boolean(item.cached),
     traffic: subscriptionTrafficItemOptionalFromAPI(item.traffic),
   };
 }

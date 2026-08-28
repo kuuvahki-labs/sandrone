@@ -26,14 +26,15 @@ type ParseResult struct {
 }
 
 type SubscriptionPreviewResult struct {
-	SubscriptionName string                        `json:"subscription_name" yaml:"subscription_name"`
-	Type             SubscriptionType              `json:"type,omitempty" yaml:"type,omitempty"`
-	Format           string                        `json:"format,omitempty" yaml:"format,omitempty"`
-	BeforeCount      int                           `json:"before_count" yaml:"before_count"`
-	AfterCount       int                           `json:"after_count" yaml:"after_count"`
-	StatusCounts     map[string]int                `json:"status_counts" yaml:"status_counts"`
-	Nodes            []SubscriptionPreviewNodeDiff `json:"nodes" yaml:"nodes"`
-	Report           Report                        `json:"report,omitempty" yaml:"report,omitempty"`
+	SubscriptionName    string                        `json:"subscription_name" yaml:"subscription_name"`
+	Type                SubscriptionType              `json:"type,omitempty" yaml:"type,omitempty"`
+	Format              string                        `json:"format,omitempty" yaml:"format,omitempty"`
+	BeforeCount         int                           `json:"before_count" yaml:"before_count"`
+	AfterCount          int                           `json:"after_count" yaml:"after_count"`
+	StatusCounts        map[string]int                `json:"status_counts" yaml:"status_counts"`
+	Nodes               []SubscriptionPreviewNodeDiff `json:"nodes" yaml:"nodes"`
+	Report              Report                        `json:"report,omitempty" yaml:"report,omitempty"`
+	SnapshotCacheStatus string                        `json:"-" yaml:"-"`
 }
 
 type SubscriptionPreviewRequest struct {
@@ -59,7 +60,6 @@ type SubscriptionTrafficResult struct {
 	SubscriptionName string                   `json:"subscription_name" yaml:"subscription_name"`
 	Type             SubscriptionType         `json:"type,omitempty" yaml:"type,omitempty"`
 	Format           string                   `json:"format,omitempty" yaml:"format,omitempty"`
-	Cached           bool                     `json:"cached,omitempty" yaml:"cached,omitempty"`
 	Traffic          *SubscriptionTrafficItem `json:"traffic,omitempty" yaml:"traffic,omitempty"`
 }
 
@@ -76,7 +76,6 @@ type RenderResult struct {
 	ContentType string `json:"content_type,omitempty" yaml:"content_type,omitempty"`
 	Body        []byte `json:"body,omitempty" yaml:"body,omitempty"`
 	Report      Report `json:"report,omitempty" yaml:"report,omitempty"`
-	Cached      bool   `json:"cached,omitempty" yaml:"cached,omitempty"`
 }
 
 type SubscriptionRenderRequest struct {
@@ -115,5 +114,4 @@ type FileResult struct {
 	ContentType string       `json:"content_type,omitempty" yaml:"content_type,omitempty"`
 	Response    ResponseInfo `json:"response,omitempty" yaml:"response,omitempty"`
 	Report      Report       `json:"report,omitempty" yaml:"report,omitempty"`
-	Cached      bool         `json:"cached,omitempty" yaml:"cached,omitempty"`
 }

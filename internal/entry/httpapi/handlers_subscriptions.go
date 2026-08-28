@@ -109,6 +109,9 @@ func writeSubscriptionPreviewResult(w http.ResponseWriter, result *domain.Subscr
 		writeServiceError(w, err)
 		return
 	}
+	if result.SnapshotCacheStatus != "" {
+		w.Header().Set("X-Sandrone-Subscription-Snapshot", result.SnapshotCacheStatus)
+	}
 	writeJSON(w, http.StatusOK, subscriptionPreviewResponse{
 		SubscriptionName: result.SubscriptionName,
 		Type:             result.Type,

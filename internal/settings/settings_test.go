@@ -23,7 +23,7 @@ func TestDefaultSettingsContainsWholeProject(t *testing.T) {
 	require.Equal(t, "auto", got.Appearance.Locale)
 	require.False(t, got.Subscriptions.AutoLoadTraffic)
 	require.Zero(t, got.CacheDefaults.ProbeTTLSeconds)
-	require.Equal(t, 60, got.CacheDefaults.SubscriptionTrafficTTLSeconds)
+	require.Zero(t, got.CacheDefaults.SubscriptionSnapshotTTLSeconds)
 	require.Equal(t, "https://cp.cloudflare.com", got.ProbeDefaults.URL)
 	require.Equal(t, 2000, got.ScriptDefaults.TimeoutMS)
 	require.False(t, got.ScheduledRefresh.Enabled)
@@ -148,9 +148,9 @@ func TestNormalizeRejectsInvalidProjectFields(t *testing.T) {
 			},
 		},
 		{
-			name: "subscription traffic ttl",
+			name: "subscription snapshot ttl",
 			mutate: func(value *domain.Settings) {
-				value.CacheDefaults.SubscriptionTrafficTTLSeconds = -1
+				value.CacheDefaults.SubscriptionSnapshotTTLSeconds = -1
 			},
 		},
 	}

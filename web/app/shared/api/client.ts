@@ -45,7 +45,7 @@ export interface SubscriptionInput {
     ref: { kind: "subscription"; name: string };
   }>;
   processors?: Array<Record<string, unknown>>;
-  render_cache_ttl_seconds?: number;
+  snapshot_ttl_seconds?: number;
   meta?: Record<string, string>;
 }
 
@@ -60,11 +60,10 @@ export interface SubscriptionPreviewRequest {
 export interface FileSpecInput {
   name: string;
   display_name?: string;
-	kind: string;
+  kind: string;
   source: Record<string, unknown>;
   config?: Record<string, unknown>;
   processors?: Array<Record<string, unknown>>;
-  render_cache_ttl_seconds?: number;
   created_at?: string;
   updated_at?: string;
   meta?: Record<string, string>;
@@ -93,9 +92,7 @@ export interface ScriptDefaultsInput {
 export interface CacheDefaultsInput {
   remote_fetch_ttl_seconds: number;
   probe_ttl_seconds: number;
-  subscription_traffic_ttl_seconds: number;
-  subscription_render_ttl_seconds: number;
-  file_render_ttl_seconds: number;
+  subscription_snapshot_ttl_seconds: number;
 }
 
 export type ScheduledRefreshTargetKind = "subscription" | "file";

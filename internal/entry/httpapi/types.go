@@ -23,7 +23,6 @@ type agentRenderResponse struct {
 	ContentType string        `json:"content_type,omitempty"`
 	Body        string        `json:"body"`
 	Report      domain.Report `json:"report"`
-	Cached      bool          `json:"cached"`
 }
 
 type subscriptionTrafficRequest struct {
@@ -40,7 +39,6 @@ type renderResponse struct {
 	Body        string              `json:"body,omitempty"`
 	Response    domain.ResponseInfo `json:"response,omitempty"`
 	Warnings    []domain.Warning    `json:"warnings"`
-	Cached      bool                `json:"cached"`
 }
 
 type sourceResponse struct {

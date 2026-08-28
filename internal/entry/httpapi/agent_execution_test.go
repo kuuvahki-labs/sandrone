@@ -23,7 +23,6 @@ type agentRenderResult struct {
 	ContentType string        `json:"content_type"`
 	Body        string        `json:"body"`
 	Report      domain.Report `json:"report"`
-	Cached      bool          `json:"cached"`
 }
 
 func TestAgentConvertSupportsProcessorsAndStructuredReport(t *testing.T) {
@@ -241,36 +240,6 @@ func TestAgentSubscriptionRenderReturnsBodyAndReport(t *testing.T) {
 	wireExpected := agentWireReport(t, expected.Report)
 	require.Equal(t, agentComparableReport(wireExpected), agentComparableReport(result.Report))
 	require.Contains(t, result.Body, "skill-node-a")
-}
-
-func TestAgentSubscriptionRenderExposesCacheStatusAndRefresh(t *testing.T) {
-	ctx := context.Background()
-	rt := testRuntime(t, app.Config{})
-	ttl := 60
-	require.NoError(t, rt.Service.PutSubscription(ctx, domain.Subscription{
-		Name: "cached", Type: domain.SubscriptionTypeLocal, Format: "uri-list",
-		Content:               "ss://aes-128-gcm:secret@example.com:8388#node-a",
-		RenderCacheTTLSeconds: &ttl,
-	}))
-	handler := httpapi.New(rt).Handler()
-	render := func(body string) agentRenderResult {
-		t.Helper()
-		rec := httptest.NewRecorder()
-		handler.ServeHTTP(rec, httptest.NewRequest(
-			http.MethodPost,
-			"/v1/subscriptions/cached/render",
-			strings.NewReader(body),
-		))
-		require.Equal(t, http.StatusOK, rec.Code)
-		var result agentRenderResult
-		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &result))
-		return result
-	}
-
-	require.False(t, render(`{"format":"uri-list"}`).Cached)
-	require.True(t, render(`{"format":"uri-list"}`).Cached)
-	require.False(t, render(`{"format":"uri-list","refresh":true}`).Cached)
-	require.True(t, render(`{"format":"uri-list"}`).Cached)
 }
 
 func TestAgentSubscriptionRenderValidatesPathAndFormat(t *testing.T) {

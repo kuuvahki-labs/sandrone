@@ -32,7 +32,7 @@ export interface SubscriptionDefinition {
   remote?: RemoteInputDetail;
   sourceRefs: string[];
   processors?: ProcessorDetail[];
-  renderCacheTTLSeconds?: number;
+  snapshotTTLSeconds?: number;
   meta?: Record<string, string>;
 }
 
@@ -96,6 +96,5 @@ export interface SubscriptionTraffic {
   subscriptionName: string;
   kind: SubscriptionKind;
   format?: string;
-  cached: boolean;
   traffic?: SubscriptionTrafficItem;
 }

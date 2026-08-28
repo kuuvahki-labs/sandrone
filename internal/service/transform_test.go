@@ -698,8 +698,7 @@ func TestServiceTransientRemoteFetchUsesRuntimeDefaultOnEveryRequest(t *testing.
 			TimeoutMS: 8000,
 		}
 		update.CacheDefaults = domain.CacheDefaults{
-			RemoteFetchTTLSeconds:         60,
-			SubscriptionTrafficTTLSeconds: 60,
+			RemoteFetchTTLSeconds: 60,
 		}
 	})
 

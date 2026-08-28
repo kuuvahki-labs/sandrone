@@ -127,9 +127,7 @@ func Default() domain.Settings {
 			Concurrency: 10,
 		},
 		ScriptDefaults: domain.ScriptDefaults{TimeoutMS: 2000},
-		CacheDefaults: domain.CacheDefaults{
-			SubscriptionTrafficTTLSeconds: 60,
-		},
+		CacheDefaults:  domain.CacheDefaults{},
 		Appearance: domain.AppearanceSettings{
 			ThemeMode: "dark",
 			Locale:    "auto",
@@ -422,14 +420,8 @@ func validateCacheDefaults(value domain.CacheDefaults) error {
 	if value.ProbeTTLSeconds < 0 {
 		return invalid("probe_ttl_seconds must be non-negative")
 	}
-	if value.SubscriptionTrafficTTLSeconds < 0 {
-		return invalid("subscription_traffic_ttl_seconds must be non-negative")
-	}
-	if value.SubscriptionRenderTTLSeconds < 0 {
-		return invalid("subscription_render_ttl_seconds must be non-negative")
-	}
-	if value.FileRenderTTLSeconds < 0 {
-		return invalid("file_render_ttl_seconds must be non-negative")
+	if value.SubscriptionSnapshotTTLSeconds < 0 {
+		return invalid("subscription_snapshot_ttl_seconds must be non-negative")
 	}
 	return nil
 }

@@ -10,11 +10,18 @@ const (
 
 type DiagnoseInputKind string
 
+type DiagnoseCacheMode string
+
 const (
 	DiagnoseInputAuto         DiagnoseInputKind = "auto"
 	DiagnoseInputNodes        DiagnoseInputKind = "nodes"
 	DiagnoseInputSubscription DiagnoseInputKind = "subscription"
 	DiagnoseInputFile         DiagnoseInputKind = "file"
+)
+
+const (
+	DiagnoseCacheModeRefresh DiagnoseCacheMode = "refresh"
+	DiagnoseCacheModeReuse   DiagnoseCacheMode = "reuse"
 )
 
 // DiagnoseRequest describes one diagnostic execution. Exactly one of Content,
@@ -30,6 +37,7 @@ type DiagnoseRequest struct {
 	Processors       []ProcessorSpec   `json:"processors,omitempty" yaml:"processors,omitempty"`
 	Target           string            `json:"target,omitempty" yaml:"target,omitempty"`
 	Meta             map[string]string `json:"meta,omitempty" yaml:"meta,omitempty"`
+	CacheMode        DiagnoseCacheMode `json:"cache_mode,omitempty" yaml:"cache_mode,omitempty"`
 }
 
 type DiagnoseInput struct {

@@ -112,7 +112,7 @@ local .json path is used as a fallback when that stored resource is absent.`,
 
 func addRenderFlags(cmd *cobra.Command, flags *renderFlags) {
 	cmd.Flags().StringArrayVar(&flags.args, "arg", nil, "request argument as key=value; may be repeated")
-	cmd.Flags().BoolVar(&flags.refresh, "refresh", false, "bypass the saved resource render cache")
+	cmd.Flags().BoolVar(&flags.refresh, "refresh", false, "bypass reusable caches while rendering the saved resource")
 	cmd.Flags().StringVar(&flags.output, "output", "", "output file path, or stdout when empty or -")
 	cmd.Flags().StringVar(&flags.reportOutput, "report-output", "", "write the complete render report as pretty JSON to a file")
 }

@@ -131,7 +131,7 @@ sandrone convert --to <format> \
 ```text
 sandrone diagnose input <path|-> [--kind auto|nodes|subscription|file]
 sandrone diagnose url <url>
-sandrone diagnose subscription <name>
+sandrone diagnose subscription <name> [--cache-mode refresh|reuse]
 sandrone diagnose file <name-or-spec-path>
 ```
 
@@ -150,7 +150,9 @@ Subscription、FileSpec 和一次性 ProcessorSpec 文件使用 JSON 定义。�
   同时从标准输入读取。文件内容必须是顶层 `ProcessorSpec[]`。
 - `url` 只把远程正文解释为节点文档，并支持 `--user-agent`、`--proxy`、
   `--remote-timeout`、`--format` 和 `--processors`。
-- `subscription` 从 Store 按名称读取并执行嵌套来源与已保存 processors。
+- `subscription` 从 Store 按名称读取并执行嵌套来源与已保存 processors；默认
+  `--cache-mode refresh` 强制新鲜诊断，显式 `--cache-mode reuse` 可以复用有效的
+  subscription-snapshot。
 - `file` 对安全名称先查询 Store，本地 `.json` 路径作为 FileSpec 回退，并执行
   完整 typed compile、订阅依赖和 file-stage processors。
 - 四个子命令都接受 `--output <path|->`。诊断 JSON 含完整节点、文件正文、report
@@ -183,7 +185,7 @@ sandrone render file <name-or-spec.json>
 两个子命令共同支持：
 
 - `--arg <key=value>` 为本次执行提供字符串请求参数，可重复；同名参数以后者为准；
-- `--refresh` 绕过已保存资源的 render cache 并重新物化；
+- `--refresh` 绕过已保存订阅的 snapshot、remote-fetch 与 probe 缓存并重新物化；
 - `--output <path|->` 控制最终正文输出，省略或使用 `-` 时写标准输出；
 - `--report-output <path>` 将完整 report 写为缩进 JSON，不能为 `-`，也不能与
   `--output` 指向同一文件。

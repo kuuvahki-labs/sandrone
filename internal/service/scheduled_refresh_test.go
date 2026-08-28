@@ -74,30 +74,6 @@ func TestScheduledRefreshSkipsOverlappingRun(t *testing.T) {
 	<-done
 }
 
-func TestScheduledFileRefreshWarmsOnlyTheDefaultRequestCache(t *testing.T) {
-	ctx := context.Background()
-	svc := New(WithFS(afero.NewMemMapFs()))
-	ttl := 60
-	require.NoError(t, svc.PutFile(ctx, domain.FileSpec{
-		Name:                  "client.txt",
-		Kind:                  domain.FileKindStatic,
-		Source:                domain.FileSource{Type: "inline", Content: "ready"},
-		RenderCacheTTLSeconds: &ttl,
-	}))
-
-	require.NoError(t, svc.refreshScheduledTarget(ctx, domain.ScheduledRefreshTarget{Kind: "file", Name: "client.txt"}))
-	defaultResult, err := svc.GetFile(ctx, domain.FileRequest{Name: "client.txt"})
-	require.NoError(t, err)
-	require.True(t, defaultResult.Cached)
-
-	withArgs, err := svc.GetFile(ctx, domain.FileRequest{
-		Name:    "client.txt",
-		Request: domain.RequestInfo{Args: map[string]string{"profile": "test"}},
-	})
-	require.NoError(t, err)
-	require.False(t, withArgs.Cached)
-}
-
 func TestScheduledRefreshCancellationReachesActiveTarget(t *testing.T) {
 	svc := New()
 	started := make(chan struct{})

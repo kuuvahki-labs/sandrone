@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"strings"
-	"time"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
@@ -19,8 +18,8 @@ type subscriptionBaseNodes struct {
 }
 
 func normalizeSubscription(sub domain.Subscription) (domain.Subscription, error) {
-	if sub.RenderCacheTTLSeconds != nil && *sub.RenderCacheTTLSeconds < 0 {
-		return domain.Subscription{}, domain.NewError(domain.CodeInvalidArgument, "subscription render_cache_ttl_seconds must be non-negative")
+	if sub.SnapshotTTLSeconds != nil && *sub.SnapshotTTLSeconds < 0 {
+		return domain.Subscription{}, domain.NewError(domain.CodeInvalidArgument, "subscription snapshot_ttl_seconds must be non-negative")
 	}
 	sub.Type = domain.SubscriptionType(strings.ToLower(strings.TrimSpace(string(sub.Type))))
 	switch sub.Type {
@@ -166,19 +165,6 @@ func (s *Service) RenderSubscriptionRequest(ctx context.Context, request domain.
 		return nil, err
 	}
 	ctx = withSubscriptionCacheOwner(ctx, sub.Name)
-	ttlSeconds := s.subscriptionRenderTTLSeconds(sub.RenderCacheTTLSeconds)
-	cacheEntryID := ""
-	if ttlSeconds > 0 {
-		cacheEntryID, err = s.subscriptionRenderCacheEntryID(sub, format, req)
-		if err != nil {
-			return nil, err
-		}
-		if !request.Refresh {
-			if cached := s.readSubscriptionRenderCache(ctx, cacheEntryID, time.Duration(ttlSeconds)*time.Second); cached != nil {
-				return cached, nil
-			}
-		}
-	}
 	execution, err := s.executeSubscription(ctx, sub, subscriptionExecutionRequest{
 		Name:    name,
 		Request: req,
@@ -198,14 +184,11 @@ func (s *Service) RenderSubscriptionRequest(ctx context.Context, request domain.
 		return nil, err
 	}
 	report := rendered.Report
-	report.Kind = "subscription_render"
 	report.Dependencies = append([]domain.ResourceRef{{Kind: "subscription", Name: name}}, nodeSet.Dependencies...)
 	report.SourceRefs = append(report.SourceRefs, sourceRefsFromSources(nodeSet.Sources)...)
 	report.Warnings = append(append([]domain.Warning{}, nodeSet.Warnings...), report.Warnings...)
-	report = s.prepareReport("subscription_render", report)
+	report = s.prepareReport("render", report)
 	rendered.Report = report
-	rendered.Cached = false
-	s.writeSubscriptionRenderCache(ctx, cacheEntryID, ttlSeconds, rendered)
 	return rendered, nil
 }
 

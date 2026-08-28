@@ -15,7 +15,7 @@ function Probe({ translationKey }: { translationKey: "nav.subscriptions" | "mess
 }
 
 describe("I18nProvider", () => {
-  it("translates materialized config names with an explicit locale", () => {
+  it("translates config names with an explicit locale", () => {
     expect(translate("zh-CN", "files.config.outputNames.group.select")).toBe("🚀 节点选择");
     expect(translate("en-US", "files.config.outputNames.group.select")).toBe("Proxy");
     expect(translate("zh-CN", "files.config.outputNames.region.hk")).toBe("🇭🇰 香港");

@@ -309,9 +309,10 @@ func TestDiagnoseSubscriptionAndFileMapStoredAndLocalInputs(t *testing.T) {
 	rec := &recordingEngine{diagnoseResult: &sandrone.DiagnoseResult{Status: sandrone.DiagnoseStatusOK}}
 	factory := WithEngineFactory(func(string) engine { return rec })
 
-	code, _, stderr := runCLI(t, []string{"diagnose", "subscription", "provider"}, "", factory)
+	code, _, stderr := runCLI(t, []string{"diagnose", "subscription", "provider", "--cache-mode", "reuse"}, "", factory)
 	require.Equal(t, 0, code, stderr)
 	require.Equal(t, "provider", rec.diagnoseRequests[0].SubscriptionName)
+	require.Equal(t, sandrone.DiagnoseCacheModeReuse, rec.diagnoseRequests[0].CacheMode)
 
 	code, _, stderr = runCLI(t, []string{"diagnose", "file", "default.yaml"}, "", factory)
 	require.Equal(t, 0, code, stderr)

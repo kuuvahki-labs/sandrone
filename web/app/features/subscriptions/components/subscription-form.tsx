@@ -20,7 +20,7 @@ import { useI18n } from "~/shared/i18n/context";
 import type { ResourceOption } from "~/shared/resources/types";
 import type { SubscriptionCreateType } from "~/shared/routing/paths";
 import { HighlightedTextarea } from "~/shared/ui/code-editor";
-import { RenderCachePolicyField } from "~/shared/ui/render-cache-policy-field";
+import { SnapshotCachePolicyField } from "~/shared/ui/snapshot-cache-policy-field";
 
 import { ProcessorBuilder } from "./processor-builder";
 import { SourceMultiSelect } from "./source-multi-select";
@@ -160,7 +160,7 @@ export function SubscriptionFormFields({ definition, item, mode, onCopySource, o
               <SourceMultiSelect defaultValue={collectionDefaultValue} excludeName={collectionName} onDirty={onDirty} subscriptions={sources} />
             </div>
           ) : null}
-          <RenderCachePolicyField defaultValue={definition?.renderCacheTTLSeconds} />
+      <SnapshotCachePolicyField defaultValue={definition?.snapshotTTLSeconds} />
         </div>
       </Paper>
       <Paper className="m-0 min-w-0 p-4" component="fieldset" variant="outlined">

@@ -179,24 +179,13 @@ export function RuntimeSettingsSection({
           </Typography>
           <TextField
             fullWidth
-            label={t("settings.runtime.subscriptionTrafficCacheTTLSeconds")}
+            helperText={t("settings.runtime.cacheZeroHint")}
+            label={t("settings.runtime.subscriptionSnapshotTTLSeconds")}
             type="number"
-            value={numberInputValue(value.cache_defaults.subscription_traffic_ttl_seconds)}
-            onChange={(event) => updateCacheDefaults({ subscription_traffic_ttl_seconds: numberOrZero(event.target.value) })}
-          />
-          <TextField
-            fullWidth
-            label={t("settings.runtime.subscriptionRenderCacheTTLSeconds")}
-            type="number"
-            value={numberInputValue(value.cache_defaults.subscription_render_ttl_seconds)}
-            onChange={(event) => updateCacheDefaults({ subscription_render_ttl_seconds: numberOrZero(event.target.value) })}
-          />
-          <TextField
-            fullWidth
-            label={t("settings.runtime.fileRenderCacheTTLSeconds")}
-            type="number"
-            value={numberInputValue(value.cache_defaults.file_render_ttl_seconds)}
-            onChange={(event) => updateCacheDefaults({ file_render_ttl_seconds: numberOrZero(event.target.value) })}
+            value={numberInputValue(value.cache_defaults.subscription_snapshot_ttl_seconds)}
+            onChange={(event) =>
+              updateCacheDefaults({ subscription_snapshot_ttl_seconds: numberOrZero(event.target.value) })
+            }
           />
         </RuntimeSettingsGroup>
       </div>

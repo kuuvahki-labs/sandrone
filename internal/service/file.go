@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/processor"
@@ -36,35 +35,7 @@ func (s *Service) GetFile(ctx context.Context, req domain.FileRequest) (*domain.
 		stack: map[string]bool{},
 		memo:  map[string]*domain.FileResult{},
 	}
-	if req.Spec != nil || strings.TrimSpace(req.Name) == "" {
-		return s.getFile(ctx, req, state)
-	}
-	spec, err := s.resolveSpec(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	ctx = withFileCacheOwner(ctx, spec.Name)
-	ttlSeconds := s.fileRenderTTLSeconds(spec.RenderCacheTTLSeconds)
-	cacheEntryID := ""
-	if ttlSeconds > 0 {
-		cacheEntryID, err = s.fileRenderCacheEntryID(spec, req)
-		if err != nil {
-			return nil, err
-		}
-		if !req.Refresh {
-			if cached := s.readFileRenderCache(ctx, cacheEntryID, time.Duration(ttlSeconds)*time.Second); cached != nil {
-				return cached, nil
-			}
-		}
-	}
-	req.Spec = &spec
-	result, err := s.getFile(ctx, req, state)
-	if err != nil {
-		return nil, err
-	}
-	result.Cached = false
-	s.writeFileRenderCache(ctx, cacheEntryID, ttlSeconds, result)
-	return result, nil
+	return s.getFile(ctx, req, state)
 }
 
 func (s *Service) getFile(ctx context.Context, req domain.FileRequest, state *fileResolveState) (*domain.FileResult, error) {

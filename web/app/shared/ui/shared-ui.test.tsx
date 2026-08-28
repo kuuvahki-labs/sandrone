@@ -7,8 +7,8 @@ import { CodeBlock, HighlightedTextarea } from "./code-editor";
 import { SelectField } from "./form-fields";
 import { PageHeader } from "./page";
 import { ProbeURLField } from "./probe-url-field";
-import { RenderCachePolicyField } from "./render-cache-policy-field";
 import { CreateSpeedDial } from "./resource-list";
+import { SnapshotCachePolicyField } from "./snapshot-cache-policy-field";
 
 const originalClipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, "clipboard");
 
@@ -394,16 +394,16 @@ describe("ProbeURLField", () => {
   });
 });
 
-describe("RenderCachePolicyField", () => {
+describe("SnapshotCachePolicyField", () => {
   it("preserves explicit disable and exposes custom TTL input on demand", () => {
-    render(<RenderCachePolicyField defaultValue={0} />);
+    render(<SnapshotCachePolicyField defaultValue={0} />);
 
-    const policy = screen.getByRole("combobox", { name: "渲染结果缓存" });
+    const policy = screen.getByRole("combobox", { name: "订阅执行快照缓存" });
     expect(policy).toHaveValue("disabled");
-    expect(screen.queryByRole("spinbutton", { name: "渲染结果缓存时长（秒）" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("spinbutton", { name: "订阅执行快照缓存时长（秒）" })).not.toBeInTheDocument();
 
     fireEvent.change(policy, { target: { value: "custom" } });
-    expect(screen.getByRole("spinbutton", { name: "渲染结果缓存时长（秒）" })).toBeInTheDocument();
+    expect(screen.getByRole("spinbutton", { name: "订阅执行快照缓存时长（秒）" })).toBeInTheDocument();
   });
 });
 

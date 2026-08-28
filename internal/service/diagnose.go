@@ -29,6 +29,9 @@ func (s *Service) Diagnose(ctx context.Context, req domain.DiagnoseRequest) (*do
 	if req.Kind == "" {
 		req.Kind = domain.DiagnoseInputAuto
 	}
+	if req.CacheMode == "" {
+		req.CacheMode = domain.DiagnoseCacheModeRefresh
+	}
 	if err := validateDiagnoseRequest(req); err != nil {
 		return nil, err
 	}
@@ -50,7 +53,9 @@ func (s *Service) Diagnose(ctx context.Context, req domain.DiagnoseRequest) (*do
 		err = s.diagnoseStoredSubscription(ctx, req, result)
 	case req.File != nil:
 		result.Input = domain.DiagnoseInput{Kind: domain.DiagnoseInputFile, Name: firstNonEmptyString(req.File.Name, req.Name)}
-		err = s.diagnoseFile(ctx, *req.File, result)
+		fileReq := *req.File
+		fileReq.Refresh = req.CacheMode != domain.DiagnoseCacheModeReuse
+		err = s.diagnoseFile(ctx, fileReq, result)
 	default:
 		detected, detectErr := s.detectDiagnoseInput(ctx, req)
 		if detectErr != nil {
@@ -74,7 +79,10 @@ func (s *Service) Diagnose(ctx context.Context, req domain.DiagnoseRequest) (*do
 		case domain.DiagnoseInputSubscription:
 			err = s.diagnoseSubscription(ctx, *detected.subscription, req, result)
 		case domain.DiagnoseInputFile:
-			err = s.diagnoseFile(ctx, domain.FileRequest{Spec: detected.file, Target: req.Target, Meta: req.Meta, Refresh: true}, result)
+			err = s.diagnoseFile(ctx, domain.FileRequest{
+				Spec: detected.file, Target: req.Target, Meta: req.Meta,
+				Refresh: req.CacheMode != domain.DiagnoseCacheModeReuse,
+			}, result)
 		}
 	}
 
@@ -122,6 +130,11 @@ func validateDiagnoseRequest(req domain.DiagnoseRequest) error {
 	case domain.DiagnoseInputAuto, domain.DiagnoseInputNodes, domain.DiagnoseInputSubscription, domain.DiagnoseInputFile:
 	default:
 		return domain.NewError(domain.CodeInvalidArgument, "diagnose kind must be auto, nodes, subscription, or file")
+	}
+	switch req.CacheMode {
+	case domain.DiagnoseCacheModeRefresh, domain.DiagnoseCacheModeReuse:
+	default:
+		return domain.NewError(domain.CodeInvalidArgument, "diagnose cache_mode must be refresh or reuse")
 	}
 	if req.Remote != nil && req.Kind != domain.DiagnoseInputAuto && req.Kind != domain.DiagnoseInputNodes {
 		return domain.NewError(domain.CodeInvalidArgument, "remote diagnose input only supports nodes")
@@ -438,7 +451,8 @@ func (s *Service) diagnoseStoredSubscription(ctx context.Context, req domain.Dia
 
 func (s *Service) diagnoseSubscription(ctx context.Context, sub domain.Subscription, req domain.DiagnoseRequest, result *domain.DiagnoseResult) error {
 	execution, err := s.executeSubscription(ctx, sub, subscriptionExecutionRequest{
-		Name: sub.Name, Request: domain.RequestInfo{Meta: req.Meta}, Refresh: true,
+		Name: sub.Name, Request: domain.RequestInfo{Meta: req.Meta},
+		Refresh: req.CacheMode != domain.DiagnoseCacheModeReuse,
 	}, newSubscriptionExecutionState())
 	if err != nil {
 		return err
@@ -482,7 +496,6 @@ func diagnosedSourceFormat(sources []domain.SourceInfo) string {
 }
 
 func (s *Service) diagnoseFile(ctx context.Context, req domain.FileRequest, result *domain.DiagnoseResult) error {
-	req.Refresh = true
 	fileResult, err := s.GetFile(ctx, req)
 	if err != nil {
 		return err

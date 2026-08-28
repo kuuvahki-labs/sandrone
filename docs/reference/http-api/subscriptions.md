@@ -35,7 +35,7 @@
 | `remote` | `remote` 的抓取描述；`remote.url` 必填，另可给出 `user_agent`、`proxy`、`timeout_ms`、`cache_ttl_seconds`。 |
 | `inputs` | `collection` 的有序输入列表；引用订阅时使用 `ref.kind: "subscription"` 与 `ref.name`。 |
 | `processors` | 按声明顺序执行的处理链；字段和失败语义见 [Processors 参考](../processors.md)。 |
-| `render_cache_ttl_seconds` | 可选非负整数；省略继承 runtime subscription-render 默认，显式 `0` 关闭，正数覆盖。 |
+| `snapshot_ttl_seconds` | 可选非负整数；省略继承 runtime subscription-snapshot 默认，显式 `0` 关闭，正数覆盖。 |
 | `meta` | 可选字符串键值元数据。 |
 | `created_at`、`updated_at` | 可选 RFC 3339 时间戳，随定义往返。 |
 
@@ -97,23 +97,29 @@
 - `warnings`，无 warning 时仍为 `[]`。warning 结构见
   [错误与诊断参考](../errors.md)。
 
+成功响应同时返回 `X-Sandrone-Subscription-Snapshot` header，值为 `hit`、`miss`、
+`bypass` 或 `disabled`，分别表示根订阅复用执行快照、未命中后重新执行、因
+`refresh: true` 主动绕过、或有效 snapshot TTL 为 `0`。该状态不进入 JSON 正文。
+
 节点完成规范化和校验后会获得仅运行时存在的 `RuntimeID`；preview 只按
 `RuntimeID` 关联前后节点，不使用名称、数组位置、连接字段或内容相等作为兜底。保留的
 节点即使被改名、重排或修改连接字段也仍按同一节点计算，变化表现为 `modified`；
 过滤、排除或去重表现为 `removed`。processor 新建或手工重建且未继承 `RuntimeID` 的
 节点表现为 `added`，对应的原节点表现为 `removed`。`RuntimeID` 不属于 NodeIR JSON，
-不会出现在 `before`、`after` 或持久化数据中。
+不会出现在 `before`、`after` 或资源定义中。执行快照会在私有 sidecar 中保存前后
+节点的 RuntimeID，使缓存命中后的 diff 仍遵守同一关联语义。
 
 远程订阅按保存的抓取设置读取，正数
 `cache_ttl_seconds` 可以复用该订阅资源自己的 remote-fetch 缓存，不与其它订阅
 共享。preview 不返回 traffic，
-也不会把节点或 report 写回订阅。`refresh: true` 跳过本次 remote-fetch 与 probe
-缓存读取，并在成功时按当前 TTL 重新填充；preview 本身不使用
-subscription-render 结果缓存。
+也不会把节点或 report 写回订阅。有效的 `snapshot_ttl_seconds` 会让
+preview、不同格式 render、typed file、share 与脚本订阅调用共享同一份处理前后
+`NodeSet`。`refresh: true` 跳过本次 snapshot、remote-fetch 与 probe
+缓存读取，并在成功时按当前 TTL 重新填充。
 
 ### `POST /v1/subscriptions/{name}/traffic`
 
-读取远程订阅响应头中的运行时用量。请求正文可省略；需要绕过缓存时传入：
+读取远程订阅响应头中的运行时用量。请求正文可省略；需要强制重新抓取远程订阅时传入：
 
 ```json
 {
@@ -121,8 +127,8 @@ subscription-render 结果缓存。
 }
 ```
 
-`refresh: true` 同时绕过 subscription-traffic 缓存和本次底层 remote-fetch
-缓存。成功时返回 `200`：
+`refresh: true` 绕过本次底层 remote-fetch 缓存。traffic 没有独立缓存层。
+成功时返回 `200`：
 
 ```json
 {
@@ -142,8 +148,7 @@ subscription-render 结果缓存。
 }
 ```
 
-命中 traffic 缓存时响应可带 `cached: true`。`traffic` 来自
-`Subscription-Userinfo`、`Profile-Web-Page-Url`、`Plan-Name` 或
+`traffic` 来自 `Subscription-Userinfo`、`Profile-Web-Page-Url`、`Plan-Name` 或
 `Profile-Title` 等远程响应头；没有可识别信息时省略。它可能包含
 `observed_at`、到期时间、剩余天数、重置日或应用 URL 等可选字段，但不会写回
 订阅定义。URL fragment 中的 `noFlow`/`noflow` 会禁用本次用量识别。
@@ -164,7 +169,7 @@ traffic 只适用于 `remote`；它不执行订阅的 nodes processors，不返�
 | --- | --- | --- |
 | `format` | string | 必填且非空；目标 renderer 格式。 |
 | `args` | object | 可选 string-to-string 参数，传给本次脚本/资源执行。 |
-| `refresh` | boolean | 可选；为 `true` 时跳过结果、remote-fetch 和 probe 缓存读取，并在成功后重新填充。 |
+| `refresh` | boolean | 可选；为 `true` 时跳过 snapshot、remote-fetch 和 probe 缓存读取，并在成功后重新填充。 |
 
 查询参数 `arg.<key>=<value>` 也进入本次 args；body `args` 的同名键覆盖查询值。
 processor 和脚本参数的完整执行语义分别见
@@ -176,9 +181,8 @@ processor 和脚本参数的完整执行语义分别见
 {
   "content_type": "application/json",
   "body": "[\n  {\n    \"name\": \"example-node\",\n    \"type\": \"ss\",\n    \"server\": \"proxy.example.invalid\",\n    \"port\": 8388,\n    \"password\": \"example-password\",\n    \"cipher\": \"aes-128-gcm\"\n  }\n]",
-  "cached": false,
   "report": {
-    "kind": "subscription_render",
+    "kind": "render",
     "status": "ok",
     "created_at": "2026-01-01T00:00:00Z",
     "dependencies": [
@@ -197,8 +201,7 @@ processor 和脚本参数的完整执行语义分别见
 ```
 
 `body` 是目标正文的 JSON string，`content_type` 描述正文格式；外层响应仍是
-JSON。`cached` 表示是否直接命中 `subscription_render`；`report` 返回本次
-完整 dependencies、source refs、warnings 与 render statistics，字段语义与
+JSON。`report` 返回本次完整 dependencies、source refs、warnings 与 render statistics，字段语义与
 敏感边界见[错误与诊断](../errors.md#report)。
 
 名称或 format 无效、订阅不存在、输入无法读取、processor 或 renderer 失败时
@@ -226,8 +229,8 @@ curl -sS "$SANDRONE_URL/v1/subscriptions/example/render?arg.environment=test" \
   `meta` 中暴露真实订阅 URL、凭据或套餐标识。
 - preview 会返回处理前后的节点对象，其中可能含连接凭据；应把响应按敏感数据
   处理。
-- 保存或删除任一订阅会使 subscription-traffic、subscription-render 和
-  file-render 缓存失效；文件和项目设置变更也会失效相关结果缓存。
+- 保存或删除订阅会清理其拥有的 remote-fetch、probe 与 subscription-snapshot
+  缓存；执行快照还会在命中时校验传递依赖 revision。
 - handler 级错误码、状态映射和 warning 字段见[错误与诊断参考](../errors.md)；
   router 与未知 action 的 plain-text `404`/`405` 边界见[通用约定](README.md#响应与失败)。
 

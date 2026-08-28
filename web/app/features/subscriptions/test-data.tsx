@@ -53,7 +53,7 @@ export const remoteSubscriptionDefinition: SubscriptionDefinition = {
     timeout_ms: 10000,
     cache_ttl_seconds: 45,
   },
-  renderCacheTTLSeconds: 0,
+  snapshotTTLSeconds: 300,
   processors: [
     {
       name: "入口重命名",
@@ -101,7 +101,6 @@ export const subscriptionTraffic: SubscriptionTraffic = {
   subscriptionName: "provider",
   kind: "remote",
   format: "uri-list",
-  cached: false,
 };
 
 export const allStatusSubscriptionPreview: SubscriptionPreview = {

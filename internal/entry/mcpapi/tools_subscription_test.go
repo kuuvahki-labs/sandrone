@@ -72,7 +72,7 @@ func TestSubscriptionRenderReturnsContentReportAndReceivesArgs(t *testing.T) {
 	decodeStructuredContent(t, result, &output)
 	require.Equal(t, "application/json", output.ContentType)
 	require.Contains(t, output.Body, `"name": "render-renamed-node-a"`)
-	require.Equal(t, "subscription_render", output.Report.Kind)
+	require.Equal(t, "render", output.Report.Kind)
 	require.Contains(t, output.Report.Warnings, domain.Warning{
 		Code: "request_args", Message: "render-",
 	})
@@ -81,32 +81,6 @@ func TestSubscriptionRenderReturnsContentReportAndReceivesArgs(t *testing.T) {
 	require.NoError(t, err)
 	require.NotContains(t, string(body), `"spec":`)
 	require.NotContains(t, string(body), `"resource_uri":`)
-}
-
-func TestSubscriptionRenderSupportsRefreshAndReturnsCacheStatus(t *testing.T) {
-	ctx := context.Background()
-	rt := testRuntime(t, app.Config{})
-	ttl := 60
-	require.NoError(t, rt.Service.PutSubscription(ctx, domain.Subscription{
-		Name: "cached", Type: domain.SubscriptionTypeLocal, Format: "uri-list",
-		Content:               "ss://aes-128-gcm:secret@example.com:8388#node-a",
-		RenderCacheTTLSeconds: &ttl,
-	}))
-	session := connect(t, ctx, mcpapi.SDKServer(rt))
-	defer session.Close()
-
-	render := func(refresh bool) bool {
-		t.Helper()
-		result := callToolSuccess(t, ctx, session, "sandrone_render_subscription", map[string]any{
-			"name": "cached", "format": "uri-list", "refresh": refresh,
-		})
-		cached, _ := result["cached"].(bool)
-		return cached
-	}
-	require.False(t, render(false))
-	require.True(t, render(false))
-	require.False(t, render(true))
-	require.True(t, render(false))
 }
 
 func TestSubscriptionTrafficReturnsRemoteServiceResult(t *testing.T) {
@@ -140,7 +114,6 @@ func TestSubscriptionTrafficReturnsRemoteServiceResult(t *testing.T) {
 	require.Equal(t, "remote", output.SubscriptionName)
 	require.Equal(t, domain.SubscriptionTypeRemote, output.Type)
 	require.Equal(t, "base64", output.Format)
-	require.False(t, output.Cached)
 	require.NotNil(t, output.Traffic)
 	require.Equal(t, "remote", output.Traffic.SourceName)
 	require.Equal(t, remote.URL, output.Traffic.SourceURL)

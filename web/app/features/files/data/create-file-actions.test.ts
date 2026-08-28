@@ -69,20 +69,6 @@ describe("file actions", () => {
     ]);
   });
 
-  it("submits a custom file render cache TTL", async () => {
-    const { client, createFile } = setupActions();
-    const form = new FormData();
-    form.set("name", "cached.yaml");
-    form.set("render_cache_mode", "custom");
-    form.set("render_cache_ttl_seconds", "120");
-
-    await createFile("static", form);
-
-    expect(client.createFile).toHaveBeenCalledWith(expect.objectContaining({
-      render_cache_ttl_seconds: 120,
-    }));
-  });
-
   it("awaits create API and refresh completion before later effects", async () => {
     const api = deferred<unknown>();
     const refresh = deferred<void>();
@@ -186,7 +172,7 @@ describe("file actions", () => {
 
   it("preserves the existing file name and current route when saving edits", async () => {
     const { client, navigate, refreshResources, saveFileEdit } = setupActions();
-		const item: FileItem = { name: "default.yaml", title: "default.yaml", kind: "static" };
+    const item: FileItem = { name: "default.yaml", title: "default.yaml", kind: "static" };
     const form = new FormData();
     form.set("name", "renamed.yaml");
     form.set("kind", "sing-box");
@@ -218,13 +204,13 @@ describe("file actions", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-27T04:05:06.000Z"));
     const { client, saveFileEdit } = setupActions();
-		const item: FileItem = { name: "default.yaml", title: "default.yaml", kind: "static" };
+    const item: FileItem = { name: "default.yaml", title: "default.yaml", kind: "static" };
     const form = new FormData();
     form.set("source", JSON.stringify({ type: "inline", content: "body" }));
 
     await saveFileEdit(item, form, {
       name: "default.yaml",
-			kind: "static",
+      kind: "static",
       source: { type: "inline", content: "old" },
       processors: [],
       createdAt: "2026-06-27T01:02:03.000Z",
@@ -337,13 +323,13 @@ describe("file actions", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-27T04:05:06.000Z"));
     const { client, saveFileEdit } = setupActions();
-		const item: FileItem = { name: "default.yaml", title: "default.yaml", kind: "static" };
+    const item: FileItem = { name: "default.yaml", title: "default.yaml", kind: "static" };
     const form = new FormData();
     form.set("source", JSON.stringify({ type: "inline", content: "body" }));
 
     await saveFileEdit(item, form, {
       name: "default.yaml",
-			kind: "static",
+      kind: "static",
       source: { type: "inline", content: "old" },
       processors: [],
       updatedAt: "2026-06-27T02:03:04.000Z",
@@ -358,7 +344,7 @@ describe("file actions", () => {
 
   it("uses the submitted source JSON while keeping the edited file name", async () => {
     const { client, saveFileEdit } = setupActions();
-		const item: FileItem = { name: "default.yaml", title: "default.yaml", kind: "static" };
+    const item: FileItem = { name: "default.yaml", title: "default.yaml", kind: "static" };
     const form = new FormData();
     form.set("name", "renamed.yaml");
     form.set("source", JSON.stringify({ type: "remote", remote: { url: "https://example.com/base.yaml" } }));
@@ -373,7 +359,7 @@ describe("file actions", () => {
 
   it("saves file edits with submitted display name", async () => {
     const { client, saveFileEdit } = setupActions();
-		const item: FileItem = { name: "default.yaml", title: "Default Profile", displayName: "Default Profile", kind: "static" };
+    const item: FileItem = { name: "default.yaml", title: "Default Profile", displayName: "Default Profile", kind: "static" };
     const form = new FormData();
     form.set("display_name", "  Mobile Config  ");
     form.set("source", JSON.stringify({ type: "inline", content: "body" }));

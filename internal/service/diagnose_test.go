@@ -368,10 +368,12 @@ func TestDiagnoseStoredSubscriptionBypassesRemoteCache(t *testing.T) {
 	defer server.Close()
 
 	ctx := context.Background()
+	snapshotTTL := 3600
 	svc := New(WithFS(afero.NewMemMapFs()))
 	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
 		Name: "remote", Type: domain.SubscriptionTypeRemote, Format: "uri-list",
-		Remote: &domain.RemoteInput{URL: server.URL, CacheTTLSeconds: 3600},
+		Remote:             &domain.RemoteInput{URL: server.URL, CacheTTLSeconds: 3600},
+		SnapshotTTLSeconds: &snapshotTTL,
 	}))
 	preview, err := svc.PreviewSubscription(ctx, "remote")
 	require.NoError(t, err)
@@ -385,6 +387,16 @@ func TestDiagnoseStoredSubscriptionBypassesRemoteCache(t *testing.T) {
 	require.Equal(t, domain.DiagnoseStatusOK, result.Status)
 	require.Len(t, result.Nodes, 1)
 	require.Equal(t, "after", result.Nodes[0].Name)
+	require.Equal(t, 2, calls)
+
+	body = "ss://aes-128-gcm:secret@example.com:8388#newer"
+	reused, err := svc.Diagnose(ctx, domain.DiagnoseRequest{
+		Kind: domain.DiagnoseInputSubscription, SubscriptionName: "remote",
+		CacheMode: domain.DiagnoseCacheModeReuse,
+	})
+	require.NoError(t, err)
+	require.Equal(t, domain.DiagnoseStatusOK, reused.Status)
+	require.Equal(t, "after", reused.Nodes[0].Name)
 	require.Equal(t, 2, calls)
 }
 

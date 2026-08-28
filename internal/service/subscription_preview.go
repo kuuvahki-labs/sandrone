@@ -55,14 +55,15 @@ func (s *Service) PreviewSubscriptionRequest(ctx context.Context, req domain.Sub
 	nodes, counts := diffPreviewNodes(before.Nodes, after.Nodes)
 	attachPreviewTargetNames(nodes, "shadowrocket", shadowrocket.PreviewNodeNames(after.Nodes))
 	return &domain.SubscriptionPreviewResult{
-		SubscriptionName: sub.Name,
-		Type:             sub.Type,
-		Format:           sub.Format,
-		BeforeCount:      len(before.Nodes),
-		AfterCount:       len(after.Nodes),
-		StatusCounts:     counts,
-		Nodes:            nodes,
-		Report:           report,
+		SubscriptionName:    sub.Name,
+		Type:                sub.Type,
+		Format:              sub.Format,
+		BeforeCount:         len(before.Nodes),
+		AfterCount:          len(after.Nodes),
+		StatusCounts:        counts,
+		Nodes:               nodes,
+		Report:              report,
+		SnapshotCacheStatus: execution.snapshotCacheStatus,
 	}, nil
 }
 

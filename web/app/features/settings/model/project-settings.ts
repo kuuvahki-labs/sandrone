@@ -39,9 +39,7 @@ export const defaultProjectSettings: SettingsView = {
   cache_defaults: {
     remote_fetch_ttl_seconds: 0,
     probe_ttl_seconds: 0,
-    subscription_traffic_ttl_seconds: 60,
-    subscription_render_ttl_seconds: 0,
-    file_render_ttl_seconds: 0,
+    subscription_snapshot_ttl_seconds: 0,
   },
   appearance: {
     theme_mode: "dark",

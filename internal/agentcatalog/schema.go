@@ -6,17 +6,17 @@ import "github.com/google/jsonschema-go/jsonschema"
 // SubscriptionSchema returns the closed wire schema for a stored subscription.
 func SubscriptionSchema() *jsonschema.Schema {
 	return closedObject(map[string]*jsonschema.Schema{
-		"name":                     stringSchema(),
-		"display_name":             stringSchema(),
-		"type":                     enumSchema("remote", "local", "collection"),
-		"format":                   subscriptionFormatSchema(),
-		"content":                  stringSchema(),
-		"remote":                   remoteInputSchema(),
-		"inputs":                   arraySchema(nodeInputSchema()),
-		"processors":               arraySchema(processorSpecSchema()),
-		"nodes":                    arraySchema(openObjectSchema()),
-		"render_cache_ttl_seconds": boundedIntegerSchema(),
-		"meta":                     stringMapSchema(),
+		"name":                 stringSchema(),
+		"display_name":         stringSchema(),
+		"type":                 enumSchema("remote", "local", "collection"),
+		"format":               subscriptionFormatSchema(),
+		"content":              stringSchema(),
+		"remote":               remoteInputSchema(),
+		"inputs":               arraySchema(nodeInputSchema()),
+		"processors":           arraySchema(processorSpecSchema()),
+		"nodes":                arraySchema(openObjectSchema()),
+		"snapshot_ttl_seconds": boundedIntegerSchema(),
+		"meta":                 stringMapSchema(),
 	}, []string{"name", "type"})
 }
 
@@ -27,14 +27,13 @@ func FileSpecSchema(requireName bool) *jsonschema.Schema {
 		required = []string{"name", "kind", "source"}
 	}
 	return closedObject(map[string]*jsonschema.Schema{
-		"name":                     stringSchema(),
-		"display_name":             stringSchema(),
-		"kind":                     enumSchema("static", "mihomo", "sing-box", "shadowrocket"),
-		"source":                   fileSourceSchema(),
-		"config":                   fileConfigSchema(),
-		"processors":               arraySchema(processorSpecSchema()),
-		"render_cache_ttl_seconds": boundedIntegerSchema(),
-		"meta":                     stringMapSchema(),
+		"name":         stringSchema(),
+		"display_name": stringSchema(),
+		"kind":         enumSchema("static", "mihomo", "sing-box", "shadowrocket"),
+		"source":       fileSourceSchema(),
+		"config":       fileConfigSchema(),
+		"processors":   arraySchema(processorSpecSchema()),
+		"meta":         stringMapSchema(),
 	}, required)
 }
 
