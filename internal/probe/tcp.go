@@ -42,9 +42,7 @@ func (b *TCPBackend) Probe(ctx context.Context, backendReq BackendRequest, nodes
 	sem := make(chan struct{}, concurrency)
 	var wg sync.WaitGroup
 	for i, node := range nodes {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			defer recoverProbeWorkerPanic(&results[i], req, node, string(domain.CodeProbeTCPFailed))
 			select {
 			case sem <- struct{}{}:
@@ -54,7 +52,7 @@ func (b *TCPBackend) Probe(ctx context.Context, backendReq BackendRequest, nodes
 				return
 			}
 			results[i] = b.probeNode(ctx, req, node, timeout, attempts)
-		}()
+		})
 	}
 	wg.Wait()
 

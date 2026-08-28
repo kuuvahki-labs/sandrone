@@ -84,10 +84,7 @@ func (b *MihomoBackend) Probe(ctx context.Context, backendReq BackendRequest, no
 	sem := make(chan struct{}, concurrency)
 	var wg sync.WaitGroup
 	for i, node := range nodes {
-		i, node := i, node
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			defer recoverProbeWorkerPanic(&results[i], req, node, string(domain.CodeProbeCoreAPIFailed))
 			if proxyByNode[i] == nil {
 				results[i] = resultForError(req, node, string(domain.CodeProbeInvalidTarget), fmt.Errorf("mihomo proxy was skipped by renderer"), b.now())
@@ -101,7 +98,7 @@ func (b *MihomoBackend) Probe(ctx context.Context, backendReq BackendRequest, no
 				return
 			}
 			results[i] = b.probeNode(ctx, req, node, proxyByNode[i], target, expectedStatus, timeout, attempts)
-		}()
+		})
 	}
 	wg.Wait()
 

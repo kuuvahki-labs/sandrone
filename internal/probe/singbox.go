@@ -95,10 +95,7 @@ func (b *SingBoxBackend) Probe(ctx context.Context, backendReq BackendRequest, n
 	sem := make(chan struct{}, concurrency)
 	var wg sync.WaitGroup
 	for i, node := range nodes {
-		i, node := i, node
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			defer recoverProbeWorkerPanic(&results[i], req, node, string(domain.CodeProbeCoreAPIFailed))
 			select {
 			case sem <- struct{}{}:
@@ -108,7 +105,7 @@ func (b *SingBoxBackend) Probe(ctx context.Context, backendReq BackendRequest, n
 				return
 			}
 			results[i] = b.probeNode(ctx, req, node, instance, target, expectedStatus, tlsClientConfig, timeout, attempts)
-		}()
+		})
 	}
 	wg.Wait()
 
@@ -210,10 +207,7 @@ func (b *SingBoxNTPBackend) Probe(ctx context.Context, backendReq BackendRequest
 	sem := make(chan struct{}, concurrency)
 	var wg sync.WaitGroup
 	for i, node := range nodes {
-		i, node := i, node
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			defer recoverProbeWorkerPanic(&results[i], req, node, string(domain.CodeProbeUDPNTPFailed))
 			select {
 			case sem <- struct{}{}:
@@ -223,7 +217,7 @@ func (b *SingBoxNTPBackend) Probe(ctx context.Context, backendReq BackendRequest
 				return
 			}
 			results[i] = b.probeNode(ctx, req, node, instance, timeout, attempts)
-		}()
+		})
 	}
 	wg.Wait()
 
