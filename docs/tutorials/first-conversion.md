@@ -6,7 +6,7 @@
 
 需要：
 
-- Go 1.25.11；
+- Go 1.27.0；
 - 一个 Sandrone 仓库 checkout；
 - 支持 POSIX shell 的终端。
 

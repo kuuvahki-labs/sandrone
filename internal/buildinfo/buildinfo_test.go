@@ -684,7 +684,7 @@ func TestBuildMetadataContracts(t *testing.T) {
 
 	for _, want := range []string{
 		`FROM --platform=$BUILDPLATFORM node:24.17.0-bookworm AS web`,
-		`FROM --platform=$BUILDPLATFORM golang:1.25.11-bookworm AS build`,
+		`FROM --platform=$BUILDPLATFORM golang:1.27.0-bookworm AS build`,
 		`ARG VERSION="dev"`,
 		"ARG REVISION",
 		"ARG TARGETOS",

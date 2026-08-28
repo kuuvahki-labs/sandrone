@@ -16,7 +16,7 @@ RUN if [ -n "$PNPM_REGISTRY" ]; then pnpm config set registry "$PNPM_REGISTRY"; 
 COPY web/ ./
 RUN pnpm build
 
-FROM --platform=$BUILDPLATFORM golang:1.25.11-bookworm AS build
+FROM --platform=$BUILDPLATFORM golang:1.27.0-bookworm AS build
 WORKDIR /src
 
 ARG GOPROXY=""
