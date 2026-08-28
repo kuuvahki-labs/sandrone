@@ -104,10 +104,10 @@ func (p *quickSettingsProc) apply(node domain.NodeIR) (domain.NodeIR, []domain.W
 	switch p.udp {
 	case quickSettingEnabled:
 		dialer := ensureDialerCopy(&updated)
-		dialer.UDPRelay = boolPtr(true)
+		dialer.UDPRelay = new(true)
 	case quickSettingDisabled:
 		dialer := ensureDialerCopy(&updated)
-		dialer.UDPRelay = boolPtr(false)
+		dialer.UDPRelay = new(false)
 	}
 
 	switch p.tfo {
@@ -158,16 +158,16 @@ func (p *quickSettingsProc) apply(node domain.NodeIR) (domain.NodeIR, []domain.W
 		case quickSettingEnabled:
 			switch snell.Version {
 			case 2, 4, 5:
-				snell.Reuse = boolPtr(true)
+				snell.Reuse = new(true)
 			default:
 				warnings = append(warnings, snellReuseWarning(updated, "enabled"))
 			}
 		case quickSettingDisabled:
 			switch snell.Version {
 			case 4, 5:
-				snell.Reuse = boolPtr(false)
+				snell.Reuse = new(false)
 			case 2:
-				snell.Reuse = boolPtr(true)
+				snell.Reuse = new(true)
 				warnings = append(warnings, snellReuseWarning(updated, "disabled"))
 			case 1, 3:
 				// These versions do not support reuse, so disabled is already satisfied.
@@ -208,8 +208,4 @@ func ensureTLSCopy(node *domain.NodeIR) *domain.TLSOptions {
 	tlsCopy := *node.TLS
 	node.TLS = &tlsCopy
 	return node.TLS
-}
-
-func boolPtr(value bool) *bool {
-	return &value
 }
