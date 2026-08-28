@@ -289,16 +289,15 @@ func SplitHostPortLoose(hostPart string) (string, string, error) {
 }
 
 func SplitBareIPv6HostPort(hostPart string) (string, string, bool) {
-	lastColon := strings.LastIndex(hostPart, ":")
-	if lastColon <= 0 || lastColon == len(hostPart)-1 {
+	host, port, found := strings.CutLast(hostPart, ":")
+	if !found || host == "" || port == "" {
 		return "", "", false
 	}
-	host := hostPart[:lastColon]
 	addr, err := netip.ParseAddr(host)
 	if err != nil || !addr.Is6() {
 		return "", "", false
 	}
-	return host, hostPart[lastColon+1:], true
+	return host, port, true
 }
 
 func ParseURLHostPort(u *url.URL, defaultPort string) (string, uint16, error) {

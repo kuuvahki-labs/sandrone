@@ -35,11 +35,11 @@ func splitURI(raw string, schemes ...string) (authority string, query string, fr
 }
 
 func splitUserInfo(authority string) (string, string) {
-	at := strings.LastIndex(authority, "@")
-	if at < 0 {
+	userinfo, host, found := strings.CutLast(authority, "@")
+	if !found {
 		return "", authority
 	}
-	return authority[:at], authority[at+1:]
+	return userinfo, host
 }
 
 func parseHysteria2Authority(authority string) (string, uint16, []string, error) {

@@ -126,12 +126,11 @@ func truncateFileShareFilename(filename string) string {
 	if filename == "" {
 		return ""
 	}
-	extensionStart := strings.LastIndex(filename, ".")
-	if extensionStart <= 0 {
+	base, extension, found := strings.CutLast(filename, ".")
+	if !found || base == "" {
 		return truncateRunes(filename, maxShareFilenameBaseRunes)
 	}
-	base := truncateRunes(filename[:extensionStart], maxShareFilenameBaseRunes)
-	return base + filename[extensionStart:]
+	return truncateRunes(base, maxShareFilenameBaseRunes) + "." + extension
 }
 
 func truncateRunes(value string, limit int) string {
