@@ -391,10 +391,7 @@ func (s *Service) diagnoseNodes(ctx context.Context, req domain.DiagnoseRequest,
 	for _, node := range parsed.Nodes {
 		result.Warnings = append(result.Warnings, node.Warnings...)
 	}
-	prepared, prepareErr := prepareNodeBatch(parsed.Nodes)
-	if prepareErr != nil {
-		return domain.WrapError(domain.CodeInvalidArgument, "assign node runtime identity", prepareErr)
-	}
+	prepared := prepareNodeBatch(parsed.Nodes)
 	validated := nodevalidation.Validate(prepared, nodevalidation.StageNormalized, req.Target)
 	result.Counts = validated.Counts
 	result.Issues = append(result.Issues, validated.Issues...)
@@ -414,10 +411,7 @@ func (s *Service) diagnoseNodes(ctx context.Context, req domain.DiagnoseRequest,
 			return processErr
 		}
 		result.Warnings = append(result.Warnings, processed.Warnings...)
-		postPrepared, prepareErr := prepareNodeBatch(processed.Nodes)
-		if prepareErr != nil {
-			return domain.WrapError(domain.CodeInvalidArgument, "assign node runtime identity", prepareErr)
-		}
+		postPrepared := prepareNodeBatch(processed.Nodes)
 		post := nodevalidation.Validate(postPrepared, nodevalidation.StageProcessed, req.Target)
 		result.Issues = append(result.Issues, post.Issues...)
 		result.Counts.Valid = post.Counts.Valid

@@ -49,7 +49,7 @@ func normalizeNodeUUID(node *domain.NodeIR) {
 }
 
 func uuidV5NilNamespace(name string) uuid.UUID {
-	digest := sha1.Sum(append(make([]byte, len(uuid.UUID{})), name...))
+	digest := sha1.Sum(append(make([]byte, len(uuid.UUID{})), name...)) //nolint:gosec // UUIDv5 requires SHA-1.
 	var id uuid.UUID
 	copy(id[:], digest[:len(id)])
 	id[6] = id[6]&0x0f | 0x50

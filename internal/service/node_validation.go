@@ -8,11 +8,7 @@ import (
 )
 
 func validateNodeBatch(nodes []domain.NodeIR, stage nodevalidation.Stage, target string) (nodevalidation.Result, []domain.Warning, error) {
-	var err error
-	nodes, err = prepareNodeBatch(nodes)
-	if err != nil {
-		return nodevalidation.Result{}, nil, domain.WrapError(domain.CodeInvalidArgument, "assign node runtime identity", err)
-	}
+	nodes = prepareNodeBatch(nodes)
 	result := nodevalidation.Validate(nodes, stage, target)
 	if result.Counts.Invalid == 0 {
 		return result, nil, nil
@@ -60,8 +56,8 @@ func validationDropWarnings(nodes []domain.NodeIR, issues []domain.ValidationIss
 	return warnings
 }
 
-func prepareNodeBatch(nodes []domain.NodeIR) ([]domain.NodeIR, error) {
+func prepareNodeBatch(nodes []domain.NodeIR) []domain.NodeIR {
 	prepared := normalizeNodes(nodes)
 	domain.AssignNodeRuntimeIDs(prepared)
-	return prepared, nil
+	return prepared
 }
