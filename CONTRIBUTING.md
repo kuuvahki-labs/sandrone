@@ -9,7 +9,7 @@
 在仓库根目录运行 Go 命令。建议准备：
 
 - Go `1.27.0`，版本以 `go.mod` 为准。
-- Node.js `24.17.0` 和 pnpm `11.5.2`，仅 Web 开发需要。
+- Node.js `24.17.0` 和 pnpm `11.24.0`，仅 Web 开发需要。
 - Docker 与 Docker Compose，用于验证容器运行路径。
 - 支持当前 Go 版本的 `golangci-lint`，仅 `make ci` 或 `make lint` 需要。
 
@@ -19,7 +19,7 @@
 nvm install 24.17.0
 nvm use 24.17.0
 corepack enable
-corepack install --global pnpm@11.5.2
+corepack install --global pnpm@11.24.0
 pnpm --dir web install --frozen-lockfile
 ```
 

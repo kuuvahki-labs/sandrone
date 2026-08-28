@@ -876,7 +876,7 @@ func TestBuildMetadataContracts(t *testing.T) {
 		`uses: actions/setup-go@v7`,
 		`go-version-file: go.mod`,
 		`uses: pnpm/action-setup@v6`,
-		`version: 11.5.2`,
+		`version: 11.24.0`,
 		`uses: actions/setup-node@v7`,
 		`node-version-file: .node-version`,
 		`make release-artifacts REVISION="${GITHUB_SHA}"`,

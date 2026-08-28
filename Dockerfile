@@ -7,7 +7,7 @@ ARG NPM_REGISTRY=""
 ARG PNPM_REGISTRY=""
 
 RUN if [ -n "$NPM_REGISTRY" ]; then npm config set registry "$NPM_REGISTRY"; fi \
-  && npm install -g pnpm@11.5.2
+  && npm install -g pnpm@11.24.0
 
 COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
 RUN if [ -n "$PNPM_REGISTRY" ]; then pnpm config set registry "$PNPM_REGISTRY"; elif [ -n "$NPM_REGISTRY" ]; then pnpm config set registry "$NPM_REGISTRY"; fi \

@@ -1,6 +1,10 @@
 minimumReleaseAgeExclude:
-  - '@react-router/dev@8.0.0'
-  - '@react-router/express@8.0.0'
-  - '@react-router/node@8.0.0'
-  - '@react-router/serve@8.0.0'
-  - react-router@8.0.0
+  - '@mui/core-downloads-tracker@9.4.0'
+  - '@mui/icons-material@9.4.0'
+  - '@mui/material@9.4.0'
+  - '@mui/private-theming@9.4.0'
+  - '@mui/styled-engine@9.4.0'
+  - '@mui/system@9.4.0'
+  - '@mui/types@9.4.0'
+  - '@mui/utils@9.4.0'
+  - isbot@5.2.2

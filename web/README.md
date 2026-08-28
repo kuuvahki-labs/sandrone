@@ -10,7 +10,7 @@ Sandrone Web UI 是一个静态 React Router SPA。本页提供安装、开发�
 ## 环境与安装
 
 Web 开发使用 Node.js 24.17.0 LTS（见 [`.nvmrc`](.nvmrc)）和 pnpm
-11.5.2：
+11.24.0：
 
 ```sh
 corepack enable
