@@ -95,7 +95,7 @@ func (s *Service) readRemoteFetchCache(ctx context.Context, key, entryID string,
 	if s.cache == nil || entryID == "" {
 		return nil
 	}
-	item, found := readCacheValue[remoteFetchCacheValue](s, ctx, key, ttl)
+	item, found := s.readCacheValue[remoteFetchCacheValue](ctx, key, ttl)
 	if !found {
 		return nil
 	}
@@ -118,7 +118,7 @@ func (s *Service) writeRemoteFetchCache(ctx context.Context, key, entryID string
 	if s.cache == nil || entryID == "" || result == nil {
 		return nil
 	}
-	value, remaining, ok := prepareCacheValueWrite[remoteFetchCacheValue](s, ctx, key, ttl)
+	value, remaining, ok := s.prepareCacheValueWrite[remoteFetchCacheValue](ctx, key, ttl)
 	if !ok {
 		return nil
 	}

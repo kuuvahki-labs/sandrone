@@ -25,7 +25,7 @@ func TestBusinessCacheValueUsesOneConservativeAbsoluteDeadline(t *testing.T) {
 
 	write := func(writeCtx context.Context, ttl time.Duration, id, content string) {
 		t.Helper()
-		value, remaining, ok := prepareCacheValueWrite[ownedCacheFixture](svc, writeCtx, key, ttl)
+		value, remaining, ok := svc.prepareCacheValueWrite[ownedCacheFixture](writeCtx, key, ttl)
 		require.True(t, ok)
 		if value.Values == nil {
 			value.Values = map[string]string{}
@@ -73,7 +73,7 @@ func TestBusinessCacheValueUsesOneConservativeAbsoluteDeadline(t *testing.T) {
 	require.Equal(t, now.Add(time.Hour), refreshed.ExpiresAt)
 	require.Equal(t, map[string]string{"fresh": "replacement", "also-fresh": "merged"}, refreshed.Value.Values)
 
-	item, found := readCacheValue[ownedCacheFixture](svc, ctx, key, 10*time.Minute)
+	item, found := svc.readCacheValue[ownedCacheFixture](ctx, key, 10*time.Minute)
 	require.True(t, found)
 	require.Contains(t, item.Value.Values, "fresh")
 	shortenedOnHit, found, err := cachepkg.GetJSON[ownedCacheFixture](ctx, svc.cache, key)

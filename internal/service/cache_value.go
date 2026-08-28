@@ -11,7 +11,7 @@ import (
 	cachepkg "github.com/kuuvahki-labs/sandrone/internal/cache"
 )
 
-func readCacheValue[T any](s *Service, ctx context.Context, key string, ttl time.Duration) (cachepkg.JSONItem[T], bool) {
+func (s *Service) readCacheValue[T any](ctx context.Context, key string, ttl time.Duration) (cachepkg.JSONItem[T], bool) {
 	var zero cachepkg.JSONItem[T]
 	if s.cache == nil || key == "" || ttl <= 0 {
 		return zero, false
@@ -39,7 +39,7 @@ func readCacheValue[T any](s *Service, ctx context.Context, key string, ttl time
 // will replace. The returned TTL preserves or shortens the existing absolute
 // deadline. The first write to a key during refresh starts from the zero value
 // and establishes a new deadline.
-func prepareCacheValueWrite[T any](s *Service, ctx context.Context, key string, ttl time.Duration) (T, time.Duration, bool) {
+func (s *Service) prepareCacheValueWrite[T any](ctx context.Context, key string, ttl time.Duration) (T, time.Duration, bool) {
 	var value T
 	if s.cache == nil || key == "" || ttl <= 0 {
 		return value, 0, false

@@ -480,7 +480,7 @@ func (s *Service) resolveProbeNodeGroups(ctx context.Context, req domain.ProbeRe
 	canRead := req.CacheTTLSeconds > 0 && s.cache != nil && owned && !cacheReadBypass(ctx)
 	cachedNodes := map[string]cachedNodeProbe{}
 	if canRead {
-		item, found := readCacheValue[probeCacheValue](s, ctx, key, time.Duration(req.CacheTTLSeconds)*time.Second)
+		item, found := s.readCacheValue[probeCacheValue](ctx, key, time.Duration(req.CacheTTLSeconds)*time.Second)
 		if found {
 			if cachedGroup, exists := item.Value.Groups[selectorID]; exists && cachedGroup.Selector == selector {
 				cachedNodes = cachedGroup.Nodes
@@ -513,7 +513,7 @@ func (s *Service) writeProbeNodeGroups(ctx context.Context, req domain.ProbeRequ
 	if err != nil {
 		return err
 	}
-	value, remaining, ok := prepareCacheValueWrite[probeCacheValue](s, ctx, key, time.Duration(req.CacheTTLSeconds)*time.Second)
+	value, remaining, ok := s.prepareCacheValueWrite[probeCacheValue](ctx, key, time.Duration(req.CacheTTLSeconds)*time.Second)
 	if !ok {
 		return nil
 	}

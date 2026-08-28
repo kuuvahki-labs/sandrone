@@ -56,7 +56,7 @@ func (s *Service) readSubscriptionSnapshotCache(ctx context.Context, entryID str
 	if s.cache == nil || entryID == "" || !owned {
 		return nil
 	}
-	item, found := readCacheValue[subscriptionSnapshotCacheValue](s, ctx, key, ttl)
+	item, found := s.readCacheValue[subscriptionSnapshotCacheValue](ctx, key, ttl)
 	if !found {
 		return nil
 	}
@@ -107,7 +107,7 @@ func (s *Service) writeSubscriptionSnapshotCache(
 		return
 	}
 	ttl := time.Duration(ttlSeconds) * time.Second
-	value, remaining, ok := prepareCacheValueWrite[subscriptionSnapshotCacheValue](s, ctx, key, ttl)
+	value, remaining, ok := s.prepareCacheValueWrite[subscriptionSnapshotCacheValue](ctx, key, ttl)
 	if !ok {
 		return
 	}
