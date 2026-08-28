@@ -1,6 +1,7 @@
 import type { ProcessorDetail } from "~/shared/resources/types";
 
 export type ProcessorDraft = {
+  enabled: boolean;
   id: string;
   name: string;
   type: string;
@@ -17,6 +18,14 @@ export function processorLabel(type: string): string {
     case "script": return "script";
     default: return type || "processor";
   }
+}
+
+export function processorIsEnabled(value: unknown): boolean {
+  return value !== false;
+}
+
+export function processorEnabledProperty(enabled: boolean): Pick<ProcessorDetail, "enabled"> {
+  return enabled ? {} : { enabled: false };
 }
 
 export function cleanParams(params: Record<string, unknown>): Record<string, unknown> {

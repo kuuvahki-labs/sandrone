@@ -72,6 +72,51 @@ describe("ProcessorBuilder", () => {
     expect(serializedProcessors()).toEqual([]);
   });
 
+  it("toggles each processor independently while preserving its configuration and order", async () => {
+    const user = userEvent.setup();
+    const onDirty = vi.fn();
+    const { serializedProcessors } = renderProcessorBuilder({
+      defaultValue: [
+        { name: "Paused rename", type: "rename", stage: "nodes", enabled: false, params: { mode: "prefix", value: "paused-" } },
+        { name: "Active sort", type: "sort", stage: "nodes", params: { by: "+name" } },
+      ],
+      onDirty,
+    });
+
+    const paused = screen.getByRole("group", { name: "处理器 Paused rename" });
+    const active = screen.getByRole("group", { name: "处理器 Active sort" });
+    const pausedToggle = within(paused).getByRole("button", { name: "启用 Paused rename" });
+    const activeToggle = within(active).getByRole("button", { name: "启用 Active sort" });
+    expect(pausedToggle).toHaveAttribute("aria-pressed", "false");
+    expect(activeToggle).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(pausedToggle);
+    await user.click(activeToggle);
+
+    expect(serializedProcessors()).toEqual([
+      { name: "Paused rename", type: "rename", stage: "nodes", params: { mode: "prefix", value: "paused-" } },
+      { name: "Active sort", type: "sort", stage: "nodes", enabled: false, params: { by: "+name" } },
+    ]);
+    expect(onDirty).toHaveBeenCalledTimes(2);
+  });
+
+  it("offers secondary processor actions from the compact menu", async () => {
+    const user = userEvent.setup();
+    const { serializedProcessors } = renderProcessorBuilder({
+      defaultValue: [
+        { name: "First", type: "filter", stage: "nodes", params: { action: "keep", field: "name", match: "regex", pattern: "first" } },
+        { name: "Second", type: "sort", stage: "nodes", params: { by: "+name" } },
+      ],
+    });
+
+    const first = screen.getByRole("group", { name: "处理器 First" });
+    await user.click(within(first).getByRole("button", { name: "更多处理器操作：First" }));
+    expect(screen.getByRole("menuitem", { name: "上移处理器" })).toHaveAttribute("aria-disabled", "true");
+    await user.click(screen.getByRole("menuitem", { name: "下移处理器" }));
+
+    expect(serializedProcessors().map((processor) => processor.name)).toEqual(["Second", "First"]);
+  });
+
   it("defaults dedup to names and offers random digits", async () => {
     const user = userEvent.setup();
     const { serializedProcessors } = renderProcessorBuilder();

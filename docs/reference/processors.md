@@ -10,6 +10,7 @@ Processor 是显式声明、按顺序执行的转换步骤。本页定义当前 
 type: rename
 stage: nodes
 name: optional-label
+enabled: false
 params:
   mode: prefix
   value: "HK-"
@@ -20,6 +21,7 @@ params:
 | `type` | 必填，必须是已注册 processor type。 |
 | `stage` | `nodes` 或 `file`。仅当该 type 只注册在一个 stage 时可省略并推断。 |
 | `name` | 可选声明名；不改变 type 或执行语义。 |
+| `enabled` | 可选布尔值；省略或 `true` 时执行，`false` 时保留声明但跳过。 |
 | `params` | object；每个内建 processor 都拒绝未知字段。 |
 
 `script` 同时注册在 `nodes` 和 `file`，所以使用时必须显式写 `stage`。未知
@@ -30,7 +32,7 @@ type 返回 `processor_unknown`；stage 无法唯一推断或参数无效返回
 JSON 字符串。可发现的 processor 摘要与逐项 schema URI 见
 [MCP resources](mcp.md#resources-与-schema-templates)，本页继续定义领域语义。
 
-每次运行只选择当前 stage 的项，并保留它们在原数组中的相对顺序。前一步输出
+每次运行先跳过 `enabled: false` 的项，再选择当前 stage，并保留启用项在原数组中的相对顺序。关闭的项不会解析 stage、构建 processor 或执行参数校验；其完整声明仍保留在资源中，重新启用后恢复原位置。前一步输出
 是后一步输入，warning 也按此顺序累积。file-stage `merge` 与 `script` 没有
 特殊优先级：它们严格出现在声明位置。
 

@@ -115,8 +115,10 @@ function remoteInputFromAPI(value: unknown): RemoteInputDetail | undefined {
 function processorFromAPI(value: unknown): ProcessorDetail {
   const item = asRecord(value);
   const params = asRecord(item.params);
+  const { enabled: _enabled, ...rest } = item;
   return {
-    ...item,
+    ...rest,
+    ...(item.enabled === false ? { enabled: false } : {}),
     name: stringField(item.name) || undefined,
     type: stringField(item.type),
     stage: stringField(item.stage) || undefined,

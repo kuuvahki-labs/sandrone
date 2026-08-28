@@ -3,12 +3,15 @@ import type { ReactNode } from "react";
 import AddIcon from "@mui/icons-material/Add";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 import Button from "@mui/material/Button";
 import Collapse from "@mui/material/Collapse";
 import Divider from "@mui/material/Divider";
 import IconButton from "@mui/material/IconButton";
+import ListItemIcon from "@mui/material/ListItemIcon";
 import Paper from "@mui/material/Paper";
 import TextField from "@mui/material/TextField";
 import Tooltip from "@mui/material/Tooltip";
@@ -21,6 +24,7 @@ import {
   keyValueTextToReplacementPatch,
   objectToKeyValueText,
   type ProcessorDraft,
+  processorIsEnabled,
   stringValue,
 } from "~/shared/processors/model";
 import type { ProcessorDetail } from "~/shared/resources/types";
@@ -29,6 +33,7 @@ import {
   SelectField,
   type SelectOption,
 } from "~/shared/ui/form-fields";
+import { ActionMenu } from "~/shared/ui/resource-list";
 
 export type ProcessorParamsEditorProps = {
   draft: ProcessorDraft;
@@ -118,6 +123,7 @@ export function ProcessorEditorList({
 
   function addProcessor() {
     commitDrafts(addProcessorDrafts ? addProcessorDrafts(newType, drafts) : [...drafts, {
+      enabled: true,
       id: createDraftId(),
       name: "",
       type: newType,
@@ -171,10 +177,11 @@ export function ProcessorEditorList({
             const isEditing = editingIds.has(draft.id);
             const editorId = `${draft.id}-name-editor`;
             const groupLabel = customProcessorName(draft, labelForType) ? displayName : typeLabel;
+            const enabledActionLabel = t(draft.enabled ? "processor.disable" : "processor.enable", { label: displayName });
             return (
               <Paper aria-label={t("processor.group", { label: groupLabel })} className="p-4" component="section" key={draft.id} role="group" variant="outlined">
                 <div className="grid gap-4">
-                  <div className="flex items-center justify-between gap-4">
+                  <div className="flex min-w-0 items-start justify-between gap-2 sm:items-center">
                     <div className="min-w-0">
                       <Typography className="break-words" component="h4" variant="subtitle1">
                         {displayName}
@@ -183,21 +190,65 @@ export function ProcessorEditorList({
                         {typeLabel}
                       </Typography>
                     </div>
-                    <div className="flex gap-1">
-                      <Tooltip title={isEditing ? t("processor.collapseNameEdit") : t("processor.editName")}>
-                        <IconButton aria-controls={editorId} aria-expanded={isEditing} aria-label={isEditing ? t("processor.collapseNameEdit") : t("processor.editName")} size="small" type="button" onClick={() => toggleEditor(draft.id)}>
-                          <EditOutlinedIcon aria-hidden fontSize="small" />
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Tooltip title={enabledActionLabel}>
+                        <IconButton aria-label={t("processor.toggleEnabled", { label: displayName })} aria-pressed={draft.enabled} color={draft.enabled ? "primary" : "default"} size="small" type="button" onClick={() => updateDraft(index, { enabled: !draft.enabled })}>
+                          {draft.enabled
+                            ? <CheckCircleOutlineIcon aria-hidden fontSize="small" />
+                            : <RadioButtonUncheckedIcon aria-hidden fontSize="small" />}
                         </IconButton>
                       </Tooltip>
-                      <IconButton aria-label={t("processor.moveUp")} disabled={index === 0} size="small" type="button" onClick={() => moveProcessor(index, -1)}>
-                        <ArrowUpwardIcon aria-hidden fontSize="small" />
-                      </IconButton>
-                      <IconButton aria-label={t("processor.moveDown")} disabled={index === drafts.length - 1} size="small" type="button" onClick={() => moveProcessor(index, 1)}>
-                        <ArrowDownwardIcon aria-hidden fontSize="small" />
-                      </IconButton>
-                      <IconButton aria-label={t("processor.delete")} color="error" size="small" type="button" onClick={() => removeProcessor(draft.id)}>
-                        <DeleteOutlinedIcon aria-hidden fontSize="small" />
-                      </IconButton>
+                      <div className="sm:hidden">
+                        <ActionMenu
+                          buttonSize="small"
+                          label={t("processor.moreActions", { label: displayName })}
+                          actions={[
+                            {
+                              accessibleLabel: isEditing ? t("processor.collapseNameEdit") : t("processor.editName"),
+                              icon: <ListItemIcon><EditOutlinedIcon aria-hidden fontSize="small" /></ListItemIcon>,
+                              label: t("actions.edit"),
+                              onSelect: () => toggleEditor(draft.id),
+                            },
+                            {
+                              accessibleLabel: t("processor.moveUp"),
+                              disabled: index === 0,
+                              icon: <ListItemIcon><ArrowUpwardIcon aria-hidden fontSize="small" /></ListItemIcon>,
+                              label: t("actions.moveUp"),
+                              onSelect: () => moveProcessor(index, -1),
+                            },
+                            {
+                              accessibleLabel: t("processor.moveDown"),
+                              disabled: index === drafts.length - 1,
+                              icon: <ListItemIcon><ArrowDownwardIcon aria-hidden fontSize="small" /></ListItemIcon>,
+                              label: t("actions.moveDown"),
+                              onSelect: () => moveProcessor(index, 1),
+                            },
+                            {
+                              accessibleLabel: t("processor.delete"),
+                              icon: <ListItemIcon><DeleteOutlinedIcon aria-hidden fontSize="small" /></ListItemIcon>,
+                              label: t("actions.delete"),
+                              onSelect: () => removeProcessor(draft.id),
+                              tone: "danger",
+                            },
+                          ]}
+                        />
+                      </div>
+                      <div className="hidden items-center gap-1 sm:flex">
+                        <Tooltip title={isEditing ? t("processor.collapseNameEdit") : t("processor.editName")}>
+                          <IconButton aria-controls={editorId} aria-expanded={isEditing} aria-label={isEditing ? t("processor.collapseNameEdit") : t("processor.editName")} size="small" type="button" onClick={() => toggleEditor(draft.id)}>
+                            <EditOutlinedIcon aria-hidden fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <IconButton aria-label={t("processor.moveUp")} disabled={index === 0} size="small" type="button" onClick={() => moveProcessor(index, -1)}>
+                          <ArrowUpwardIcon aria-hidden fontSize="small" />
+                        </IconButton>
+                        <IconButton aria-label={t("processor.moveDown")} disabled={index === drafts.length - 1} size="small" type="button" onClick={() => moveProcessor(index, 1)}>
+                          <ArrowDownwardIcon aria-hidden fontSize="small" />
+                        </IconButton>
+                        <IconButton aria-label={t("processor.delete")} color="error" size="small" type="button" onClick={() => removeProcessor(draft.id)}>
+                          <DeleteOutlinedIcon aria-hidden fontSize="small" />
+                        </IconButton>
+                      </div>
                     </div>
                   </div>
                   <Collapse id={editorId} in={isEditing} timeout="auto" unmountOnExit>
@@ -229,7 +280,7 @@ export function ProcessorEditorList({
 }
 
 function draftFromProcessor(processor: ProcessorDetail, index: number, createDraftId: (index?: number) => string): ProcessorDraft {
-  return { id: createDraftId(index), name: stringValue(processor.name), type: processor.type || "script", params: cleanParams(processor.params ?? {}) };
+  return { enabled: processorIsEnabled(processor.enabled), id: createDraftId(index), name: stringValue(processor.name), type: processor.type || "script", params: cleanParams(processor.params ?? {}) };
 }
 
 function processorDisplayName(draft: ProcessorDraft, index: number, labelForType: (type: string) => string, t: Translator): string {

@@ -29,6 +29,8 @@ import {
   createProcessorDraftId,
   customProcessorName,
   type ProcessorDraft,
+  processorEnabledProperty,
+  processorIsEnabled,
   processorLabel as modelProcessorLabel,
   stringValue,
 } from "~/shared/processors/model";
@@ -115,7 +117,7 @@ export function FileProcessorBuilder({ defaultValue = [], kind, onDirty, onValid
       setPresetNotice(notice.dependencyLabels.length || notice.removedLabels.length ? notice : null);
       return applyFileProcessorPresetPlan(current, plan);
     }
-    return [...current, { id: createProcessorID(), name: "", type, params: defaultParams(type, kind) }];
+    return [...current, { enabled: true, id: createProcessorID(), name: "", type, params: defaultParams(type, kind) }];
   }, [driver, kind, serializeProcessorDraft, t]);
   const normalizedDefaultValue = filterForeignManagedProcessors(
     driver.processors.presets,
@@ -181,7 +183,7 @@ function draftProcessors(processors: ProcessorDetail[]): ProcessorDraft[] {
 }
 
 function draftFromProcessor(processor: ProcessorDetail, index = Date.now()): ProcessorDraft {
-  return { id: createProcessorID(index), name: stringValue(processor.name), type: processor.type || "script", params: cleanParams(processor.params ?? {}) };
+  return { enabled: processorIsEnabled(processor.enabled), id: createProcessorID(index), name: stringValue(processor.name), type: processor.type || "script", params: cleanParams(processor.params ?? {}) };
 }
 
 function applyFileProcessorPresetPlan(
@@ -206,14 +208,18 @@ function applyFileProcessorPresetPlan(
 }
 
 function serializeDraft(draft: ProcessorDraft, t: Translator, kind: FileKind): ProcessorDetail {
-	if (draft.opaque) return draft.opaque;
+  if (draft.opaque) {
+    const { enabled, ...opaque } = draft.opaque;
+    if (!draft.enabled) return { ...opaque, enabled: false };
+    return enabled === true ? { ...opaque, enabled: true } : opaque;
+  }
   const params = draft.type === "script"
     ? sanitizeScriptParams(draft.params)
     : draft.type === "merge"
       ? mergeParams(draft.params, kind)
       : cleanParams(draft.params);
   const name = customProcessorName(draft, (type) => processorLabel(type, t));
-  return { ...(name ? { name } : {}), type: draft.type, stage: "file", ...(Object.keys(params).length ? { params } : {}) };
+  return { ...(name ? { name } : {}), ...processorEnabledProperty(draft.enabled), type: draft.type, stage: "file", ...(Object.keys(params).length ? { params } : {}) };
 }
 
 function defaultParams(type: string, kind: FileKind): Record<string, unknown> {

@@ -13,6 +13,8 @@ import {
   numberInputValue,
   numberOrEmpty,
   objectToKeyValueText,
+  processorEnabledProperty,
+  processorIsEnabled,
   stringValue,
   textToList,
 } from "./model";
@@ -47,8 +49,16 @@ describe("processor parameter helpers", () => {
   it("uses only custom processor names that differ from the type label", () => {
     const labelForType = (type: string) => type === "script" ? "脚本" : type;
 
-    expect(customProcessorName({ id: "1", name: " 自定义 ", type: "script", params: {} }, labelForType)).toBe("自定义");
-    expect(customProcessorName({ id: "2", name: "脚本", type: "script", params: {} }, labelForType)).toBe("");
+    expect(customProcessorName({ enabled: true, id: "1", name: " 自定义 ", type: "script", params: {} }, labelForType)).toBe("自定义");
+    expect(customProcessorName({ enabled: true, id: "2", name: "脚本", type: "script", params: {} }, labelForType)).toBe("");
+  });
+
+  it("defaults processors to enabled and only serializes the disabled override", () => {
+    expect(processorIsEnabled(undefined)).toBe(true);
+    expect(processorIsEnabled(true)).toBe(true);
+    expect(processorIsEnabled(false)).toBe(false);
+    expect(processorEnabledProperty(true)).toEqual({});
+    expect(processorEnabledProperty(false)).toEqual({ enabled: false });
   });
 
   it("converts scalar and list editor values without retaining empty entries", () => {

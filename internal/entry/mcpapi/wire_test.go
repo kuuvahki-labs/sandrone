@@ -38,6 +38,21 @@ func TestProcessorParamsAcceptOrdinaryObjects(t *testing.T) {
 			want: "HK-hk-a",
 		},
 		{
+			name:          "disabled rename",
+			processorsKey: "render_processors",
+			processors: []any{map[string]any{
+				"type":    "rename",
+				"stage":   "nodes",
+				"enabled": false,
+				"params": map[string]any{
+					"mode":  "prefix",
+					"value": "disabled-",
+				},
+			}},
+			want:    "hk-a",
+			notWant: "disabled-hk-a",
+		},
+		{
 			name:          "filter",
 			processorsKey: "parse_processors",
 			processors: []any{map[string]any{

@@ -43,7 +43,7 @@ describe("subscription model codec", () => {
         { name: "ignored-file", type: "ref", ref: { kind: "file", name: "default.yaml" } },
         { name: "warn", type: "subscription", ref: { kind: "subscription", name: "warn" } },
       ],
-      processors: [{ name: "only hk", type: "filter", stage: "nodes", params: { action: "keep", field: "name", match: "regex", pattern: "HK" } }],
+      processors: [{ name: "only hk", type: "filter", stage: "nodes", enabled: false, params: { action: "keep", field: "name", match: "regex", pattern: "HK" } }],
       meta: { description: "main group" },
     })).toMatchObject({
       name: "default",
@@ -53,7 +53,7 @@ describe("subscription model codec", () => {
     updatedAt: "2026-06-27T04:05:06.000Z",
     snapshotTTLSeconds: 300,
       sourceRefs: ["provider", "warn"],
-      processors: [{ name: "only hk", type: "filter", stage: "nodes", params: { action: "keep", field: "name", match: "regex", pattern: "HK" } }],
+      processors: [{ name: "only hk", type: "filter", stage: "nodes", enabled: false, params: { action: "keep", field: "name", match: "regex", pattern: "HK" } }],
       meta: { description: "main group" },
     });
   });

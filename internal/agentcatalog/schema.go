@@ -39,10 +39,11 @@ func FileSpecSchema(requireName bool) *jsonschema.Schema {
 
 func processorSpecSchema() *jsonschema.Schema {
 	return closedObject(map[string]*jsonschema.Schema{
-		"type":   stringSchema(),
-		"stage":  enumSchema("nodes", "file"),
-		"name":   stringSchema(),
-		"params": openObjectSchema(),
+		"type":    stringSchema(),
+		"stage":   enumSchema("nodes", "file"),
+		"name":    stringSchema(),
+		"enabled": {Type: "boolean"},
+		"params":  openObjectSchema(),
 	}, []string{"type"})
 }
 

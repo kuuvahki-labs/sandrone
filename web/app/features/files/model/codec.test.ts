@@ -77,7 +77,7 @@ describe("file model codec", () => {
     created_at: "2026-06-27T01:02:03.000Z",
     updated_at: "2026-06-27T04:05:06.000Z",
       source: { type: "remote", remote: { url: "https://example.com/base.yaml", user_agent: "Sandrone Web", timeout_ms: 9000 } },
-      processors: [{ type: "script", stage: "file", params: { source: { type: "file", name: "scripts/file.js" } } }],
+      processors: [{ type: "script", stage: "file", enabled: false, params: { source: { type: "file", name: "scripts/file.js" } } }],
       meta: { description: "remote file" },
     })).toMatchObject({
       name: "remote.yaml",
@@ -86,7 +86,7 @@ describe("file model codec", () => {
     createdAt: "2026-06-27T01:02:03.000Z",
     updatedAt: "2026-06-27T04:05:06.000Z",
       source: { type: "remote", remote: { url: "https://example.com/base.yaml", user_agent: "Sandrone Web", timeout_ms: 9000 } },
-      processors: [{ type: "script", stage: "file", params: { source: { type: "file", name: "scripts/file.js" } } }],
+      processors: [{ type: "script", stage: "file", enabled: false, params: { source: { type: "file", name: "scripts/file.js" } } }],
       meta: { description: "remote file" },
       rawSpec: {
         name: "remote.yaml",

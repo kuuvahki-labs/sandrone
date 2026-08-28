@@ -8,10 +8,11 @@ import (
 )
 
 type processorSpec struct {
-	Type   string         `json:"type"`
-	Stage  domain.Stage   `json:"stage,omitempty"`
-	Name   string         `json:"name,omitempty"`
-	Params map[string]any `json:"params,omitempty"`
+	Type    string         `json:"type"`
+	Stage   domain.Stage   `json:"stage,omitempty"`
+	Name    string         `json:"name,omitempty"`
+	Enabled *bool          `json:"enabled,omitempty"`
+	Params  map[string]any `json:"params,omitempty"`
 }
 
 func (spec processorSpec) domain() (domain.ProcessorSpec, error) {
@@ -20,10 +21,11 @@ func (spec processorSpec) domain() (domain.ProcessorSpec, error) {
 		return domain.ProcessorSpec{}, fmt.Errorf("processor params: %w", err)
 	}
 	return domain.ProcessorSpec{
-		Type:   spec.Type,
-		Stage:  spec.Stage,
-		Name:   spec.Name,
-		Params: params,
+		Type:    spec.Type,
+		Stage:   spec.Stage,
+		Name:    spec.Name,
+		Enabled: spec.Enabled,
+		Params:  params,
 	}, nil
 }
 

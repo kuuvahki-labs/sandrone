@@ -137,7 +137,8 @@ func TestSubscriptionEndpointsUseSingleSegmentNamesForTrafficAndPreview(t *testi
 		"format": "uri-list",
 		"content": "ss://aes-128-gcm:secret@example.com:8388#node-a",
 		"processors": [
-			{"name": "入口重命名", "type": "rename", "stage": "nodes", "params": {"mode": "prefix", "value": "sub-"}}
+			{"name": "入口重命名", "type": "rename", "stage": "nodes", "params": {"mode": "prefix", "value": "sub-"}},
+			{"name": "已停用后缀", "type": "rename", "stage": "nodes", "enabled": false, "params": {"mode": "suffix", "value": "-disabled"}}
 		],
 		"meta": {"description": "daily\nprivate", "origin": "local"}
 	}`))
@@ -155,8 +156,10 @@ func TestSubscriptionEndpointsUseSingleSegmentNamesForTrafficAndPreview(t *testi
 	require.Equal(t, "Provider Nodes", subscription.DisplayName)
 	require.Equal(t, domain.SubscriptionTypeLocal, subscription.Type)
 	require.Equal(t, "daily\nprivate", subscription.Meta["description"])
-	require.Len(t, subscription.Processors, 1)
+	require.Len(t, subscription.Processors, 2)
 	require.Equal(t, "入口重命名", subscription.Processors[0].Name)
+	require.NotNil(t, subscription.Processors[1].Enabled)
+	require.False(t, *subscription.Processors[1].Enabled)
 
 	preview := httptest.NewRequest(http.MethodPost, "/v1/subscriptions/provider/preview", nil)
 	w = httptest.NewRecorder()

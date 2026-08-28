@@ -45,7 +45,7 @@ export function ActionMenu({ actions, buttonSize, label }: { actions: Destinatio
           type="button"
           onClick={(event) => setAnchor(event.currentTarget)}
         >
-          <MoreVertIcon aria-hidden />
+          <MoreVertIcon aria-hidden fontSize={buttonSize === "small" ? "small" : "medium"} />
         </IconButton>
       </Tooltip>
       <Menu

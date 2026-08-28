@@ -32,10 +32,11 @@ type fileConfigOutput struct {
 }
 
 type processorSpecOutput struct {
-	Type   string         `json:"type"`
-	Stage  domain.Stage   `json:"stage,omitempty"`
-	Name   string         `json:"name,omitempty"`
-	Params map[string]any `json:"params,omitempty"`
+	Type    string         `json:"type"`
+	Stage   domain.Stage   `json:"stage,omitempty"`
+	Name    string         `json:"name,omitempty"`
+	Enabled *bool          `json:"enabled,omitempty"`
+	Params  map[string]any `json:"params,omitempty"`
 }
 
 type fileSourceOutput struct {
@@ -188,7 +189,8 @@ func newFileSpecOutput(spec domain.FileSpec) (fileSpecOutput, error) {
 				params[name] = value
 			}
 			output.Processors[index] = processorSpecOutput{
-				Type: processor.Type, Stage: processor.Stage, Name: processor.Name, Params: params,
+				Type: processor.Type, Stage: processor.Stage, Name: processor.Name,
+				Enabled: processor.Enabled, Params: params,
 			}
 		}
 	}

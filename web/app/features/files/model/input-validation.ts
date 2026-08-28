@@ -36,6 +36,7 @@ export function validateJSONConfigSource(source: FileSourceDetail): FileInputVal
 export function validateJSONMergeProcessors(processors: ProcessorDetail[]): FileProcessorValidationIssue[] {
   const issues: FileProcessorValidationIssue[] = [];
   processors.forEach((processor, index) => {
+    if (processor.enabled === false) return;
     if (processor.type !== "merge") return;
     const mode = processor.params?.mode;
     if (mode !== "json_overlay" && mode !== "json_override") return;

@@ -14,6 +14,9 @@ import (
 func (r *Registry) SelectSpecs(specs []domain.ProcessorSpec, stage domain.Stage) ([]domain.ProcessorSpec, error) {
 	out := make([]domain.ProcessorSpec, 0, len(specs))
 	for _, spec := range specs {
+		if !spec.IsEnabled() {
+			continue
+		}
 		resolved, err := r.ResolveStage(spec)
 		if err != nil {
 			return nil, err

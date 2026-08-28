@@ -36,6 +36,8 @@ import {
   numberInputValue,
   numberOrEmpty,
   type ProcessorDraft,
+  processorEnabledProperty,
+  processorIsEnabled,
   stringValue,
   textToList,
 } from "~/shared/processors/model";
@@ -208,6 +210,7 @@ function draftFromProcessor(processor: ProcessorDetail, index: number): Processo
   const type = processor.type || "filter";
   const params = type === "probe" ? sanitizeProbeParams(processor.params ?? {}) : processor.params ?? {};
   return {
+    enabled: processorIsEnabled(processor.enabled),
     id: createProcessorID(index),
     name: stringValue(processor.name),
     type,
@@ -220,6 +223,7 @@ function serializeDraft(draft: ProcessorDraft, t: Translator): ProcessorDetail {
   const name = customProcessorName(draft, (type) => processorLabel(type, t));
   return {
     ...(name ? { name } : {}),
+    ...processorEnabledProperty(draft.enabled),
     type: draft.type,
     stage: defaultStage(),
     ...(Object.keys(params).length ? { params } : {}),
@@ -242,6 +246,7 @@ function processorOptions(t: Translator, probeEnabled = true) {
 function addSubscriptionProcessorDrafts(type: string, current: ProcessorDraft[], t: Translator): ProcessorDraft[] {
   if (type !== "information_filter_preset") {
     return [...current, {
+      enabled: true,
       id: createProcessorID(),
       name: "",
       type,
@@ -249,6 +254,7 @@ function addSubscriptionProcessorDrafts(type: string, current: ProcessorDraft[],
     }];
   }
   const preset: ProcessorDraft = {
+    enabled: true,
     id: createProcessorID(),
     name: t("processors.filter.infoPresetName"),
     type: "filter",

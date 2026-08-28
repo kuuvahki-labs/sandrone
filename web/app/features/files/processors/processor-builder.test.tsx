@@ -168,15 +168,28 @@ describe("FileProcessorBuilder", () => {
     expect(screen.getByRole("alert")).not.toHaveTextContent("Description");
   });
 
-  it("preserves unsupported processors byte-for-byte in their original order", () => {
+  it("preserves unsupported processors in their original order and allows toggling them", async () => {
+    const user = userEvent.setup();
     const processors: ProcessorDetail[] = [
-      { type: "future", stage: "file", params: { nested: { keep: true }, empty: [] }, future: { version: 2 } },
+      { name: "Future", type: "future", stage: "file", enabled: false, params: { nested: { keep: true }, empty: [] }, future: { version: 2 } },
+      { name: "Explicitly active", type: "future-active", stage: "file", enabled: true, future: { version: 3 } },
       { type: "script", stage: "file", params: { source: { type: "inline", content: "function main(input) { return input; }" } } },
     ];
 
     render(<FileProcessorBuilder kind="mihomo" defaultValue={processors} />);
 
     expect(currentProcessors()).toEqual(processors);
+
+    const future = screen.getByRole("group", { name: "处理器 Future" });
+    const enabledButton = within(future).getByRole("button", { name: "启用 Future" });
+    expect(enabledButton).toHaveAttribute("aria-pressed", "false");
+    await user.click(enabledButton);
+    expect(enabledButton).toHaveAttribute("aria-pressed", "true");
+    expect(currentProcessors()).toEqual([
+      { name: "Future", type: "future", stage: "file", params: { nested: { keep: true }, empty: [] }, future: { version: 2 } },
+      processors[1],
+      processors[2],
+    ]);
   });
 
   it("starts a Shadowrocket merge processor in ini_override mode", async () => {

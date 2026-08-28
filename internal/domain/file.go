@@ -167,10 +167,15 @@ const (
 )
 
 type ProcessorSpec struct {
-	Name   string                     `json:"name,omitempty" yaml:"name,omitempty"`
-	Type   string                     `json:"type" yaml:"type"`
-	Stage  Stage                      `json:"stage,omitempty" yaml:"stage,omitempty"`
-	Params map[string]json.RawMessage `json:"params,omitempty" yaml:"params,omitempty"`
+	Name    string                     `json:"name,omitempty" yaml:"name,omitempty"`
+	Type    string                     `json:"type" yaml:"type"`
+	Stage   Stage                      `json:"stage,omitempty" yaml:"stage,omitempty"`
+	Enabled *bool                      `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+	Params  map[string]json.RawMessage `json:"params,omitempty" yaml:"params,omitempty"`
+}
+
+func (spec ProcessorSpec) IsEnabled() bool {
+	return spec.Enabled == nil || *spec.Enabled
 }
 
 type FileProcessInput struct {

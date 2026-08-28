@@ -22,6 +22,7 @@ export interface RemoteInputDetail {
 
 export interface ProcessorDetail {
   [key: string]: unknown;
+  enabled?: boolean;
   name?: string;
   type: string;
   stage?: string;

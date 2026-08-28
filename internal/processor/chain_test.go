@@ -88,6 +88,21 @@ func TestRunNodesPreservesDeclarationOrder(t *testing.T) {
 	require.Equal(t, []string{"first", "second"}, out.Nodes[0].Tags)
 }
 
+func TestRunNodesSkipsDisabledProcessorsAndPreservesTheirConfiguration(t *testing.T) {
+	r := newTestRegistry(t)
+	disabled := false
+	specs := []domain.ProcessorSpec{
+		{Type: "unknown-while-disabled", Enabled: &disabled, Params: rawParams(t, map[string]any{"keep": "config"})},
+		{Type: "append_tag", Params: rawParams(t, map[string]any{"tag": "active"})},
+	}
+	out, err := r.RunNodes(context.Background(), specs, domain.NodeProcessInput{
+		Nodes: []domain.NodeIR{{Name: "n"}},
+	})
+	require.NoError(t, err)
+	require.Equal(t, []string{"active"}, out.Nodes[0].Tags)
+	require.Equal(t, `"config"`, string(specs[0].Params["keep"]))
+}
+
 func TestRunNodesEmptyChainPassesThrough(t *testing.T) {
 	r := newTestRegistry(t)
 	nodes := []domain.NodeIR{{Name: "n"}}
@@ -144,6 +159,18 @@ func TestRunFileChain(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, string(out.File.Content), "# annotated")
 	require.Len(t, out.Warnings, 1)
+}
+
+func TestRunFileSkipsDisabledProcessors(t *testing.T) {
+	r := newTestRegistry(t)
+	disabled := false
+	in := domain.FileProcessInput{File: domain.FileDocument{Name: "x", Content: []byte("a")}}
+	out, err := r.RunFile(context.Background(), []domain.ProcessorSpec{{
+		Type: "annotate", Stage: domain.StageFile, Enabled: &disabled,
+	}}, in)
+	require.NoError(t, err)
+	require.Equal(t, "a", string(out.File.Content))
+	require.Empty(t, out.Warnings)
 }
 
 func TestRunFileDoesNotMutateInputParts(t *testing.T) {

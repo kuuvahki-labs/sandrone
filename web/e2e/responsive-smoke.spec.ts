@@ -264,6 +264,36 @@ for (const route of routes) {
     if (route.path === "/files") {
       await expect(page.getByText("main config")).toBeHidden();
     }
+    if (route.path === "/subscriptions/new?type=local") {
+      const addProcessor = page.getByRole("button", { name: "添加处理器" });
+      await addProcessor.click();
+      await addProcessor.click();
+      const processorCards = page.getByRole("group", { name: "处理器 过滤" });
+      await expect(processorCards).toHaveCount(2);
+      const secondProcessor = processorCards.nth(1);
+      const enabledButton = secondProcessor.getByRole("button", { name: "启用 处理器 2" });
+      await expect(enabledButton).toHaveAttribute("aria-pressed", "true");
+      await enabledButton.click();
+      await expect(enabledButton).toHaveAttribute("aria-pressed", "false");
+      const moreActions = secondProcessor.getByRole("button", { name: "更多处理器操作：处理器 2" });
+      if (testInfo.project.name === "mobile") {
+        await expect(moreActions).toBeVisible();
+        await moreActions.click();
+        await expect(page.getByRole("menuitem", { name: "编辑名称" })).toBeVisible();
+        await expect(page.getByRole("menuitem", { name: "删除处理器" })).toBeVisible();
+        await page.getByRole("menuitem", { name: "编辑名称" }).click();
+        await expect(secondProcessor.getByRole("textbox", { name: "名称" })).toBeVisible();
+      } else {
+        await expect(moreActions).toBeHidden();
+        await expect(secondProcessor.getByRole("button", { name: "编辑名称" })).toBeVisible();
+      }
+      const processorMetrics = await secondProcessor.evaluate((card) => ({
+        clientWidth: card.clientWidth,
+        scrollWidth: card.scrollWidth,
+      }));
+      expect(processorMetrics.scrollWidth, "processor actions should fit within their card")
+        .toBeLessThanOrEqual(processorMetrics.clientWidth + 1);
+    }
 
     const pageMetrics = await page.evaluate(() => ({
       clientWidth: document.documentElement.clientWidth,

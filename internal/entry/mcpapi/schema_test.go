@@ -24,6 +24,9 @@ func TestToolSchemasExposeObjectValuesAndBoundaryValidation(t *testing.T) {
 	require.JSONEq(t, `{"type":"object"}`, extractSchema(
 		t, result.Tools, "sandrone_convert", "properties.parse_processors.items.properties.params",
 	))
+	require.JSONEq(t, `{"type":"boolean"}`, extractSchema(
+		t, result.Tools, "sandrone_convert", "properties.parse_processors.items.properties.enabled",
+	))
 	require.JSONEq(t, `{"type":"object"}`, extractSchema(
 		t, result.Tools, "sandrone_put_file", "properties.config.properties.settings",
 	))

@@ -53,7 +53,7 @@ canonical stage、processor、file kind、Subscription、FileSpec 和脚本 API�
 | `content` | `string` |
 | `remote` | 封闭 object；必填 `url: string`，可选 `user_agent: string`、`proxy: string`、非负整数 `timeout_ms`、`cache_ttl_seconds` |
 | `inputs` | `NodeInput` array，形状见下节 |
-| `processors` | processor array；每项是封闭 object，必填 `type: string`，可选 `name: string`、`stage` enum `nodes`/`file`、开放 object `params` |
+| `processors` | processor array；每项是封闭 object，必填 `type: string`，可选 `name: string`、`stage` enum `nodes`/`file`、`enabled: boolean`、开放 object `params` |
 | `nodes` | 开放 node object array |
 | `snapshot_ttl_seconds` | 非负整数；省略继承项目默认，`0` 关闭订阅执行快照缓存 |
 | `meta` | string-to-string object |

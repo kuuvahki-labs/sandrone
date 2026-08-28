@@ -34,6 +34,14 @@ describe("sing-box file input validation", () => {
     }])).toEqual([expect.objectContaining({ code: "processor_json_invalid", index: 0 })]);
   });
 
+  it("does not block saving malformed content for a disabled processor", () => {
+    expect(validateJSONMergeProcessors([{
+      type: "merge",
+      enabled: false,
+      params: { mode: "json_override", content: "{" },
+    }])).toEqual([]);
+  });
+
   it.each([
     { content: '{"route":{"+rules":{}}}', path: "route.+rules" },
     { content: '{"route":{"rules+":"dns"}}', path: "route.rules+" },

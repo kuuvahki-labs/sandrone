@@ -51,6 +51,7 @@ func TestSchemaRoutesPublishServerCatalogs(t *testing.T) {
 		{"/v1/schemas/subscription", func(t *testing.T, body string) {
 			require.Contains(t, body, `"name"`)
 			require.Contains(t, body, `"processors"`)
+			require.Contains(t, body, `"enabled"`)
 		}},
 		{"/v1/schemas/file-spec", func(t *testing.T, body string) {
 			require.Contains(t, body, `"kind"`)
