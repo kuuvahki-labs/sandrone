@@ -106,9 +106,14 @@ typed file 有显式 source 时，其正文作为 base；`source.type` 为空时
 
 ### Subscription materialization
 
-service 按 `config.subscriptions` 的声明顺序读取订阅。每个 subscription 完整执行自己的来源解析、normalize、语义校验和 nodes-stage processors，结果节点按订阅顺序聚合。
+service 按 `config.subscriptions` 的声明顺序读取订阅。每个 subscription 通过与
+preview 和直接 subscription render 相同的 canonical subscription execution
+完整执行来源解析、normalize、语义校验和 nodes-stage processors，结果节点按订阅
+顺序聚合。客户端 target 只传给随后的 node renderer，不改变订阅节点集合。
 
-直接和间接订阅引用进入 file report dependencies。缺失订阅、subscription cycle、全部节点非法或 nodes processor 失败都会终止文件生成。
+直接和间接订阅引用、nodes script 使用的文件资源以及脚本动态产生的订阅都进入
+file report dependencies。声明式与脚本动态订阅调用共享同一递归栈；缺失订阅、
+subscription cycle、全部节点非法或 nodes processor 失败都会终止文件生成。
 
 typed file 不要求订阅一定存在；空 subscriptions 可以由 driver 根据 base 和 settings 生成不含 Sandrone 节点的配置。客户端是否允许这种结果仍由 driver 编译规则决定。
 

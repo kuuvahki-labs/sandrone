@@ -30,6 +30,11 @@ Subscription 或形成可列举产物。直接 render/convert 与 preview 不使
 
 输入解析返回的不只是节点，还包括 `SourceInfo`、resource dependencies、warnings 和订阅级运行时 metadata。它们随 `NodeSet` 传播，由 service 汇总，processor 和 renderer 不自行重新读取来源。
 
+已保存 Subscription 通过唯一的 subscription execution 边界生成 canonical
+`NodeSet`。preview、subscription render、typed file、diagnose、定时更新和脚本中的
+订阅子调用复用同一条 normalize、校验和 nodes-stage processor 链；执行同时返回
+处理前与处理后结果，并显式汇总声明式引用、脚本文件和脚本动态订阅依赖。
+
 远程输入的自动识别是 service 的受控策略。显式格式只调用对应 parser；允许自动识别的输入先判断受支持的完整配置结构，再使用严格订阅格式兜底。adapter 不应各自形成不一致的隐式 fallback 链。
 
 ## 2. Parse：外部格式进入 `NodeIR`
@@ -117,6 +122,10 @@ service 还会统一移除非 TCP/raw transport 上的 VLESS Vision flow，并�
 ## 4. `process(nodes)`：声明式节点处理
 
 nodes-stage processor 接收节点切片、目标、来源上下文和请求 metadata，返回新的节点结果与 warnings。处理器通过 registry 按 `ProcessorSpec` 构造。
+
+已保存 Subscription 的 nodes-stage 结果是客户端无关的 canonical 结果，因此该
+执行作用域中的 `target` 为空。目标格式只在后续 renderer 或 file driver 边界生效。
+一次性 parse/render/convert 的 processor 仍可接收其调用方明确给出的 target。
 
 执行规则是稳定契约：
 

@@ -358,6 +358,36 @@ func TestDiagnoseStoredSubscriptionTracesNestedScopes(t *testing.T) {
 	require.Contains(t, result.Dependencies, domain.ResourceRef{Kind: "subscription", Name: "child"})
 }
 
+func TestDiagnoseStoredSubscriptionBypassesRemoteCache(t *testing.T) {
+	body := "ss://aes-128-gcm:secret@example.com:8388#before"
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		_, _ = w.Write([]byte(body))
+	}))
+	defer server.Close()
+
+	ctx := context.Background()
+	svc := New(WithFS(afero.NewMemMapFs()))
+	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+		Name: "remote", Type: domain.SubscriptionTypeRemote, Format: "uri-list",
+		Remote: &domain.RemoteInput{URL: server.URL, CacheTTLSeconds: 3600},
+	}))
+	preview, err := svc.PreviewSubscription(ctx, "remote")
+	require.NoError(t, err)
+	require.Equal(t, "before", preview.Nodes[0].After.Name)
+
+	body = "ss://aes-128-gcm:secret@example.com:8388#after"
+	result, err := svc.Diagnose(ctx, domain.DiagnoseRequest{
+		Kind: domain.DiagnoseInputSubscription, SubscriptionName: "remote",
+	})
+	require.NoError(t, err)
+	require.Equal(t, domain.DiagnoseStatusOK, result.Status)
+	require.Len(t, result.Nodes, 1)
+	require.Equal(t, "after", result.Nodes[0].Name)
+	require.Equal(t, 2, calls)
+}
+
 func TestDiagnoseStoredFileTracesSubscriptionAndFileProcessors(t *testing.T) {
 	svc := New(WithFS(afero.NewMemMapFs()))
 	require.NoError(t, svc.PutSubscription(context.Background(), domain.Subscription{

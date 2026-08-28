@@ -521,7 +521,7 @@ export const zhCN = {
   "subscriptions.preview.remainingChanges": "还有 {count} 处变化",
   "subscriptions.preview.search": "搜索预览节点",
   "subscriptions.preview.statusAdded": "新增",
-  "subscriptions.preview.statusAll": "全部",
+  "subscriptions.preview.statusFinal": "最终节点",
   "subscriptions.preview.statusModified": "已修改",
   "subscriptions.preview.statusRemoved": "已移除",
   "subscriptions.preview.statusUnchanged": "未变化",

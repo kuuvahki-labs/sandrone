@@ -104,6 +104,66 @@ func TestServiceSubscriptionTrafficIsRemoteOnlyAndPreviewDetectsCycles(t *testin
 	require.Contains(t, err.Error(), "subscription dependency cycle")
 }
 
+func TestServiceSubscriptionScriptProduceSharesCycleDetection(t *testing.T) {
+	ctx := context.Background()
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	putScripted := func(name, dependency string) {
+		require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+			Name: name, Type: domain.SubscriptionTypeLocal, Format: "uri-list",
+			Content: "ss://aes-128-gcm:secret@example.com:8388#" + name,
+			Processors: []domain.ProcessorSpec{{
+				Type: "script", Stage: domain.StageNodes,
+				Params: params(t, map[string]any{"source": inlineScriptSource(`function main(input, api) {
+  input.nodes = api.subscription.produce("` + dependency + `").nodes;
+  return input;
+}`)}),
+			}},
+		}))
+	}
+	putScripted("script-a", "script-b")
+	putScripted("script-b", "script-a")
+
+	_, err := svc.PreviewSubscription(ctx, "script-a")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), `subscription dependency cycle at "script-a"`)
+}
+
+func TestServiceSubscriptionScriptProduceMemoizesByRequestArgs(t *testing.T) {
+	ctx := context.Background()
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+		Name: "argument-leaf", Type: domain.SubscriptionTypeLocal, Format: "uri-list",
+		Content: "ss://aes-128-gcm:secret@example.com:8388#node",
+		Processors: []domain.ProcessorSpec{{
+			Type: "script", Stage: domain.StageNodes,
+			Params: params(t, map[string]any{"source": inlineScriptSource(`function main(input) {
+  input.nodes.forEach(function(node) { node.name = input.args.prefix + node.name; });
+  return input;
+}`)}),
+		}},
+	}))
+	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+		Name: "argument-parent", Type: domain.SubscriptionTypeLocal, Format: "uri-list",
+		Content: "ss://aes-128-gcm:secret@placeholder.example:8388#placeholder",
+		Processors: []domain.ProcessorSpec{{
+			Type: "script", Stage: domain.StageNodes,
+			Params: params(t, map[string]any{"source": inlineScriptSource(`function main(input, api) {
+  var first = api.subscription.produce("argument-leaf", {args: {prefix: "first-"}});
+  var second = api.subscription.produce("argument-leaf", {args: {prefix: "second-"}});
+  input.nodes = first.nodes.concat(second.nodes);
+  return input;
+}`)}),
+		}},
+	}))
+
+	preview, err := svc.PreviewSubscription(ctx, "argument-parent")
+	require.NoError(t, err)
+	require.Equal(t, []string{"first-node", "second-node"}, []string{
+		preview.Nodes[0].After.Name,
+		preview.Nodes[1].After.Name,
+	})
+}
+
 func TestServiceProbeProcessorAllowsRuntimeProbeDefaults(t *testing.T) {
 	seen := []domain.ProbeRequest{}
 	svc := service.New(

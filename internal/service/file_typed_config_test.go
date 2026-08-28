@@ -482,6 +482,39 @@ func TestServiceTypedFileScriptSourcesReuseFileMemoAndRecordDependencies(t *test
 	require.Contains(t, result.Report.Dependencies, domain.ResourceRef{Kind: "file", Name: "helper.js"})
 }
 
+func TestServiceSubscriptionNodesAreCanonicalAcrossPreviewRenderAndTypedFile(t *testing.T) {
+	ctx := context.Background()
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+		Name: "canonical", Type: domain.SubscriptionTypeLocal, Format: "uri-list",
+		Content: "ss://aes-128-gcm:secret@example.com:8388#node",
+		Processors: []domain.ProcessorSpec{{
+			Type: "script", Stage: domain.StageNodes,
+			Params: params(t, map[string]any{"source": inlineScriptSource(`function main(input) {
+  var prefix = input.target ? input.target : "canonical";
+  input.nodes.forEach(function(node) { node.name = prefix + "-" + node.name; });
+  return input;
+}`)}),
+		}},
+	}))
+	require.NoError(t, svc.PutFile(ctx, domain.FileSpec{
+		Name: "config.yaml", Kind: domain.FileKindMihomo,
+		Config: &domain.FileConfig{Subscriptions: []string{"canonical"}},
+	}))
+
+	preview, err := svc.PreviewSubscription(ctx, "canonical")
+	require.NoError(t, err)
+	require.Len(t, preview.Nodes, 1)
+	require.Equal(t, "canonical-node", preview.Nodes[0].After.Name)
+	rendered, err := svc.RenderSubscription(ctx, "canonical", "mihomo-proxies", domain.RequestInfo{})
+	require.NoError(t, err)
+	require.Contains(t, string(rendered.Body), "canonical-node")
+	file, err := svc.GetFile(ctx, domain.FileRequest{Name: "config.yaml"})
+	require.NoError(t, err)
+	require.Contains(t, string(file.Content), "canonical-node")
+	require.NotContains(t, string(file.Content), "mihomo-proxies-node")
+}
+
 func TestServiceTypedNodeScriptsDoNotGainFileAPIFromResolutionContext(t *testing.T) {
 	ctx := context.Background()
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))

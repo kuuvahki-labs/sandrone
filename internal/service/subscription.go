@@ -2,19 +2,11 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
-	"github.com/kuuvahki-labs/sandrone/internal/nodevalidation"
-	"github.com/kuuvahki-labs/sandrone/internal/processor"
 )
-
-type subscriptionResolveState struct {
-	stack map[string]bool
-	memo  map[string]*domain.NodeSet
-}
 
 type subscriptionBaseNodes struct {
 	Nodes        []domain.NodeIR
@@ -24,13 +16,6 @@ type subscriptionBaseNodes struct {
 	Traffic      []domain.SubscriptionTrafficItem
 	Meta         map[string]string
 	Source       *domain.SourceInfo
-}
-
-func newSubscriptionResolveState() *subscriptionResolveState {
-	return &subscriptionResolveState{
-		stack: map[string]bool{},
-		memo:  map[string]*domain.NodeSet{},
-	}
 }
 
 func normalizeSubscription(sub domain.Subscription) (domain.Subscription, error) {
@@ -58,137 +43,7 @@ func normalizeSubscription(sub domain.Subscription) (domain.Subscription, error)
 	return sub, nil
 }
 
-func (s *Service) materializeSubscription(ctx context.Context, sub domain.Subscription, req domain.FileRequest, state *subscriptionResolveState) (*domain.NodeSet, error) {
-	if state == nil {
-		state = newSubscriptionResolveState()
-	}
-	normalized, err := normalizeSubscription(sub)
-	if err != nil {
-		return nil, err
-	}
-	sub = normalized
-	scopeName := firstNonEmptyString(sub.Name, req.Name, "inline")
-	ctx = processor.WithTraceScope(ctx, "subscription:"+scopeName)
-	if sub.Name != "" {
-		if state.stack[sub.Name] {
-			return nil, domain.NewError(domain.CodeInvalidArgument, fmt.Sprintf("subscription dependency cycle at %q", sub.Name))
-		}
-		if cached, ok := state.memo[sub.Name]; ok {
-			return cached.Clone(), nil
-		}
-		state.stack[sub.Name] = true
-		defer delete(state.stack, sub.Name)
-	}
-	base, err := s.subscriptionBaseNodes(ctx, sub, req, state)
-	if err != nil {
-		return nil, err
-	}
-	validatedBase, baseValidationWarnings, err := validateNodeBatch(base.Nodes, nodevalidation.StageNormalized, req.Target)
-	if err != nil {
-		return nil, err
-	}
-	base.Nodes = validatedBase.Nodes
-	base.Warnings = append(base.Warnings, baseValidationWarnings...)
-	processed, err := s.registry.RunNodes(ctx, sub.Processors, domain.NodeProcessInput{
-		Target: req.Target,
-		Nodes:  append([]domain.NodeIR{}, base.Nodes...),
-		Context: domain.NodeContext{
-			InputName:    firstNonEmptyString(req.Name, sub.Name),
-			Dependencies: append([]domain.ResourceRef{}, base.Dependencies...),
-			Sources:      append([]domain.SourceInfo{}, base.Sources...),
-			Meta:         cloneStringMap(base.Meta),
-		},
-		Request: req.Request,
-	})
-	if err != nil {
-		return nil, err
-	}
-	validatedProcessed, processedValidationWarnings, err := validateNodeBatch(processed.Nodes, nodevalidation.StageProcessed, req.Target)
-	if err != nil {
-		return nil, err
-	}
-	processed.Nodes = validatedProcessed.Nodes
-	processed.Warnings = append(processed.Warnings, processedValidationWarnings...)
-	out := &domain.NodeSet{
-		Nodes:        append([]domain.NodeIR{}, processed.Nodes...),
-		Dependencies: append([]domain.ResourceRef{}, base.Dependencies...),
-		Sources:      append([]domain.SourceInfo{}, base.Sources...),
-		Warnings:     append(append([]domain.Warning{}, base.Warnings...), processed.Warnings...),
-		Traffic:      domain.CloneSubscriptionTrafficItems(base.Traffic),
-		Meta:         cloneStringMap(base.Meta),
-	}
-	if sub.Name != "" {
-		state.memo[sub.Name] = out.Clone()
-	}
-	return out, nil
-}
-
-func (s *Service) subscriptionPreviewNodes(ctx context.Context, sub domain.Subscription, req domain.FileRequest, state *subscriptionResolveState) (*domain.NodeSet, *domain.NodeSet, error) {
-	if state == nil {
-		state = newSubscriptionResolveState()
-	}
-	normalized, err := normalizeSubscription(sub)
-	if err != nil {
-		return nil, nil, err
-	}
-	sub = normalized
-	if sub.Name != "" {
-		if state.stack[sub.Name] {
-			return nil, nil, domain.NewError(domain.CodeInvalidArgument, fmt.Sprintf("subscription dependency cycle at %q", sub.Name))
-		}
-		state.stack[sub.Name] = true
-		defer delete(state.stack, sub.Name)
-	}
-	base, err := s.subscriptionBaseNodes(ctx, sub, req, state)
-	if err != nil {
-		return nil, nil, err
-	}
-	validatedBase, baseValidationWarnings, err := validateNodeBatch(base.Nodes, nodevalidation.StageNormalized, req.Target)
-	if err != nil {
-		return nil, nil, err
-	}
-	base.Nodes = validatedBase.Nodes
-	base.Warnings = append(base.Warnings, baseValidationWarnings...)
-	before := &domain.NodeSet{
-		Nodes:        append([]domain.NodeIR{}, base.Nodes...),
-		Dependencies: append([]domain.ResourceRef{}, base.Dependencies...),
-		Sources:      append([]domain.SourceInfo{}, base.Sources...),
-		Warnings:     append([]domain.Warning{}, base.Warnings...),
-		Traffic:      domain.CloneSubscriptionTrafficItems(base.Traffic),
-		Meta:         cloneStringMap(base.Meta),
-	}
-	processed, err := s.registry.RunNodes(ctx, sub.Processors, domain.NodeProcessInput{
-		Target: req.Target,
-		Nodes:  append([]domain.NodeIR{}, before.Nodes...),
-		Context: domain.NodeContext{
-			InputName:    firstNonEmptyString(req.Name, sub.Name),
-			Dependencies: append([]domain.ResourceRef{}, before.Dependencies...),
-			Sources:      append([]domain.SourceInfo{}, before.Sources...),
-			Meta:         cloneStringMap(before.Meta),
-		},
-		Request: req.Request,
-	})
-	if err != nil {
-		return nil, nil, err
-	}
-	validatedProcessed, processedValidationWarnings, err := validateNodeBatch(processed.Nodes, nodevalidation.StageProcessed, req.Target)
-	if err != nil {
-		return nil, nil, err
-	}
-	processed.Nodes = validatedProcessed.Nodes
-	processed.Warnings = append(processed.Warnings, processedValidationWarnings...)
-	after := &domain.NodeSet{
-		Nodes:        append([]domain.NodeIR{}, processed.Nodes...),
-		Dependencies: append([]domain.ResourceRef{}, before.Dependencies...),
-		Sources:      append([]domain.SourceInfo{}, before.Sources...),
-		Warnings:     append(append([]domain.Warning{}, before.Warnings...), processed.Warnings...),
-		Traffic:      domain.CloneSubscriptionTrafficItems(before.Traffic),
-		Meta:         cloneStringMap(before.Meta),
-	}
-	return before, after, nil
-}
-
-func (s *Service) subscriptionBaseNodes(ctx context.Context, sub domain.Subscription, req domain.FileRequest, state *subscriptionResolveState) (*subscriptionBaseNodes, error) {
+func (s *Service) subscriptionBaseNodes(ctx context.Context, sub domain.Subscription, req subscriptionExecutionRequest, state *subscriptionExecutionState) (*subscriptionBaseNodes, error) {
 	switch sub.Type {
 	case domain.SubscriptionTypeRemote, domain.SubscriptionTypeLocal:
 		return s.parseSubscriptionBaseNodes(ctx, sub)
@@ -240,7 +95,7 @@ func (s *Service) parseSubscriptionBaseNodes(ctx context.Context, sub domain.Sub
 	}, nil
 }
 
-func (s *Service) collectionSubscriptionBaseNodes(ctx context.Context, sub domain.Subscription, req domain.FileRequest, state *subscriptionResolveState) (*subscriptionBaseNodes, error) {
+func (s *Service) collectionSubscriptionBaseNodes(ctx context.Context, sub domain.Subscription, req subscriptionExecutionRequest, state *subscriptionExecutionState) (*subscriptionBaseNodes, error) {
 	if len(sub.Inputs) == 0 {
 		if len(sub.Nodes) > 0 {
 			return &subscriptionBaseNodes{
@@ -324,14 +179,15 @@ func (s *Service) RenderSubscriptionRequest(ctx context.Context, request domain.
 			}
 		}
 	}
-	nodeSet, err := s.materializeSubscription(ctx, sub, domain.FileRequest{
+	execution, err := s.executeSubscription(ctx, sub, subscriptionExecutionRequest{
 		Name:    name,
-		Target:  format,
 		Request: req,
-	}, newSubscriptionResolveState())
+		Refresh: request.Refresh,
+	}, newSubscriptionExecutionState())
 	if err != nil {
 		return nil, err
 	}
+	nodeSet := execution.After
 	rendered, err := s.Render(ctx, domain.RenderRequest{
 		Format:  format,
 		Target:  format,

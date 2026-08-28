@@ -34,13 +34,15 @@ func (s *Service) PreviewSubscriptionRequest(ctx context.Context, req domain.Sub
 		return nil, err
 	}
 	ctx = withSubscriptionCacheOwner(ctx, sub.Name)
-	before, after, err := s.subscriptionPreviewNodes(ctx, sub, domain.FileRequest{
-		Request: domain.RequestInfo{Args: req.Request.Args, Meta: sub.Meta},
-		Meta:    sub.Meta,
-	}, newSubscriptionResolveState())
+	execution, err := s.executeSubscription(ctx, sub, subscriptionExecutionRequest{
+		Name:    sub.Name,
+		Request: req.Request,
+		Refresh: req.Refresh,
+	}, newSubscriptionExecutionState())
 	if err != nil {
 		return nil, err
 	}
+	before, after := execution.Before, execution.After
 	report := domain.Report{
 		Dependencies: append([]domain.ResourceRef{}, after.Dependencies...),
 		Warnings:     append([]domain.Warning{}, after.Warnings...),

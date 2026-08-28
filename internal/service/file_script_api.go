@@ -76,6 +76,13 @@ func (s *Service) loadScriptFileResource(ctx context.Context, source scriptproc.
 		memo:  map[string]*domain.FileResult{},
 	}
 	req := domain.FileRequest{Name: name}
+	subscriptionCtx, hasSubscriptionCtx := subscriptionExecutionContextFrom(ctx)
+	if hasSubscriptionCtx {
+		subscriptionCtx.addDependency(domain.ResourceRef{Kind: "file", Name: name})
+		state = subscriptionCtx.state.fileState
+		req.Request = requestWithExplicitArgs(subscriptionCtx.request.Request, nil)
+		req.Meta = cloneStringMap(subscriptionCtx.request.Request.Meta)
+	}
 	if rctx, ok := fileResolutionContextFrom(ctx); ok {
 		state = rctx.state
 		req.Request = requestWithExplicitArgs(rctx.req.Request, nil)
@@ -90,6 +97,11 @@ func (s *Service) loadScriptFileResource(ctx context.Context, source scriptproc.
 	result, err := s.getFile(ctx, req, state)
 	if err != nil {
 		return "", "", err
+	}
+	if hasSubscriptionCtx {
+		for _, dependency := range result.Report.Dependencies {
+			subscriptionCtx.addDependency(dependency)
+		}
 	}
 	return string(result.Content), name, nil
 }
@@ -165,15 +177,21 @@ func (s *Service) ProduceSubscription(ctx context.Context, name string, opts dom
 	if s.metaStore == nil {
 		return nil, storeUnavailable()
 	}
-	req := domain.FileRequest{
+	renderTarget := strings.TrimSpace(opts.Target)
+	req := subscriptionExecutionRequest{
 		Name:    name,
-		Target:  strings.TrimSpace(opts.Target),
 		Request: domain.RequestInfo{Args: cloneArgs(opts.Args)},
 	}
-	if fctx, ok := fileScriptContextFrom(ctx); ok {
-		fctx.state.dynamicDeps = appendResourceRef(fctx.state.dynamicDeps, domain.ResourceRef{Kind: "subscription", Name: name})
-		req.Request = requestWithExplicitArgs(fctx.req.Request, opts.Args)
-		req.Meta = fctx.req.Meta
+	state := newSubscriptionExecutionState()
+	parentExecution, hasParentExecution := subscriptionExecutionContextFrom(ctx)
+	if hasParentExecution {
+		state = parentExecution.state
+		req.Request = requestWithExplicitArgs(parentExecution.request.Request, opts.Args)
+	}
+	fileCtx, hasFileCtx := fileScriptContextFrom(ctx)
+	if hasFileCtx {
+		fileCtx.state.dynamicDeps = appendResourceRef(fileCtx.state.dynamicDeps, domain.ResourceRef{Kind: "subscription", Name: name})
+		req.Request = requestWithExplicitArgs(fileCtx.req.Request, opts.Args)
 	}
 
 	sub, err := s.metaStore.GetSubscription(ctx, name)
@@ -181,12 +199,24 @@ func (s *Service) ProduceSubscription(ctx context.Context, name string, opts dom
 		return nil, err
 	}
 	ctx = withSubscriptionCacheOwner(ctx, sub.Name)
-	nodeSet, err := s.materializeSubscription(ctx, sub, req, newSubscriptionResolveState())
+	execution, err := s.executeSubscription(ctx, sub, req, state)
 	if err != nil {
 		return nil, err
 	}
+	nodeSet := execution.After
+	if hasParentExecution {
+		parentExecution.addDependency(domain.ResourceRef{Kind: "subscription", Name: name})
+		for _, dependency := range nodeSet.Dependencies {
+			parentExecution.addDependency(dependency)
+		}
+	}
+	if hasFileCtx {
+		for _, dependency := range nodeSet.Dependencies {
+			fileCtx.state.dynamicDeps = appendResourceRef(fileCtx.state.dynamicDeps, dependency)
+		}
+	}
 	report := reportForProducedSubscription(name, nodeSet)
-	if req.Target == "" {
+	if renderTarget == "" {
 		report = s.prepareReport("subscription_produce", report)
 		return &domain.ScriptSubscriptionProduceResult{
 			Kind:   "nodes",
@@ -194,11 +224,11 @@ func (s *Service) ProduceSubscription(ctx context.Context, name string, opts dom
 			Report: report,
 		}, nil
 	}
-	renderer, ok := s.renderers[normalizeFormat(req.Target)]
+	renderer, ok := s.renderers[normalizeFormat(renderTarget)]
 	if !ok {
-		return nil, domain.NewError(domain.CodeInvalidArgument, fmt.Sprintf("unsupported render target %q", req.Target))
+		return nil, domain.NewError(domain.CodeInvalidArgument, fmt.Sprintf("unsupported render target %q", renderTarget))
 	}
-	body, renderReport, err := s.renderWithReport(ctx, renderer, nodeSet.Nodes, domain.RenderOptions{Format: req.Target})
+	body, renderReport, err := s.renderWithReport(ctx, renderer, nodeSet.Nodes, domain.RenderOptions{Format: renderTarget})
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +237,7 @@ func (s *Service) ProduceSubscription(ctx context.Context, name string, opts dom
 	report = s.prepareReport("subscription_produce", report)
 	return &domain.ScriptSubscriptionProduceResult{
 		Kind:    "content",
-		Target:  req.Target,
+		Target:  renderTarget,
 		Content: string(body),
 		Report:  report,
 	}, nil

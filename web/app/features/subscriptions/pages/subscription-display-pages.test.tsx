@@ -31,6 +31,7 @@ describe("SubscriptionPreviewPage", () => {
     render(<SubscriptionPreviewPage {...previewPageActions} item={subscriptions[0]} preview={subscriptionPreview} />);
 
     const searchbox = screen.getByRole("searchbox", { name: "搜索预览节点" });
+    await user.click(screen.getByRole("button", { name: "已移除 1" }));
     await user.type(searchbox, "EXAMPLE.ORG:8389");
     expect(screen.getByText("drop")).toBeInTheDocument();
     expect(screen.queryByText("source-keep")).not.toBeInTheDocument();
@@ -300,7 +301,7 @@ describe("SubscriptionPreviewPage", () => {
     expect(screen.getByRole("button", { name: "available-node 节点详情，测活状态：可用" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "failed-node 节点详情，测活状态：失败" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "missing-node 节点详情" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "removed-node 节点详情" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "removed-node 节点详情" })).not.toBeInTheDocument();
 
     await user.hover(screen.getByLabelText("测活耗时 42 毫秒"));
     expect(await screen.findByRole("tooltip")).toHaveTextContent("方式：url_test");
@@ -308,6 +309,10 @@ describe("SubscriptionPreviewPage", () => {
     await user.unhover(screen.getByLabelText("测活耗时 42 毫秒"));
     await user.hover(screen.getByLabelText("测活状态：失败"));
     expect(await screen.findByRole("tooltip")).toHaveTextContent("错误：probe_tcp_failed");
+    await user.unhover(screen.getByLabelText("测活状态：失败"));
+    await user.click(screen.getByRole("button", { name: "已移除 1" }));
+    expect(screen.getByRole("button", { name: "removed-node 节点详情" })).toBeInTheDocument();
+    expect(screen.queryByText("99 ms")).not.toBeInTheDocument();
   });
   it("puts name changes first in modified node diffs", async () => {
     const user = userEvent.setup();

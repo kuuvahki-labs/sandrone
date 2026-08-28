@@ -131,7 +131,7 @@ JSON 中带 `omitempty` 的成员在无值时可能不存在。脚本应对 `arg
 | --- | --- |
 | `version` | envelope 版本，当前为 `1` |
 | `stage` | 当前阶段：`nodes` 或 `file` |
-| `target` | 当前目标格式或调用方给出的 target；可能为空 |
+| `target` | 当前目标格式或调用方给出的 target；已保存 Subscription 的 canonical nodes-stage 执行中为空 |
 | `render_options` | 渲染选项对象；当前公开字段为可选 `format` |
 | `context` | 节点阶段的输入名、依赖、来源与 metadata；文件阶段当前为空 |
 | `request` | 请求信息：可选 `trace_id`、字符串 `args` 与字符串 `meta` |
@@ -276,9 +276,11 @@ header；未知字段同样会使 `api.ini.stringify` 失败。输出统一使�
 
 - 没有 `target` 时返回 `{kind: "nodes", nodes, report}`；
 - 有 `target` 时用对应 renderer 返回 `{kind: "content", target, content, report}`；
-- 返回对象的 `report` 描述该订阅的依赖、来源和 warning；在文件渲染上下文中，直接订阅还会记入外层文件的动态依赖。
+- `target` 只选择返回内容的 renderer，不改变被调用 Subscription 的 canonical nodes-stage 结果；
+- 返回对象的 `report` 描述该订阅的依赖、来源和 warning；调用发生在另一订阅或文件执行中时，直接订阅及其传递依赖会记入外层结果。
 
-空名称、未知订阅、递归解析失败或未知 target 会令脚本失败。
+声明式和脚本动态订阅调用共享递归检测与请求内 memo。空名称、未知订阅、递归解析
+失败或未知 target 会令脚本失败。
 
 ### `api.file.content(name, options?)`
 

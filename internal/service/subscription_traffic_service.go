@@ -50,7 +50,7 @@ func (s *Service) SubscriptionTraffic(ctx context.Context, req domain.Subscripti
 		}
 	}
 
-	base, err := s.subscriptionBaseNodes(ctx, sub, domain.FileRequest{}, newSubscriptionResolveState())
+	base, err := s.subscriptionBaseNodes(ctx, sub, subscriptionExecutionRequest{Refresh: req.Refresh}, newSubscriptionExecutionState())
 	if err != nil {
 		return nil, err
 	}

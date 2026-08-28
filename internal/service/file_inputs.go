@@ -11,10 +11,12 @@ import (
 )
 
 func (s *Service) resolveNodeInput(ctx context.Context, input domain.NodeInput, req domain.FileRequest) (*domain.NodeSet, error) {
-	return s.resolveNodeInputWithSubscriptionState(ctx, input, req, newSubscriptionResolveState())
+	return s.resolveNodeInputWithSubscriptionState(ctx, input, subscriptionExecutionRequest{
+		Name: req.Name, Request: req.Request, Refresh: req.Refresh,
+	}, newSubscriptionExecutionState())
 }
 
-func (s *Service) resolveNodeInputWithSubscriptionState(ctx context.Context, input domain.NodeInput, req domain.FileRequest, subscriptionState *subscriptionResolveState) (*domain.NodeSet, error) {
+func (s *Service) resolveNodeInputWithSubscriptionState(ctx context.Context, input domain.NodeInput, req subscriptionExecutionRequest, subscriptionState *subscriptionExecutionState) (*domain.NodeSet, error) {
 	switch strings.ToLower(input.Type) {
 	case "inline_nodes":
 		nodes, warnings := normalizeInlineNodes(input.Nodes)
@@ -90,7 +92,7 @@ func normalizeInlineNodes(nodes []domain.NodeIR) ([]domain.NodeIR, []domain.Warn
 	return out, warnings
 }
 
-func (s *Service) resolveSubscriptionNodeInput(ctx context.Context, input domain.NodeInput, req domain.FileRequest, subscriptionState *subscriptionResolveState) (*domain.NodeSet, error) {
+func (s *Service) resolveSubscriptionNodeInput(ctx context.Context, input domain.NodeInput, req subscriptionExecutionRequest, subscriptionState *subscriptionExecutionState) (*domain.NodeSet, error) {
 	if s.metaStore == nil {
 		return nil, storeUnavailable()
 	}
@@ -105,10 +107,11 @@ func (s *Service) resolveSubscriptionNodeInput(ctx context.Context, input domain
 	ctx = withSubscriptionCacheOwner(ctx, sub.Name)
 	childReq := req
 	childReq.Name = input.Name
-	nodeSet, err := s.materializeSubscription(ctx, sub, childReq, subscriptionState)
+	execution, err := s.executeSubscription(ctx, sub, childReq, subscriptionState)
 	if err != nil {
 		return nil, err
 	}
+	nodeSet := execution.After
 	out := nodeSet.Clone()
 	out.Dependencies = append([]domain.ResourceRef{{Kind: "subscription", Name: name}}, out.Dependencies...)
 	out.Meta = mergeStringMaps(out.Meta, input.Meta)

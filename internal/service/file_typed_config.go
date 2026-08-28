@@ -85,7 +85,7 @@ func (s *Service) configNodes(ctx context.Context, subscriptions []string, req d
 	if s.metaStore == nil {
 		return nil, storeUnavailable()
 	}
-	subState := newSubscriptionResolveState()
+	subState := newSubscriptionExecutionState()
 	nodes := []domain.NodeIR{}
 	for _, name := range subscriptions {
 		sub, err := s.metaStore.GetSubscription(ctx, name)
@@ -93,15 +93,15 @@ func (s *Service) configNodes(ctx context.Context, subscriptions []string, req d
 			return nil, err
 		}
 		subCtx := withSubscriptionCacheOwner(ctx, sub.Name)
-		nodeSet, err := s.materializeSubscription(subCtx, sub, domain.FileRequest{
+		execution, err := s.executeSubscription(subCtx, sub, subscriptionExecutionRequest{
 			Name:    name,
-			Target:  req.Target,
 			Request: req.Request,
-			Meta:    req.Meta,
+			Refresh: req.Refresh,
 		}, subState)
 		if err != nil {
 			return nil, err
 		}
+		nodeSet := execution.After
 		nodes = append(nodes, nodeSet.Nodes...)
 		if state != nil {
 			state.dynamicDeps = appendResourceRef(state.dynamicDeps, domain.ResourceRef{Kind: "subscription", Name: name})

@@ -437,10 +437,13 @@ func (s *Service) diagnoseStoredSubscription(ctx context.Context, req domain.Dia
 }
 
 func (s *Service) diagnoseSubscription(ctx context.Context, sub domain.Subscription, req domain.DiagnoseRequest, result *domain.DiagnoseResult) error {
-	set, err := s.materializeSubscription(ctx, sub, domain.FileRequest{Name: sub.Name, Target: req.Target, Request: domain.RequestInfo{Meta: req.Meta}, Refresh: true}, newSubscriptionResolveState())
+	execution, err := s.executeSubscription(ctx, sub, subscriptionExecutionRequest{
+		Name: sub.Name, Request: domain.RequestInfo{Meta: req.Meta}, Refresh: true,
+	}, newSubscriptionExecutionState())
 	if err != nil {
 		return err
 	}
+	set := execution.After
 	result.Input.Kind = domain.DiagnoseInputSubscription
 	result.Input.Name = sub.Name
 	result.Input.Format = normalizeFormat(sub.Format)

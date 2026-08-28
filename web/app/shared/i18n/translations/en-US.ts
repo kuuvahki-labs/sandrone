@@ -523,7 +523,7 @@ export const enUS: Record<TranslationKey, string> = {
   "subscriptions.preview.remainingChanges": "{count} more changes",
   "subscriptions.preview.search": "Search preview nodes",
   "subscriptions.preview.statusAdded": "Added",
-  "subscriptions.preview.statusAll": "All",
+  "subscriptions.preview.statusFinal": "Final nodes",
   "subscriptions.preview.statusModified": "Modified",
   "subscriptions.preview.statusRemoved": "Removed",
   "subscriptions.preview.statusUnchanged": "Unchanged",

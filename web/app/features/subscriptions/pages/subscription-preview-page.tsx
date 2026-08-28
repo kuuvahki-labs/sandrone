@@ -26,7 +26,7 @@ import { CollapsibleWarningPanel } from "~/shared/resources/warning-panel";
 import { CodeBlock } from "~/shared/ui/code-editor";
 import { Metric, PageHeader } from "~/shared/ui/page";
 
-type PreviewFilter = SubscriptionPreviewStatus | "all";
+type PreviewFilter = SubscriptionPreviewStatus | "final";
 type PreviewDetailMode = "diff" | "meta";
 type StatusColor = "success" | "warning" | "error" | "info";
 
@@ -47,15 +47,15 @@ export interface SubscriptionPreviewPageProps {
 
 export function SubscriptionPreviewPage({ backLabel, elapsedSeconds = 0, failed = false, pending = false, preview, onBack, onRefresh, onShare }: SubscriptionPreviewPageProps) {
   const { t } = useI18n();
-  const [filter, setFilter] = useState<PreviewFilter>("all");
+  const [filter, setFilter] = useState<PreviewFilter>("final");
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
   const previewNodes = preview?.nodes;
   const visibleNodes = useMemo(() => {
     const normalizedQuery = deferredQuery.trim().toLowerCase();
     return (previewNodes ?? []).filter((node) => {
-      if (filter !== "all" && node.status !== filter) return false;
-      return !normalizedQuery || previewNodeSearchText(node).includes(normalizedQuery);
+      if (filter === "final" ? !node.after : node.status !== filter) return false;
+      return !normalizedQuery || previewNodeSearchText(node, filter === "final").includes(normalizedQuery);
     });
   }, [deferredQuery, filter, previewNodes]);
   const warningGroupCount = preview ? groupPreviewWarnings(preview.warnings).length : undefined;
@@ -153,12 +153,9 @@ export function SubscriptionPreviewPage({ backLabel, elapsedSeconds = 0, failed 
   );
 }
 
-function previewNodeSearchText(diff: SubscriptionPreviewNodeDiff): string {
+function previewNodeSearchText(diff: SubscriptionPreviewNodeDiff, finalOnly = false): string {
   const values: unknown[] = [
-    diff.before?.name,
-    diff.before?.type,
-    diff.before?.server,
-    diff.before?.endpoint,
+    ...(finalOnly ? [] : [diff.before?.name, diff.before?.type, diff.before?.server, diff.before?.endpoint]),
     diff.after?.name,
     diff.after?.type,
     diff.after?.server,
@@ -339,7 +336,7 @@ function NodeSummaryItem({ node }: { node?: SubscriptionPreviewNode }) {
 
 function previewFilters(preview: SubscriptionPreview, t: Translator): Array<{ value: PreviewFilter; label: string; count: number }> {
   return [
-    { value: "all", label: t("subscriptions.preview.statusAll"), count: preview.nodes.length },
+    { value: "final", label: t("subscriptions.preview.statusFinal"), count: preview.afterCount },
     { value: "modified", label: t("subscriptions.preview.statusModified"), count: preview.statusCounts.modified },
     { value: "removed", label: t("subscriptions.preview.statusRemoved"), count: preview.statusCounts.removed },
     { value: "added", label: t("subscriptions.preview.statusAdded"), count: preview.statusCounts.added },
@@ -348,7 +345,7 @@ function previewFilters(preview: SubscriptionPreview, t: Translator): Array<{ va
 }
 
 function filterColor(status: PreviewFilter) {
-  return status === "all" ? "primary" : statusColor(status);
+  return status === "final" ? "primary" : statusColor(status);
 }
 
 function statusColor(status: SubscriptionPreviewStatus): StatusColor {

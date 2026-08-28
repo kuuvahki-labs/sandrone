@@ -155,6 +155,139 @@ func TestSubscriptionRenderCacheValidatesSavedDependencyRevisions(t *testing.T) 
 	require.Equal(t, 1, files)
 }
 
+func TestSubscriptionRenderCacheTracksFileBackedNodeScript(t *testing.T) {
+	ctx := context.Background()
+	ttl := 60
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	putScript := func(prefix string) {
+		require.NoError(t, svc.PutFile(ctx, domain.FileSpec{
+			Name: "rename.js", Kind: domain.FileKindStatic,
+			Source: domain.FileSource{Type: "inline", Content: `function main(input) {
+  input.nodes.forEach(function(node) { node.name = "` + prefix + `-" + node.name; });
+  return input;
+}`},
+		}))
+	}
+	putScript("before")
+	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+		Name: "scripted", Type: domain.SubscriptionTypeLocal, Format: "uri-list",
+		Content:               "ss://aes-128-gcm:secret@example.com:8388#node",
+		RenderCacheTTLSeconds: &ttl,
+		Processors: []domain.ProcessorSpec{{
+			Type: "script", Stage: domain.StageNodes,
+			Params: params(t, map[string]any{"source": fileScriptSource("rename.js")}),
+		}},
+	}))
+
+	first, err := svc.RenderSubscriptionRequest(ctx, domain.SubscriptionRenderRequest{Name: "scripted", Format: "uri-list"})
+	require.NoError(t, err)
+	require.False(t, first.Cached)
+	require.Contains(t, string(first.Body), "before-node")
+	require.Contains(t, first.Report.Dependencies, domain.ResourceRef{Kind: "file", Name: "rename.js"})
+	second, err := svc.RenderSubscriptionRequest(ctx, domain.SubscriptionRenderRequest{Name: "scripted", Format: "uri-list"})
+	require.NoError(t, err)
+	require.True(t, second.Cached)
+
+	putScript("after")
+	third, err := svc.RenderSubscriptionRequest(ctx, domain.SubscriptionRenderRequest{Name: "scripted", Format: "uri-list"})
+	require.NoError(t, err)
+	require.False(t, third.Cached)
+	require.Contains(t, string(third.Body), "after-node")
+	require.NotContains(t, string(third.Body), "before-node")
+}
+
+func TestSubscriptionRenderCacheTracksTransitiveScriptFileDependencies(t *testing.T) {
+	ctx := context.Background()
+	ttl := 60
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	putTemplate := func(prefix string) {
+		require.NoError(t, svc.PutFile(ctx, domain.FileSpec{
+			Name: "template.js", Kind: domain.FileKindStatic,
+			Source: domain.FileSource{Type: "inline", Content: `function main(input) {
+  input.nodes.forEach(function(node) { node.name = "` + prefix + `-" + node.name; });
+  return input;
+}`},
+		}))
+	}
+	putTemplate("before")
+	require.NoError(t, svc.PutFile(ctx, domain.FileSpec{
+		Name: "loader.js", Kind: domain.FileKindStatic,
+		Source: domain.FileSource{Type: "inline", Content: "placeholder"},
+		Processors: []domain.ProcessorSpec{{
+			Type: "script", Stage: domain.StageFile,
+			Params: params(t, map[string]any{"source": inlineScriptSource(`function main(input, api) {
+  input.file.content = api.file.content("template.js");
+  return input;
+}`)}),
+		}},
+	}))
+	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+		Name: "transitive-script", Type: domain.SubscriptionTypeLocal, Format: "uri-list",
+		Content:               "ss://aes-128-gcm:secret@example.com:8388#node",
+		RenderCacheTTLSeconds: &ttl,
+		Processors: []domain.ProcessorSpec{{
+			Type: "script", Stage: domain.StageNodes,
+			Params: params(t, map[string]any{"source": fileScriptSource("loader.js")}),
+		}},
+	}))
+
+	first, err := svc.RenderSubscriptionRequest(ctx, domain.SubscriptionRenderRequest{Name: "transitive-script", Format: "uri-list"})
+	require.NoError(t, err)
+	require.Contains(t, string(first.Body), "before-node")
+	require.Contains(t, first.Report.Dependencies, domain.ResourceRef{Kind: "file", Name: "loader.js"})
+	require.Contains(t, first.Report.Dependencies, domain.ResourceRef{Kind: "file", Name: "template.js"})
+	second, err := svc.RenderSubscriptionRequest(ctx, domain.SubscriptionRenderRequest{Name: "transitive-script", Format: "uri-list"})
+	require.NoError(t, err)
+	require.True(t, second.Cached)
+
+	putTemplate("after")
+	third, err := svc.RenderSubscriptionRequest(ctx, domain.SubscriptionRenderRequest{Name: "transitive-script", Format: "uri-list"})
+	require.NoError(t, err)
+	require.False(t, third.Cached)
+	require.Contains(t, string(third.Body), "after-node")
+}
+
+func TestSubscriptionRenderCacheTracksScriptProducedSubscription(t *testing.T) {
+	ctx := context.Background()
+	ttl := 60
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	putLeaf := func(server string) {
+		require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+			Name: "leaf", Type: domain.SubscriptionTypeLocal, Format: "uri-list",
+			Content: "ss://aes-128-gcm:secret@" + server + ":8388#leaf",
+		}))
+	}
+	putLeaf("before.example")
+	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+		Name: "scripted-parent", Type: domain.SubscriptionTypeLocal, Format: "uri-list",
+		Content:               "ss://aes-128-gcm:secret@placeholder.example:8388#placeholder",
+		RenderCacheTTLSeconds: &ttl,
+		Processors: []domain.ProcessorSpec{{
+			Type: "script", Stage: domain.StageNodes,
+			Params: params(t, map[string]any{"source": inlineScriptSource(`function main(input, api) {
+  input.nodes = api.subscription.produce("leaf").nodes;
+  return input;
+}`)}),
+		}},
+	}))
+
+	first, err := svc.RenderSubscriptionRequest(ctx, domain.SubscriptionRenderRequest{Name: "scripted-parent", Format: "uri-list"})
+	require.NoError(t, err)
+	require.False(t, first.Cached)
+	require.Contains(t, string(first.Body), "before.example")
+	require.Contains(t, first.Report.Dependencies, domain.ResourceRef{Kind: "subscription", Name: "leaf"})
+	second, err := svc.RenderSubscriptionRequest(ctx, domain.SubscriptionRenderRequest{Name: "scripted-parent", Format: "uri-list"})
+	require.NoError(t, err)
+	require.True(t, second.Cached)
+
+	putLeaf("after.example")
+	third, err := svc.RenderSubscriptionRequest(ctx, domain.SubscriptionRenderRequest{Name: "scripted-parent", Format: "uri-list"})
+	require.NoError(t, err)
+	require.False(t, third.Cached)
+	require.Contains(t, string(third.Body), "after.example")
+	require.NotContains(t, string(third.Body), "before.example")
+}
+
 func TestServiceExplicitZeroDisablesInheritedFileRenderCache(t *testing.T) {
 	ctx := context.Background()
 	calls := 0
