@@ -196,6 +196,41 @@ describe("shared UI primitives", () => {
     }
   });
 
+  it("renders an opted-in mobile page-header action as an accessible icon button", () => {
+    vi.stubGlobal("matchMedia", vi.fn((query: string) => ({
+      matches: query === "(max-width:819px)",
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })));
+
+    try {
+      render(
+        <PageHeader
+          label=""
+          secondaryActions={[{
+            accessibleLabel: "生成转换链接",
+            icon: <span aria-hidden>icon</span>,
+            label: "生成转换链接",
+            mobileIconOnly: true,
+            mobileVisible: true,
+          }]}
+          title="分享"
+        />,
+      );
+
+      const action = screen.getByRole("button", { name: "生成转换链接" });
+      expect(action).not.toHaveTextContent("生成转换链接");
+      expect(action).toHaveTextContent("icon");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("renders long code content with Prism tokens and a copy action", async () => {
     const user = userEvent.setup();
     const writeText = vi.fn(async (_value: string) => undefined);

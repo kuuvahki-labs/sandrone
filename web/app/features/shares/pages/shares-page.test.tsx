@@ -23,6 +23,28 @@ const shares: ShareItem[] = [
 ];
 
 describe("shares page", () => {
+  it("filters shares by status and clears the selected filter on a second click", async () => {
+    const user = userEvent.setup();
+    const items: ShareItem[] = [
+      shares[0],
+      { ...shares[0], id: "sh_upcoming", publicUrl: "https://example.com/s/sh_upcoming", status: "upcoming", title: "future" },
+      { ...shares[0], id: "sh_expired", publicUrl: "https://example.com/s/sh_expired", status: "expired", title: "old" },
+    ];
+    render(<SharesPage items={items} onCopy={vi.fn()} onCopyUrl={vi.fn()} onDelete={vi.fn()} onGenerateConvertLink={vi.fn()} />);
+
+    const upcomingFilter = screen.getByRole("button", { name: "按未生效筛选" });
+    await user.click(upcomingFilter);
+    expect(upcomingFilter).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("future")).toBeInTheDocument();
+    expect(screen.queryByText("mobile")).not.toBeInTheDocument();
+    expect(screen.queryByText("old")).not.toBeInTheDocument();
+
+    await user.click(upcomingFilter);
+    expect(upcomingFilter).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText("mobile")).toBeInTheDocument();
+    expect(screen.getByText("old")).toBeInTheDocument();
+  });
+
   it("opens share details from the card and leaves only delete in a file share menu", async () => {
     const user = userEvent.setup();
     const onCopy = vi.fn().mockResolvedValue({ copied: true });

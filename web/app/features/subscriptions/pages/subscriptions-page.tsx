@@ -21,7 +21,7 @@ import type { SubscriptionItem, SubscriptionKind, SubscriptionTraffic } from "~/
 import { type Translator, useI18n } from "~/shared/i18n/context";
 import { resourceOptionText, resourceSecondaryName } from "~/shared/resources/labels";
 import { EmptyState } from "~/shared/ui/feedback";
-import { Metric, PageHeader } from "~/shared/ui/page";
+import { Metric, MetricGroup, PageHeader } from "~/shared/ui/page";
 import {
   CreateSpeedDial,
   type CreateSpeedDialAction,
@@ -57,16 +57,17 @@ export function SubscriptionsPage({
   onShare,
 }: SubscriptionsPageProps) {
   const { t } = useI18n();
+  const [kindFilter, setKindFilter] = useState<SubscriptionListFilter>("all");
   const [query, setQuery] = useState("");
   const [queryFocused, setQueryFocused] = useState(false);
   const summary = subscriptionSummary(items);
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    if (!normalized) {
-      return items;
-    }
-    return items.filter((item) => [item.title, item.name, item.format, item.description, item.warning].some((value) => String(value ?? "").toLowerCase().includes(normalized)));
-  }, [items, query]);
+    return items.filter((item) => {
+      if (kindFilter !== "all" && item.kind !== kindFilter) return false;
+      return !normalized || [item.title, item.name, item.format, item.description, item.warning].some((value) => String(value ?? "").toLowerCase().includes(normalized));
+    });
+  }, [items, kindFilter, query]);
 
   return (
     <section className="grid gap-6">
@@ -74,12 +75,36 @@ export function SubscriptionsPage({
         label=""
         title={t("subscriptions.title")}
         metrics={(
-          <div aria-label={t("subscriptions.summary")} className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            <Metric label={t("subscriptions.metric.total")} value={loaded ? summary.total : undefined} />
-            <Metric label={t("subscriptions.metric.collection")} value={loaded ? summary.collections : undefined} />
-            <Metric label={t("subscriptions.metric.remote")} value={loaded ? summary.remote : undefined} />
-            <Metric label={t("subscriptions.metric.local")} value={loaded ? summary.local : undefined} />
-          </div>
+          <MetricGroup label={t("subscriptions.summary")}>
+            <Metric
+              actionLabel={t("actions.showAll")}
+              label={t("subscriptions.metric.total")}
+              selected={kindFilter === "all"}
+              value={loaded ? summary.total : undefined}
+              onSelect={() => setKindFilter("all")}
+            />
+            <Metric
+              actionLabel={t("actions.filterBy", { label: t("subscriptions.metric.collection") })}
+              label={t("subscriptions.metric.collection")}
+              selected={kindFilter === "collection"}
+              value={loaded ? summary.collections : undefined}
+              onSelect={() => setKindFilter((current) => current === "collection" ? "all" : "collection")}
+            />
+            <Metric
+              actionLabel={t("actions.filterBy", { label: t("subscriptions.metric.remote") })}
+              label={t("subscriptions.metric.remote")}
+              selected={kindFilter === "remote"}
+              value={loaded ? summary.remote : undefined}
+              onSelect={() => setKindFilter((current) => current === "remote" ? "all" : "remote")}
+            />
+            <Metric
+              actionLabel={t("actions.filterBy", { label: t("subscriptions.metric.local") })}
+              label={t("subscriptions.metric.local")}
+              selected={kindFilter === "local"}
+              value={loaded ? summary.local : undefined}
+              onSelect={() => setKindFilter((current) => current === "local" ? "all" : "local")}
+            />
+          </MetricGroup>
         )}
       />
 
@@ -146,12 +171,14 @@ export function SubscriptionsPage({
           })}
         </List>
       ) : loaded ? (
-        <EmptyState title={t("subscriptions.empty")} />
+        <EmptyState title={items.length ? t("filters.empty") : t("subscriptions.empty")} />
       ) : null}
       <CreateSpeedDial actions={createActions} ariaLabel={t("subscriptions.create")} />
     </section>
   );
 }
+
+type SubscriptionListFilter = "all" | SubscriptionKind;
 
 function SubscriptionListTraffic({
   traffic,

@@ -15,7 +15,7 @@ import { type ShareCopyFormat, shareCopyFormats } from "~/features/shares/model/
 import type { ShareItem } from "~/features/shares/model/types";
 import { type Translator, useI18n } from "~/shared/i18n/context";
 import { EmptyState } from "~/shared/ui/feedback";
-import { Metric, PageHeader } from "~/shared/ui/page";
+import { Metric, MetricGroup, PageHeader } from "~/shared/ui/page";
 import {
   type DestinationListAction,
   DestinationListItem,
@@ -34,9 +34,11 @@ export function SharesPage({ items, loaded = true, onCopy, onCopyUrl, onDelete, 
   const { t } = useI18n();
   const [manualCopyUrl, setManualCopyUrl] = useState<string | null>(null);
   const [selectedShare, setSelectedShare] = useState<ShareItem | null>(null);
+  const [statusFilter, setStatusFilter] = useState<ShareStatusFilter>("all");
   const validCount = items.filter((item) => item.status === "valid").length;
   const upcomingCount = items.filter((item) => item.status === "upcoming").length;
   const expiredCount = items.filter((item) => item.status === "expired").length;
+  const filteredItems = statusFilter === "all" ? items : items.filter((item) => item.status === statusFilter);
   return (
     <section className="grid gap-6">
       <PageHeader
@@ -45,21 +47,40 @@ export function SharesPage({ items, loaded = true, onCopy, onCopyUrl, onDelete, 
           accessibleLabel: t("shares.convert.action"),
           icon: <TransformOutlinedIcon aria-hidden fontSize="small" />,
           label: t("shares.convert.action"),
+          mobileIconOnly: true,
           mobileVisible: true,
           onSelect: onGenerateConvertLink,
         }]}
         title={t("shares.title")}
         metrics={(
-          <div aria-label={t("shares.summary")} className="grid grid-cols-2 gap-4 md:grid-cols-3">
-            <Metric label={t("shares.metric.valid")} value={loaded ? validCount : undefined} />
-            <Metric label={t("shares.metric.upcoming")} value={loaded ? upcomingCount : undefined} />
-            <Metric label={t("shares.metric.expired")} value={loaded ? expiredCount : undefined} />
-          </div>
+          <MetricGroup label={t("shares.summary")}>
+            <Metric
+              actionLabel={t("actions.filterBy", { label: t("shares.metric.valid") })}
+              label={t("shares.metric.valid")}
+              selected={statusFilter === "valid"}
+              value={loaded ? validCount : undefined}
+              onSelect={() => setStatusFilter((current) => current === "valid" ? "all" : "valid")}
+            />
+            <Metric
+              actionLabel={t("actions.filterBy", { label: t("shares.metric.upcoming") })}
+              label={t("shares.metric.upcoming")}
+              selected={statusFilter === "upcoming"}
+              value={loaded ? upcomingCount : undefined}
+              onSelect={() => setStatusFilter((current) => current === "upcoming" ? "all" : "upcoming")}
+            />
+            <Metric
+              actionLabel={t("actions.filterBy", { label: t("shares.metric.expired") })}
+              label={t("shares.metric.expired")}
+              selected={statusFilter === "expired"}
+              value={loaded ? expiredCount : undefined}
+              onSelect={() => setStatusFilter((current) => current === "expired" ? "all" : "expired")}
+            />
+          </MetricGroup>
         )}
       />
-      {items.length ? (
+      {filteredItems.length ? (
         <List aria-label={t("shares.list")} className="grid gap-3 p-0">
-          {items.map((item) => (
+          {filteredItems.map((item) => (
             <DestinationListItem
               actions={shareActions(item, {
                 onCopy: async (format) => {
@@ -75,8 +96,9 @@ export function SharesPage({ items, loaded = true, onCopy, onCopyUrl, onDelete, 
                   {shareStatusChip(item, t)}
                   {item.ageRecipient ? <Chip label="age X25519" size="small" variant="outlined" /> : null}
                   <Typography
-                    className="block cursor-text break-words select-text"
+                    className="block min-w-0 w-full basis-full cursor-text truncate select-text"
                     component="code"
+                    title={item.publicUrl}
                     variant="body2"
                     onClick={(event) => {
                       event.stopPropagation();
@@ -97,7 +119,7 @@ export function SharesPage({ items, loaded = true, onCopy, onCopyUrl, onDelete, 
           ))}
         </List>
       ) : loaded ? (
-        <EmptyState title={t("shares.empty")} />
+        <EmptyState title={items.length ? t("filters.empty") : t("shares.empty")} />
       ) : null}
       {selectedShare ? (
         <ShareDetailsDialog
@@ -116,6 +138,8 @@ export function SharesPage({ items, loaded = true, onCopy, onCopyUrl, onDelete, 
     </section>
   );
 }
+
+type ShareStatusFilter = "all" | ShareItem["status"];
 
 function shareActions(
   item: ShareItem,

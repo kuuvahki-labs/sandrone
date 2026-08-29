@@ -123,7 +123,7 @@ export function DestinationListItem({
           {subtitle}
         </Typography>
       ) : null}
-      {meta ? <div className="flex flex-wrap items-center gap-2">{meta}</div> : null}
+      {meta ? <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2 overflow-hidden">{meta}</div> : null}
     </div>
   ) : undefined;
 

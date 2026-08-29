@@ -181,6 +181,15 @@ describe("FilesPage", () => {
     expect(screen.queryByText("inline.yaml")).not.toBeInTheDocument();
     fireEvent.change(searchbox, { target: { value: "" } });
 
+    const configFilter = screen.getByRole("button", { name: "按配置筛选" });
+    await user.click(configFilter);
+    expect(configFilter).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("client.yaml")).toBeInTheDocument();
+    expect(screen.queryByText("移动端配置")).not.toBeInTheDocument();
+    expect(screen.queryByText("inline.yaml")).not.toBeInTheDocument();
+    await user.click(configFilter);
+    expect(screen.getByRole("button", { name: "显示全部" })).toHaveAttribute("aria-pressed", "true");
+
     await user.click(screen.getByRole("button", { name: "新建文件" }));
     await user.click(await screen.findByRole("menuitem", { name: "远程" }));
     await user.click(screen.getByRole("button", { name: "编辑：移动端配置 (default.yaml)" }));

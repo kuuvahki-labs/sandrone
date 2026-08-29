@@ -16,7 +16,7 @@ import type { FileItem } from "~/features/files/model/types";
 import { type Translator, useI18n } from "~/shared/i18n/context";
 import { resourceOptionText, resourceSecondaryName } from "~/shared/resources/labels";
 import { EmptyState } from "~/shared/ui/feedback";
-import { Metric, PageHeader } from "~/shared/ui/page";
+import { Metric, MetricGroup, PageHeader } from "~/shared/ui/page";
 import {
   CreateSpeedDial,
   type CreateSpeedDialAction,
@@ -38,6 +38,7 @@ export interface FilesPageProps {
 
 export function FilesPage({ createActions, items, loaded = true, onCopy, onDelete, onEdit, onExport, onPreview, onShare }: FilesPageProps) {
   const { t } = useI18n();
+  const [fileFilter, setFileFilter] = useState<FileListFilter>("all");
   const [query, setQuery] = useState("");
   const [queryFocused, setQueryFocused] = useState(false);
   const localCount = items.filter((item) => !isConfigFile(item) && item.sourceType !== "remote").length;
@@ -46,6 +47,7 @@ export function FilesPage({ createActions, items, loaded = true, onCopy, onDelet
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     return items.filter((item) => {
+      if (!fileMatchesFilter(item, fileFilter)) return false;
       if (!normalized) return true;
       return [
         item.title,
@@ -56,19 +58,43 @@ export function FilesPage({ createActions, items, loaded = true, onCopy, onDelet
         fileUsageLabel(item, t),
       ].some((value) => String(value ?? "").toLowerCase().includes(normalized));
     });
-  }, [items, query, t]);
+  }, [fileFilter, items, query, t]);
 
   return (
     <section className="grid gap-6">
       <PageHeader
         label=""
         metrics={(
-          <div aria-label={t("files.summary")} className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            <Metric label={t("files.metric.files")} value={loaded ? items.length : undefined} />
-            <Metric label={t("files.metric.local")} value={loaded ? localCount : undefined} />
-            <Metric label={t("files.metric.remote")} value={loaded ? remoteCount : undefined} />
-            <Metric label={t("files.metric.config")} value={loaded ? configCount : undefined} />
-          </div>
+          <MetricGroup label={t("files.summary")}>
+            <Metric
+              actionLabel={t("actions.showAll")}
+              label={t("files.metric.files")}
+              selected={fileFilter === "all"}
+              value={loaded ? items.length : undefined}
+              onSelect={() => setFileFilter("all")}
+            />
+            <Metric
+              actionLabel={t("actions.filterBy", { label: t("files.metric.local") })}
+              label={t("files.metric.local")}
+              selected={fileFilter === "local"}
+              value={loaded ? localCount : undefined}
+              onSelect={() => setFileFilter((current) => current === "local" ? "all" : "local")}
+            />
+            <Metric
+              actionLabel={t("actions.filterBy", { label: t("files.metric.remote") })}
+              label={t("files.metric.remote")}
+              selected={fileFilter === "remote"}
+              value={loaded ? remoteCount : undefined}
+              onSelect={() => setFileFilter((current) => current === "remote" ? "all" : "remote")}
+            />
+            <Metric
+              actionLabel={t("actions.filterBy", { label: t("files.metric.config") })}
+              label={t("files.metric.config")}
+              selected={fileFilter === "config"}
+              value={loaded ? configCount : undefined}
+              onSelect={() => setFileFilter((current) => current === "config" ? "all" : "config")}
+            />
+          </MetricGroup>
         )}
         title={t("files.title")}
       />
@@ -125,11 +151,26 @@ export function FilesPage({ createActions, items, loaded = true, onCopy, onDelet
           })}
         </List>
       ) : loaded ? (
-        <EmptyState title={t("files.empty")} />
+        <EmptyState title={items.length ? t("filters.empty") : t("files.empty")} />
       ) : null}
       <CreateSpeedDial actions={createActions} ariaLabel={t("files.create")} />
     </section>
   );
+}
+
+type FileListFilter = "all" | "config" | "local" | "remote";
+
+function fileMatchesFilter(item: FileItem, filter: FileListFilter): boolean {
+  switch (filter) {
+    case "all":
+      return true;
+    case "config":
+      return isConfigFile(item);
+    case "local":
+      return !isConfigFile(item) && item.sourceType !== "remote";
+    case "remote":
+      return item.sourceType === "remote";
+  }
 }
 
 function fileIcon(item: FileItem) {

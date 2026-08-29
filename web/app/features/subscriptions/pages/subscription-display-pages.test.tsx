@@ -385,6 +385,14 @@ describe("SubscriptionsPage", () => {
     expect(screen.getByText("provider")).toBeInTheDocument();
     expect(screen.getByText("default")).toBeInTheDocument();
 
+    const remoteFilter = screen.getByRole("button", { name: "按远程筛选" });
+    expect(screen.getByRole("button", { name: "显示全部" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(remoteFilter);
+    expect(remoteFilter).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("机场主订阅")).toBeInTheDocument();
+    expect(screen.queryByText("local")).not.toBeInTheDocument();
+    expect(screen.queryByText("default")).not.toBeInTheDocument();
+
     const searchbox = screen.getByRole("searchbox", { name: "搜索订阅" });
     fireEvent.change(searchbox, { target: { value: "机场" } });
     expect(screen.getByText("机场主订阅")).toBeInTheDocument();
@@ -396,6 +404,8 @@ describe("SubscriptionsPage", () => {
     expect(screen.getByText("warn")).toBeInTheDocument();
     expect(screen.queryByText("default")).not.toBeInTheDocument();
     fireEvent.change(searchbox, { target: { value: "" } });
+    await user.click(remoteFilter);
+    expect(screen.getByRole("button", { name: "显示全部" })).toHaveAttribute("aria-pressed", "true");
 
     await user.click(screen.getByRole("button", { name: "编辑：default" }));
     await user.click(screen.getByRole("button", { name: "default 更多操作" }));

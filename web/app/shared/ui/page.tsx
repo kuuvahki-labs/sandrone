@@ -1,6 +1,8 @@
-import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { Children, type ReactNode, useEffect, useId, useRef, useState } from "react";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
+import ButtonBase from "@mui/material/ButtonBase";
 import IconButton from "@mui/material/IconButton";
 import Paper from "@mui/material/Paper";
 import Tooltip from "@mui/material/Tooltip";
@@ -13,18 +15,115 @@ import {
   type DestinationListAction,
 } from "~/shared/ui/resource-list";
 
-export function Metric({ label, value }: { label: string; value?: string | number | null }) {
+export function Metric({
+  actionLabel,
+  label,
+  onSelect,
+  selected = false,
+  value,
+}: {
+  actionLabel?: string;
+  label: string;
+  onSelect?: () => void;
+  selected?: boolean;
+  value?: string | number | null;
+}) {
+  const content = (
+    <div className="grid gap-1">
+      <Typography
+        className="break-words"
+        color={selected ? "primary.main" : undefined}
+        component="strong"
+        variant="h5"
+        sx={{ "@media (max-width:819px)": { fontSize: "1.25rem", lineHeight: 1.35 } }}
+      >
+        {value ?? "-"}
+      </Typography>
+      <Typography
+        color={selected ? "primary.main" : "text.secondary"}
+        variant="body2"
+        sx={{ "@media (max-width:819px)": { fontSize: "0.75rem", lineHeight: 1.35 } }}
+      >
+        {label}
+      </Typography>
+    </div>
+  );
   return (
-    <Paper variant="outlined" className="min-w-0 p-4">
-      <div className="grid gap-1">
-        <Typography className="break-words" component="strong" variant="h5">
-          {value ?? "-"}
-        </Typography>
-        <Typography color="text.secondary" variant="body2">
-          {label}
-        </Typography>
-      </div>
+    <Paper
+      variant="outlined"
+      className="min-w-0"
+      sx={{
+        bgcolor: selected ? "action.selected" : undefined,
+        borderColor: selected ? "primary.main" : undefined,
+        height: "100%",
+        "@media (max-width:819px)": {
+          border: 0,
+          borderBottom: selected ? 2 : 0,
+          borderBottomColor: selected ? "primary.main" : undefined,
+          borderRadius: 0,
+          boxShadow: "none",
+          textAlign: "center",
+        },
+      }}
+    >
+      {onSelect ? (
+        <ButtonBase
+          aria-label={actionLabel}
+          aria-pressed={selected}
+          className="h-full w-full"
+          type="button"
+          sx={{
+            display: "block",
+            p: 2,
+            textAlign: "inherit",
+            "&:focus-visible": { outline: "2px solid", outlineColor: "primary.main", outlineOffset: -2 },
+            "@media (max-width:819px)": { px: 0.75, py: 1 },
+          }}
+          onClick={onSelect}
+        >
+          {content}
+        </ButtonBase>
+      ) : (
+        <Box
+          sx={{
+            p: 2,
+            "@media (max-width:819px)": { px: 0.75, py: 1 },
+          }}
+        >
+          {content}
+        </Box>
+      )}
     </Paper>
+  );
+}
+
+export function MetricGroup({ children, label }: { children: ReactNode; label: string }) {
+  const metrics = Children.toArray(children);
+  return (
+    <Box
+      aria-label={label}
+      sx={{
+        display: "grid",
+        gap: 2,
+        gridTemplateColumns: `repeat(${metrics.length}, minmax(0, 1fr))`,
+        "@media (max-width:819px)": { gap: 0 },
+      }}
+    >
+      {metrics.map((metric, index) => (
+        <Box
+          key={index}
+          sx={index === 0 ? undefined : {
+            "@media (max-width:819px)": {
+              borderColor: "divider",
+              borderLeftStyle: "solid",
+              borderLeftWidth: 1,
+            },
+          }}
+        >
+          {metric}
+        </Box>
+      ))}
+    </Box>
   );
 }
 
@@ -80,7 +179,7 @@ export function PageHeader({
   const compactOverflowActions = mobile
     ? secondaryActions.filter((action) => !compactVisibleActions.includes(action)).map(toDestinationListAction)
     : [];
-  const actionMenu = useCompactLayout && compactOverflowActions.length ? (
+  const actionMenu = (useCompactLayout || mobile) && compactOverflowActions.length ? (
     <ActionMenu actions={compactOverflowActions} buttonSize="medium" label={t("actions.more")} />
   ) : null;
 
@@ -114,8 +213,8 @@ export function PageHeader({
           </div>
         ) : (
           <div className={`grid gap-4 p-4 sm:p-5 ${backAction ? "pl-0 sm:pl-1" : ""}`}>
-            <div className="flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center">
-              <div className="flex min-w-0 items-start gap-2">
+            <div className="flex min-w-0 items-center justify-between gap-3 min-[820px]:gap-4">
+              <div className="flex min-w-0 flex-1 items-start gap-2">
                 {backAction ? (
                   <Button className="mt-0.5 shrink-0 px-2 sm:px-3" startIcon={<ArrowBackIcon aria-hidden fontSize="small" />} type="button" onClick={backAction.onSelect}>
                     {backAction.label}
@@ -123,7 +222,12 @@ export function PageHeader({
                 ) : null}
                 <div className="min-w-0">
                   {label ? <Typography color="text.secondary" variant="overline">{label}</Typography> : null}
-                  <Typography className="break-words [overflow-wrap:anywhere]" component="h2" variant="h4">
+                  <Typography
+                    className="break-words [overflow-wrap:anywhere]"
+                    component="h2"
+                    variant="h4"
+                    sx={{ "@media (max-width:819px)": { fontSize: "1.5rem", lineHeight: 1.35 } }}
+                  >
                     {title}
                   </Typography>
                   {description ? (
@@ -134,12 +238,12 @@ export function PageHeader({
                 </div>
               </div>
               {badge || primaryAction || secondaryActions.length ? (
-                <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+                <div className="flex min-w-0 shrink-0 flex-wrap items-center justify-end gap-2">
                   {badge}
                   <div className="flex items-center gap-2">
-                    {secondaryActions.map((action) => <PageHeaderActionButton action={action} key={action.accessibleLabel ?? action.label} />)}
+                    {(mobile ? compactVisibleActions : secondaryActions).map((action) => <PageHeaderActionButton action={action} compact={mobile} key={action.accessibleLabel ?? action.label} />)}
                   </div>
-                  {primaryAction ? <PageHeaderActionButton action={primaryAction} /> : null}
+                  {primaryAction ? <PageHeaderActionButton action={primaryAction} compact={mobile} /> : null}
                   {actionMenu}
                 </div>
               ) : null}
@@ -163,6 +267,7 @@ export interface PageHeaderAction {
   disabledReason?: string;
   icon?: ReactNode;
   label: string;
+  mobileIconOnly?: boolean;
   mobileVisible?: boolean;
   onSelect?: () => void;
   tone?: "default" | "danger";
@@ -172,7 +277,21 @@ export interface PageHeaderAction {
 
 function PageHeaderActionButton({ action, compact = false }: { action: PageHeaderAction; compact?: boolean }) {
   const reasonId = useId();
-  const button = (
+  const iconOnly = compact && action.mobileIconOnly && action.icon !== undefined && action.icon !== null;
+  const button = iconOnly ? (
+    <IconButton
+      aria-hidden={action.disabled && action.disabledReason ? true : undefined}
+      aria-describedby={action.disabledReason ? reasonId : undefined}
+      aria-label={action.accessibleLabel ?? action.label}
+      color={action.tone === "danger" ? "error" : "primary"}
+      disabled={action.disabled}
+      size="small"
+      type={action.type ?? "button"}
+      onClick={action.onSelect}
+    >
+      {action.icon}
+    </IconButton>
+  ) : (
     <Button
       aria-hidden={action.disabled && action.disabledReason ? true : undefined}
       aria-describedby={action.disabledReason ? reasonId : undefined}
@@ -189,7 +308,7 @@ function PageHeaderActionButton({ action, compact = false }: { action: PageHeade
     </Button>
   );
   if (!action.disabled || !action.disabledReason) {
-    return button;
+    return iconOnly ? <Tooltip title={action.label}>{button}</Tooltip> : button;
   }
   return (
     <>
