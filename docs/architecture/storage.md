@@ -155,6 +155,15 @@ renderer、typed file、preview、share、定时更新及 `api.subscription.prod
 snapshot TTL 可以有意冻结较旧的观测。`refresh` 请求跳过 subscription-snapshot、
 remote-fetch 和 probe 的缓存读取，成功执行后仍按当前 TTL 重新填充。订阅 render 与
 FileSpec 每次都会从 canonical NodeSet 执行目标渲染或文件编译，不持久化最终正文。
+
+运行时 probe 可用性有意不属于 subscription-snapshot identity：共享同一 Store 的
+有能力实例可以通过定时 `refresh` 物化包含测活结果的快照，无 probe backend 的实例
+会在 processor 执行前复用该快照。若无 backend 的实例冷 miss，processor 会 warning
+并继续，但这份未执行 probe 的降级结果不会写入 subscription-snapshot，避免覆盖或
+抢先填充共享缓存。生产者和消费者仍必须具有相同的构建身份、remote/probe/script
+执行设置、Subscription 及请求上下文，且 snapshot TTL 必须为正数；scheduler 能力
+不参与 identity。
+
 除此之外，订阅解析和文件递归各有一次
 请求内 memo，用于去重同一调用中的重复依赖；它们不持久化、没有 TTL，也不是
 可配置 cache 层。当前不做跨请求 singleflight；两个同时发生的冷 miss 可以各自
@@ -170,6 +179,9 @@ FileSpec 每次都会从 canonical NodeSet 执行目标渲染或文件编译，�
 长驻的 HTTP、MCP HTTP 和合并 serve 模式会启动一个进程内定时更新器；直接 CLI
 操作和嵌入 `Engine` 不启动它。项目设置用一个 cron 计划和一组显式目标控制该
 更新器。每次触发按配置顺序逐个执行目标，不并发物化目标：
+
+运行时声明 `scheduler.enabled=false` 时不启动更新器；stored 定时配置仍保留，
+effective 设置为未启用。能力语义见[格式与能力参考](../reference/capabilities.md#运行时能力发现)。
 
 - subscription 目标执行不带 args、`refresh=true` 的 preview，完成订阅物化和
   nodes-stage processors，但不要求或生成某个 renderer 目标；

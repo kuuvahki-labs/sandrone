@@ -11,6 +11,10 @@ type ProbeRunner interface {
 	Probe(ctx context.Context, req domain.ProbeRequest) (*domain.ProbeResult, error)
 }
 
+type probeAvailability interface {
+	ProbeAvailable() bool
+}
+
 // Register attaches all built-in node-stage processors to r. The optional
 // probe runner is used only by probe.
 func Register(r *processor.Registry, probes ...ProbeRunner) {

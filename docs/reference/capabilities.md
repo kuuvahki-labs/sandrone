@@ -36,6 +36,13 @@
   `settings.scheduled_refresh.enabled`（用户是否开启定时刷新）不同；
 - `core.mihomo`、`core.sing_box`：对应测活 core backend 是否可用。
 
+这些 feature 不只是 Web 展示提示。`probe.enabled=false` 时，内建 `probe`
+processor 按[处理器契约](processors.md#nodes-probe)降级为 warning 并继续处理链；
+显式 Probe 调用仍报错，但可以复用共享 Store 中由有能力运行时物化的兼容订阅快照。
+`scheduler.enabled=false` 时，导入或保存的定时配置原样保留，
+但 effective 设置强制为未启用，当前进程不创建 cron 或执行目标。这样备份迁移到
+具备相应能力的运行时后不需要重建配置。
+
 格式集合当前由前后端同版本发布，继续使用现有格式 capability 和前端固定资源
 配置，不纳入 UI feature catalog。未来出现独立发布或动态变化的格式能力时，
 再增加对应的 UI feature。

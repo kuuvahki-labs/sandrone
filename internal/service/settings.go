@@ -33,6 +33,7 @@ func (s *Service) PutSettings(ctx context.Context, update domain.SettingsUpdate)
 	}
 	s.storedSettings = next
 	applyDynamicSettings(&s.effectiveSettings, next)
+	s.applyRuntimeCapabilities(&s.effectiveSettings)
 	snapshot := settingsSnapshot(s.storedSettings, s.effectiveSettings, s.settingsOverrides)
 	s.settingsMu.Unlock()
 
@@ -61,6 +62,7 @@ func (s *Service) ReloadSettings(ctx context.Context) error {
 	s.settingsMu.Lock()
 	s.storedSettings = next
 	applyDynamicSettings(&s.effectiveSettings, next)
+	s.applyRuntimeCapabilities(&s.effectiveSettings)
 	s.settingsMu.Unlock()
 	s.notifyScheduledRefreshSettingsChanged()
 	return nil
@@ -81,6 +83,12 @@ func applyDynamicSettings(effective *domain.Settings, stored domain.Settings) {
 	effective.Appearance = stored.Appearance
 	effective.Subscriptions = stored.Subscriptions
 	effective.ScheduledRefresh = stored.ScheduledRefresh
+}
+
+func (s *Service) applyRuntimeCapabilities(effective *domain.Settings) {
+	if !s.schedulerEnabled {
+		effective.ScheduledRefresh.Enabled = false
+	}
 }
 
 func settingsSnapshot(stored, effective domain.Settings, overrides map[string]string) domain.SettingsSnapshot {

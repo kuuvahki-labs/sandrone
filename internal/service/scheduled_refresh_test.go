@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
+	"github.com/kuuvahki-labs/sandrone/internal/probe"
 	projectsettings "github.com/kuuvahki-labs/sandrone/internal/settings"
 	"github.com/kuuvahki-labs/sandrone/internal/store"
 )
@@ -39,6 +40,25 @@ func TestScheduledRefreshContinuesAfterTargetFailure(t *testing.T) {
 	require.Equal(t, 1, status.LastFailureCount)
 	require.NotNil(t, status.LastStartedAt)
 	require.NotNil(t, status.LastCompletedAt)
+}
+
+func TestScheduledRefreshTargetSucceedsWhenProbeProcessorIsUnavailable(t *testing.T) {
+	svc := New(WithFS(afero.NewMemMapFs()), WithProbeEngine(probe.NewDisabled()))
+	require.NoError(t, svc.PutSubscription(t.Context(), domain.Subscription{
+		Name: "imported", Type: domain.SubscriptionTypeLocal, Format: "uri-list",
+		Content: "ss://aes-128-gcm:secret@example.com:8388#node",
+		Processors: []domain.ProcessorSpec{{
+			Type: "probe", Stage: domain.StageNodes,
+		}},
+	}))
+
+	svc.runScheduledRefresh(t.Context(), []domain.ScheduledRefreshTarget{{
+		Kind: "subscription", Name: "imported",
+	}}, nil)
+
+	status := svc.ScheduledRefreshStatus(t.Context())
+	require.Equal(t, 1, status.LastSuccessCount)
+	require.Zero(t, status.LastFailureCount)
 }
 
 func TestScheduledRefreshSkipsOverlappingRun(t *testing.T) {
@@ -136,6 +156,42 @@ func TestScheduledRefreshSchedulerAppliesDynamicSettings(t *testing.T) {
 		status := svc.ScheduledRefreshStatus(context.Background())
 		return !status.Enabled && status.NextRunAt == nil
 	}, time.Second, 10*time.Millisecond)
+}
+
+func TestDisabledSchedulerPreservesStoredSettingsWithoutScheduling(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	coordinator := store.Coordinate(store.NewFSStore(fs))
+	repository := store.NewSettingsStore(coordinator)
+	value := projectsettings.Default()
+	svc := New(
+		WithStore(coordinator),
+		WithProjectSettings(repository, value, value, nil),
+		WithSchedulerEnabled(false),
+	)
+	update := scheduledRefreshSettingsUpdate(value)
+	update.ScheduledRefresh = domain.ScheduledRefreshSettings{
+		Enabled: true, Schedule: "@every 1m",
+		Targets: []domain.ScheduledRefreshTarget{{Kind: "file", Name: "imported"}},
+	}
+
+	snapshot, err := svc.PutSettings(t.Context(), update)
+	require.NoError(t, err)
+	require.True(t, snapshot.Settings.ScheduledRefresh.Enabled)
+	require.False(t, snapshot.Effective.ScheduledRefresh.Enabled)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() {
+		svc.RunScheduledRefresh(ctx)
+		close(done)
+	}()
+	cancel()
+	<-done
+
+	status := svc.ScheduledRefreshStatus(t.Context())
+	require.False(t, status.Enabled)
+	require.Nil(t, status.NextRunAt)
+	require.Nil(t, status.LastStartedAt)
 }
 
 func TestScheduledRefreshUpdatesNextRun(t *testing.T) {

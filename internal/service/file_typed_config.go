@@ -35,11 +35,11 @@ func (s *Service) resolveConfigFile(ctx context.Context, spec domain.FileSpec, r
 	if spec.Config != nil {
 		config = *spec.Config
 	}
-	nodes, err := s.configNodes(ctx, trimStringList(config.Subscriptions), req, state)
+	nodes, subscriptionWarnings, err := s.configNodes(ctx, trimStringList(config.Subscriptions), req, state)
 	if err != nil {
 		return domain.FileDocument{}, nil, nil, err
 	}
-	rendered, warnings, err := s.renderTypedFileNodes(ctx, descriptor, nodes)
+	rendered, renderWarnings, err := s.renderTypedFileNodes(ctx, descriptor, nodes)
 	if err != nil {
 		return domain.FileDocument{}, nil, nil, err
 	}
@@ -52,7 +52,7 @@ func (s *Service) resolveConfigFile(ctx context.Context, spec domain.FileSpec, r
 		return domain.FileDocument{}, nil, nil, err
 	}
 	base.Content = body
-	return base, sourceRef, warnings, nil
+	return base, sourceRef, append(subscriptionWarnings, renderWarnings...), nil
 }
 
 func (s *Service) renderTypedFileNodes(ctx context.Context, descriptor filedriver.Descriptor, nodes []domain.NodeIR) ([]byte, []domain.Warning, error) {
@@ -78,19 +78,20 @@ func trimStringList(values []string) []string {
 	return out
 }
 
-func (s *Service) configNodes(ctx context.Context, subscriptions []string, req domain.FileRequest, state *fileResolveState) ([]domain.NodeIR, error) {
+func (s *Service) configNodes(ctx context.Context, subscriptions []string, req domain.FileRequest, state *fileResolveState) ([]domain.NodeIR, []domain.Warning, error) {
 	if len(subscriptions) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 	if s.metaStore == nil {
-		return nil, storeUnavailable()
+		return nil, nil, storeUnavailable()
 	}
 	subState := newSubscriptionExecutionState()
 	nodes := []domain.NodeIR{}
+	warnings := []domain.Warning{}
 	for _, name := range subscriptions {
 		sub, err := s.metaStore.GetSubscription(ctx, name)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		subCtx := withSubscriptionCacheOwner(ctx, sub.Name)
 		execution, err := s.executeSubscription(subCtx, sub, subscriptionExecutionRequest{
@@ -99,10 +100,11 @@ func (s *Service) configNodes(ctx context.Context, subscriptions []string, req d
 			Refresh: req.Refresh,
 		}, subState)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		nodeSet := execution.After
 		nodes = append(nodes, nodeSet.Nodes...)
+		warnings = append(warnings, nodeSet.Warnings...)
 		if state != nil {
 			state.dynamicDeps = appendResourceRef(state.dynamicDeps, domain.ResourceRef{Kind: "subscription", Name: name})
 			for _, dep := range nodeSet.Dependencies {
@@ -110,5 +112,5 @@ func (s *Service) configNodes(ctx context.Context, subscriptions []string, req d
 			}
 		}
 	}
-	return nodes, nil
+	return nodes, warnings, nil
 }

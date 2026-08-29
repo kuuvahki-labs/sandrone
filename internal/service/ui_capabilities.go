@@ -23,11 +23,8 @@ func (s *Service) ListUICapabilities(_ context.Context) (*domain.UICapabilityLis
 		}
 	}
 
-	backendSummary := []domain.ProbeBackendSummary{}
-	if provider, ok := s.prober.(probeCapabilityProvider); ok {
-		backendSummary = provider.BackendSummary()
-	}
-	probeEnabled := len(backendSummary) > 0
+	backendSummary := s.probeBackendSummary()
+	probeEnabled := s.probeEnabled()
 	setFeature("probe.enabled", probeEnabled, capabilityReason(probeEnabled, "probe backend is not available"))
 
 	cores := map[string]bool{}
@@ -48,6 +45,24 @@ func (s *Service) ListUICapabilities(_ context.Context) (*domain.UICapabilityLis
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].Key < items[j].Key })
 	return &domain.UICapabilityListResult{Features: items}, nil
+}
+
+func (s *Service) probeEnabled() bool {
+	if availability, ok := s.prober.(probeAvailability); ok {
+		return availability.ProbeAvailable()
+	}
+	if _, ok := s.prober.(probeCapabilityProvider); ok {
+		return len(s.probeBackendSummary()) > 0
+	}
+	return s.prober != nil
+}
+
+func (s *Service) probeBackendSummary() []domain.ProbeBackendSummary {
+	provider, ok := s.prober.(probeCapabilityProvider)
+	if !ok {
+		return []domain.ProbeBackendSummary{}
+	}
+	return provider.BackendSummary()
 }
 
 func capabilityReason(enabled bool, reason string) string {

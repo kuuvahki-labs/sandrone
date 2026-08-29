@@ -205,7 +205,8 @@ endpoint 级限制以 [HTTP API 参考](http-api/README.md)为准。
 - 脚本：`script_ext_field`、缺省的 `script_warning`；脚本 `api.warn`
   也可以显式提供自定义 code。
 - 订阅用量：`subscription_traffic_parse_failed`。
-- Probe：`probe_cache_write_failed`、`probe_expected_status_unsupported`，以及上一节的
+- Probe：`probe_cache_write_failed`、`probe_expected_status_unsupported`、
+  `probe_skipped_duplicate_node_names`、`probe_skipped_backend_unavailable`，以及上一节的
   单节点 error code。缓存命中通过 probe result 的 `cache_hit` 与 report 的
   `cache_hit_count` 表达，不属于 warning。
 

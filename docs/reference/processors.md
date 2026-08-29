@@ -167,6 +167,16 @@ processor 就跳过探测，按原顺序原样返回全部节点，并只产生�
 均不生效。preview 与其它执行这条 nodes processor 链的入口共享该行为；直接调用
 probe service 不经过这项 processor 前置检查。
 
+当前运行时完全没有 probe backend 时，processor 同样原样返回节点并继续后续步骤，
+产生 `probe_skipped_backend_unavailable` warning；`fail_mode`、`annotate` 和 `sort`
+均不生效。保存、导入或备份恢复不会删除或禁用该 processor，因此同一配置迁移回
+支持 probe 的运行时后会恢复执行。直接 Probe API、CLI probe 和脚本 `api.probe`
+属于显式探测调用，backend 不可用时仍返回 `probe_backend_unavailable`；指定了不可用
+method/core 也继续返回对应错误，不按这条全局不可用规则跳过。
+这份跳过 probe 的降级结果不会写入 subscription-snapshot；如果执行 processor 前已
+命中由其他有能力运行时写入的兼容快照，则直接复用该快照。共享缓存的完整身份与
+生产者/消费者规则见[存储与并发](../architecture/storage.md#缓存层)。
+
 runner 返回的结果数必须与输入节点数相同。probe report warning 会并入 processor
 warning；runner 错误直接终止链。使用 sing-box core 时，核心目标不能表达的节点
 由 runner 在原位置返回 `probe_invalid_target`，而不是让可探测的同批节点失败；

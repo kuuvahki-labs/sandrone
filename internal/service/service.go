@@ -155,8 +155,8 @@ func WithProbeEngine(prober ProbeEngine) Option {
 	}
 }
 
-// WithSchedulerEnabled controls whether the runtime exposes scheduler-backed
-// UI features. Serve entrypoints keep the default enabled behavior.
+// WithSchedulerEnabled controls whether the runtime exposes and executes
+// scheduler-backed features. Serve entrypoints keep the default enabled behavior.
 func WithSchedulerEnabled(enabled bool) Option {
 	return func(s *Service) {
 		s.schedulerEnabled = enabled
@@ -230,8 +230,9 @@ func New(opts ...Option) *Service {
 		fetcher:                 fetcher.New(),
 		now:                     time.Now,
 		scheduledRefreshUpdates: make(chan struct{}, 1),
+		schedulerEnabled:        true,
 	}
-	nodeproc.Register(registry, s)
+	nodeproc.Register(registry, processorProbeRunner{service: s})
 	fileproc.Register(registry)
 	scriptproc.Register(
 		registry,
@@ -254,6 +255,7 @@ func New(opts ...Option) *Service {
 	if s.settingsOverrides == nil {
 		s.settingsOverrides = map[string]string{}
 	}
+	s.applyRuntimeCapabilities(&s.effectiveSettings)
 	if s.cache == nil && s.store != nil {
 		s.cache = cachepkg.New(s.store, s.now)
 	}

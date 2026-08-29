@@ -14,6 +14,11 @@ import (
 // RunScheduledRefresh runs the internal refresh scheduler until ctx is
 // cancelled. It is intended for long-lived serve entrypoints only.
 func (s *Service) RunScheduledRefresh(ctx context.Context) {
+	if !s.schedulerEnabled {
+		s.setScheduledRefreshConfiguration(false, nil)
+		<-ctx.Done()
+		return
+	}
 	logger := scheduledRefreshCronLogger{service: s}
 	runner := cron.New(
 		cron.WithLocation(time.Local),

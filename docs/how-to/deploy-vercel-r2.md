@@ -95,8 +95,13 @@ Vercel 不运行进程内 scheduler，也不提供任何 probe backend：
 - `core.sing_box=false`。
 
 Web UI 会隐藏定时更新、测活默认值和新增 probe processor 的入口。脚本
-`api.probe` 或执行已有 probe processor 时返回 `probe_backend_unavailable`，
-不会静默跳过。HTTP 与 MCP 不提供直接 probe 入口。
+`api.probe` 仍返回 `probe_backend_unavailable`；已有 probe processor 在无兼容订阅
+快照命中时会产生 warning、保留节点并继续处理链。若另一个有 probe 和 scheduler
+能力的 Sandrone 实例与 Vercel 共享同一 S3/R2 Store，它可以通过定时刷新物化订阅
+快照供 Vercel 复用；Vercel 的降级结果不会写回该快照。两端需使用相同构建、
+remote/probe/script 执行设置和 Subscription，并为订阅快照配置正数 TTL；scheduler
+能力不参与缓存 identity。HTTP 与 MCP 不提供直接 probe 入口。缓存身份和写入规则
+见[存储与并发](../architecture/storage.md#缓存层)。
 
 CLI、Docker 与其他长驻 `serve` 部署不受此 profile 影响。
 

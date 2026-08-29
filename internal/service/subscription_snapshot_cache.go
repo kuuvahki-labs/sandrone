@@ -17,6 +17,8 @@ const (
 	snapshotCacheStatusHit      = "hit"
 	snapshotCacheStatusMiss     = "miss"
 	snapshotCacheStatusBypass   = "bypass"
+
+	probeSkippedBackendUnavailableWarning = "probe_skipped_backend_unavailable"
 )
 
 type cachedSubscriptionSnapshot struct {
@@ -84,7 +86,7 @@ func (s *Service) writeSubscriptionSnapshotCache(
 	result *subscriptionExecutionResult,
 ) {
 	key, owned := ownedCacheKey(ctx, cacheKeyPrefixSubscriptionSnapshot)
-	if s.cache == nil || entryID == "" || ttlSeconds <= 0 || result == nil || result.Before == nil || result.After == nil || !owned {
+	if s.cache == nil || entryID == "" || ttlSeconds <= 0 || !subscriptionSnapshotCacheable(result) || !owned {
 		return
 	}
 	refs := make([]domain.ResourceRef, 0, 1+len(result.Before.Dependencies)+len(result.After.Dependencies))
@@ -116,6 +118,18 @@ func (s *Service) writeSubscriptionSnapshotCache(
 	}
 	value.Results[entryID] = cached
 	_ = cachepkg.SetJSON(ctx, s.cache, key, value, remaining)
+}
+
+func subscriptionSnapshotCacheable(result *subscriptionExecutionResult) bool {
+	if result == nil || result.Before == nil || result.After == nil {
+		return false
+	}
+	for _, warning := range result.After.Warnings {
+		if warning.Code == probeSkippedBackendUnavailableWarning {
+			return false
+		}
+	}
+	return true
 }
 
 func nodeRuntimeIDs(nodes []domain.NodeIR) []string {

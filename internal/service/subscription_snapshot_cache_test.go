@@ -11,8 +11,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
+	"github.com/kuuvahki-labs/sandrone/internal/probe"
 	"github.com/kuuvahki-labs/sandrone/internal/processor"
 	"github.com/kuuvahki-labs/sandrone/internal/service"
+	"github.com/kuuvahki-labs/sandrone/internal/store"
 )
 
 func TestSubscriptionSnapshotCacheIsSharedAcrossPreviewRenderAndTypedFile(t *testing.T) {
@@ -76,6 +78,85 @@ func TestSubscriptionSnapshotCacheIsSharedAcrossPreviewRenderAndTypedFile(t *tes
 	require.NoError(t, err)
 	require.Equal(t, "bypass", refreshed.SnapshotCacheStatus)
 	require.Equal(t, 2, processorCalls)
+}
+
+func TestSubscriptionSnapshotCacheSharesProbedRefreshWithDisabledRuntime(t *testing.T) {
+	ctx := t.Context()
+	sharedStore := store.Coordinate(store.NewFSStore(afero.NewMemMapFs()))
+	probeCalls := 0
+	producer := service.New(
+		service.WithStore(sharedStore),
+		service.WithProbeEngine(fakeProbeEngine{probe: func(_ context.Context, req domain.ProbeRequest, nodes []domain.NodeIR, _ ...probe.Payload) (*domain.ProbeResult, error) {
+			probeCalls++
+			results := make([]domain.NodeProbeResult, len(nodes))
+			for index, node := range nodes {
+				results[index] = domain.NodeProbeResult{
+					NodeName: node.Name, Method: string(req.Method),
+					Alive: index == 0, DurationMS: index + 1,
+					CheckedAt: time.Date(2026, 8, 29, 1, 2, 3, 0, time.UTC),
+				}
+			}
+			return &domain.ProbeResult{Results: results}, nil
+		}}),
+	)
+	putProjectSettings(t, producer, ctx, func(update *domain.SettingsUpdate) {
+		update.CacheDefaults.SubscriptionSnapshotTTLSeconds = 60
+	})
+	probeProcessor := domain.ProcessorSpec{
+		Type: "probe", Stage: domain.StageNodes,
+		Params: params(t, map[string]any{"fail_mode": "drop"}),
+	}
+	putSubscription := func(name string) {
+		t.Helper()
+		require.NoError(t, producer.PutSubscription(ctx, domain.Subscription{
+			Name: name, Type: domain.SubscriptionTypeLocal, Format: "uri-list",
+			Content: "ss://aes-128-gcm:secret@example.com:8388#alive\n" +
+				"ss://aes-128-gcm:secret@example.net:8388#failed",
+			Processors: []domain.ProcessorSpec{probeProcessor},
+		}))
+	}
+	putSubscription("scheduled")
+	putSubscription("cold")
+
+	consumer := service.New(
+		service.WithStore(sharedStore),
+		service.WithProbeEngine(probe.NewDisabled()),
+		service.WithSchedulerEnabled(false),
+	)
+	require.NoError(t, consumer.ReloadSettings(ctx))
+
+	refreshed, err := producer.PreviewSubscriptionRequest(ctx, domain.SubscriptionPreviewRequest{
+		Name: "scheduled", Refresh: true,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "bypass", refreshed.SnapshotCacheStatus)
+	require.Equal(t, 1, refreshed.AfterCount)
+	require.Equal(t, 1, probeCalls)
+
+	cached, err := consumer.PreviewSubscriptionRequest(ctx, domain.SubscriptionPreviewRequest{Name: "scheduled"})
+	require.NoError(t, err)
+	require.Equal(t, "hit", cached.SnapshotCacheStatus)
+	require.Equal(t, 1, cached.AfterCount)
+	require.NotContains(t, warningCodeSet(cached.Report.Warnings), "probe_skipped_backend_unavailable")
+	require.Equal(t, 1, probeCalls)
+
+	degraded, err := consumer.PreviewSubscriptionRequest(ctx, domain.SubscriptionPreviewRequest{Name: "cold"})
+	require.NoError(t, err)
+	require.Equal(t, "miss", degraded.SnapshotCacheStatus)
+	require.Equal(t, 2, degraded.AfterCount)
+	requireWarningCode(t, degraded.Report.Warnings, "probe_skipped_backend_unavailable")
+
+	materialized, err := producer.PreviewSubscriptionRequest(ctx, domain.SubscriptionPreviewRequest{Name: "cold"})
+	require.NoError(t, err)
+	require.Equal(t, "miss", materialized.SnapshotCacheStatus)
+	require.Equal(t, 1, materialized.AfterCount)
+	require.Equal(t, 2, probeCalls)
+
+	cached, err = consumer.PreviewSubscriptionRequest(ctx, domain.SubscriptionPreviewRequest{Name: "cold"})
+	require.NoError(t, err)
+	require.Equal(t, "hit", cached.SnapshotCacheStatus)
+	require.Equal(t, 1, cached.AfterCount)
+	require.NotContains(t, warningCodeSet(cached.Report.Warnings), "probe_skipped_backend_unavailable")
 }
 
 func TestSubscriptionSnapshotCacheIdentityIncludesRequestAndNotRenderTarget(t *testing.T) {
@@ -226,4 +307,12 @@ func (p snapshotCountingProcessor) Name() string { return "count_snapshot" }
 func (p snapshotCountingProcessor) ApplyNodes(_ context.Context, in domain.NodeProcessInput) (domain.NodeProcessOutput, error) {
 	(*p.calls)++
 	return domain.NodeProcessOutput{Nodes: append([]domain.NodeIR{}, in.Nodes...)}, nil
+}
+
+func warningCodeSet(warnings []domain.Warning) map[string]struct{} {
+	codes := make(map[string]struct{}, len(warnings))
+	for _, warning := range warnings {
+		codes[warning.Code] = struct{}{}
+	}
+	return codes
 }

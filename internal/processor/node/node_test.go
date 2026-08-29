@@ -59,6 +59,12 @@ func (s *stubProbeRunner) Probe(_ context.Context, req domain.ProbeRequest) (*do
 	return s.result, s.err
 }
 
+type unavailableProbeRunner struct {
+	stubProbeRunner
+}
+
+func (*unavailableProbeRunner) ProbeAvailable() bool { return false }
+
 func buildNode(t *testing.T, r *processor.Registry, typ string, p map[string]any) domain.NodeProcessor {
 	t.Helper()
 	spec := domain.ProcessorSpec{Type: typ}
@@ -360,6 +366,31 @@ func TestProbeProcessorSkipsDuplicateNodeNamesWithOneWarning(t *testing.T) {
 		Message: "probe skipped because duplicate node names were detected: groups=2 affected_nodes=5",
 		Source:  "probe",
 	}, out.Warnings[0])
+}
+
+func TestProbeProcessorSkipsUnavailableBackendAndContinuesChain(t *testing.T) {
+	for _, failMode := range []string{"keep", "drop", "error"} {
+		t.Run(failMode, func(t *testing.T) {
+			runner := &unavailableProbeRunner{}
+			r := makeProbeRegistry(runner)
+			specs := []domain.ProcessorSpec{
+				{Type: "rename", Params: params(t, map[string]any{"mode": "prefix", "value": "before-"})},
+				{Type: "probe", Params: params(t, map[string]any{"annotate": true, "fail_mode": failMode, "sort": "duration"})},
+				{Type: "rename", Params: params(t, map[string]any{"mode": "suffix", "value": "-after"})},
+			}
+
+			out, err := r.RunNodes(t.Context(), specs, domain.NodeProcessInput{Nodes: []domain.NodeIR{{Name: "node"}}})
+
+			require.NoError(t, err)
+			require.Empty(t, runner.requests)
+			require.Equal(t, "before-node-after", out.Nodes[0].Name)
+			require.Equal(t, []domain.Warning{{
+				Code:    "probe_skipped_backend_unavailable",
+				Message: "probe processor skipped because no probe backend is available",
+				Source:  "probe",
+			}}, out.Warnings)
+		})
+	}
 }
 
 func TestProbeProcessorRejectsUnsupportedMethod(t *testing.T) {

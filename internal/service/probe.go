@@ -21,6 +21,18 @@ type probeRequestAvailability interface {
 	CheckAvailability(domain.ProbeRequest) error
 }
 
+type processorProbeRunner struct {
+	service *Service
+}
+
+func (r processorProbeRunner) Probe(ctx context.Context, req domain.ProbeRequest) (*domain.ProbeResult, error) {
+	return r.service.Probe(ctx, req)
+}
+
+func (r processorProbeRunner) ProbeAvailable() bool {
+	return r.service.probeEnabled()
+}
+
 type cachedNodeProbe struct {
 	Result         domain.NodeProbeResult `json:"result"`
 	Backend        string                 `json:"backend,omitempty"`

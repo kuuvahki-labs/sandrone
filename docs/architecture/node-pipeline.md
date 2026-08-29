@@ -136,7 +136,9 @@ nodes-stage processor 接收节点切片、目标、来源上下文和请求 met
 - 某类型只注册在一个阶段时，registry 可以推断空 stage。
 - 同时注册 nodes/file 的类型必须显式写 stage；`script` 属于这种情况。
 - 每一步读取上一步结果，后一步不会看到原始输入的旁路副本。
-- processor 失败会终止当前调用，service 不把中间节点作为成功结果交付。
+- processor 失败会终止当前调用，service 不把中间节点作为成功结果交付；运行时
+  完全没有 probe backend 时，内建 probe processor 按
+  [probe 降级契约](../reference/processors.md#nodes-probe)返回 warning，不视为失败。
 
 内建处理器覆盖过滤、去重、重命名、排序、常用属性策略和显式探测。JavaScript processor 用于内建策略无法表达的开放式改写，但仍受同步 envelope、超时和注入 API 限制。
 

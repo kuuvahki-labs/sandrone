@@ -86,6 +86,16 @@ func buildProbe(prober ProbeRunner) processor.NodeBuilder {
 func (p *probeProc) Name() string { return "probe" }
 
 func (p *probeProc) ApplyNodes(ctx context.Context, in domain.NodeProcessInput) (domain.NodeProcessOutput, error) {
+	if availability, ok := p.prober.(probeAvailability); ok && !availability.ProbeAvailable() {
+		return domain.NodeProcessOutput{
+			Nodes: append([]domain.NodeIR{}, in.Nodes...),
+			Warnings: []domain.Warning{{
+				Code:    "probe_skipped_backend_unavailable",
+				Message: "probe processor skipped because no probe backend is available",
+				Source:  "probe",
+			}},
+		}, nil
+	}
 	duplicateGroups, affectedNodes := duplicateNodeNameCounts(in.Nodes)
 	if duplicateGroups > 0 {
 		return domain.NodeProcessOutput{
