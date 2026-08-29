@@ -98,6 +98,7 @@ describe("ApiClient", () => {
       fetcher: async (input, init) => {
         calls.push({ input, init });
         return new Response(JSON.stringify({
+          build_time: "2026-08-30T03:15:42Z",
           name: "sandrone",
           version: "0.1.0",
           revision: "0123456789abcdef",
@@ -110,6 +111,7 @@ describe("ApiClient", () => {
     const version = await client.getVersion();
 
     expect(version).toEqual({
+      build_time: "2026-08-30T03:15:42Z",
       name: "sandrone",
       version: "0.1.0",
       revision: "0123456789abcdef",

@@ -54,6 +54,43 @@ func TestVersionFormats(t *testing.T) {
 	}
 }
 
+func TestBuildTime(t *testing.T) {
+	originalBuildTime := rawBuildTime
+	t.Cleanup(func() { rawBuildTime = originalBuildTime })
+
+	rawBuildTime = " 2026-08-30T03:15:42Z "
+	if got := BuildTime(); got != "2026-08-30T03:15:42Z" {
+		t.Fatalf("BuildTime() = %q, want RFC3339 build time", got)
+	}
+}
+
+func TestSummaryIncludesBuildTime(t *testing.T) {
+	originalVersion := rawVersion
+	originalRevision := rawRevision
+	originalBuildTime := rawBuildTime
+	originalReadBuildInfo := readBuildInfo
+	t.Cleanup(func() {
+		rawVersion = originalVersion
+		rawRevision = originalRevision
+		rawBuildTime = originalBuildTime
+		readBuildInfo = originalReadBuildInfo
+	})
+	readBuildInfo = func() (*debug.BuildInfo, bool) { return nil, false }
+	rawBuildTime = "2026-08-30T03:15:42Z"
+
+	rawVersion = "dev"
+	rawRevision = ""
+	if got := Summary(); got != "dev (2026-08-30T03:15:42Z)" {
+		t.Fatalf("Summary() = %q, want development build time", got)
+	}
+
+	rawVersion = "0.1.0"
+	rawRevision = "0123456789abcdef"
+	if got := Summary(); got != "0.1.0 (0123456789ab; 2026-08-30T03:15:42Z)" {
+		t.Fatalf("Summary() = %q, want release revision and build time", got)
+	}
+}
+
 func TestRevisionPrefersInjectedValue(t *testing.T) {
 	originalRevision := rawRevision
 	originalReadBuildInfo := readBuildInfo
@@ -236,6 +273,19 @@ func TestMakeRejectsUnsafeBuildRevisions(t *testing.T) {
 	}
 }
 
+func TestMakeValidatesRFC3339UTCBuildTime(t *testing.T) {
+	if output, err := runMake(t, "help", "BUILD_TIME=2026-08-30T03:15:42Z"); err != nil {
+		t.Fatalf("make rejected RFC3339 UTC build time: %v\n%s", err, output)
+	}
+	for _, buildTime := range []string{"", "20260830-031542", "2026-08-30T03:15:42+08:00", "$(whoami)"} {
+		t.Run(buildTime, func(t *testing.T) {
+			if output, err := runMake(t, "help", "BUILD_TIME="+buildTime); err == nil {
+				t.Fatalf("make accepted invalid BUILD_TIME %q:\n%s", buildTime, output)
+			}
+		})
+	}
+}
+
 func TestResolveBuildRevisionRequiresCleanGitWorktree(t *testing.T) {
 	script, err := filepath.Abs(filepath.Join("..", "..", "scripts", "resolve-build-revision.sh"))
 	if err != nil {
@@ -334,8 +384,9 @@ func TestMakeImageDerivesIdentityFromWorktreeState(t *testing.T) {
 func TestMakeInjectsBuildRevision(t *testing.T) {
 	binary := filepath.Join(t.TempDir(), "sandrone")
 	revision := "deadbeefcafe0123456789abcdef0123456789ab"
+	buildTime := "2026-08-30T03:15:42Z"
 
-	output, err := runMake(t, "build-check", "BUILD_BIN="+binary, "REVISION="+revision)
+	output, err := runMake(t, "build-check", "BUILD_BIN="+binary, "REVISION="+revision, "BUILD_TIME="+buildTime)
 	if err != nil {
 		t.Fatalf("make build-check failed: %v\n%s", err, output)
 	}
@@ -344,19 +395,21 @@ func TestMakeInjectsBuildRevision(t *testing.T) {
 	if err != nil {
 		t.Fatalf("built binary --version failed: %v\n%s", err, versionOutput)
 	}
-	if got, want := string(versionOutput), "sandrone version "+canonicalVersion(t)+" (deadbeefcafe)\n"; got != want {
+	if got, want := string(versionOutput), "sandrone version "+canonicalVersion(t)+" (deadbeefcafe; "+buildTime+")\n"; got != want {
 		t.Fatalf("built binary --version = %q, want %q", got, want)
 	}
 }
 
 func TestMakeBuildWithoutRevisionForcesDevVersion(t *testing.T) {
 	binary := filepath.Join(t.TempDir(), "sandrone")
+	buildTime := "2026-08-30T03:15:42Z"
 	output, err := runMake(
 		t,
 		"build-check",
 		"BUILD_BIN="+binary,
 		"VERSION=9.9.9",
 		"REVISION=",
+		"BUILD_TIME="+buildTime,
 	)
 	if err != nil {
 		t.Fatalf("make build-check failed: %v\n%s", err, output)
@@ -366,7 +419,7 @@ func TestMakeBuildWithoutRevisionForcesDevVersion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("built binary --version failed: %v\n%s", err, versionOutput)
 	}
-	if got, want := string(versionOutput), "sandrone version dev\n"; got != want {
+	if got, want := string(versionOutput), "sandrone version dev ("+buildTime+")\n"; got != want {
 		t.Fatalf("built binary --version = %q, want %q", got, want)
 	}
 }
@@ -382,8 +435,8 @@ func TestArtifactTargetsUseCanonicalScript(t *testing.T) {
 		t.Errorf("Makefile does not validate artifact targets")
 	}
 	for target, wantRecipe := range map[string]string{
-		"release-artifacts":  "release-artifacts: build-webui\n\tARTIFACT_KIND=release VERSION=\"$(BUILD_VERSION)\" REVISION=\"$(BUILD_REVISION)\" ./scripts/build-release-artifacts.sh\n",
-		"snapshot-artifacts": "snapshot-artifacts: build-webui\n\tARTIFACT_KIND=snapshot VERSION=dev REVISION=\"\" OUTPUT_DIR=\"$(CURDIR)/dist/snapshot\" ./scripts/build-release-artifacts.sh\n",
+		"release-artifacts":  "release-artifacts: build-webui\n\tARTIFACT_KIND=release VERSION=\"$(BUILD_VERSION)\" REVISION=\"$(BUILD_REVISION)\" BUILD_TIME=\"$(BUILD_TIME)\" ./scripts/build-release-artifacts.sh\n",
+		"snapshot-artifacts": "snapshot-artifacts: build-webui\n\tARTIFACT_KIND=snapshot VERSION=dev REVISION=\"\" BUILD_TIME=\"$(BUILD_TIME)\" OUTPUT_DIR=\"$(CURDIR)/dist/snapshot\" ./scripts/build-release-artifacts.sh\n",
 	} {
 		if count := strings.Count(content, wantRecipe); count != 1 {
 			t.Errorf("Makefile contains %d canonical %s recipes, want 1", count, target)
@@ -445,7 +498,7 @@ func TestBuildReleaseArtifactsProducesCanonicalArchive(t *testing.T) {
 	if !strings.HasPrefix(lines[1], "0|linux|arm64|build-check BUILD_BIN=") {
 		t.Errorf("build call does not use the linux/arm64 static environment:\n%s", lines[1])
 	}
-	for _, want := range []string{" VERSION=1.2.3", " REVISION=" + revision} {
+	for _, want := range []string{" VERSION=1.2.3", " REVISION=" + revision, " BUILD_TIME="} {
 		if !strings.Contains(lines[1], want) {
 			t.Errorf("build call does not contain %q:\n%s", want, lines[1])
 		}
@@ -480,7 +533,7 @@ func TestBuildSnapshotArtifactsAllowsUnknownRevision(t *testing.T) {
 	if got, want := len(lines), 2; got != want {
 		t.Fatalf("make call count = %d, want %d:\n%s", got, want, makeCalls)
 	}
-	for _, want := range []string{" VERSION=dev", " REVISION="} {
+	for _, want := range []string{" VERSION=dev", " REVISION=", " BUILD_TIME="} {
 		if !strings.Contains(lines[1], want) {
 			t.Errorf("snapshot build call does not contain %q:\n%s", want, lines[1])
 		}
@@ -543,6 +596,7 @@ func newReleaseArtifactFixture(t *testing.T) (repo, makeScript, makeLog string) 
 		"LICENSE",
 		filepath.Join("scripts", "build-release-artifacts.sh"),
 		filepath.Join("scripts", "validate-build-revision.sh"),
+		filepath.Join("scripts", "validate-build-time.sh"),
 		filepath.Join("scripts", "validate-build-version.sh"),
 	} {
 		content, readErr := os.ReadFile(filepath.Join(root, name))
@@ -687,6 +741,7 @@ func TestBuildMetadataContracts(t *testing.T) {
 		`FROM --platform=$BUILDPLATFORM golang:1.27.0-bookworm AS build`,
 		`ARG VERSION="dev"`,
 		"ARG REVISION",
+		"ARG BUILD_TIME",
 		"ARG TARGETOS",
 		"ARG TARGETARCH",
 		`CGO_ENABLED=0 GOOS="$TARGETOS" GOARCH="$TARGETARCH"`,
@@ -760,7 +815,10 @@ func TestBuildMetadataContracts(t *testing.T) {
         shell: bash
         run: |
           version="$(tr -d '\r\n' < internal/buildinfo/VERSION)"
-          echo "version=${version}" >> "${GITHUB_OUTPUT}"`; got != want {
+          {
+            echo "version=${version}"
+            echo "build_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } >> "${GITHUB_OUTPUT}"`; got != want {
 		t.Errorf("Resolve image version step =\n%s\nwant:\n%s", got, want)
 	}
 	if got, want := workflowNamedStep(t, containerCheckJob, "Build container image"), `      - name: Build container image
@@ -775,6 +833,7 @@ func TestBuildMetadataContracts(t *testing.T) {
           build-args: |
             VERSION=${{ steps.image-metadata.outputs.version }}
             REVISION=${{ github.sha }}
+            BUILD_TIME=${{ steps.image-metadata.outputs.build_time }}
           labels: |
             org.opencontainers.image.version=${{ steps.image-metadata.outputs.version }}
             org.opencontainers.image.revision=${{ github.sha }}`; got != want {
@@ -800,10 +859,12 @@ func TestBuildMetadataContracts(t *testing.T) {
         shell: bash
         run: |
           version="$(tr -d '\r\n' < internal/buildinfo/VERSION)"
+          build_time="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           git fetch --force --tags origin
           tags="$(./scripts/container-image-tags.sh)"
           {
             echo "version=${version}"
+            echo "build_time=${build_time}"
             echo 'tags<<EOF'
             echo "${tags}"
             echo EOF
@@ -830,6 +891,7 @@ func TestBuildMetadataContracts(t *testing.T) {
           build-args: |
             VERSION=${{ steps.image-metadata.outputs.version }}
             REVISION=${{ github.sha }}
+            BUILD_TIME=${{ steps.image-metadata.outputs.build_time }}
           labels: |
             org.opencontainers.image.version=${{ steps.image-metadata.outputs.version }}
             org.opencontainers.image.revision=${{ github.sha }}`; got != want {
@@ -1008,6 +1070,7 @@ func TestValidateReleaseTagMatchesVersionFile(t *testing.T) {
 
 func TestMakeImageInjectsCanonicalVersionAndRevision(t *testing.T) {
 	revision := "deadbeefcafe0123456789abcdef0123456789ab"
+	buildTime := "2026-08-30T03:15:42Z"
 	canonical := canonicalVersion(t)
 	output, err := runMake(
 		t,
@@ -1015,6 +1078,7 @@ func TestMakeImageInjectsCanonicalVersionAndRevision(t *testing.T) {
 		"DOCKER=echo",
 		"SANDRONE_IMAGE=example.test/sandrone:test",
 		"REVISION="+revision,
+		"BUILD_TIME="+buildTime,
 	)
 	if err != nil {
 		t.Fatalf("make image failed: %v\n%s", err, output)
@@ -1022,6 +1086,7 @@ func TestMakeImageInjectsCanonicalVersionAndRevision(t *testing.T) {
 	for _, want := range []string{
 		"--build-arg VERSION=" + canonical,
 		"--build-arg REVISION=" + revision,
+		"--build-arg BUILD_TIME=" + buildTime,
 		"--label org.opencontainers.image.version=" + canonical,
 		"--label org.opencontainers.image.revision=" + revision,
 		"--tag example.test/sandrone:test",
@@ -1033,11 +1098,13 @@ func TestMakeImageInjectsCanonicalVersionAndRevision(t *testing.T) {
 }
 
 func TestMakeImageWithoutRevisionUsesDevVersion(t *testing.T) {
+	buildTime := "2026-08-30T03:15:42Z"
 	output, err := runMake(
 		t,
 		"image",
 		"DOCKER=echo",
 		"REVISION=",
+		"BUILD_TIME="+buildTime,
 	)
 	if err != nil {
 		t.Fatalf("make image failed: %v\n%s", err, output)
@@ -1045,6 +1112,7 @@ func TestMakeImageWithoutRevisionUsesDevVersion(t *testing.T) {
 	for _, want := range []string{
 		"--build-arg VERSION=dev",
 		"--build-arg REVISION=",
+		"--build-arg BUILD_TIME=" + buildTime,
 		"--label org.opencontainers.image.version=dev",
 		"--label org.opencontainers.image.revision=",
 		"--tag ghcr.io/kuuvahki-labs/sandrone:local",
@@ -1295,6 +1363,7 @@ func newMakeFixtureRepo(t *testing.T) (string, string) {
 		filepath.Join("internal", "buildinfo", "VERSION"),
 		filepath.Join("scripts", "resolve-build-revision.sh"),
 		filepath.Join("scripts", "validate-build-revision.sh"),
+		filepath.Join("scripts", "validate-build-time.sh"),
 		filepath.Join("scripts", "validate-build-version.sh"),
 	} {
 		content, err := os.ReadFile(filepath.Join(root, name))

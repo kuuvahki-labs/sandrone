@@ -13,6 +13,7 @@ var defaultVersion string
 
 var rawVersion string
 var rawRevision string
+var rawBuildTime string
 var readBuildInfo = debug.ReadBuildInfo
 
 func Version() string {
@@ -39,6 +40,9 @@ func DisplayVersion() string {
 }
 
 func UserAgent() string { return "sandrone/" + Version() }
+
+// BuildTime returns the RFC3339 timestamp injected by the build entrypoint.
+func BuildTime() string { return strings.TrimSpace(rawBuildTime) }
 
 func Revision() string {
 	if value := strings.TrimSpace(rawRevision); value != "" {
@@ -68,12 +72,19 @@ func vcsInfo() (revision string, modified bool) {
 }
 
 func Summary() string {
+	var details []string
 	revision := Revision()
-	if revision == "" {
+	if revision != "" {
+		if len(revision) > 12 {
+			revision = revision[:12]
+		}
+		details = append(details, revision)
+	}
+	if buildTime := BuildTime(); buildTime != "" {
+		details = append(details, buildTime)
+	}
+	if len(details) == 0 {
 		return Version()
 	}
-	if len(revision) > 12 {
-		revision = revision[:12]
-	}
-	return Version() + " (" + revision + ")"
+	return Version() + " (" + strings.Join(details, "; ") + ")"
 }

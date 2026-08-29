@@ -136,9 +136,10 @@ func TestVersionIsPublicWhenTokenAuthIsEnabled(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, w.Code)
 	require.JSONEq(t, fmt.Sprintf(
-		`{"name":"sandrone","version":%q,"revision":%q}`,
+		`{"name":"sandrone","version":%q,"revision":%q,"build_time":%q}`,
 		buildinfo.Version(),
 		buildinfo.Revision(),
+		buildinfo.BuildTime(),
 	), w.Body.String())
 }
 

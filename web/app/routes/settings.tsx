@@ -12,6 +12,7 @@ export default function SettingsRoute() {
 
   return (
     <SettingsPage
+      buildTime={version.buildTime}
       publicBaseUrl={app.publicBaseUrl}
       revision={version.revision}
       localeMode={app.effectiveSettings.appearance.locale}

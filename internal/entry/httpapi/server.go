@@ -254,8 +254,9 @@ func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) version(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
-		"name":     "sandrone",
-		"version":  buildinfo.Version(),
-		"revision": buildinfo.Revision(),
+		"name":       "sandrone",
+		"version":    buildinfo.Version(),
+		"revision":   buildinfo.Revision(),
+		"build_time": buildinfo.BuildTime(),
 	})
 }

@@ -199,6 +199,7 @@ export interface ScheduledRefreshStatus {
 }
 
 export interface VersionInfo {
+  build_time: string;
   name: string;
   version: string;
   revision: string;

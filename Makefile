@@ -16,6 +16,7 @@ ifeq ($(origin VERSION),undefined)
 VERSION := $(DEFAULT_VERSION)
 endif
 REVISION_ORIGIN := $(origin REVISION)
+BUILD_TIME_ORIGIN := $(origin BUILD_TIME)
 LDFLAGS ?=
 DOCKER ?= docker
 SANDRONE_IMAGE ?= ghcr.io/kuuvahki-labs/sandrone:local
@@ -28,6 +29,11 @@ ifeq ($(REVISION_ORIGIN),undefined)
 override REVISION := $(shell sh ./scripts/resolve-build-revision.sh)
 else
 override REVISION := $(value REVISION)
+endif
+ifeq ($(BUILD_TIME_ORIGIN),undefined)
+BUILD_TIME := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+else
+override BUILD_TIME := $(value BUILD_TIME)
 endif
 BUILD_VERSION := $(value VERSION)
 
@@ -47,13 +53,15 @@ ifneq ($(BUILD_REVISION),)
 REVISION_X := -X github.com/kuuvahki-labs/sandrone/internal/buildinfo.rawRevision=$(BUILD_REVISION)
 endif
 
-ifneq ($(strip $(BUILD_VERSION)$(BUILD_REVISION)),)
+BUILD_TIME_X := -X github.com/kuuvahki-labs/sandrone/internal/buildinfo.rawBuildTime=$(BUILD_TIME)
+
+ifneq ($(strip $(BUILD_VERSION)$(BUILD_REVISION)$(BUILD_TIME)),)
 ifneq ($(findstring -ldflags,$(GOFLAGS)),)
-$(error VERSION and REVISION cannot be combined with ldflags in GOFLAGS; move linker arguments to LDFLAGS)
+$(error VERSION, REVISION, and BUILD_TIME cannot be combined with ldflags in GOFLAGS; move linker arguments to LDFLAGS)
 endif
 endif
 
-BUILD_LDFLAGS := $(strip $(LDFLAGS) $(VERSION_X) $(REVISION_X))
+BUILD_LDFLAGS := $(strip $(LDFLAGS) $(VERSION_X) $(REVISION_X) $(BUILD_TIME_X))
 BUILD_LDFLAGS_ARG :=
 ifneq ($(BUILD_LDFLAGS),)
 BUILD_LDFLAGS_ARG := -ldflags "$(BUILD_LDFLAGS)"
@@ -68,6 +76,7 @@ $(VALIDATED_TARGETS): | validate-build-identity
 
 validate-build-identity: override export VERSION := $(value VERSION)
 validate-build-identity: override export REVISION := $(value REVISION)
+validate-build-identity: override export BUILD_TIME := $(value BUILD_TIME)
 validate-build-identity:
 	@if [ "$$(sh ./scripts/validate-build-version.sh)" != "ok" ]; then \
 		printf '%s\n' 'VERSION must be empty or contain only ASCII letters, digits, dots, plus signs, and hyphens' >&2; \
@@ -75,6 +84,10 @@ validate-build-identity:
 	fi
 	@if [ "$$(sh ./scripts/validate-build-revision.sh)" != "ok" ]; then \
 		printf '%s\n' 'REVISION must be empty or a complete 40- or 64-character hexadecimal Git object ID' >&2; \
+		exit 2; \
+	fi
+	@if [ "$$(sh ./scripts/validate-build-time.sh)" != "ok" ]; then \
+		printf '%s\n' 'BUILD_TIME must use UTC RFC3339 format YYYY-MM-DDTHH:MM:SSZ' >&2; \
 		exit 2; \
 	fi
 
@@ -132,10 +145,10 @@ build-check:
 	$(GO) build $(GOFLAGS) $(BUILD_VCS_ARG) $(BUILD_LDFLAGS_ARG) -o $(BUILD_BIN) $(CMD_PKG)
 
 release-artifacts: build-webui
-	ARTIFACT_KIND=release VERSION="$(BUILD_VERSION)" REVISION="$(BUILD_REVISION)" ./scripts/build-release-artifacts.sh
+	ARTIFACT_KIND=release VERSION="$(BUILD_VERSION)" REVISION="$(BUILD_REVISION)" BUILD_TIME="$(BUILD_TIME)" ./scripts/build-release-artifacts.sh
 
 snapshot-artifacts: build-webui
-	ARTIFACT_KIND=snapshot VERSION=dev REVISION="" OUTPUT_DIR="$(CURDIR)/dist/snapshot" ./scripts/build-release-artifacts.sh
+	ARTIFACT_KIND=snapshot VERSION=dev REVISION="" BUILD_TIME="$(BUILD_TIME)" OUTPUT_DIR="$(CURDIR)/dist/snapshot" ./scripts/build-release-artifacts.sh
 
 build-webui:
 	./scripts/build-webui.sh
@@ -144,6 +157,7 @@ image:
 	$(DOCKER) build \
 		--build-arg VERSION="$(IMAGE_VERSION)" \
 		--build-arg REVISION="$(BUILD_REVISION)" \
+		--build-arg BUILD_TIME="$(BUILD_TIME)" \
 		--label org.opencontainers.image.version="$(IMAGE_VERSION)" \
 		--label org.opencontainers.image.revision="$(BUILD_REVISION)" \
 		--tag "$(SANDRONE_IMAGE)" \

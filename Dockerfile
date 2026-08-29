@@ -29,6 +29,7 @@ RUN if [ -n "$GOPROXY" ]; then go env -w GOPROXY="$GOPROXY"; fi \
 
 ARG VERSION="dev"
 ARG REVISION=""
+ARG BUILD_TIME=""
 RUN if [ -z "$REVISION" ] && [ "$VERSION" != "dev" ]; then \
     printf '%s\n' 'VERSION requires a complete REVISION; use VERSION=dev for untraceable builds' >&2; \
     exit 1; \
@@ -36,8 +37,10 @@ RUN if [ -z "$REVISION" ] && [ "$VERSION" != "dev" ]; then \
 
 COPY . .
 COPY --from=web /src/web/build/client ./internal/entry/webui/static
-RUN CGO_ENABLED=0 GOOS="$TARGETOS" GOARCH="$TARGETARCH" \
-  make build BUILD_BIN=/out/sandrone VERSION="$VERSION" REVISION="$REVISION"
+RUN build_time="$BUILD_TIME"; \
+  if [ -z "$build_time" ]; then build_time="$(date -u +%Y-%m-%dT%H:%M:%SZ)"; fi; \
+  CGO_ENABLED=0 GOOS="$TARGETOS" GOARCH="$TARGETARCH" \
+  make build BUILD_BIN=/out/sandrone VERSION="$VERSION" REVISION="$REVISION" BUILD_TIME="$build_time"
 
 FROM debian:bookworm-slim AS runtime
 

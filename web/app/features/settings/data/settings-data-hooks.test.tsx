@@ -13,6 +13,7 @@ import { useVersionInfo } from "./use-version-info";
 describe("useVersionInfo", () => {
   it("loads build identity", async () => {
     const getVersion = vi.fn().mockResolvedValue({
+      build_time: "2026-08-30T03:15:42Z",
       name: "sandrone",
       revision: "0123456789abcdef",
       version: "0.1.0",
@@ -22,6 +23,7 @@ describe("useVersionInfo", () => {
 
     await waitFor(() => {
       expect(result.current).toEqual({
+        buildTime: "2026-08-30T03:15:42Z",
         name: "sandrone",
         revision: "0123456789abcdef",
         version: "0.1.0",
@@ -36,7 +38,7 @@ describe("useVersionInfo", () => {
     const { result } = renderHook(() => useVersionInfo({ client }));
 
     await waitFor(() => expect(getVersion).toHaveBeenCalledTimes(1));
-    expect(result.current).toEqual({ name: undefined, revision: undefined, version: undefined });
+    expect(result.current).toEqual({ buildTime: undefined, name: undefined, revision: undefined, version: undefined });
   });
 });
 

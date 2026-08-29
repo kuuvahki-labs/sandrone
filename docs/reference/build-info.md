@@ -1,9 +1,10 @@
 # 构建身份
 
-Sandrone 将发布版本与源码 revision 作为两个独立事实：
+Sandrone 将发布版本、源码 revision 与产物构建时间作为三个独立事实：
 
 - `version` 是面向兼容性和发布说明的规范版本，例如 `0.1.0`；
-- `revision` 是生成当前二进制的完整 Git object ID，用于诊断和追溯。
+- `revision` 是生成当前二进制的完整 Git object ID，用于诊断和追溯；
+- `build_time` 是构建入口生成的 RFC3339 UTC 时间，用于区分实际产物。
 
 不要把 revision 拼进 `version`。User-Agent、MCP server version 和备份清单中的
 `app_version` 都继续使用纯版本号。项目设置未显式覆盖 User-Agent 时，每次远程
@@ -17,16 +18,22 @@ Sandrone 将发布版本与源码 revision 作为两个独立事实：
 
 构建信息按以下优先级解析：
 
-1. Make/CI 发布构建通过 Go linker 显式注入；
+1. Make/CI 构建通过 Go linker 显式注入 version、revision 和 build time；
 2. 直接在干净 Git worktree 中执行 `go build` 时，revision 回退到 Go 自动写入的
    `vcs.revision`；
 3. 裸 `docker build` 显式注入 `dev` 版本且不提供 revision，不会伪装成可追溯
-   的发布构建。
+   的发布构建，但仍记录本次容器内编译的 build time。
 
-`sandrone --version` 和 Web 关于页使用 12 位短 revision，便于阅读；公开
-`GET /version` 接口返回完整 revision。revision 未知时只展示版本号。
+Go metadata 的 `vcs.time` 是 commit time，不是 binary build time，不能用于区分
+同一提交下的不同构建。直接执行 `go build` 不经过项目构建入口，因此不会注入
+`build_time`。
+
+`sandrone --version` 和 Web 关于页使用 12 位短 revision，并显示完整 RFC3339
+build time；公开 `GET /version` 接口返回完整 revision 和 `build_time`。例如开发
+构建显示 `dev (2026-08-30T03:15:42Z)`，tag 构建显示
+`v0.1.12 (0123456789ab; 2026-08-30T03:15:42Z)`。
 Go metadata 标记为 `vcs.modified=true`，或者 Make 检测到 staged、unstaged 或
-untracked 改动时，构建身份统一为 `dev` 且不报告 revision。
+untracked 改动时，构建身份统一为 `dev` 且不报告 revision，但仍报告 build time。
 
 ## 本地构建参数
 
@@ -36,11 +43,12 @@ untracked 改动时，构建身份统一为 `dev` 且不报告 revision。
 make build-bin
 ```
 
-也可以显式覆盖 `VERSION` 和 `REVISION`。`VERSION` 只允许 ASCII 字母、数字、
+也可以显式覆盖 `VERSION`、`REVISION` 和 `BUILD_TIME`。`VERSION` 只允许 ASCII 字母、数字、
 点、加号和连字符；一个开头的 `v` 会在运行时移除。`REVISION` 可以为空，否则
 必须是完整的 40 位或 64 位十六进制 Git object ID。revision 为空时，有效版本
-始终强制为 `dev`；非 `dev` 版本必须与完整 revision 一起提供。两者都经过验证
-后才进入 linker flags。
+始终强制为 `dev`；非 `dev` 版本必须与完整 revision 一起提供。`BUILD_TIME` 默认
+是当前 RFC3339 UTC 时间，也可显式传入同格式的值，让同批多架构产物共享一个时间。
+三者都经过验证后才进入 linker flags。
 
 构建本地镜像使用统一入口：
 
@@ -51,7 +59,8 @@ make image SANDRONE_IMAGE=ghcr.io/kuuvahki-labs/sandrone:v0.1.0
 
 `make image` 默认生成 `ghcr.io/kuuvahki-labs/sandrone:local`。干净 worktree
 会向二进制和 OCI labels 传入规范版本及当前 HEAD；dirty worktree 或无 Git
-目录与裸 Docker 构建一样改用 `dev`，不会输出看似正式但不可追溯的版本。
+目录与裸 Docker 构建一样改用 `dev`，不会输出看似正式但不可追溯的版本。每次
+`make image` 都把新的 build time 作为 Docker build arg，避免构建层缓存沿用旧时间。
 `SANDRONE_IMAGE` 同时是 Make 的构建 tag 和 Compose 的运行镜像覆盖变量。本地
 `make image` 始终使用当前 Docker daemon 的单一平台，不创建多架构 manifest。
 
@@ -97,8 +106,9 @@ make snapshot-artifacts
 ```
 
 该目标同样构建 `linux/amd64`、`linux/arm64` 和 `checksums.txt`，输出到
-`dist/snapshot/`。快照身份固定为 `version=dev` 且不报告 revision，不会覆盖
-`dist/` 下的正式发布附件，也不用于 GitHub Release。
+`dist/snapshot/`。快照身份固定为 `version=dev` 且不报告 revision；同一次任务的
+多架构二进制共享 build time。快照不会覆盖 `dist/` 下的正式发布附件，也不用于
+GitHub Release。
 
 纯 `vMAJOR.MINOR.PATCH` tag 创建正式 Release；其他与版本文件匹配的 tag（例如
 `v0.1.0-rc.1`）创建 prerelease。重新运行同一个 tag 的发布任务会替换同名附件，
@@ -113,7 +123,7 @@ Docker build context 继续排除 `.git`，避免发送仓库历史、扩大 con
 ```sh
 docker build -t sandrone:dev .
 docker run --rm sandrone:dev --version
-# sandrone version dev
+# sandrone version dev (2026-08-30T03:15:42Z)
 ```
 
 需要本地可追溯镜像时，在干净 worktree 中执行 `make image`。CI 使用 Buildx；

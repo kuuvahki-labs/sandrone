@@ -9,6 +9,43 @@ import { SettingsPage } from "./settings-page";
 const noop = () => undefined;
 
 describe("settings page", () => {
+  it("shows RFC3339 build time for development and release builds", () => {
+    const { rerender } = render(
+      <SettingsPage
+        buildTime="2026-08-30T03:15:42Z"
+        localeMode="auto"
+        publicBaseUrl="https://example.com"
+        themeMode="system"
+        version="dev"
+        onOpenData={noop}
+        onOpenService={noop}
+        onLocaleMode={noop}
+        onSaveBaseUrl={noop}
+        onSignOut={noop}
+        onThemeMode={noop}
+      />,
+    );
+    expect(screen.getByText("dev (2026-08-30T03:15:42Z)")).toBeInTheDocument();
+
+    rerender(
+      <SettingsPage
+        buildTime="2026-08-30T03:15:42Z"
+        localeMode="auto"
+        publicBaseUrl="https://example.com"
+        revision="0123456789abcdef"
+        themeMode="system"
+        version="0.1.12"
+        onOpenData={noop}
+        onOpenService={noop}
+        onLocaleMode={noop}
+        onSaveBaseUrl={noop}
+        onSignOut={noop}
+        onThemeMode={noop}
+      />,
+    );
+    expect(screen.getByText("v0.1.12 (0123456789ab; 2026-08-30T03:15:42Z)")).toBeInTheDocument();
+  });
+
   it("updates theme mode and the public base URL", async () => {
     const user = userEvent.setup();
     const onSaveBaseUrl = vi.fn();

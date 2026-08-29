@@ -3,6 +3,8 @@ set -eu
 
 : "${VERSION:?VERSION is required}"
 
+BUILD_TIME=${BUILD_TIME-$(date -u +%Y-%m-%dT%H:%M:%SZ)}
+
 artifact_kind=${ARTIFACT_KIND-release}
 REVISION=${REVISION-}
 case "$artifact_kind" in
@@ -43,6 +45,10 @@ if [ "$(REVISION="$REVISION" sh "$script_dir/validate-build-revision.sh")" != ok
 	printf '%s\n' 'REVISION must be a complete 40- or 64-character hexadecimal Git object ID' >&2
 	exit 2
 fi
+if [ "$(BUILD_TIME="$BUILD_TIME" sh "$script_dir/validate-build-time.sh")" != ok ]; then
+	printf '%s\n' 'BUILD_TIME must use UTC RFC3339 format YYYY-MM-DDTHH:MM:SSZ' >&2
+	exit 2
+fi
 
 # RELEASE_TARGETS is a space-separated list by contract.
 # shellcheck disable=SC2086
@@ -81,7 +87,8 @@ for target do
 		"$make_command" build-check \
 		"BUILD_BIN=$package_dir/sandrone" \
 		"VERSION=$VERSION" \
-		"REVISION=$REVISION"
+		"REVISION=$REVISION" \
+		"BUILD_TIME=$BUILD_TIME"
 	cp "$repo_root/LICENSE" "$package_dir/LICENSE"
 	tar -czf "$artifact_dir/sandrone_${goos}_${goarch}.tar.gz" \
 		-C "$package_dir" sandrone LICENSE

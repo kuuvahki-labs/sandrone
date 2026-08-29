@@ -20,6 +20,7 @@ import type { LocaleMode, ThemeMode } from "~/shared/storage/preferences";
 import { PageHeader } from "~/shared/ui/page";
 
 export interface SettingsPageProps {
+  buildTime?: string;
   publicBaseUrl: string;
   revision?: string;
   localeMode: LocaleMode;
@@ -33,7 +34,15 @@ export interface SettingsPageProps {
   onThemeMode: (mode: ThemeMode) => void;
 }
 
+function formatBuildIdentity(version?: string, revision?: string, buildTime?: string) {
+  if (!version) return undefined;
+  const details = [revision?.slice(0, 12), buildTime].filter(Boolean);
+  const label = version === "dev" ? version : `v${version}`;
+  return details.length > 0 ? `${label} (${details.join("; ")})` : label;
+}
+
 export function SettingsPage({
+  buildTime,
   publicBaseUrl,
   revision,
   localeMode,
@@ -48,6 +57,7 @@ export function SettingsPage({
 }: SettingsPageProps) {
   const { t } = useI18n();
   const [confirmSignOut, setConfirmSignOut] = useState(false);
+  const buildIdentity = formatBuildIdentity(version, revision, buildTime);
 
   return (
     <>
@@ -103,9 +113,7 @@ export function SettingsPage({
             <div className="flex items-center justify-between gap-4">
               <Typography component="h3" variant="h6">{t("settings.about.title")}</Typography>
               <Typography color="text.secondary" variant="body2">
-                {version
-                  ? `${version === "dev" ? "dev" : `v${version}`}${revision ? ` (${revision.slice(0, 12)})` : ""}`
-                  : t("settings.about.versionUnavailable")}
+                {buildIdentity ?? t("settings.about.versionUnavailable")}
               </Typography>
             </div>
             <Link href="https://github.com/kuuvahki-labs/sandrone" rel="noreferrer" target="_blank">
