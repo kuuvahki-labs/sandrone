@@ -31,12 +31,12 @@ describe("SubscriptionPreviewPage", () => {
     render(<SubscriptionPreviewPage {...previewPageActions} item={subscriptions[0]} preview={subscriptionPreview} />);
 
     const searchbox = screen.getByRole("searchbox", { name: "搜索预览节点" });
-    await user.click(screen.getByRole("button", { name: "已移除 1" }));
+    await user.click(screen.getByRole("button", { name: "筛选已移除，共 1 个" }));
     await user.type(searchbox, "EXAMPLE.ORG:8389");
     expect(screen.getByText("drop")).toBeInTheDocument();
     expect(screen.queryByText("source-keep")).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "已修改 1" }));
+    await user.click(screen.getByRole("button", { name: "筛选已修改，共 1 个" }));
     expect(screen.getByRole("heading", { name: "没有匹配节点" })).toBeInTheDocument();
 
     await user.clear(searchbox);
@@ -66,7 +66,7 @@ describe("SubscriptionPreviewPage", () => {
     render(<SubscriptionPreviewPage {...previewPageActions} item={subscriptions[0]} preview={repeatedWarnings} />);
 
     const summary = screen.getByLabelText("预览统计");
-    expect(within(summary).getAllByText(/^\d+$/).map((node) => node.textContent)).toEqual(["2", "1", "1", "1"]);
+    expect(Array.from(summary.querySelectorAll("strong"), (node) => node.textContent)).toEqual(["2 → 1", "1", "1"]);
     const warningRegion = screen.getByRole("region", { name: "预览警告" });
     expect(within(warningRegion).getByText("1 组警告 · 2 条记录")).toBeInTheDocument();
     expect(within(warningRegion).queryByText("2 个节点或位置受到影响")).not.toBeInTheDocument();
@@ -106,13 +106,15 @@ describe("SubscriptionPreviewPage", () => {
 
     expect(screen.getByRole("heading", { name: "节点预览" })).toBeInTheDocument();
     const summary = screen.getByLabelText("预览统计");
-    expect(within(summary).getAllByText(/^\d+$/).map((node) => node.textContent)).toEqual(["2", "1", "1", "2"]);
-    expect(within(summary).getAllByText(/处理前|处理后|已移除|警告/).map((node) => node.textContent)).toEqual(["处理前", "处理后", "已移除", "警告"]);
+    expect(Array.from(summary.querySelectorAll("strong"), (node) => node.textContent)).toEqual(["2 → 1", "1", "2"]);
+    expect(within(summary).getAllByText(/节点数|移除|警告/).map((node) => node.textContent)).toEqual(["节点数", "移除", "警告"]);
+    const filters = screen.getByLabelText("节点状态筛选");
+    expect(within(filters).getAllByRole("button").map((button) => button.textContent)).toEqual(["最终 1", "修改 1", "移除 1", "新增 0", "未变 0"]);
+    expect(within(filters).getByRole("button", { name: "筛选最终节点，共 1 个" })).toBeInTheDocument();
     expect(screen.getByText("source-keep")).toBeInTheDocument();
     expect(screen.getByText("name")).toBeInTheDocument();
     expect(screen.getByText("keep -> source-keep")).toBeInTheDocument();
     expect(screen.getAllByText((_, element) => element?.textContent === "ss · example.com:8388")).toHaveLength(1);
-    expect(screen.getAllByText("已移除").length).toBeGreaterThan(0);
     const warningRegion = screen.getByRole("region", { name: "预览警告" });
     expect(within(warningRegion).getByText("警告")).toBeInTheDocument();
     expect(within(warningRegion).getByText("2 组警告 · 2 条记录")).toBeInTheDocument();
@@ -132,7 +134,7 @@ describe("SubscriptionPreviewPage", () => {
     expect(warningJson).toHaveTextContent('"node": "keep"');
     expect(warningJson).toHaveTextContent('"node_index": 7');
     expect(warningJson).toHaveTextContent('"node_context"');
-    await user.click(screen.getByRole("button", { name: "已移除 1" }));
+    await user.click(screen.getByRole("button", { name: "筛选已移除，共 1 个" }));
 
     expect(screen.queryByText("source-keep")).not.toBeInTheDocument();
     expect(screen.queryByText("移除节点")).not.toBeInTheDocument();
@@ -152,7 +154,7 @@ describe("SubscriptionPreviewPage", () => {
     expect(detailBlock).toHaveTextContent('"name": "drop"');
     await user.click(removedSummary);
     expect(removedSummary).toHaveAttribute("aria-expanded", "false");
-    await user.click(screen.getByRole("button", { name: "已修改 1" }));
+    await user.click(screen.getByRole("button", { name: "筛选已修改，共 1 个" }));
     const modifiedSummary = screen.getByRole("button", { name: /source-keep/ });
     await user.click(modifiedSummary);
 
@@ -310,7 +312,7 @@ describe("SubscriptionPreviewPage", () => {
     await user.hover(screen.getByLabelText("测活状态：失败"));
     expect(await screen.findByRole("tooltip")).toHaveTextContent("错误：probe_tcp_failed");
     await user.unhover(screen.getByLabelText("测活状态：失败"));
-    await user.click(screen.getByRole("button", { name: "已移除 1" }));
+    await user.click(screen.getByRole("button", { name: "筛选已移除，共 1 个" }));
     expect(screen.getByRole("button", { name: "removed-node 节点详情" })).toBeInTheDocument();
     expect(screen.queryByText("99 ms")).not.toBeInTheDocument();
   });

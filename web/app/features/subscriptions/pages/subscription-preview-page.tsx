@@ -24,7 +24,7 @@ import { PreviewPendingStatus } from "~/shared/preview/preview-pending-status";
 import { groupPreviewWarnings } from "~/shared/resources/warning-groups";
 import { CollapsibleWarningPanel } from "~/shared/resources/warning-panel";
 import { CodeBlock } from "~/shared/ui/code-editor";
-import { Metric, PageHeader } from "~/shared/ui/page";
+import { Metric, MetricGroup, PageHeader } from "~/shared/ui/page";
 
 type PreviewFilter = SubscriptionPreviewStatus | "final";
 type PreviewDetailMode = "diff" | "meta";
@@ -71,12 +71,14 @@ export function SubscriptionPreviewPage({ backLabel, elapsedSeconds = 0, failed 
         title={t("subscriptions.preview.title")}
       />
 
-      <div aria-label={t("subscriptions.preview.summary")} className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <Metric label={t("subscriptions.preview.metricBefore")} value={preview?.beforeCount} />
-        <Metric label={t("subscriptions.preview.metricAfter")} value={preview?.afterCount} />
+      <MetricGroup label={t("subscriptions.preview.summary")}>
+        <Metric
+          label={t("subscriptions.preview.metricChange")}
+          value={preview ? `${preview.beforeCount} → ${preview.afterCount}` : undefined}
+        />
         <Metric label={t("subscriptions.preview.metricRemoved")} value={preview?.statusCounts.removed} />
         <Metric label={t("subscriptions.preview.metricWarnings")} value={warningGroupCount} />
-      </div>
+      </MetricGroup>
 
       {pending ? <PreviewPendingStatus elapsedSeconds={elapsedSeconds} /> : null}
 
@@ -113,16 +115,19 @@ export function SubscriptionPreviewPage({ backLabel, elapsedSeconds = 0, failed 
               }}
               onChange={(event) => setQuery(event.target.value)}
             />
-            <div aria-label={t("subscriptions.preview.filter")} className="flex flex-wrap gap-2">
+            <div aria-label={t("subscriptions.preview.filter")} className="grid grid-cols-5 gap-1">
               {previewFilters(preview, t).map((option) => (
                 <Button
                   key={option.value}
+                  aria-label={t("subscriptions.preview.filterAction", { count: option.count, status: option.label })}
                   color={filterColor(option.value)}
+                  size="small"
+                  sx={{ minWidth: 0, px: { xs: 0.5, sm: 1 }, whiteSpace: "nowrap" }}
                   type="button"
                   variant={filter === option.value ? "contained" : "outlined"}
                   onClick={() => setFilter(option.value)}
                 >
-                  {option.label} {option.count}
+                  {option.shortLabel} {option.count}
                 </Button>
               ))}
             </div>
@@ -334,13 +339,13 @@ function NodeSummaryItem({ node }: { node?: SubscriptionPreviewNode }) {
   );
 }
 
-function previewFilters(preview: SubscriptionPreview, t: Translator): Array<{ value: PreviewFilter; label: string; count: number }> {
+function previewFilters(preview: SubscriptionPreview, t: Translator): Array<{ value: PreviewFilter; label: string; shortLabel: string; count: number }> {
   return [
-    { value: "final", label: t("subscriptions.preview.statusFinal"), count: preview.afterCount },
-    { value: "modified", label: t("subscriptions.preview.statusModified"), count: preview.statusCounts.modified },
-    { value: "removed", label: t("subscriptions.preview.statusRemoved"), count: preview.statusCounts.removed },
-    { value: "added", label: t("subscriptions.preview.statusAdded"), count: preview.statusCounts.added },
-    { value: "unchanged", label: t("subscriptions.preview.statusUnchanged"), count: preview.statusCounts.unchanged },
+    { value: "final", label: t("subscriptions.preview.statusFinal"), shortLabel: t("subscriptions.preview.statusFinalShort"), count: preview.afterCount },
+    { value: "modified", label: t("subscriptions.preview.statusModified"), shortLabel: t("subscriptions.preview.statusModifiedShort"), count: preview.statusCounts.modified },
+    { value: "removed", label: t("subscriptions.preview.statusRemoved"), shortLabel: t("subscriptions.preview.statusRemovedShort"), count: preview.statusCounts.removed },
+    { value: "added", label: t("subscriptions.preview.statusAdded"), shortLabel: t("subscriptions.preview.statusAddedShort"), count: preview.statusCounts.added },
+    { value: "unchanged", label: t("subscriptions.preview.statusUnchanged"), shortLabel: t("subscriptions.preview.statusUnchangedShort"), count: preview.statusCounts.unchanged },
   ];
 }
 

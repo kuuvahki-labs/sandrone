@@ -254,6 +254,23 @@ for (const route of routes) {
     }
     if (route.path === "/subscriptions/remote/provider/preview") {
       await expect(page.getByText("42 ms")).toBeVisible();
+      const previewFilters = page.getByLabel("节点状态筛选");
+      const filterMetrics = await previewFilters.getByRole("button").evaluateAll((buttons) => ({
+        tops: buttons.map((button) => Math.round(button.getBoundingClientRect().top)),
+        widths: buttons.map((button) => button.getBoundingClientRect().width),
+      }));
+      expect(filterMetrics.tops).toHaveLength(5);
+      expect(new Set(filterMetrics.tops).size, "preview filters should stay on one row").toBe(1);
+      expect(Math.max(...filterMetrics.widths) - Math.min(...filterMetrics.widths), "preview filters should have equal widths").toBeLessThanOrEqual(1);
+      if (testInfo.project.name === "mobile") {
+        const previewSummary = page.getByLabel("预览统计");
+        const summaryMetrics = await previewSummary.locator("strong").evaluateAll((metrics) => ({
+          height: metrics[0]?.parentElement?.parentElement?.parentElement?.getBoundingClientRect().height ?? 0,
+          tops: metrics.map((metric) => Math.round(metric.getBoundingClientRect().top)),
+        }));
+        expect(new Set(summaryMetrics.tops).size, "preview metrics should stay on one mobile row").toBe(1);
+        expect(summaryMetrics.height, "preview metrics should stay compact on mobile").toBeLessThanOrEqual(80);
+      }
       const searchbox = page.getByRole("searchbox", { name: "搜索预览节点" });
       await searchbox.fill("not-found");
       await expect(page.getByRole("heading", { name: "没有匹配节点" })).toBeVisible();
