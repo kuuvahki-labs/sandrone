@@ -138,6 +138,35 @@ func TestServiceSingBoxURLTestAcceptsDisabledVLESSPacketEncoding(t *testing.T) {
 	}
 }
 
+func TestServiceSingBoxURLTestAcceptsHysteriaMPortRanges(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		content string
+	}{
+		{name: "hysteria", content: "hysteria://127.0.0.1:443?mport=9000-20000&auth_str=secret&up=1&down=1#hy"},
+		{name: "hysteria2", content: "hy2://secret@127.0.0.1:443?mport=9000-20000#hy2"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			result, err := service.New().Probe(t.Context(), domain.ProbeRequest{
+				Input: domain.NodeInput{
+					Type:    "inline",
+					Format:  "uri-list",
+					Content: test.content,
+				},
+				Method:    domain.ProbeURLTest,
+				Core:      "sing-box",
+				URL:       "http://127.0.0.1:1",
+				TimeoutMS: 100,
+			})
+
+			require.NoError(t, err)
+			require.Len(t, result.Results, 1)
+			require.False(t, result.Results[0].Alive)
+			require.NotEqual(t, string(domain.CodeProbeCoreStartFailed), result.Results[0].ErrorCode)
+		})
+	}
+}
+
 func TestServiceSingBoxURLTestIsolatesUnsupportedVLESSFlow(t *testing.T) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)

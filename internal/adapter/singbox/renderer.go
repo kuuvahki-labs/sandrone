@@ -261,7 +261,7 @@ func renderHysteria(node domain.NodeIR) (map[string]any, bool, map[string]bool, 
 	}
 	out := baseOutbound(node, "hysteria")
 	if len(hy.ServerPorts) > 0 {
-		out["server_ports"] = hy.ServerPorts
+		out["server_ports"] = singBoxHysteriaServerPorts(hy.ServerPorts)
 	}
 	if hy.HopInterval != "" {
 		out["hop_interval"] = hy.HopInterval
@@ -325,6 +325,22 @@ func validateSingBoxHopInterval(value string) error {
 	return duration.UnmarshalJSON([]byte(strconv.Quote(value)))
 }
 
+func singBoxHysteriaServerPorts(values []string) []string {
+	ports := make([]string, len(values))
+	for index, value := range values {
+		if strings.Contains(value, ":") {
+			ports[index] = value
+			continue
+		}
+		start, end, ranged := strings.Cut(value, "-")
+		if !ranged {
+			end = start
+		}
+		ports[index] = start + ":" + end
+	}
+	return ports
+}
+
 func renderHysteria2(node domain.NodeIR) (map[string]any, bool, map[string]bool, []domain.Warning, error) {
 	if node.Server == "" || node.Port == 0 || node.TLS == nil || !node.TLS.Enabled {
 		return nil, false, nil, nil, domain.NewError(domain.CodeRenderFailed, "missing hysteria2 fields")
@@ -341,7 +357,7 @@ func renderHysteria2(node domain.NodeIR) (map[string]any, bool, map[string]bool,
 		return nil, false, nil, nil, domain.WrapError(domain.CodeRenderFailed, "invalid sing-box hysteria2 hop_interval", err)
 	}
 	if len(hy.ServerPorts) > 0 {
-		out["server_ports"] = hy.ServerPorts
+		out["server_ports"] = singBoxHysteriaServerPorts(hy.ServerPorts)
 	}
 	if hy.HopInterval != "" {
 		out["hop_interval"] = hy.HopInterval

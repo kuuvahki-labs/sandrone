@@ -37,7 +37,8 @@ func TestParseURIHysteriaMPortAlias(t *testing.T) {
 		require.NoError(t, err)
 		require.Empty(t, singBoxReport.Warnings)
 		require.Contains(t, string(singBoxBody), `"server_ports": [`)
-		require.Contains(t, string(singBoxBody), `"8443-8450"`)
+		require.Contains(t, string(singBoxBody), `"8443:8450"`)
+		require.Contains(t, string(singBoxBody), `"9443:9443"`)
 	})
 
 	t.Run("authority wins conflict", func(t *testing.T) {
