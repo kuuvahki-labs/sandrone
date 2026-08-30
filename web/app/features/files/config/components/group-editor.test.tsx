@@ -192,7 +192,7 @@ describe("ProxyGroupEditor Shadowrocket schema", () => {
     expect(onChange).toHaveBeenLastCalledWith([{
       name: "Hong Kong",
       type: "url-test",
-      proxies: ["$nodes"],
+      proxies: ["PROXY"],
       interval: 300,
       timeout: 5,
       tolerance: 50,

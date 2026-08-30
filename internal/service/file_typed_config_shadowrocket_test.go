@@ -6,22 +6,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/service"
 )
 
-func TestServiceShadowrocketFileGeneratesCompleteConfig(t *testing.T) {
-	ctx := context.Background()
-	svc := service.New(service.WithFS(afero.NewMemMapFs()))
-	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
-		Name:    "default",
-		Type:    domain.SubscriptionTypeLocal,
-		Format:  "uri-list",
-		Content: "ss://aes-128-gcm:secret@example.com:8388#hk-node",
-	}))
+func TestServiceShadowrocketFileRejectsSubscriptions(t *testing.T) {
 	spec := domain.FileSpec{
 		Name:   "default.conf",
 		Kind:   domain.FileKindShadowrocket,
@@ -29,21 +20,10 @@ func TestServiceShadowrocketFileGeneratesCompleteConfig(t *testing.T) {
 		Config: &domain.FileConfig{Subscriptions: []string{"default"}},
 	}
 
-	result, err := svc.GetFile(ctx, domain.FileRequest{Spec: &spec})
+	_, err := service.New().GetFile(context.Background(), domain.FileRequest{Spec: &spec})
 
-	require.NoError(t, err)
-	require.Equal(t, "text/plain; charset=utf-8", result.ContentType)
-	require.Equal(t, "shadowrocket", result.File.Kind)
-	body := string(result.Content)
-	require.Contains(t, body, "[General]\nipv6 = false")
-	require.Contains(t, body, "[Host]\nlocalhost = 127.0.0.1")
-	require.Contains(t, body, "[Proxy]\nhk-node = ss, example.com, 8388")
-	require.Contains(t, body, "[Proxy Group]\nProxy = select,hk-node,DIRECT")
-	require.Contains(t, body, "[Rule]\nIP-CIDR,10.0.0.0/8,DIRECT,no-resolve")
-	require.Contains(t, body, "IP-CIDR,172.16.0.0/12,DIRECT,no-resolve")
-	require.Contains(t, body, "IP-CIDR,192.168.0.0/16,DIRECT,no-resolve")
-	require.Contains(t, body, "GEOIP,CN,DIRECT")
-	require.Contains(t, body, "FINAL,Proxy")
+	require.True(t, domain.IsCode(err, domain.CodeInvalidArgument), "got %v", err)
+	require.ErrorContains(t, err, `file kind "shadowrocket" does not allow subscriptions`)
 }
 
 func TestServiceShadowrocketFileUsesAppProxyWithoutSubscriptions(t *testing.T) {
@@ -52,7 +32,7 @@ func TestServiceShadowrocketFileUsesAppProxyWithoutSubscriptions(t *testing.T) {
 		Kind: domain.FileKindShadowrocket,
 		Config: &domain.FileConfig{Settings: shadowrocketSettings(t, map[string]any{
 			"groups": []map[string]any{
-				{"name": "Proxy", "type": "select", "proxies": []string{"PROXY", "$nodes", "DIRECT", "REJECT"}},
+				{"name": "Proxy", "type": "select", "proxies": []string{"PROXY", "DIRECT", "REJECT"}},
 			},
 		})},
 	}
@@ -66,56 +46,17 @@ func TestServiceShadowrocketFileUsesAppProxyWithoutSubscriptions(t *testing.T) {
 	require.Contains(t, body, "FINAL,Proxy")
 }
 
-func TestServiceShadowrocketFileNormalizesNamesThatConflictWithINISyntaxOrPolicies(t *testing.T) {
-	ctx := context.Background()
-	svc := service.New(service.WithFS(afero.NewMemMapFs()))
-	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
-		Name: "names", Type: domain.SubscriptionTypeCollection,
-		Nodes: []domain.NodeIR{
-			{Name: "#comment", Type: domain.NodeTypeHTTP, Server: "one.example.com", Port: 8080},
-			{Name: ";comment", Type: domain.NodeTypeHTTP, Server: "two.example.com", Port: 8080},
-			{Name: "[section]", Type: domain.NodeTypeHTTP, Server: "three.example.com", Port: 8080},
-			{Name: "DIRECT", Type: domain.NodeTypeHTTP, Server: "four.example.com", Port: 8080},
-			{Name: "direct", Type: domain.NodeTypeHTTP, Server: "five.example.com", Port: 8080},
-			{Name: "ReJeCt", Type: domain.NodeTypeHTTP, Server: "six.example.com", Port: 8080},
-		},
-	}))
-	spec := domain.FileSpec{
-		Name: "names.conf", Kind: domain.FileKindShadowrocket,
-		Config: &domain.FileConfig{Subscriptions: []string{"names"}},
-	}
-
-	result, err := svc.GetFile(ctx, domain.FileRequest{Spec: &spec})
-
-	require.NoError(t, err)
-	body := string(result.Content)
-	require.Contains(t, body, "［section] = http, three.example.com, 8080")
-	require.Contains(t, body, "DIRECT (Node) = http, four.example.com, 8080")
-	require.Contains(t, body, "direct (Node) = http, five.example.com, 8080")
-	require.Contains(t, body, "ReJeCt (Node) = http, six.example.com, 8080")
-	require.Contains(t, body, "Proxy = select,＃comment,；comment,［section],DIRECT (Node),direct (Node),ReJeCt (Node),DIRECT")
-}
-
 func TestServiceShadowrocketFileUsesExplicitGroupsRuleSetsAndRules(t *testing.T) {
-	ctx := context.Background()
-	svc := service.New(service.WithFS(afero.NewMemMapFs()))
-	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
-		Name:    "default",
-		Type:    domain.SubscriptionTypeLocal,
-		Format:  "uri-list",
-		Content: "ss://aes-128-gcm:secret@example.com:8388#hk-node",
-	}))
 	spec := domain.FileSpec{
 		Name: "custom.conf",
 		Kind: domain.FileKindShadowrocket,
 		Config: &domain.FileConfig{
-			Subscriptions: []string{"default"},
 			Settings: shadowrocketSettings(t, map[string]any{
 				"adaptive_groups": map[string]any{
 					"type": "url-test", "regions": []string{"hk", "jp"},
 				},
 				"groups": []map[string]any{
-					{"name": "Manual", "type": "select", "proxies": []string{"$nodes", "DIRECT"}},
+					{"name": "Manual", "type": "select", "proxies": []string{"PROXY", "DIRECT"}},
 					{
 						"name": "Auto", "type": "url-test", "policy-regex-filter": "(?i)hk",
 						"interval": 600, "timeout": 5, "tolerance": 20,
@@ -135,11 +76,11 @@ func TestServiceShadowrocketFileUsesExplicitGroupsRuleSetsAndRules(t *testing.T)
 		},
 	}
 
-	result, err := svc.GetFile(ctx, domain.FileRequest{Spec: &spec})
+	result, err := service.New().GetFile(context.Background(), domain.FileRequest{Spec: &spec})
 
 	require.NoError(t, err)
 	body := string(result.Content)
-	require.Contains(t, body, "Manual = select,hk-node,DIRECT")
+	require.Contains(t, body, "Manual = select,PROXY,DIRECT")
 	require.Contains(t, body, "Auto = url-test,policy-regex-filter=(?i)hk,interval=600,timeout=5,tolerance=20,hidden=0")
 	require.Contains(t, body, "RULE-SET,https://rules.example/private.list,DIRECT")
 	require.Contains(t, body, "DOMAIN-SET,https://direct.example/ads.list,REJECT")
@@ -243,20 +184,13 @@ func TestServiceShadowrocketExplicitEmptySettingsStayEmpty(t *testing.T) {
 }
 
 func TestServiceShadowrocketReplacesOwnedSectionsAndPreservesBase(t *testing.T) {
-	ctx := context.Background()
-	svc := service.New(service.WithFS(afero.NewMemMapFs()))
-	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
-		Name: "default", Type: domain.SubscriptionTypeLocal, Format: "uri-list",
-		Content: "ss://aes-128-gcm:secret@example.com:8388#new-node",
-	}))
 	base := "\ufeff# keep\r\n[General]\r\nipv6 = false\r\n\r\n[Proxy]\r\nold = ss, old.example, 1\r\n\r\n[Host]\r\n# untouched\r\nlocalhost = 127.0.0.1\r\n\r\n[proxy]\r\nold-duplicate = ss, old.example, 2\r\n\r\n[Proxy Group]\r\nOld = select,old\r\n\r\n[Rule]\r\nFINAL,Old\r\n"
 	spec := domain.FileSpec{
 		Name: "preserve.conf", Kind: domain.FileKindShadowrocket,
 		Source: domain.FileSource{Type: "inline", Content: base},
-		Config: &domain.FileConfig{Subscriptions: []string{"default"}},
 	}
 
-	result, err := svc.GetFile(ctx, domain.FileRequest{Spec: &spec})
+	result, err := service.New().GetFile(context.Background(), domain.FileRequest{Spec: &spec})
 
 	require.NoError(t, err)
 	body := string(result.Content)
@@ -264,8 +198,8 @@ func TestServiceShadowrocketReplacesOwnedSectionsAndPreservesBase(t *testing.T) 
 	require.Contains(t, body, "[General]\r\nipv6 = false\r\n")
 	require.Contains(t, body, "[Host]\r\n# untouched\r\nlocalhost = 127.0.0.1\r\n")
 	require.Equal(t, 1, countSection(body, "Proxy"))
+	require.Equal(t, "", sectionBody(body, "Proxy"))
 	require.NotContains(t, body, "old.example")
-	require.Contains(t, body, "[Proxy]\r\nnew-node = ss, example.com, 8388")
 }
 
 func TestServiceShadowrocketSettingsValidation(t *testing.T) {
@@ -291,7 +225,7 @@ func TestServiceShadowrocketSettingsValidation(t *testing.T) {
 		{name: "missing member source", settings: `{"groups":[{"name":"Proxy","type":"select"}]}`, path: "config.settings.groups[0]"},
 		{name: "duplicate group", settings: `{"groups":[{"name":"Proxy","type":"select","proxies":["DIRECT"]},{"name":"Proxy","type":"select","proxies":["DIRECT"]}]}`, path: "config.settings.groups[1].name"},
 		{name: "group cycle", settings: `{"groups":[{"name":"A","type":"select","proxies":["B"]},{"name":"B","type":"select","proxies":["A"]}]}`, path: "config.settings.groups"},
-		{name: "bad interval", settings: `{"groups":[{"name":"Auto","type":"url-test","proxies":["$nodes"],"interval":0}]}`, path: "config.settings.groups[0].interval"},
+		{name: "bad interval", settings: `{"groups":[{"name":"Auto","type":"url-test","proxies":["PROXY"],"interval":0}]}`, path: "config.settings.groups[0].interval"},
 		{name: "removed policy select name", settings: `{"groups":[{"name":"Proxy","type":"select","proxies":["DIRECT"],"policy-select-name":"DIRECT"}],"rules":[]}`, path: "config.settings.groups[0].policy-select-name"},
 		{name: "removed select", settings: `{"groups":[{"name":"Proxy","type":"select","proxies":["DIRECT"],"select":0}],"rules":[]}`, path: "config.settings.groups[0].select"},
 		{name: "missing final policy", settings: `{"rules":["FINAL"]}`, path: "config.settings.rules[0]"},
@@ -340,7 +274,6 @@ func TestServiceShadowrocketRejectsUnresolvedPoliciesAfterRenderingNodes(t *test
 		{name: "rule-only policy used as group member", settings: `{"groups":[{"name":"Proxy","type":"select","proxies":["TAILSCALE"]}],"rules":[]}`, path: "config.settings.groups[0].proxies"},
 		{name: "rule policy", settings: `{"groups":[],"rules":["FINAL,missing"]}`, path: "config.settings.rules[0]"},
 		{name: "implicit final without Proxy", settings: `{"groups":[]}`, path: "config.settings.rules[4]"},
-		{name: "nodes expansion leaves empty group", settings: `{"groups":[{"name":"Proxy","type":"select","proxies":["$nodes"]}],"rules":[]}`, path: "config.settings.groups[0].proxies"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -357,72 +290,22 @@ func TestServiceShadowrocketRejectsUnresolvedPoliciesAfterRenderingNodes(t *test
 	}
 }
 
-func TestServiceShadowrocketRejectsAmbiguousRenderedPolicyNames(t *testing.T) {
-	ctx := context.Background()
-	svc := service.New(service.WithFS(afero.NewMemMapFs()))
-	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
-		Name: "default", Type: domain.SubscriptionTypeLocal, Format: "uri-list",
-		Content: "ss://aes-128-gcm:secret@example.com:8388#node-a",
-	}))
-	tests := []struct {
-		name     string
-		nodeName string
-		settings string
-		path     string
-	}{
-		{
-			name:     "group conflicts with node",
-			settings: `{"groups":[{"name":"node-a","type":"select","proxies":["$nodes"]}],"rules":[]}`,
-			path:     "config.settings.groups[0].name",
-		},
-		{
-			name:     "node conflicts with default group",
-			nodeName: "Proxy",
-			settings: `{}`,
-			path:     "rendered node name",
-		},
+func TestServiceShadowrocketRejectsNodesMacro(t *testing.T) {
+	spec := domain.FileSpec{
+		Name: "invalid.conf", Kind: domain.FileKindShadowrocket,
+		Config: &domain.FileConfig{Settings: json.RawMessage(`{"groups":[{"name":"Proxy","type":"select","proxies":["$nodes"]}],"rules":[]}`)},
 	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			if test.nodeName != "" {
-				require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
-					Name: "default", Type: domain.SubscriptionTypeLocal, Format: "uri-list",
-					Content: "ss://aes-128-gcm:secret@example.com:8388#" + test.nodeName,
-				}))
-				t.Cleanup(func() {
-					require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
-						Name: "default", Type: domain.SubscriptionTypeLocal, Format: "uri-list",
-						Content: "ss://aes-128-gcm:secret@example.com:8388#node-a",
-					}))
-				})
-			}
-			spec := domain.FileSpec{
-				Name: "ambiguous.conf", Kind: domain.FileKindShadowrocket,
-				Config: &domain.FileConfig{
-					Subscriptions: []string{"default"},
-					Settings:      json.RawMessage(test.settings),
-				},
-			}
 
-			_, err := svc.GetFile(ctx, domain.FileRequest{Spec: &spec})
+	_, err := service.New().GetFile(context.Background(), domain.FileRequest{Spec: &spec})
 
-			require.True(t, domain.IsCode(err, domain.CodeInvalidArgument), "got %v", err)
-			require.ErrorContains(t, err, test.path)
-		})
-	}
+	require.True(t, domain.IsCode(err, domain.CodeInvalidArgument), "got %v", err)
+	require.ErrorContains(t, err, `config.settings.groups[0].proxies references unknown policy "$nodes"`)
 }
 
 func TestServiceShadowrocketINIOverrideRunsAfterTypedCompilation(t *testing.T) {
-	ctx := context.Background()
-	svc := service.New(service.WithFS(afero.NewMemMapFs()))
-	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
-		Name: "default", Type: domain.SubscriptionTypeLocal, Format: "uri-list",
-		Content: "ss://aes-128-gcm:secret@example.com:8388#node-a",
-	}))
 	spec := domain.FileSpec{
 		Name: "override.conf", Kind: domain.FileKindShadowrocket,
 		Source: domain.FileSource{Type: "inline", Content: "[General]\nmode = rule\n"},
-		Config: &domain.FileConfig{Subscriptions: []string{"default"}},
 		Processors: []domain.ProcessorSpec{{
 			Type: "merge", Stage: domain.StageFile,
 			Params: params(t, map[string]any{
@@ -432,12 +315,12 @@ func TestServiceShadowrocketINIOverrideRunsAfterTypedCompilation(t *testing.T) {
 		}},
 	}
 
-	result, err := svc.GetFile(ctx, domain.FileRequest{Spec: &spec})
+	result, err := service.New().GetFile(context.Background(), domain.FileRequest{Spec: &spec})
 
 	require.NoError(t, err)
 	body := string(result.Content)
 	require.Contains(t, body, "[General]\nmode = global\n")
-	require.Contains(t, body, "[Proxy]\nnode-a = ss, example.com, 8388")
+	require.Contains(t, body, "[Proxy]\n[Proxy Group]")
 	require.Contains(t, body, "FINAL,Proxy\nDOMAIN,example.com,DIRECT")
 }
 

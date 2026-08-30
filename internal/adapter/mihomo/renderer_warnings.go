@@ -5,10 +5,10 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
 
-func mihomoStructuredLossWarnings(node domain.NodeIR) []domain.Warning {
+func mihomoStructuredLossWarnings(node domain.NodeIR, target string) []domain.Warning {
 	warnings := []domain.Warning{}
 	add := func(field, message string) {
-		warnings = append(warnings, shared.RenderLossyWarning(node, "mihomo-proxies", field, message))
+		warnings = append(warnings, shared.RenderLossyWarning(node, target, field, message))
 	}
 	if node.Network != "" {
 		add("network", "mihomo network is a transport selector and cannot represent the canonical tcp/udp protocol selector")

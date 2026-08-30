@@ -45,7 +45,7 @@ describe("file config model", () => {
   it("uses backend runtime defaults for omitted Shadowrocket sections", () => {
     const config = initialConfig("shadowrocket", {}, "zh-CN");
 
-    expect(config.groups).toEqual([{ name: "Proxy", type: "select", proxies: ["$nodes", "DIRECT"] }]);
+    expect(config.groups).toEqual([{ name: "Proxy", type: "select", proxies: ["PROXY", "DIRECT"] }]);
     expect(config.ruleSets).toEqual([]);
     expect(serializeRules("shadowrocket", config.rules)).toEqual([
       "IP-CIDR,10.0.0.0/8,DIRECT,no-resolve",
@@ -321,7 +321,7 @@ describe("file config model", () => {
     expect(proxyGroupHasMemberSource("shadowrocket", {
       name: "Proxy",
       type: "select",
-      proxies: ["$nodes", "DIRECT"],
+      proxies: ["PROXY", "DIRECT"],
     })).toBe(true);
   });
 

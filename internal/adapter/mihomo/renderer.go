@@ -10,14 +10,39 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
 
-type Renderer struct{}
+type Renderer struct {
+	format string
+}
 
 func NewRenderer() *Renderer {
-	return &Renderer{}
+	return NewRendererForFormat("mihomo-proxies")
+}
+
+// NewRendererForFormat reuses the Mihomo/Clash YAML wire format for another
+// public client target while keeping reports and capabilities attributed to
+// the requested format.
+func NewRendererForFormat(format string) *Renderer {
+	return &Renderer{format: format}
+}
+
+// PreviewNodeNames returns the names that survive the same Clash/Mihomo node
+// conversion used by RenderWithReport. Empty entries identify skipped nodes.
+func PreviewNodeNames(nodes []domain.NodeIR) []string {
+	names := make([]string, len(nodes))
+	for index, node := range nodes {
+		doc, _, _, err := nodeToMihomo(node)
+		if err != nil {
+			continue
+		}
+		if name, ok := doc["name"].(string); ok {
+			names[index] = name
+		}
+	}
+	return names
 }
 
 func (r *Renderer) Name() string {
-	return "mihomo-proxies"
+	return r.format
 }
 
 func (r *Renderer) Render(ctx context.Context, nodes []domain.NodeIR, opt domain.RenderOptions) ([]byte, error) {
@@ -38,7 +63,7 @@ func (r *Renderer) RenderWithReport(ctx context.Context, nodes []domain.NodeIR, 
 			shared.MergeWarnings(&report, []domain.Warning{warning})
 			continue
 		}
-		warnings = append(warnings, mihomoStructuredLossWarnings(node)...)
+		warnings = append(warnings, mihomoStructuredLossWarnings(node, r.Name())...)
 		warnings = append(warnings, shared.RawWarnings(node, skipRaw, r.Name())...)
 		for warningIndex := range warnings {
 			warnings[warningIndex].NodeIndex = &index

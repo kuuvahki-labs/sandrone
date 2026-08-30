@@ -11,6 +11,7 @@ export interface ConfigReferenceOption {
 
 export interface ConfigReferenceStrategy {
   groupBuiltins: readonly string[];
+  includeAllNodesMacro?: boolean;
   includeNode: (node: ConfigNodeSummary) => boolean;
   rulePolicyBuiltins: readonly string[];
 }
@@ -22,7 +23,7 @@ export function memberReferenceOptions(
   currentGroup: string,
 ): ConfigReferenceOption[] {
   return uniqueReferenceOptions([
-    { kind: "macro", value: "$nodes" },
+    ...(strategy.includeAllNodesMacro === false ? [] : [{ kind: "macro" as const, value: "$nodes" }]),
     ...nodeOptions(strategy, nodes),
     ...groupOptions(groups).filter((option) => option.value !== currentGroup),
     ...builtinOptions(strategy.groupBuiltins),

@@ -104,63 +104,23 @@ describe("structured file driver orchestration strategies", () => {
    });
  });
 
-  it("projects Shadowrocket node options exclusively from service-realized target names", () => {
+  it("keeps Shadowrocket configuration independent from subscription node previews", () => {
     const adapter = task3Adapter("shadowrocket");
     const preview: ConfigNodePreviewInput = {
       subscriptionName: "provider",
       nodes: [
-        { runtimeId: "skipped", after: { name: "secret raw name", type: "ss", endpoint: "bad.example:1" }, targetNames: { shadowrocket: "" } },
-        { runtimeId: "first", after: { name: "DIRECT", type: "http", endpoint: "one.example:2" }, targetNames: { shadowrocket: "DIRECT (Node)" } },
-        { runtimeId: "second", after: { name: "DIRECT", type: "http", endpoint: "two.example:3" }, targetNames: { shadowrocket: "DIRECT (Node) (2)" } },
+        { runtimeId: "first", after: { name: "raw node", type: "http", endpoint: "one.example:2" }, targetNames: { shadowrocket: "Rendered Node" } },
       ],
       warnings: [],
    };
 
-    const projected = adapter.preview.projectNodes(configNodePreviewFromSubscription(preview));
+    const normalized = configNodePreviewFromSubscription(preview);
+    const projected = adapter.preview.projectNodes(normalized);
 
-    expect(projected.map((node) => node.name)).toEqual(["DIRECT (Node)", "DIRECT (Node) (2)"]);
-    expect(projected.map((node) => node.name)).not.toContain("secret raw name");
- });
-
-  it.each([
-    {
-      name: "missing",
-      targetNames: [undefined, undefined],
-      expectedNames: ["raw one", "raw two"],
-      expectedValid: true,
-   },
-    {
-      name: "partial",
-      targetNames: [{ shadowrocket: "Service One" }, undefined],
-      expectedNames: ["Service One"],
-      expectedValid: true,
-   },
-    {
-      name: "complete",
-      targetNames: [{ shadowrocket: "Service One" }, { shadowrocket: "Service Two" }],
-      expectedNames: ["Service One", "Service Two"],
-      expectedValid: true,
-   },
-    {
-      name: "all-skipped",
-      targetNames: [{ shadowrocket: "" }, { shadowrocket: "" }],
-      expectedNames: [],
-      expectedValid: false,
-   },
-    {
-      name: "partial-without-safe-options",
-      targetNames: [{ shadowrocket: "" }, undefined],
-      expectedNames: [],
-      expectedValid: false,
-   },
-  ])("uses conservative Shadowrocket readiness for $name target-name coverage", ({ targetNames, expectedNames, expectedValid }) => {
-    const adapter = task3Adapter("shadowrocket");
-    const preview = configNodePreviewFromSubscription(shadowrocketPreview(targetNames));
-    const projectedNodes = adapter.preview.projectNodes(preview);
-
-    expect(projectedNodes.map((node) => node.name)).toEqual(expectedNames);
-    expect(adapter.preview.validate({ formMode: "edit", preview, projectedNodes, selected: true }).valid)
-      .toBe(expectedValid);
+    expect(projected).toEqual([]);
+    expect(adapter.preview.relationNodeNames(projected, true)).toEqual([]);
+    expect(adapter.preview.validate({ formMode: "edit", preview: normalized, projectedNodes: projected, selected: true }))
+      .toEqual({ valid: true });
  });
 
   it.each([
@@ -264,22 +224,4 @@ function task3Adapter(kind: typeof CONFIG_KINDS[number]): StructuredFileConfigur
   const driver = requireFileDriver(kind);
   if (driver.configuration.mode !== "structured") throw new Error(`${kind} must be structured`);
   return driver.configuration.adapter as StructuredFileConfigurationAdapter & Task3AdapterStrategies;
-}
-
-function shadowrocketPreview(
-  targetNames: Array<{ shadowrocket: string } | undefined>,
-): ConfigNodePreviewInput {
-  return {
-    subscriptionName: "provider",
-    nodes: targetNames.map((names, index) => ({
-      runtimeId: `node-${index}`,
-      after: {
-        name: index === 0 ? "raw one" : "raw two",
-        type: "http",
-        endpoint: `${index}.example:80`,
-     },
-      ...(names ? { targetNames: names } : {}),
-   })),
-    warnings: [],
- };
 }

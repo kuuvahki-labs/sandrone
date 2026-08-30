@@ -82,3 +82,17 @@ func TestDecodeShadowrocketSettingsKeepsUnknownRulesOpen(t *testing.T) {
 		"FUTURE-RULE,custom,opaque-policy,extension",
 	}, settings.Rules)
 }
+
+func TestCompileShadowrocketGroupsUsesRuntimeProxyPolicy(t *testing.T) {
+	members := []string{"PROXY", "PROXY", "DIRECT"}
+
+	lines, err := compileShadowrocketGroups([]ShadowrocketGroupSettings{{
+		Name: "Proxy", Type: "select", Proxies: &members,
+	}})
+
+	require.NoError(t, err)
+	require.Equal(t, []string{"Proxy = select,PROXY,DIRECT"}, lines)
+	defaults, err := compileShadowrocketGroups(nil)
+	require.NoError(t, err)
+	require.Equal(t, []string{"Proxy = select,PROXY,DIRECT"}, defaults)
+}

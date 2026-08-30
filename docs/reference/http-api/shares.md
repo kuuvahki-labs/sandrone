@@ -88,7 +88,7 @@ GET /s/mobile?arg.profile=travel
 | `uri-list` | `text/plain` | `.txt` |
 | `mihomo-proxies` | `application/yaml` | `.yaml` |
 | `sing-box-outbounds` | `application/json` | `.json` |
-| `shadowrocket-proxies` | `text/plain; charset=utf-8` | `.conf` |
+| `shadowrocket-proxies` | `application/yaml` | `.yaml` |
 | `json-nodes` | `application/json` | `.json` |
 
 文件 share 忽略 `format`，始终执行目标文件当前定义的处理链。所有
@@ -115,7 +115,7 @@ file-stage processor 中消费它们，订阅 share 可在订阅的 node-stage p
       "uri-list": "mobile.txt",
       "mihomo-proxies": "mobile.yaml",
       "sing-box-outbounds": "mobile.json",
-      "shadowrocket-proxies": "mobile.conf",
+      "shadowrocket-proxies": "mobile.yaml",
       "json-nodes": "mobile.json"
     },
     "created_at": "2026-07-22T12:00:00Z",
@@ -142,7 +142,7 @@ file-stage processor 中消费它们，订阅 share 可在订阅的 node-stage p
         "uri-list": "mobile.txt",
         "mihomo-proxies": "mobile.yaml",
         "sing-box-outbounds": "mobile.json",
-        "shadowrocket-proxies": "mobile.conf",
+        "shadowrocket-proxies": "mobile.yaml",
         "json-nodes": "mobile.json"
       }
     }
@@ -182,7 +182,7 @@ canonical 路径把该文件名 percent-encode 为单个 path segment。订阅 s
 
 ```text
 /s/mobile/mobile.yaml?format=mihomo-proxies
-/s/mobile/mobile.conf?format=shadowrocket-proxies
+/s/mobile/mobile.yaml?format=shadowrocket-proxies
 ```
 
 服务端会精确校验解码后的 `:filename` 与实际格式对应的 canonical 文件名。

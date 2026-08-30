@@ -7,10 +7,8 @@ import (
 )
 
 const (
-	MihomoModule         = "github.com/metacubex/mihomo@v1.19.25"
-	SingBoxModule        = "github.com/sagernet/sing-box@v1.13.14"
-	ShadowrocketRepo     = "github.com/LOWERTOP/Shadowrocket"
-	ShadowrocketRevision = "5f1916b5897fc59fb7172aca59ae52050a3532fe"
+	MihomoModule  = "github.com/metacubex/mihomo@v1.19.25"
+	SingBoxModule = "github.com/sagernet/sing-box@v1.13.14"
 )
 
 func SourceRefs(format string) []domain.SourceRef {
@@ -148,7 +146,7 @@ func SourceRefs(format string) []domain.SourceRef {
 			Revision: "spec",
 			Note:     "WireGuard protocol",
 		}}
-	case "mihomo", "mihomo-proxies":
+	case "mihomo", "mihomo-proxies", "shadowrocket-proxies":
 		return []domain.SourceRef{{
 			Kind:     "implementation",
 			Name:     "mihomo outbound adapter schemas",
@@ -248,8 +246,6 @@ func SourceRefs(format string) []domain.SourceRef {
 			Lines:    "79-92",
 			Note:     "JSON tags for WebSocket early data and gRPC fields",
 		}}
-	case "shadowrocket", "shadowrocket-proxies":
-		return []domain.SourceRef{shadowrocketRef()}
 	default:
 		return nil
 	}
@@ -277,12 +273,10 @@ func SourceRefFor(format string, protocol domain.NodeType) domain.SourceRef {
 
 func canonicalSourceFormat(format string) string {
 	switch format {
-	case "mihomo-proxies":
+	case "mihomo-proxies", "shadowrocket-proxies":
 		return "mihomo"
 	case "sing-box-outbounds":
 		return "sing-box"
-	case "shadowrocket-proxies":
-		return "shadowrocket"
 	case "uri", "uri-list", "base64":
 		return "uri-list"
 	default:
@@ -318,19 +312,6 @@ var adapterSourceRefs = map[string]map[domain.NodeType]domain.SourceRef{
 		domain.NodeTypeHTTP:        singBoxRef("sing-box http outbound schema", "/option/simple.go", "32-39", "JSON tags for HTTP outbound fields"),
 		domain.NodeTypeWireGuard:   singBoxRef("sing-box wireguard endpoint schema", "/option/wireguard.go", "9-29", "JSON tags for WireGuard endpoint fields"),
 	},
-	"shadowrocket": {
-		domain.NodeTypeShadowsocks: shadowrocketRef(),
-		domain.NodeTypeVMess:       shadowrocketRef(),
-		domain.NodeTypeVLESS:       shadowrocketRef(),
-		domain.NodeTypeTrojan:      shadowrocketRef(),
-		domain.NodeTypeHysteria:    shadowrocketRef(),
-		domain.NodeTypeHysteria2:   shadowrocketRef(),
-		domain.NodeTypeTUIC:        shadowrocketRef(),
-		domain.NodeTypeHTTP:        shadowrocketRef(),
-		domain.NodeTypeSOCKS:       shadowrocketRef(),
-		domain.NodeTypeWireGuard:   shadowrocketRef(),
-		domain.NodeTypeSnell:       shadowrocketRef(),
-	},
 }
 
 func mihomoRef(name, path, lines, note string) domain.SourceRef {
@@ -354,18 +335,6 @@ func singBoxRef(name, path, lines, note string) domain.SourceRef {
 		Path:     strings.TrimPrefix(path, "/"),
 		Lines:    lines,
 		Note:     note,
-	}
-}
-
-func shadowrocketRef() domain.SourceRef {
-	return domain.SourceRef{
-		Kind:     "implementation",
-		Name:     "Shadowrocket local node configuration examples",
-		Repo:     ShadowrocketRepo,
-		Revision: ShadowrocketRevision,
-		Path:     "README.md",
-		Lines:    "1222-1271",
-		Note:     "documented field names and value forms for local proxy lines",
 	}
 }
 

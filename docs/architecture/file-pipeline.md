@@ -15,7 +15,7 @@ FileSpec(kind=static) -> read source -> FileDocument -> process(file) -> serve
 类型化配置文件：
 
 ```text
-FileSpec(kind=registered typed kind) -> driver lookup -> read/build base -> resolve config.subscriptions -> node render -> driver compile settings -> process(file) -> serve
+FileSpec(kind=registered typed kind) -> driver lookup -> read/build base -> optional subscription materialization/node render -> driver compile settings -> process(file) -> serve
 ```
 
 两条路径只共享 source 读取、运行时文档、file-stage processor 和结果报告。typed 路径额外拥有 driver registry、订阅物化和客户端编译边界。
@@ -26,7 +26,8 @@ FileSpec(kind=registered typed kind) -> driver lookup -> read/build base -> reso
 
 `static` 不允许携带 `config`。typed file 的公共 `FileConfig` 只包含：
 
-- `subscriptions`：需要在编译时物化的已保存订阅名称。
+- `subscriptions`：仅供声明节点 renderer 的 typed driver 在编译时物化；
+  config-only driver 拒绝非空值。
 - `settings`：客户端专属 JSON object，由对应 driver 严格解码。
 
 公共 service 不读取 Mihomo、sing-box 或 Shadowrocket 的联合 settings，也不通过字段形状推断目标客户端。未知公共 config 字段会在领域解码时拒绝；unknown settings 字段和类型错误由选中的 driver 拒绝。
@@ -82,11 +83,13 @@ typed-file registry 是 service 私有组合边界。每个 driver descriptor �
 - canonical kind。
 - 输出 media type、syntax 和默认扩展名。
 - 可选默认 base。
-- 用于节点片段的 render format。
+- 可选的节点片段 render format；config-only driver 不声明此字段。
 
 driver 还拥有 settings 校验和完整客户端结构编译。service 只根据 `kind` lookup driver，再执行统一编排，不包含按具体客户端名称分支的公共业务逻辑。
 
-注册时会拒绝空 kind、保留的 `static`、缺失 descriptor 字段或重复 kind。运行时还会确认 descriptor 要求的节点 renderer 已注册。
+注册时会拒绝空 kind、保留的 `static`、缺失必填 descriptor 字段或重复 kind。
+运行时还会确认 descriptor 声明的节点 renderer 已注册。Shadowrocket 是
+config-only driver，因此不声明 renderer。
 
 ### Base
 
@@ -96,7 +99,8 @@ typed file 有显式 source 时，其正文作为 base；`source.type` 为空时
 
 ### Subscription materialization
 
-service 按 `config.subscriptions` 的声明顺序读取订阅。每个 subscription 通过与
+只有 descriptor 声明节点 renderer 时，service 才按 `config.subscriptions` 的
+声明顺序读取订阅。每个 subscription 通过与
 preview 和直接 subscription render 相同的 canonical subscription execution
 完整执行来源解析、normalize、语义校验和 nodes-stage processors，结果节点按订阅
 顺序聚合。客户端 target 只传给随后的 node renderer，不改变订阅节点集合。
@@ -105,17 +109,22 @@ preview 和直接 subscription render 相同的 canonical subscription execution
 file report dependencies。声明式与脚本动态订阅调用共享同一递归栈；缺失订阅、
 subscription cycle、全部节点非法或 nodes processor 失败都会终止文件生成。
 
-typed file 不要求订阅一定存在；空 subscriptions 可以由 driver 根据 base 和 settings 生成不含 Sandrone 节点的配置。客户端是否允许这种结果仍由 driver 编译规则决定。
+支持节点渲染的 typed file 不要求订阅一定存在；空 subscriptions 可以由 driver
+根据 base 和 settings 生成不含 Sandrone 节点的配置。config-only driver（当前为
+Shadowrocket）拒绝非空 subscriptions，直接基于 base 和 settings 编译。
 
 ### Node render 与 driver compile
 
-service 使用 descriptor 指定的 renderer 把聚合后的 `NodeIR` 生成目标节点片段。该 renderer 继续遵守能力与有损边界：
+descriptor 声明 renderer 时，service 才把聚合后的 `NodeIR` 生成目标节点片段。
+该 renderer 继续遵守能力与有损边界：
 
 - 可选字段损失产生结构化 warning。
 - 不安全的节点变体可以被跳过。
 - 没有任何可渲染节点且 renderer 要求非空结果时返回错误。
 
-renderer warnings 合并进 file report。service 不解析节点片段的客户端语义；driver 接收 base、节点片段和原始 settings，并负责：
+renderer warnings 合并进 file report。config-only driver 则直接收到空节点片段。
+service 不解析节点片段的客户端语义；driver 接收 base、可选节点片段和原始
+settings，并负责：
 
 - 严格解码自身 settings。
 - 解析和校验 base。

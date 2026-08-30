@@ -44,6 +44,7 @@ import { ConfigTemplateAppliedNotice, type ConfigTemplateChoice, ConfigTemplateP
 
 export interface FileConfigEditorProps {
   adapter: StructuredFileConfigurationAdapter;
+  allowSubscriptions?: boolean;
   baseEditor: ReactNode;
   createNamingLocale?: ConfigNamingLocale;
   defaultValue?: ConfigEditorDraft | FileConfigDraft;
@@ -56,7 +57,7 @@ export interface FileConfigEditorProps {
   ui: Readonly<StructuredConfigurationFieldSlots>;
 }
 
-export function FileConfigEditor({ adapter, baseEditor, createNamingLocale = "en-US", defaultValue, loadRuleSetCatalog, loadSubscriptionPreview = emptySubscriptionPreview, mode: formMode, onDirty, onValidityChange, subscriptions, ui }: FileConfigEditorProps) {
+export function FileConfigEditor({ adapter, allowSubscriptions = true, baseEditor, createNamingLocale = "en-US", defaultValue, loadRuleSetCatalog, loadSubscriptionPreview = emptySubscriptionPreview, mode: formMode, onDirty, onValidityChange, subscriptions, ui }: FileConfigEditorProps) {
   const { t } = useI18n();
   const [editorState, setEditorState] = useState(() => (
     initializeConfigEditorState(adapter, {
@@ -245,7 +246,7 @@ export function FileConfigEditor({ adapter, baseEditor, createNamingLocale = "en
           {templateUndo ? <ConfigTemplateAppliedNotice message={copy.applied} undoLabel={copy.undo} onUndo={undoTemplate} /> : null}
         </WorkbenchGroupSection>
       ) : null}
-      <ConfigNodeSourceSection
+      {allowSubscriptions ? <ConfigNodeSourceSection
         disabled={multipleSubscriptions}
         loadPreview={loadSubscriptionPreview}
         selected={selected}
@@ -255,7 +256,7 @@ export function FileConfigEditor({ adapter, baseEditor, createNamingLocale = "en
           updateEditorState({ type: "select-subscription", name });
         }}
         onStateChange={setNodeSourceState}
-      />
+      /> : null}
 			{previewValidation.issueKey ? <Alert severity="error">{t(previewValidation.issueKey)}</Alert> : null}
 			{rawMode ? (
 				<>

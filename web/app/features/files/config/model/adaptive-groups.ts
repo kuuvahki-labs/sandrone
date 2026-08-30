@@ -81,6 +81,7 @@ export interface ConfigAdaptiveDialect {
   groupMembers: (group: ConfigMap) => string[] | undefined;
   groupName: (group: ConfigMap) => string;
   inboundReferences: (config: Readonly<FileConfigDraft>) => Readonly<Record<string, number>>;
+  referenceInsertionIndex?: (members: readonly string[]) => number;
   materialize: (
     definition: CanonicalGroupDefinition,
     type: string,
@@ -316,7 +317,7 @@ export function mergeAdaptiveGroups(
   const generatedGroupNames = desiredGroups.map((group) => dialect.groupName(group));
   const rewrittenReferences = new Map(referenceGroups.map((entry) => [
     entry.index,
-    rewriteAdaptiveReferences(entry, managedNames, generatedGroupNames),
+    rewriteAdaptiveReferences(dialect, entry, managedNames, generatedGroupNames),
   ]));
 
   const retainedGroups = currentGroups.flatMap((group, index) => {
@@ -484,6 +485,7 @@ function adaptiveReferenceGroups(
 }
 
 function rewriteAdaptiveReferences(
+  dialect: Pick<ConfigAdaptiveDialect, "referenceInsertionIndex">,
   group: Readonly<AdaptiveReferenceGroup>,
   managedNames: ReadonlySet<string>,
   generatedNames: readonly string[],
@@ -491,9 +493,10 @@ function rewriteAdaptiveReferences(
   const members = group.members.filter((target) => !managedNames.has(target));
   const anchorIndex = group.anchor ? -1 : members.findIndex(isAnchorReference);
   const nodesIndex = members.findIndex((target) => target === "$nodes");
+  const dialectIndex = dialect.referenceInsertionIndex?.(members) ?? -1;
   const insertionIndex = anchorIndex >= 0
     ? anchorIndex + 1
-    : nodesIndex >= 0 ? nodesIndex : members.length;
+    : nodesIndex >= 0 ? nodesIndex : dialectIndex >= 0 ? dialectIndex : members.length;
   members.splice(insertionIndex, 0, ...generatedNames);
   return members;
 }

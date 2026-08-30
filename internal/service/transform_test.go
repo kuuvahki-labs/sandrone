@@ -433,7 +433,7 @@ func TestServiceConvertVMessWithoutCipherUsesClientDefaults(t *testing.T) {
 			require.NoError(t, err)
 
 			switch format {
-			case "mihomo-proxies":
+			case "mihomo-proxies", "shadowrocket-proxies":
 				require.Contains(t, string(result.Body), "cipher: auto")
 			case "sing-box-outbounds":
 				var doc struct {
@@ -442,8 +442,6 @@ func TestServiceConvertVMessWithoutCipherUsesClientDefaults(t *testing.T) {
 				require.NoError(t, json.Unmarshal(result.Body, &doc))
 				require.Len(t, doc.Outbounds, 1)
 				require.Equal(t, "auto", doc.Outbounds[0]["security"])
-			case "shadowrocket-proxies":
-				require.Contains(t, string(result.Body), "method=auto")
 			case "uri-list", "base64":
 				parsed, err := svc.Parse(context.Background(), domain.ParseRequest{
 					Format:  format,

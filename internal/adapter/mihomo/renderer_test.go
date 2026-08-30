@@ -29,6 +29,39 @@ func TestRenderMihomoRenderWrapper(t *testing.T) {
 	}
 }
 
+func TestShadowrocketSubscriptionTargetReusesClashYAMLWithOwnReportTarget(t *testing.T) {
+	t.Parallel()
+
+	node := domain.NodeIR{
+		Name: "http", Type: domain.NodeTypeHTTP, Server: "proxy.example.com", Port: 8080,
+		Network: "tcp",
+	}
+	mihomoBody, _, err := mihomo.NewRenderer().RenderWithReport(context.Background(), []domain.NodeIR{node}, domain.RenderOptions{})
+	require.NoError(t, err)
+	shadowrocketRenderer := mihomo.NewRendererForFormat("shadowrocket-proxies")
+	shadowrocketBody, report, err := shadowrocketRenderer.RenderWithReport(context.Background(), []domain.NodeIR{node}, domain.RenderOptions{})
+	require.NoError(t, err)
+	require.Equal(t, mihomoBody, shadowrocketBody)
+	require.Contains(t, string(shadowrocketBody), "proxies:")
+	require.NotContains(t, string(shadowrocketBody), "[Proxy]")
+	require.NotEmpty(t, report.Warnings)
+	for _, warning := range report.Warnings {
+		require.Equal(t, "shadowrocket-proxies", warning.Target)
+	}
+	require.Equal(t, "shadowrocket-proxies", shadowrocketRenderer.RenderCapabilities()[0].Format)
+}
+
+func TestPreviewNodeNamesUsesMihomoRenderability(t *testing.T) {
+	t.Parallel()
+
+	nodes := []domain.NodeIR{
+		{Name: "ss", Type: domain.NodeTypeShadowsocks, Server: "one.example.com", Port: 8388, Cipher: "aes-128-gcm", Password: "secret"},
+		{Name: "unsupported", Type: domain.NodeType("unsupported"), Server: "two.example.com", Port: 443},
+	}
+
+	require.Equal(t, []string{"ss", ""}, mihomo.PreviewNodeNames(nodes))
+}
+
 func TestRenderMihomoVMessCipherDefaultsAndPreservesExplicitValue(t *testing.T) {
 	for _, tc := range []struct {
 		name       string

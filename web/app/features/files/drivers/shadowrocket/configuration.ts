@@ -1,3 +1,4 @@
+import { ADAPTIVE_REGION_GROUPS } from "~/features/files/config/model/adaptive-regions";
 import type { ConfigMap, GroupDraft, RuleDraft, RuleSetDraft } from "~/features/files/config/model/editor-model";
 import { stringField } from "~/features/files/config/model/editor-model";
 import {
@@ -79,7 +80,7 @@ export const shadowrocketConfigurationAdapter = createStructuredConfigurationAda
   defaults: {
     ruleSets: () => [],
     rules: defaultRules,
-    runtimeGroups: () => [{ name: "Proxy", type: "select", proxies: ["$nodes", "DIRECT"] }],
+    runtimeGroups: () => [{ name: "Proxy", type: "select", proxies: ["PROXY", "DIRECT"] }],
     runtimeRules: () => runtimeRules(),
   },
   validate: (draft) => validateDraft(draft, {
@@ -150,7 +151,7 @@ function shadowrocketGroups(): StructuredFileConfigurationAdapter["groups"] {
     create: (locale = "en-US") => projectKnown([{
       name: configCustomGroupName(locale),
       type: "select",
-      proxies: ["$nodes", "DIRECT"],
+      proxies: ["PROXY", "DIRECT"],
     }])[0],
     defaults: (preset, locale = "en-US") => projectKnown(defaultGroups(preset, locale)),
     isHealthCheck,
@@ -163,7 +164,7 @@ function shadowrocketGroups(): StructuredFileConfigurationAdapter["groups"] {
       ...group,
       memberMode: mode,
       members: mode === "fixed"
-        ? restoredMembers?.length ? restoredMembers : group.members.length ? group.members : ["$nodes"]
+        ? fixedRuntimeMembers(restoredMembers?.length ? restoredMembers : group.members)
         : group.members,
       filter: mode === "runtime-filter" ? group.filter || "(?i)" : "",
     }),
@@ -313,20 +314,29 @@ function defaultGroups(preset: string, locale: ConfigNamingLocale): ConfigMap[] 
   const auto = configAutoName(locale);
   const fallback = configGroupName("fallback", locale);
   const other = configGroupName("other", locale);
-  if (preset === "minimal") return [{ name: anchor, type: "select", proxies: ["$nodes", "DIRECT"] }];
+  if (preset === "minimal") return [{ name: anchor, type: "select", proxies: ["PROXY", "DIRECT"] }];
   if (preset === "region") {
+    const regions = (["hk", "tw", "jp", "sg", "us"] as const);
     return [
-      { name: anchor, type: "select", proxies: [auto, ...(["hk", "tw", "jp", "sg", "us"] as const).map((id) => configRegionName(id, locale)), other, "$nodes", "DIRECT"] },
-      ...(["hk", "tw", "jp", "sg", "us"] as const).map((id) => ({ name: configRegionName(id, locale), type: "select", proxies: ["$nodes"] })),
-      { name: other, type: "select", proxies: ["$nodes"] },
-      { name: auto, type: "url-test", proxies: ["$nodes"], interval: 300, timeout: 5, tolerance: 50 },
+      { name: anchor, type: "select", proxies: [auto, ...regions.map((id) => configRegionName(id, locale)), other, "PROXY", "DIRECT"] },
+      ...regions.map((id) => ({ name: configRegionName(id, locale), type: "select", "policy-regex-filter": regionFilter(id) })),
+      { name: other, type: "select", "policy-regex-filter": "(?i)" },
+      { name: auto, type: "url-test", "policy-regex-filter": "(?i)", interval: 300, timeout: 5, tolerance: 50 },
     ];
   }
   return [
-    { name: anchor, type: "select", proxies: [auto, fallback, "$nodes", "DIRECT"] },
-    { name: auto, type: "url-test", proxies: ["$nodes"], interval: 300, timeout: 5, tolerance: 50 },
-    { name: fallback, type: "fallback", proxies: ["$nodes"], interval: 300, timeout: 5 },
+    { name: anchor, type: "select", proxies: [auto, fallback, "PROXY", "DIRECT"] },
+    { name: auto, type: "url-test", "policy-regex-filter": "(?i)", interval: 300, timeout: 5, tolerance: 50 },
+    { name: fallback, type: "fallback", "policy-regex-filter": "(?i)", interval: 300, timeout: 5 },
   ];
+}
+
+function fixedRuntimeMembers(members: string[] | undefined): string[] {
+  return [...new Set(members?.length ? members : ["PROXY"])];
+}
+
+function regionFilter(id: string): string {
+  return ADAPTIVE_REGION_GROUPS.find((region) => region.id === id)?.filter ?? "(?i)";
 }
 
 function defaultRules(locale: ConfigNamingLocale): string[] {

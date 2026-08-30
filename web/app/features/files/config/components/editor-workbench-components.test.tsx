@@ -64,15 +64,15 @@ describe("shared config editor rows", () => {
         code: "driver_reserved_name",
         itemId: "group-0",
         message: "untranslated fallback",
-        messageKey: "files.config.issueShadowrocketNodeReserved",
-        messageParams: { reference: "DIRECT" },
+        messageKey: "files.config.issueGroupNameDuplicate",
+        messageParams: { reference: "Proxy" },
         section: "groups",
         severity: "error",
       }]} />,
     );
 
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "Rendered Shadowrocket node name “DIRECT” conflicts with a built-in policy.",
+      "Proxy group name “Proxy” is duplicated.",
     );
     expect(screen.getByRole("alert")).not.toHaveTextContent("untranslated fallback");
   });

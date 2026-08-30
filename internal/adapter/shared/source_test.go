@@ -61,6 +61,8 @@ func TestSourceRefForTargetSchema(t *testing.T) {
 	require.Equal(t, "mihomo shadowsocks outbound schema", mihomo.Name)
 	require.Equal(t, "adapter/outbound/shadowsocks.go", mihomo.Path)
 	require.Equal(t, "41-53", mihomo.Lines)
+	shadowrocketSubscription := shared.SourceRefFor("shadowrocket-proxies", domain.NodeTypeShadowsocks)
+	require.Equal(t, mihomo, shadowrocketSubscription)
 
 	singBox := shared.SourceRefFor("sing-box-outbounds", domain.NodeTypeWireGuard)
 	require.Equal(t, "sing-box wireguard endpoint schema", singBox.Name)

@@ -115,7 +115,7 @@ func TestServiceListSharesIncludesEveryRegisteredSubscriptionFormatPresentation(
 			"base64":               "mobile.txt",
 			"uri-list":             "mobile.txt",
 			"mihomo-proxies":       "mobile.yaml",
-			"shadowrocket-proxies": "mobile.conf",
+			"shadowrocket-proxies": "mobile.yaml",
 			"sing-box-outbounds":   "mobile.json",
 			"json-nodes":           "mobile.json",
 		},
@@ -137,7 +137,7 @@ func TestServiceCreateShareReturnsCanonicalPresentation(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "mobile.yaml", created.Presentation.PublicFilename)
 	require.Equal(t, "mobile.txt", created.Presentation.FormatFilenames["uri-list"])
-	require.Equal(t, "mobile.conf", created.Presentation.FormatFilenames["shadowrocket-proxies"])
+	require.Equal(t, "mobile.yaml", created.Presentation.FormatFilenames["shadowrocket-proxies"])
 }
 
 func TestServiceDefaultsNewSubscriptionSharesToBase64(t *testing.T) {
@@ -308,7 +308,7 @@ func TestServiceRenderSubscriptionShareSupportsDefaultAndOverrideFormat(t *testi
 	}{
 		{name: "stored uri-list default", contentType: "text/plain", filename: "mobile.txt", bodyPart: "node-a"},
 		{name: "mihomo proxies", format: "mihomo-proxies", contentType: "application/yaml", filename: "mobile.yaml", bodyPart: "proxies:"},
-		{name: "shadowrocket proxies", format: "shadowrocket-proxies", contentType: "text/plain; charset=utf-8", filename: "mobile.conf", bodyPart: "[Proxy]"},
+		{name: "shadowrocket proxies", format: "shadowrocket-proxies", contentType: "application/yaml", filename: "mobile.yaml", bodyPart: "proxies:"},
 		{name: "sing-box outbounds", format: "sing-box-outbounds", contentType: "application/json", filename: "mobile.json", bodyPart: "outbounds"},
 		{name: "json nodes", format: "json-nodes", contentType: "application/json", filename: "mobile.json", bodyPart: `"name"`},
 	} {

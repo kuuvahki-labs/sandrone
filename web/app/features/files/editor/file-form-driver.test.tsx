@@ -17,6 +17,22 @@ afterEach(() => {
 });
 
 describe("file form drivers", () => {
+  it("does not expose subscriptions for Shadowrocket config", () => {
+    render(
+      <FileKindConfigWorkbench
+        baseEditor={<div />}
+        configDefault={{ settingsPresent: true, settings: {} }}
+        createNamingLocale="en-US"
+        mode="edit"
+        driver={requireFileDriver("shadowrocket")}
+        subscriptions={[{ name: "provider", title: "Provider" }]}
+      />,
+    );
+
+    expect(screen.queryByRole("combobox", { name: "订阅" })).not.toBeInTheDocument();
+    expect(currentConfig()).toEqual({ settings: {} });
+  });
+
   it("shows a subscription display title while serializing its canonical name", async () => {
     const user = userEvent.setup();
     const { container } = render(

@@ -1,4 +1,4 @@
-// Package filedriver compiles rendered canonical nodes into complete client configurations.
+// Package filedriver compiles typed client configurations.
 package filedriver
 
 import (
@@ -25,7 +25,8 @@ type Descriptor struct {
 	Examples          []map[string]any
 }
 
-// CompileInput contains the resolved base document and rendered canonical nodes.
+// CompileInput contains the resolved base document and, when the driver declares
+// a node render format, rendered canonical nodes.
 type CompileInput struct {
 	Base          []byte
 	RenderedNodes []byte
@@ -75,9 +76,6 @@ func (r *Registry) register(driver Driver) error {
 	}
 	if descriptor.DefaultExtension == "" {
 		return fmt.Errorf("typed file driver %q default extension is required", kind)
-	}
-	if descriptor.NodeRenderFormat == "" {
-		return fmt.Errorf("typed file driver %q node render format is required", kind)
 	}
 	if descriptor.SettingsPrototype == nil {
 		return fmt.Errorf("typed file driver %q settings prototype is required", kind)

@@ -42,9 +42,8 @@ func TestRegistryRequiresCompleteDescriptor(t *testing.T) {
 		{name: "media type", descriptor: Descriptor{Kind: "future"}, want: `driver "future" media type is required`},
 		{name: "syntax", descriptor: Descriptor{Kind: "future", MediaType: "text/plain"}, want: `driver "future" syntax is required`},
 		{name: "extension", descriptor: Descriptor{Kind: "future", MediaType: "text/plain", Syntax: "text"}, want: `driver "future" default extension is required`},
-		{name: "renderer", descriptor: Descriptor{Kind: "future", MediaType: "text/plain", Syntax: "text", DefaultExtension: ".txt"}, want: `driver "future" node render format is required`},
-		{name: "settings prototype", descriptor: Descriptor{Kind: "future", MediaType: "text/plain", Syntax: "text", DefaultExtension: ".txt", NodeRenderFormat: "text"}, want: `driver "future" settings prototype is required`},
-		{name: "source rules", descriptor: Descriptor{Kind: "future", MediaType: "text/plain", Syntax: "text", DefaultExtension: ".txt", NodeRenderFormat: "text", SettingsPrototype: struct{}{}}, want: `driver "future" source rules are required`},
+		{name: "settings prototype", descriptor: Descriptor{Kind: "future", MediaType: "text/plain", Syntax: "text", DefaultExtension: ".txt"}, want: `driver "future" settings prototype is required`},
+		{name: "source rules", descriptor: Descriptor{Kind: "future", MediaType: "text/plain", Syntax: "text", DefaultExtension: ".txt", SettingsPrototype: struct{}{}}, want: `driver "future" source rules are required`},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

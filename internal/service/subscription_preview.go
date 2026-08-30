@@ -4,7 +4,7 @@ import (
 	"context"
 	"reflect"
 
-	"github.com/kuuvahki-labs/sandrone/internal/adapter/shadowrocket"
+	"github.com/kuuvahki-labs/sandrone/internal/adapter/mihomo"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
 
@@ -53,7 +53,7 @@ func (s *Service) PreviewSubscriptionRequest(ctx context.Context, req domain.Sub
 	report = s.prepareReport("subscription_preview", report)
 
 	nodes, counts := diffPreviewNodes(before.Nodes, after.Nodes)
-	attachPreviewTargetNames(nodes, "shadowrocket", shadowrocket.PreviewNodeNames(after.Nodes))
+	attachPreviewTargetNames(nodes, "shadowrocket", mihomo.PreviewNodeNames(after.Nodes))
 	return &domain.SubscriptionPreviewResult{
 		SubscriptionName:    sub.Name,
 		Type:                sub.Type,

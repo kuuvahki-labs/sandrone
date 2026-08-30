@@ -159,16 +159,18 @@ export function FileKindConfigWorkbench({
       />
     );
   }
+  const allowSubscriptions = driver.targetRendererFormat !== undefined;
   return (
     <FileConfigEditor
       adapter={driver.configuration.adapter}
+      allowSubscriptions={allowSubscriptions}
       baseEditor={baseEditor}
       createNamingLocale={createNamingLocale}
       defaultValue={driver.configuration.adapter.decode(configDefault, createNamingLocale)}
       loadSubscriptionPreview={loadSubscriptionPreview}
       loadRuleSetCatalog={loadRuleSetCatalog}
       mode={mode}
-      subscriptions={subscriptions}
+      subscriptions={allowSubscriptions ? subscriptions : []}
       ui={requireFileDriverUI(driver.kind)}
       onDirty={onDirty}
       onValidityChange={onValidityChange}

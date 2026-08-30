@@ -1,6 +1,7 @@
 package filedriver
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -18,11 +19,10 @@ type shadowrocketFileDriver struct{}
 func (shadowrocketFileDriver) Descriptor() Descriptor {
 	return Descriptor{
 		Kind:              domain.FileKindShadowrocket,
-		Description:       "Compile subscriptions into a complete Shadowrocket INI configuration.",
+		Description:       "Compile a node-free Shadowrocket INI configuration for separately managed subscriptions.",
 		MediaType:         "text/plain; charset=utf-8",
 		Syntax:            "ini",
 		DefaultExtension:  ".conf",
-		NodeRenderFormat:  "shadowrocket-proxies",
 		SettingsPrototype: ShadowrocketFileCapabilitySettings{},
 		SourceRules: filekind.SourceRules{
 			AllowedTypes: []string{"inline", "remote"},
@@ -31,8 +31,7 @@ func (shadowrocketFileDriver) Descriptor() Descriptor {
 		Examples: []map[string]any{{
 			"name": "shadowrocket.conf", "kind": string(domain.FileKindShadowrocket),
 			"config": map[string]any{
-				"subscriptions": []any{},
-				"settings":      map[string]any{"groups": []any{}},
+				"settings": map[string]any{"groups": []any{}},
 			},
 		}},
 		DefaultBase: []byte("[General]\n"),
@@ -45,6 +44,9 @@ func (shadowrocketFileDriver) ValidateSettings(raw json.RawMessage) error {
 }
 
 func (shadowrocketFileDriver) Compile(_ context.Context, in CompileInput) ([]byte, error) {
+	if len(bytes.TrimSpace(in.RenderedNodes)) > 0 {
+		return nil, domain.NewError(domain.CodeInvalidArgument, `file kind "shadowrocket" does not accept rendered nodes`)
+	}
 	settings, err := decodeShadowrocketFileSettings(in.Settings)
 	if err != nil {
 		return nil, err
@@ -53,79 +55,29 @@ func (shadowrocketFileDriver) Compile(_ context.Context, in CompileInput) ([]byt
 	if err != nil {
 		return nil, domain.WrapError(domain.CodeInvalidArgument, `file kind "shadowrocket" base: parse INI`, err)
 	}
-	rendered, err := inidoc.Parse(in.RenderedNodes)
-	if err != nil {
-		return nil, domain.WrapError(domain.CodeInvalidArgument, `file kind "shadowrocket": parse rendered proxy section`, err)
-	}
-	proxyLines := rendered.SectionLines("Proxy")
-	nodeNames, err := shadowrocketProxyNames(proxyLines)
+	groupLines, err := compileShadowrocketGroups(settings.Groups)
 	if err != nil {
 		return nil, err
 	}
-	groupLines, err := compileShadowrocketGroups(settings.Groups, nodeNames)
+	ruleLines, err := compileShadowrocketRules(settings.RuleSets, settings.Rules, groupLines)
 	if err != nil {
 		return nil, err
 	}
-	ruleLines, err := compileShadowrocketRules(settings.RuleSets, settings.Rules, groupLines, nodeNames)
-	if err != nil {
-		return nil, err
-	}
-	base.ReplaceSection("Proxy", proxyLines)
+	base.ReplaceSection("Proxy", nil)
 	base.ReplaceSection("Proxy Group", groupLines)
 	base.ReplaceSection("Rule", ruleLines)
 	return base.Bytes(), nil
 }
 
-func shadowrocketProxyNames(lines []string) ([]string, error) {
-	names := make([]string, 0, len(lines))
-	seen := map[string]bool{}
-	for index, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, ";") {
-			continue
-		}
-		separator := strings.Index(line, " = ")
-		if separator <= 0 {
-			return nil, domain.NewError(domain.CodeInvalidArgument, fmt.Sprintf(`file kind "shadowrocket": rendered Proxy line %d is not an assignment`, index+1))
-		}
-		name := strings.TrimSpace(line[:separator])
-		if name == "" || seen[name] {
-			return nil, domain.NewError(domain.CodeInvalidArgument, fmt.Sprintf(`file kind "shadowrocket": rendered Proxy line %d has an invalid or duplicate name`, index+1))
-		}
-		if shadowrocketadapter.ConflictsWithBuiltinRulePolicy(name) {
-			return nil, domain.NewError(domain.CodeInvalidArgument, fmt.Sprintf(`file kind "shadowrocket": rendered node name on Proxy line %d conflicts with a built-in policy`, index+1))
-		}
-		seen[name] = true
-		names = append(names, name)
-	}
-	return names, nil
-}
-
-func compileShadowrocketGroups(groups []ShadowrocketGroupSettings, nodeNames []string) ([]string, error) {
+func compileShadowrocketGroups(groups []ShadowrocketGroupSettings) ([]string, error) {
 	if groups == nil {
-		for _, name := range nodeNames {
-			if name == "Proxy" {
-				return nil, domain.NewError(domain.CodeInvalidArgument, `file kind "shadowrocket": rendered node name conflicts with the default "Proxy" group`)
-			}
-		}
-		members := append(append([]string{}, nodeNames...), "DIRECT")
-		return []string{"Proxy = select," + strings.Join(members, ",")}, nil
-	}
-	nodeNameSet := make(map[string]bool, len(nodeNames))
-	for _, name := range nodeNames {
-		nodeNameSet[name] = true
+		return []string{"Proxy = select,PROXY,DIRECT"}, nil
 	}
 	groupNames := make(map[string]bool, len(groups))
-	for index, group := range groups {
-		if nodeNameSet[group.Name] {
-			return nil, shadowrocketSettingsError(fmt.Errorf("config.settings.groups[%d].name conflicts with a rendered node", index))
-		}
+	for _, group := range groups {
 		groupNames[group.Name] = true
 	}
-	validMembers := make(map[string]bool, len(nodeNames)+len(groupNames))
-	for _, name := range nodeNames {
-		validMembers[name] = true
-	}
+	validMembers := make(map[string]bool, len(groupNames))
 	for name := range groupNames {
 		validMembers[name] = true
 	}
@@ -137,15 +89,6 @@ func compileShadowrocketGroups(groups []ShadowrocketGroupSettings, nodeNames []s
 			members := []string{}
 			seen := map[string]bool{}
 			for _, member := range *group.Proxies {
-				if member == "$nodes" {
-					for _, name := range nodeNames {
-						if !seen[name] {
-							members = append(members, name)
-							seen[name] = true
-						}
-					}
-					continue
-				}
 				if !shadowrocketadapter.IsBuiltinGroupPolicy(member) && !validMembers[member] {
 					return nil, shadowrocketSettingsError(fmt.Errorf("config.settings.groups[%d].proxies references unknown policy %q", index, member))
 				}
@@ -190,7 +133,7 @@ func shadowrocketBool(value bool) string {
 	return "0"
 }
 
-func compileShadowrocketRules(ruleSets []ShadowrocketRuleSetSettings, rules []string, groupLines, nodeNames []string) ([]string, error) {
+func compileShadowrocketRules(ruleSets []ShadowrocketRuleSetSettings, rules []string, groupLines []string) ([]string, error) {
 	if rules == nil {
 		rules = []string{
 			"IP-CIDR,10.0.0.0/8,DIRECT,no-resolve",
@@ -205,9 +148,6 @@ func compileShadowrocketRules(ruleSets []ShadowrocketRuleSetSettings, rules []st
 		sets[item.Name] = item
 	}
 	policies := map[string]bool{}
-	for _, name := range nodeNames {
-		policies[name] = true
-	}
 	for _, line := range groupLines {
 		if separator := strings.Index(line, " = "); separator > 0 {
 			policies[strings.TrimSpace(line[:separator])] = true

@@ -1,3 +1,5 @@
+// Package shadowrocket contains Shadowrocket policy helpers used by the typed
+// configuration driver.
 package shadowrocket
 
 import "strings"

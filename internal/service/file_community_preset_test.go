@@ -711,15 +711,9 @@ func TestServiceCommunityPresetSingBoxTailscaleExternalGeneratesDistinctFullFile
 	assertNoTailscaleSecretsOrExitNode(t, doc, result.Content)
 }
 
-func TestServiceCommunityPresetShadowrocketTailscaleNativeGeneratesFullFile(t *testing.T) {
+func TestServiceCommunityPresetShadowrocketTailscaleNativeGeneratesConfigOnlyFile(t *testing.T) {
 	ctx := context.Background()
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
-	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
-		Name:    "shadowrocket-native-node",
-		Type:    domain.SubscriptionTypeLocal,
-		Format:  "uri-list",
-		Content: "ss://aes-128-gcm:example-password@example.com:8388#Shadow-Node",
-	}))
 	script := communityPresetRawScript(t, "insert-shadowrocket-rules.js")
 	processor := orderedRuleProcessor(t, script, "tailscale-native", "Tailscale 原生接管", `[
 		"DOMAIN-SUFFIX,ts.net,TAILSCALE",
@@ -731,10 +725,9 @@ func TestServiceCommunityPresetShadowrocketTailscaleNativeGeneratesFullFile(t *t
 		Kind:   domain.FileKindShadowrocket,
 		Source: domain.FileSource{Type: "inline", Content: "[General]\nprofile = keep\n"},
 		Config: &domain.FileConfig{
-			Subscriptions: []string{"shadowrocket-native-node"},
 			Settings: raw(t, map[string]any{
 				"groups": []map[string]any{
-					{"name": "Proxy", "type": "select", "proxies": []string{"$nodes", "DIRECT"}},
+					{"name": "Proxy", "type": "select", "proxies": []string{"PROXY", "DIRECT"}},
 				},
 				"rules": []string{
 					"DOMAIN,user.example,DIRECT",
@@ -752,7 +745,7 @@ func TestServiceCommunityPresetShadowrocketTailscaleNativeGeneratesFullFile(t *t
 	require.NotNil(t, result)
 	model, err := inidoc.ParseModel(result.Content)
 	require.NoError(t, err)
-	require.Contains(t, modelSectionLines(t, model, "Proxy"), "Shadow-Node = ss, example.com, 8388, password=example-password, method=aes-128-gcm")
+	require.Empty(t, modelSectionLines(t, model, "Proxy"))
 	require.Equal(t, []string{
 		"DOMAIN-SUFFIX,ts.net,TAILSCALE",
 		"IP-CIDR,100.64.0.0/10,TAILSCALE,no-resolve",
@@ -768,12 +761,6 @@ func TestServiceCommunityPresetShadowrocketTailscaleNativeGeneratesFullFile(t *t
 func TestServiceCommunityPresetShadowrocketTailscaleExternalGeneratesFullFile(t *testing.T) {
 	ctx := context.Background()
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
-	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
-		Name:    "shadowrocket-external-node",
-		Type:    domain.SubscriptionTypeLocal,
-		Format:  "uri-list",
-		Content: "ss://aes-128-gcm:example-password@example.com:8388#Shadow-Node",
-	}))
 	script := communityPresetRawScript(t, "shadowrocket-tailscale-external.js")
 	processor := domain.ProcessorSpec{
 		Name:  "Tailscale 共存",
@@ -792,10 +779,9 @@ func TestServiceCommunityPresetShadowrocketTailscaleExternalGeneratesFullFile(t 
 			"tun-excluded-routes = 192.168.0.0/16\n\n" +
 			"[Host]\nexample.com = 192.0.2.1\n"},
 		Config: &domain.FileConfig{
-			Subscriptions: []string{"shadowrocket-external-node"},
 			Settings: raw(t, map[string]any{
 				"groups": []map[string]any{
-					{"name": "Proxy", "type": "select", "proxies": []string{"$nodes", "DIRECT"}},
+					{"name": "Proxy", "type": "select", "proxies": []string{"PROXY", "DIRECT"}},
 				},
 				"rules": []string{
 					"DOMAIN,user.example,DIRECT",
@@ -813,6 +799,7 @@ func TestServiceCommunityPresetShadowrocketTailscaleExternalGeneratesFullFile(t 
 	require.NotNil(t, result)
 	model, err := inidoc.ParseModel(result.Content)
 	require.NoError(t, err)
+	require.Empty(t, modelSectionLines(t, model, "Proxy"))
 	require.Equal(t, []string{
 		"profile = keep",
 		"skip-proxy = 192.168.0.0/16,100.64.0.0/10,fd7a:115c:a1e0::/48",

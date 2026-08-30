@@ -1,6 +1,8 @@
 # 渲染客户端配置
 
-本页说明如何把一个已保存的订阅渲染成 Mihomo、sing-box 或 Shadowrocket 完整配置。假设服务已经启动，且订阅 `default` 可以成功 preview。
+本页说明如何把一个已保存的订阅渲染进 Mihomo、sing-box 完整配置，以及如何
+生成与订阅节点分离的 Shadowrocket `.conf`。假设服务已经启动，且订阅
+`default` 可以成功 preview。
 
 完整字段定义见 [FileSpec 参考](../reference/file-spec.md)；这里仅保留可直接改造的最小范式。
 
@@ -103,7 +105,9 @@ sed -n '1,40p' config.json
 
 ## Shadowrocket
 
-Shadowrocket 以 INI source 为基础，driver 会生成受管的代理、分组与规则 section：
+Shadowrocket 以 INI source 为基础，driver 会清空 `[Proxy]` 并生成受管的分组与
+规则 section。节点不写入 `.conf`，而是在 Shadowrocket 中通过
+`shadowrocket-proxies` 分享链接单独添加：
 
 ```sh
 curl -sS -X POST "$SANDRONE_API/v1/files" \
@@ -117,12 +121,11 @@ curl -sS -X POST "$SANDRONE_API/v1/files" \
       "content": "[General]\nipv6 = false\n"
     },
     "config": {
-      "subscriptions": ["default"],
       "settings": {
         "groups": [{
           "name": "Proxy",
           "type": "select",
-          "proxies": ["$nodes", "DIRECT"]
+          "proxies": ["PROXY", "DIRECT"]
         }],
         "rule_sets": [],
         "rules": ["FINAL,Proxy"]
@@ -131,6 +134,9 @@ curl -sS -X POST "$SANDRONE_API/v1/files" \
     "processors": []
   }'
 ```
+
+对应节点订阅可使用分享 URL 的 `format=shadowrocket-proxies`；它返回与
+`mihomo-proxies` 同形的 Clash YAML。配置文件和节点订阅是两个独立入口。
 
 渲染：
 
@@ -163,7 +169,8 @@ curl -fsS \
 
 - `kind` 缺失、大小写错误或使用了 renderer 名称；
 - `config.settings` 不是 JSON object，或包含目标 driver 不认识的字段；
-- `config.subscriptions` 引用了不存在或无法生成节点的订阅；
+- Mihomo/sing-box 的 `config.subscriptions` 引用了不存在或无法生成节点的订阅，
+  或 Shadowrocket FileSpec 携带了非空 `config.subscriptions`；
 - 分组、规则或规则集互相引用的名称不一致；
 - 显式空数组保持为空；它与省略字段并不等价。
 

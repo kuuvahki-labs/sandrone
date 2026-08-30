@@ -50,9 +50,9 @@ describe("share formats", () => {
     expect(shareUrlWithFormat(
       "https://example.com/s/sh_nodes/mobile.yaml?token=abc&format=mihomo-proxies#install",
       "shadowrocket-proxies",
-      "mobile.conf",
+      "mobile.yaml",
     )).toBe(
-      "https://example.com/s/sh_nodes/mobile.conf?token=abc&format=shadowrocket-proxies#install",
+      "https://example.com/s/sh_nodes/mobile.yaml?token=abc&format=shadowrocket-proxies#install",
     );
   });
 
@@ -60,9 +60,9 @@ describe("share formats", () => {
     expect(shareUrlWithFormat(
       "/s/sh_nodes/mobile.yaml",
       "shadowrocket-proxies",
-      "配置 ☁.conf",
+      "配置 ☁.yaml",
     )).toBe(
-      "/s/sh_nodes/%E9%85%8D%E7%BD%AE%20%E2%98%81.conf?format=shadowrocket-proxies",
+      "/s/sh_nodes/%E9%85%8D%E7%BD%AE%20%E2%98%81.yaml?format=shadowrocket-proxies",
     );
   });
 });

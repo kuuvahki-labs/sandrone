@@ -35,13 +35,23 @@ func (s *Service) resolveConfigFile(ctx context.Context, spec domain.FileSpec, r
 	if spec.Config != nil {
 		config = *spec.Config
 	}
-	nodes, subscriptionWarnings, err := s.configNodes(ctx, trimStringList(config.Subscriptions), req, state)
-	if err != nil {
-		return domain.FileDocument{}, nil, nil, err
-	}
-	rendered, renderWarnings, err := s.renderTypedFileNodes(ctx, descriptor, nodes)
-	if err != nil {
-		return domain.FileDocument{}, nil, nil, err
+	subscriptions := trimStringList(config.Subscriptions)
+	var rendered []byte
+	var subscriptionWarnings, renderWarnings []domain.Warning
+	if descriptor.NodeRenderFormat == "" {
+		if len(subscriptions) > 0 {
+			return domain.FileDocument{}, nil, nil, domain.NewError(domain.CodeInvalidArgument, fmt.Sprintf("file kind %q does not allow subscriptions", spec.Kind))
+		}
+	} else {
+		nodes, warnings, err := s.configNodes(ctx, subscriptions, req, state)
+		if err != nil {
+			return domain.FileDocument{}, nil, nil, err
+		}
+		subscriptionWarnings = warnings
+		rendered, renderWarnings, err = s.renderTypedFileNodes(ctx, descriptor, nodes)
+		if err != nil {
+			return domain.FileDocument{}, nil, nil, err
+		}
 	}
 	body, err := driver.Compile(ctx, filedriver.CompileInput{
 		Base:          base.Content,

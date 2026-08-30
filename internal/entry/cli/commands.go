@@ -76,9 +76,12 @@ body to stdout. Use --report-output with a file path to write the complete
 conversion report as pretty JSON.
 
 json-nodes is the normalized node IR, useful for debugging or exporting parsed
-nodes. mihomo-proxies and sing-box-outbounds are structured node fragments;
-shadowrocket-proxies is a native [Proxy] section. Use render when a declared
-Subscription or FileSpec should produce its final output.
+nodes. mihomo-proxies and shadowrocket-proxies are Clash YAML node documents;
+sing-box-outbounds is a structured JSON node fragment. shadowrocket-proxies is
+intended for Shadowrocket Subscribe imports; use a Shadowrocket FileSpec when a
+node-free native INI configuration is required. Shadowrocket manages Subscribe
+nodes separately from that FileSpec. Use render when a declared Subscription or
+FileSpec should produce its final output.
 
 ` + inputFormatsHelp + `
 ` + targetFormatsHelp,

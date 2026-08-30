@@ -197,13 +197,12 @@ describe("config relation model", () => {
   it("counts Shadowrocket DOMAIN-SET and RULE-SET references and treats FINAL as final", () => {
     const model = buildConfigRelationModel(
       "shadowrocket",
-      [{ name: "Proxy", type: "select", proxies: ["Node 1", "$nodes", "DIRECT", "REJECT"] }],
+      [{ name: "Proxy", type: "select", proxies: ["PROXY", "DIRECT", "REJECT"] }],
       [
         { name: "domains", type: "domain-set", url: "https://example.com/domains.list" },
         { name: "mixed", type: "rule-set", url: "https://example.com/mixed.list" },
       ],
       ["DOMAIN-SET,domains,Proxy", "RULE-SET,mixed,DIRECT,no-resolve", "FINAL,Proxy"],
-      ["Node 1"],
     );
 
     expect(model.issues).toEqual([]);
@@ -243,14 +242,11 @@ describe("config relation model", () => {
     expect(model.issues).not.toContainEqual(expect.objectContaining({ reference: "PROXY" }));
   });
 
-  it("makes unresolved Shadowrocket targets blocking only when current preview names are available", () => {
+  it("makes unresolved Shadowrocket targets blocking without node previews", () => {
     const groups = [{ name: "Proxy", type: "select", proxies: ["Missing Node", "DIRECT"] }];
     const rules = ["FINAL,Missing Policy"];
 
     expect(buildConfigRelationModel("shadowrocket", groups, [], rules).issues).toEqual([
-      expect.objectContaining({ severity: "warning", code: "unknown_rule_policy" }),
-    ]);
-    expect(buildConfigRelationModel("shadowrocket", groups, [], rules, ["Known Node"]).issues).toEqual([
       expect.objectContaining({ severity: "error", code: "unknown_group_target", reference: "Missing Node" }),
       expect.objectContaining({ severity: "error", code: "unknown_rule_policy", reference: "Missing Policy" }),
     ]);
@@ -260,8 +256,7 @@ describe("config relation model", () => {
     const model = buildConfigRelationModel(
       "shadowrocket",
       [
-        { name: "DIRECT", type: "select", proxies: ["$nodes"] },
-        { name: "Node 1", type: "select", proxies: ["DIRECT"] },
+        { name: "DIRECT", type: "select", proxies: ["PROXY"] },
         {
           name: "Ranges",
           type: "url-test",
@@ -273,39 +268,18 @@ describe("config relation model", () => {
       ],
       [{ name: "bad,name", type: "rule-set", url: "https://example.com/rules,tracking.list" }],
       [],
-      ["Node 1"],
     );
 
     expect(model.issues).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: "shadowrocket_group_name_reserved", itemId: "group-0" }),
-      expect.objectContaining({ code: "shadowrocket_group_node_collision", itemId: "group-1" }),
-      expect.objectContaining({ code: "shadowrocket_group_member_duplicate", itemId: "group-2" }),
-      expect.objectContaining({ code: "shadowrocket_group_interval_invalid", itemId: "group-2" }),
-      expect.objectContaining({ code: "shadowrocket_group_timeout_invalid", itemId: "group-2" }),
-      expect.objectContaining({ code: "shadowrocket_group_tolerance_invalid", itemId: "group-2" }),
+      expect.objectContaining({ code: "shadowrocket_group_member_duplicate", itemId: "group-1" }),
+      expect.objectContaining({ code: "shadowrocket_group_interval_invalid", itemId: "group-1" }),
+      expect.objectContaining({ code: "shadowrocket_group_timeout_invalid", itemId: "group-1" }),
+      expect.objectContaining({ code: "shadowrocket_group_tolerance_invalid", itemId: "group-1" }),
       expect.objectContaining({ code: "shadowrocket_rule_set_name_invalid", itemId: "ruleset-0" }),
       expect.objectContaining({ code: "rule_set_url_invalid", itemId: "ruleset-0" }),
     ]));
   });
-
-  it.each(["DIRECT", "direct", "ReJeCt", "PROXY", "TAILSCALE", "REJECT-DROP"])(
-    "rejects a Shadowrocket rendered node name that shadows a built-in policy: %s",
-    (name) => {
-      const model = buildConfigRelationModel(
-        "shadowrocket",
-        [{ name: "Proxy", type: "select", proxies: ["DIRECT"] }],
-        [],
-        ["FINAL,Proxy"],
-        [name],
-      );
-
-      expect(model.issues).toContainEqual(expect.objectContaining({
-        severity: "error",
-        code: "shadowrocket_node_reserved_collision",
-        reference: name,
-      }));
-    },
-  );
 
   it.each(["PROXY", "TAILSCALE", "REJECT-DROP"])(
     "rejects a Shadowrocket group name that shadows a built-in rule policy: %s",
@@ -342,22 +316,6 @@ describe("config relation model", () => {
       }));
     },
   );
-
-  it("rejects a fixed Shadowrocket group that is empty after expanding subscription nodes", () => {
-    const model = buildConfigRelationModel(
-      "shadowrocket",
-      [{ name: "Empty", type: "select", proxies: ["$nodes"] }],
-      [],
-      [],
-      [],
-    );
-
-    expect(model.issues).toContainEqual(expect.objectContaining({
-      severity: "error",
-      code: "shadowrocket_group_members_empty",
-      itemId: "group-0",
-    }));
-  });
 
   it("allows Shadowrocket health groups to omit interval and timeout", () => {
     const model = buildConfigRelationModel(

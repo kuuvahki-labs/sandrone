@@ -391,7 +391,7 @@ describe("config templates", () => {
     expect(groupsByName.get("Proxy")).toEqual({
       name: "Proxy",
       type: "select",
-      proxies: ["PROXY", "$nodes", "DIRECT", "REJECT"],
+      proxies: ["PROXY", "DIRECT", "REJECT"],
    });
     expect(groupsByName.has("Auto")).toBe(false);
     for (const group of config.groups ?? []) {
@@ -520,24 +520,6 @@ describe("config templates", () => {
     expect(recognizeConfigTemplate(kind, { ...config, groups }).match).toBe("custom");
  });
 
-  it("does not migrate a legacy Shadowrocket Auto template during recognition", () => {
-    const config = createConfigFromTemplate("shadowrocket", "minimal");
-    const groups = structuredClone(config.groups ?? []);
-    const proxy = groups.find((group) => group.name === "Proxy");
-    if (!proxy) throw new Error("expected Proxy group");
-    proxy.proxies = ["Auto", "$nodes", "DIRECT", "REJECT"];
-    groups.splice(1, 0, {
-      name: "Auto",
-      type: "url-test",
-      proxies: ["$nodes"],
-      interval: 300,
-      timeout: 5,
-      tolerance: 50,
-   });
-
-    expect(recognizeConfigTemplate("shadowrocket", { ...config, groups }).match).toBe("custom");
- });
-
   it.each(CONFIG_KINDS)("keeps the detected Chinese naming language for customized %s configs", (kind) => {
     const config = createConfigFromTemplate(kind, "minimal", "zh-CN");
     const groups = structuredClone(config.groups ?? []);
@@ -663,7 +645,7 @@ function referenceProblems(kind: ConfigKind, config: FileConfigDraft): string[] 
   const literals = new Set(kind === "sing-box"
     ? ["direct", "block", "$nodes"]
     : kind === "shadowrocket"
-      ? ["PROXY", "DIRECT", "REJECT", "$nodes"]
+      ? ["PROXY", "DIRECT", "REJECT"]
       : ["DIRECT", "REJECT", "$nodes"]);
   const groupNames = new Set(groups.map((group) => String(group[groupNameKey])));
   const ruleSetNames = new Set(ruleSets.map((ruleSet) => String(ruleSet[ruleSetNameKey])));

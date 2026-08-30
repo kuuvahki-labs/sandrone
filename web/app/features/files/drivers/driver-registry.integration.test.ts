@@ -29,7 +29,7 @@ describe("file driver codecs", () => {
       ["static", undefined],
       ["mihomo", "mihomo-proxies"],
       ["sing-box", "sing-box-outbounds"],
-      ["shadowrocket", "shadowrocket-proxies"],
+      ["shadowrocket", undefined],
     ]);
     expect(FILE_DRIVER_REGISTRY.get("static")).not.toHaveProperty("targetRendererFormat");
     expect(FILE_DRIVER_REGISTRY.createPresets).toEqual([

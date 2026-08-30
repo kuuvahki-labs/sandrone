@@ -80,7 +80,7 @@ describe("config reference options", () => {
     ])).toEqual(["private", "ads"]);
   });
 
-  it("does not offer Shadowrocket nodes whose rendered names shadow built-in policies", () => {
+  it("keeps Shadowrocket member references independent from subscription nodes", () => {
     const shadowrocketNodes = [
       { key: "direct-upper", name: "DIRECT", type: "ss", endpoint: "one.example:443" },
       { key: "direct-lower", name: "direct", type: "ss", endpoint: "two.example:443" },
@@ -93,14 +93,11 @@ describe("config reference options", () => {
     const groups = [{ name: "Proxy", type: "select", proxies: ["$nodes"] }];
 
     expect(memberReferenceOptions("shadowrocket", shadowrocketNodes, groups, "Proxy").map(optionKey)).toEqual([
-      "macro:$nodes",
-      "node:HK Node",
       "builtin:PROXY",
       "builtin:DIRECT",
       "builtin:REJECT",
     ]);
     expect(policyReferenceOptions("shadowrocket", shadowrocketNodes, groups).map(optionKey)).toEqual([
-      "node:HK Node",
       "group:Proxy",
       "builtin:PROXY",
       "builtin:DIRECT",

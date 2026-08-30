@@ -2,8 +2,9 @@
 
 本页是节点输入 parser、节点输出 renderer、协议覆盖和字段兼容状态的现行契约。
 它不描述完整客户端文件；`mihomo-proxies`、`sing-box-outbounds` 和
-`shadowrocket-proxies` 都是节点片段，完整文件由 [FileSpec](file-spec.md)
-及对应 typed-file driver 生成。
+`shadowrocket-proxies` 都是节点输出。Mihomo、sing-box 完整文件以及
+Shadowrocket 无节点配置由 [FileSpec](file-spec.md) 和对应 typed-file driver
+生成。
 
 ## 运行时能力发现
 
@@ -127,11 +128,12 @@ renderer 或 probe core。当前值域为 `chrome`、`firefox`、`edge`、`safar
 | `json-nodes` | 缩进的 `NodeIR` JSON 数组 |
 | `mihomo-proxies` | 带顶层 `proxies` 的 YAML 节点文档 |
 | `sing-box-outbounds` | 带 `outbounds` 和/或 `endpoints` 的 JSON 节点文档 |
-| `shadowrocket-proxies` | 完整的 Shadowrocket `[Proxy]` section |
+| `shadowrocket-proxies` | 面向 Shadowrocket Subscribe 的 Clash YAML 节点文档；wire shape 与 `mihomo-proxies` 相同 |
 | `uri-list` | 未做 Base64 包装的逐行分享 URI |
 
-`shadowrocket-proxies` 是纯输出 adapter，不参与自动检测；上述 Shadowrocket
-分享链接由通用 URI parser 严格识别，不新增独立输入 format。
+`shadowrocket-proxies` 是纯输出 adapter，不参与自动检测。它表示 Shadowrocket
+Subscribe 所消费的 Clash YAML，不表示原生 INI。Shadowrocket 分享 URI 仍由
+通用 URI parser 严格识别，不新增独立输入 format。
 
 ## 协议矩阵
 
@@ -141,19 +143,19 @@ renderer 或 probe core。当前值域为 `chrome`、`firefox`、`edge`、`safar
 | `NodeIR.type` | URI 输入/输出 | Mihomo 输入/输出 | sing-box 输入/输出 | JSON 输入/输出 | Shadowrocket 输出 |
 | --- | --- | --- | --- | --- | --- |
 | `ss` | 是 | 是 | 是 | 是 | 是 |
-| `ssr` | 是 | 是 | 否 | 是 | 否 |
+| `ssr` | 是 | 是 | 否 | 是 | 是 |
 | `vmess` | 是 | 是 | 是 | 是 | 是 |
 | `vless` | 是 | 是 | 是 | 是 | 是 |
 | `trojan` | 是 | 是 | 是 | 是 | 是 |
 | `hysteria` | 是 | 是 | 是 | 是 | 是 |
 | `hysteria2` | 是 | 是 | 是 | 是 | 是 |
 | `tuic` | 是 | 是 | 是 | 是 | 是 |
-| `mieru` | 是 | 是 | 否 | 是 | 否 |
+| `mieru` | 是 | 是 | 否 | 是 | 是 |
 | `socks` | 是 | 是 | 是 | 是 | 是 |
 | `http` | 是 | 是 | 是 | 是 | 是 |
 | `wireguard` | 否 | 是 | 是 | 是 | 是 |
 | `snell` | 否 | 是 | 否 | 是 | 是 |
-| `anytls` | 是 | 是 | 是 | 是 | 否 |
+| `anytls` | 是 | 是 | 是 | 是 | 是 |
 
 URI parser 接受常用别名，例如 `hy://`、`hy2://`、`socks5://`、`vmess1://`；
 Mieru 使用 `mierus://`。这些语法别名最终都规范化为表中的 canonical type。
@@ -349,18 +351,13 @@ Mbps 界限或其它无效 canonical 速率时只跳过该节点，不会使仍�
 
 ### `shadowrocket-proxies`
 
-- 输出完整 `[Proxy]` section，支持 SS、VMess、VLESS、Trojan、Hysteria、
-  Hysteria2、TUIC uuid/password、HTTP/HTTPS、SOCKS5/SOCKS5-TLS、单 peer
-  WireGuard 和 Snell v2。
-- SSR、Mieru、AnyTLS，以及不符合上述语法约束的协议变体会被跳过。
-- WireGuard 必须能归约为一个有效 peer；Snell 只接受 v2 语义，且不接受
-  ShadowTLS。Hysteria v1 只接受文档化的 `udp`、`wechat-video`、`faketcp`
-  protocol。
-- 连接关键的未知 transport、TLS identity、Reality/ECH、认证变体不能安全降级，
-  因而跳过节点；可选且不影响连接成立的字段才以 `render_lossy_field` 保留节点。
-- 节点名会清理 CR/LF，并替换会破坏 INI 的 `,`、`=`、行首
-  `#`/`;`/`[`；空名、重复名和与内建策略冲突的名称也会规范化。任何名称变化
-  都进入 report。
+- 面向 Shadowrocket 首页 Subscribe 输出带顶层 `proxies` 的 Clash YAML；正文
+  与 `mihomo-proxies` 使用同一 serializer，避免两个 Clash dialect 漂移。
+- 节点类型、字段状态、跳过条件和有损边界与 `mihomo-proxies` 相同；warning 的
+  `target` 保持为 `shadowrocket-proxies`，便于识别调用方选择的客户端目标。
+- 这不是 Shadowrocket 原生 `[Proxy]` section。Shadowrocket FileSpec 只生成
+  与订阅分离的无节点 `.conf`：它清空 `[Proxy]`，并管理 `[General]`、
+  `[Proxy Group]` 和 `[Rule]`。节点通过 Subscribe 独立导入。
 
 ## 部分成功与 warning 策略
 

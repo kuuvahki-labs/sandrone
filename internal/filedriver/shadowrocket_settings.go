@@ -35,7 +35,7 @@ type ShadowrocketAdaptiveGroupSettings struct {
 type ShadowrocketGroupSettings struct {
 	Name              string    `json:"name" jsonschema:"Unique assignment-safe group name"`
 	Type              string    `json:"type" jsonschema:"Shadowrocket group type" enum:"select,url-test,fallback,load-balance,random"`
-	Proxies           *[]string `json:"proxies,omitempty" jsonschema:"Fixed policies or the $nodes expansion token"`
+	Proxies           *[]string `json:"proxies,omitempty" jsonschema:"Fixed built-in policies or declared proxy groups"`
 	PolicyRegexFilter *string   `json:"policy-regex-filter,omitempty" jsonschema:"Dynamic policy regular-expression filter"`
 	Interval          *int      `json:"interval,omitempty" jsonschema:"Health-check interval in seconds" minimum:"1" maximum:"86400"`
 	Timeout           *int      `json:"timeout,omitempty" jsonschema:"Health-check timeout in seconds" minimum:"1" maximum:"300"`

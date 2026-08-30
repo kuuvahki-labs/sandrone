@@ -155,7 +155,9 @@ function SortableProxyGroupRow({ adapter, focusFirstField, group, id, inboundCou
   const name = group.name || t("files.config.unnamedGroup");
   const targets = group.members;
   const memberMode = group.memberMode;
-  const fixedTargetsRef = useRef(targets.length ? targets : ["$nodes"]);
+  const fixedTargetsRef = useRef<string[]>(
+    targets.length ? targets : adapter.references.includeAllNodesMacro === false ? [] : ["$nodes"],
+  );
   const runtimeFilterRef = useRef(group.filter || "(?i)");
   useEffect(() => {
     if (memberMode === "fixed" && targets.length) fixedTargetsRef.current = targets;

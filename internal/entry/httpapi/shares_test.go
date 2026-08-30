@@ -225,10 +225,10 @@ func TestHTTPPublicShareFriendlyFilename(t *testing.T) {
 	require.Contains(t, w.Body.String(), "proxies:")
 
 	w = httptest.NewRecorder()
-	server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/s/nodes-share/%E9%85%8D%E7%BD%AE.conf?format=shadowrocket-proxies", nil))
+	server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/s/nodes-share/%E9%85%8D%E7%BD%AE.yaml?format=shadowrocket-proxies", nil))
 	require.Equal(t, http.StatusOK, w.Code)
-	requireInlineHTTPFilename(t, w.Header(), "配置.conf")
-	require.Contains(t, w.Body.String(), "[Proxy]")
+	requireInlineHTTPFilename(t, w.Header(), "配置.yaml")
+	require.Contains(t, w.Body.String(), "proxies:")
 }
 
 func TestHTTPPublicShareRejectsInvalidFriendlyPath(t *testing.T) {
@@ -326,7 +326,7 @@ func TestHTTPShareListIncludesPublicFilenames(t *testing.T) {
 				"base64":               "mobile.txt",
 				"uri-list":             "mobile.txt",
 				"mihomo-proxies":       "mobile.yaml",
-				"shadowrocket-proxies": "mobile.conf",
+				"shadowrocket-proxies": "mobile.yaml",
 				"sing-box-outbounds":   "mobile.json",
 				"json-nodes":           "mobile.json",
 			},

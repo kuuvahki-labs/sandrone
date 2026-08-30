@@ -24,7 +24,7 @@
 | `static` | 不解释 | 无 | 无 |
 | `mihomo` | YAML | 内建 Mihomo 基础配置 | Mihomo proxy 列表 |
 | `sing-box` | JSON | 内建 sing-box 基础配置 | sing-box outbound/endpoints |
-| `shadowrocket` | INI | `[General]` | Shadowrocket `[Proxy]` |
+| `shadowrocket` | INI | `[General]` | 无；配置与客户端订阅节点分离 |
 
 因此 `kind: static` 也必须显式写出；空字符串、`Static`、` static ` 和未注册值
 均为无效输入。
@@ -61,7 +61,7 @@ typed 文件的公共 `config` **只有**两个字段：
 
 | 字段 | 类型 | 语义 |
 | --- | --- | --- |
-| `subscriptions` | string[] | 按数组顺序解析订阅，并按同一顺序拼接节点。每项先去除首尾空白；空项跳过。 |
+| `subscriptions` | string[] | 仅适用于声明了节点 renderer 的 typed kind；按数组顺序解析订阅并拼接节点。Shadowrocket 不允许非空值。 |
 | `settings` | JSON object | 原样交给当前 kind 的 driver 严格解码。 |
 
 `config` 的其他字段会被拒绝。组、规则集和规则必须放在
@@ -72,8 +72,10 @@ typed 文件的公共 `config` **只有**两个字段：
 它编码成 JSON 字符串。各 canonical kind 的可发现 schema、source rules 与
 examples 见 [MCP resources](mcp.md#resources-与-schema-templates)。
 
-`subscriptions` 省略和显式 `[]` 都产生零个节点。重复的订阅名不会去重。
-解析任一订阅失败会终止整个文件生成，不返回部分配置。
+对 Mihomo 和 sing-box，`subscriptions` 省略和显式 `[]` 都产生零个节点；重复的
+订阅名不会去重，解析任一订阅失败会终止整个文件生成。Shadowrocket FileSpec
+不解析订阅，非空 `subscriptions` 返回 `invalid_argument`；其节点订阅通过
+`shadowrocket-proxies` 独立交付。
 
 ## typed settings 与空值
 
@@ -96,7 +98,8 @@ Mihomo 与 sing-box 的 `groups`、`rule_sets`、`rules` 使用客户端结构�
 Shadowrocket 的 settings 还执行字段级严格校验：
 
 - `groups[]` 必须有 `name`、`type`，且必须二选一给出 `proxies` 或
-  `policy-regex-filter`；`proxies` 中的 `$nodes` 在编译时展开为全部节点；
+  `policy-regex-filter`；使用 `PROXY` 引用客户端当前代理，或用
+  `policy-regex-filter` 匹配客户端订阅节点；
 - `rule_sets[]` 使用 `name`、`type`、`url`；
 - `rules[]` 是 Shadowrocket 规则字符串；
 - Web/HTTP 兼容元数据 `adaptive_groups` 只接受已声明的 type 和 region 值。
@@ -117,7 +120,8 @@ driver 会重建其拥有的节点和策略位置，而不是简单把节点附�
 - Mihomo 重建 `proxies`、`proxy-groups`、`rule-providers`、`rules`；
 - sing-box 重建 `outbounds`、`route.rule_set`、`route.rules`，缺少
   `route.final` 时补为 `Proxy`；渲染到 endpoint 的节点写入 `endpoints`；
-- Shadowrocket 重建 `[Proxy]`、`[Proxy Group]`、`[Rule]`，保留其他 section。
+- Shadowrocket 清空 `[Proxy]`，重建 `[Proxy Group]`、`[Rule]`，保留其他 section；
+  它不会把 Sandrone 订阅节点写进 `.conf`。
 
 要在 typed 编译后做结构化修改，使用 file-stage `merge`；开放式逻辑使用
 file-stage `script`。二者都在编译完成后按 `processors` 的声明顺序执行。
@@ -156,13 +160,13 @@ name: shadowrocket.conf
 kind: shadowrocket
 source: {}
 config:
-  subscriptions: [provider]
   settings:
     groups:
       - name: Proxy
         type: select
-        proxies: [$nodes, DIRECT]
+        proxies: [PROXY, DIRECT]
 ```
 
-这三个示例都使用内建 base。若要自带 base，把 `source` 改成完整的
+这三个示例都使用内建 base。Shadowrocket 的节点订阅须另行添加
+`shadowrocket-proxies` 分享链接。若要自带 base，把 `source` 改成完整的
 `inline` 或 `remote` source。

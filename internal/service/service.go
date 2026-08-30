@@ -18,7 +18,6 @@ import (
 
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/jsonnodes"
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/mihomo"
-	"github.com/kuuvahki-labs/sandrone/internal/adapter/shadowrocket"
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/singbox"
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/uri"
 	cachepkg "github.com/kuuvahki-labs/sandrone/internal/cache"
@@ -202,7 +201,7 @@ func New(opts ...Option) *Service {
 	mihomoRenderer := mihomo.NewRenderer()
 	singBoxRenderer := singbox.NewRenderer()
 	jsonRenderer := jsonnodes.NewRenderer()
-	shadowrocketRenderer := shadowrocket.NewRenderer()
+	shadowrocketSubscriptionRenderer := mihomo.NewRendererForFormat("shadowrocket-proxies")
 
 	registry := processor.NewRegistry()
 	typedFiles := filedriver.New()
@@ -218,7 +217,7 @@ func New(opts ...Option) *Service {
 		renderers: map[string]Renderer{
 			"base64":               base64Renderer,
 			"mihomo-proxies":       mihomoRenderer,
-			"shadowrocket-proxies": shadowrocketRenderer,
+			"shadowrocket-proxies": shadowrocketSubscriptionRenderer,
 			"sing-box-outbounds":   singBoxRenderer,
 			"json-nodes":           jsonRenderer,
 			"uri-list":             uriRenderer,

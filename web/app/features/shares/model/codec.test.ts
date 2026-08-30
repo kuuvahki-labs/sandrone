@@ -48,7 +48,7 @@ describe("share model codec", () => {
         format_filenames: {
           "uri-list": "mobile.txt",
           "mihomo-proxies": "mobile.yaml",
-          "shadowrocket-proxies": "mobile.conf",
+          "shadowrocket-proxies": "mobile.yaml",
           "sing-box-outbounds": "mobile.json",
           "json-nodes": "mobile.json",
         },
@@ -69,7 +69,7 @@ describe("share model codec", () => {
         formatFilenames: {
           "uri-list": "mobile.txt",
           "mihomo-proxies": "mobile.yaml",
-          "shadowrocket-proxies": "mobile.conf",
+          "shadowrocket-proxies": "mobile.yaml",
           "sing-box-outbounds": "mobile.json",
           "json-nodes": "mobile.json",
         },

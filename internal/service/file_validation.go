@@ -32,7 +32,11 @@ func (s *Service) validateFileSpecStructure(spec domain.FileSpec) error {
 		return err
 	}
 	descriptor := driver.Descriptor()
-	if _, ok := s.renderers[descriptor.NodeRenderFormat]; !ok {
+	if descriptor.NodeRenderFormat == "" {
+		if spec.Config != nil && len(trimStringList(spec.Config.Subscriptions)) > 0 {
+			return domain.NewError(domain.CodeInvalidArgument, fmt.Sprintf("file kind %q does not allow subscriptions", spec.Kind))
+		}
+	} else if _, ok := s.renderers[descriptor.NodeRenderFormat]; !ok {
 		return domain.NewError(domain.CodeInvalidArgument, fmt.Sprintf("file kind %q requires node renderer %q", spec.Kind, descriptor.NodeRenderFormat))
 	}
 	if spec.Config == nil {

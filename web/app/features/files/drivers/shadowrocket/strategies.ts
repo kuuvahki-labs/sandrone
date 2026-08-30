@@ -69,28 +69,14 @@ const adaptive = shadowrocketAdaptive(shadowrocketAdaptiveDialect(relations));
 export const shadowrocketConfigurationStrategies = Object.freeze({
   adaptive,
   preview: Object.freeze<ConfigPreviewStrategy>({
-    projectNodes: (preview) => {
-      const realized = preview.targetOptions?.shadowrocket;
-      return realized?.options ?? preview.options.filter((node) => (
-        !conflictsWithShadowrocketBuiltinRulePolicy(node.name)
-      ));
-    },
-    relationNodeNames: (nodes, selected) => selected
-      ? nodes?.map((node) => node.name)
-      : [],
-    validate: ({ preview }) => {
-      const realized = preview?.targetOptions?.shadowrocket;
-      const valid = realized === undefined
-        || preview?.renderCandidates.length === 0
-        || realized.options.length > 0;
-      return valid
-        ? { valid }
-        : { valid, issueKey: "files.config.shadowrocketNoRenderableNodes" };
-    },
+    projectNodes: () => [],
+    relationNodeNames: () => [],
+    validate: () => ({ valid: true }),
   }),
   references: Object.freeze<ConfigReferenceStrategy>({
     groupBuiltins: shadowrocketGroupBuiltinPolicies,
-    includeNode: (node) => !conflictsWithShadowrocketBuiltinRulePolicy(node.name),
+    includeAllNodesMacro: false,
+    includeNode: () => false,
     rulePolicyBuiltins: shadowrocketRuleBuiltinPolicies,
   }),
   relations,
@@ -99,22 +85,20 @@ export const shadowrocketConfigurationStrategies = Object.freeze({
 
 function shadowrocketRelations(): ConfigRelationStrategy {
 	const strategy: ConfigRelationStrategy = {
-    project(groups, ruleSets, rules, nodeNames): ConfigRelationProjection {
+    project(groups, ruleSets, rules): ConfigRelationProjection {
       const groupIdentities = groups.map((group, index) => relationIdentity("group", index, group.name));
       const ruleSetIdentities = ruleSets.map((ruleSet, index) => relationIdentity("ruleset", index, ruleSet.name));
       const knownGroups = new Set(groupIdentities.map((group) => group.name).filter(Boolean));
       const knownRuleSets = new Set(ruleSetIdentities.map((ruleSet) => ruleSet.name).filter(Boolean));
-      const knownNodes = new Set(nodeNames?.map((name) => name.trim()).filter(Boolean) ?? []);
-      const allowedGroupTargets = new Set<string>(["$nodes", ...shadowrocketGroupBuiltinPolicies, ...knownNodes]);
-      const allowedRulePolicies = new Set<string>([...shadowrocketRuleBuiltinPolicies, ...knownNodes]);
-      const severity = nodeNames === undefined ? "warning" : "error";
-      const issues = shadowrocketFieldIssues(groups, ruleSets, nodeNames);
+      const allowedGroupTargets = new Set<string>(shadowrocketGroupBuiltinPolicies);
+      const allowedRulePolicies = new Set<string>(shadowrocketRuleBuiltinPolicies);
+      const issues = shadowrocketFieldIssues(groups, ruleSets);
       const events = groups.flatMap((group, index) => {
         const sourceGroup = groupIdentities[index].name;
         const projected = strictStringList(group.proxies).map((target) => relationReferenceEvent({
-          allowed: nodeNames === undefined || allowedGroupTargets.has(target) || knownGroups.has(target),
+          allowed: allowedGroupTargets.has(target) || knownGroups.has(target),
           danglingIssue: relationIssue(
-            severity,
+            "error",
             "unknown_group_target",
             "groups",
             `group-${index}`,
@@ -186,7 +170,7 @@ function shadowrocketRelations(): ConfigRelationStrategy {
           events.push(relationReferenceEvent({
             allowed: allowedRulePolicies.has(target) || knownGroups.has(target),
             danglingIssue: relationIssue(
-              severity,
+              "error",
               "unknown_rule_policy",
               "rules",
               `rule-${index}`,
@@ -225,19 +209,8 @@ function shadowrocketRelations(): ConfigRelationStrategy {
 function shadowrocketFieldIssues(
   groups: Record<string, unknown>[],
   ruleSets: Record<string, unknown>[],
-  nodeNames?: string[],
 ) {
   const issues: ConfigValidationIssue[] = [];
-  const knownNodes = new Set(nodeNames?.map((name) => name.trim()).filter(Boolean) ?? []);
-  for (const name of knownNodes) {
-    if (conflictsWithShadowrocketBuiltinRulePolicy(name)) {
-      issues.push({
-        ...relationIssue("error", "shadowrocket_node_reserved_collision", "groups", "group-0", `Rendered node name "${name}" is reserved.`, name),
-        messageKey: "files.config.issueShadowrocketNodeReserved",
-        messageParams: { reference: name },
-      });
-    }
-  }
   for (const [index, group] of groups.entries()) {
     const itemId = `group-${index}`;
     const name = trimmedString(group.name);
@@ -246,9 +219,6 @@ function shadowrocketFieldIssues(
     }
     if (name === "$nodes" || conflictsWithShadowrocketBuiltinRulePolicy(name)) {
       issues.push(relationIssue("error", "shadowrocket_group_name_reserved", "groups", itemId, `Group name "${name}" is reserved.`, name));
-    }
-    if (knownNodes.has(name)) {
-      issues.push(relationIssue("error", "shadowrocket_group_node_collision", "groups", itemId, `Group name "${name}" conflicts with a rendered node.`, name));
     }
     if (Array.isArray(group.proxies)) {
       const seen = new Set<string>();
@@ -264,10 +234,6 @@ function shadowrocketFieldIssues(
     addIntegerIssue(issues, group.interval, 1, 86400, "shadowrocket_group_interval_invalid", itemId, "interval");
     addIntegerIssue(issues, group.timeout, 1, 300, "shadowrocket_group_timeout_invalid", itemId, "timeout");
     addIntegerIssue(issues, group.tolerance, 0, 65535, "shadowrocket_group_tolerance_invalid", itemId, "tolerance");
-    const expandedMembers = expandedMembersForValidation(group, nodeNames);
-    if (expandedMembers?.length === 0 && Array.isArray(group.proxies) && group.proxies.length > 0) {
-      issues.push(relationIssue("error", "shadowrocket_group_members_empty", "groups", itemId, "Group must contain at least one member after expanding subscription nodes."));
-    }
   }
   for (const [index, ruleSet] of ruleSets.entries()) {
     const itemId = `ruleset-${index}`;
@@ -322,6 +288,10 @@ function shadowrocketAdaptiveDialect(
       [],
       config.rules ?? [],
     )).groupInboundReferences,
+    referenceInsertionIndex: (members) => {
+      const index = members.findIndex((member) => member === "DIRECT" || member === "REJECT");
+      return index < 0 ? members.length : index;
+    },
     materialize,
     replaceGroupMembers: (group, members) => ({ ...group, proxies: [...members] }),
     requiresNodePreview: false,
@@ -379,7 +349,7 @@ function materializeShadowrocketTemplate(
     const targets = [...new Set([
       ...(item.id === "select" ? ["PROXY"] : []),
       ...templateGroupTargets(item, selectName, autoName, "DIRECT", "REJECT"),
-    ].filter((target) => target !== name))];
+    ].filter((target) => target !== name && target !== "$nodes"))];
     return item.groupMode === "url-test"
       ? { name, type: "url-test", proxies: targets, interval: 300, timeout: 5, tolerance: 50 }
       : { name, type: "select", proxies: targets };
@@ -475,19 +445,6 @@ function anchorProblem(groups: readonly ConfigMap[]): AdaptiveGroupAnchorProblem
     return { code: "anchor_members_invalid" };
   }
   return null;
-}
-
-function expandedMembersForValidation(
-  group: Record<string, unknown>,
-  nodeNames?: string[],
-): string[] | undefined {
-  if (typeof group["policy-regex-filter"] === "string") return undefined;
-  const targets = strictStringList(group.proxies);
-  if (nodeNames === undefined && targets.includes("$nodes")) return undefined;
-  return [...new Set(targets
-    .flatMap((target) => target === "$nodes" ? nodeNames ?? [] : [target])
-    .map((target) => target.trim())
-    .filter(Boolean))];
 }
 
 function addIntegerIssue(

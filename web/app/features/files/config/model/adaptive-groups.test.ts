@@ -580,7 +580,7 @@ describe("adaptive Shadowrocket group generation", () => {
     expect(canonicalAdaptiveGroupNames(first.config.groups ?? [], "shadowrocket")).toEqual(["Hong Kong"]);
     expect(first.generatedGroupNames).toEqual(["Hong Kong"]);
     expect(first.config.groups?.find((group) => group.name === "Proxy")?.proxies)
-      .toEqual(["PROXY", "Hong Kong", "$nodes", "DIRECT", "REJECT"]);
+      .toEqual(["PROXY", "Hong Kong", "DIRECT", "REJECT"]);
     expect(second.changed).toBe(false);
  });
 });

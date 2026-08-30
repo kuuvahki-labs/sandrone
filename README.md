@@ -63,7 +63,7 @@ curl http://127.0.0.1:1137/version
           ↓
 过滤 → 去重 → 重命名 → 排序 → 探测 → 受限脚本
           ↓
-Mihomo / sing-box / Shadowrocket 完整配置
+Mihomo / sing-box 完整配置，或 Shadowrocket 无节点配置
           ↓
      预览、下载或分享链接
 ```
@@ -78,8 +78,8 @@ Mihomo / sing-box / Shadowrocket 完整配置
 | --- | --- |
 | 输入 | 单条分享 URI、URI 列表、Base64 订阅、Mihomo YAML / JSON、sing-box JSON |
 | 节点处理 | filter、dedup、rename、sort、quick settings、probe、sandboxed JavaScript |
-| 节点输出 | Mihomo proxies、sing-box outbounds / endpoints、Shadowrocket `[Proxy]`、URI 列表 |
-| 完整文件 | Mihomo、sing-box、Shadowrocket typed config，以及 static / remote file |
+| 节点输出 | Mihomo proxies、sing-box outbounds / endpoints、Shadowrocket Subscribe（Clash YAML 别名）、URI 列表 |
+| 完整文件 | Mihomo、sing-box typed config、Shadowrocket 无节点 typed config，以及 static / remote file |
 | 文件处理 | YAML / JSON / INI merge、JSON Patch、template 与 sandboxed JavaScript |
 | 运行能力 | preview、CLI diagnose、声明式 TCP / UDP / URL probe、缓存、定时刷新、分享、备份与恢复 |
 | 接入方式 | Web UI、CLI、HTTP API、MCP Streamable HTTP、`pkg/sandrone` Go API |

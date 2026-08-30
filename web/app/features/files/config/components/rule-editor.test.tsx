@@ -167,7 +167,7 @@ describe("config rule editors", () => {
   it("offers common Shadowrocket string rules and only meaningful no-resolve", async () => {
     const user = userEvent.setup();
     const config = initialConfig("shadowrocket", {
-      groups: [{ name: "Proxy", type: "select", proxies: ["$nodes", "DIRECT"] }],
+      groups: [{ name: "Proxy", type: "select", proxies: ["PROXY", "DIRECT"] }],
       rule_sets: [{ name: "ads", type: "domain-set", url: "https://example.com/ads.list" }],
       rules: ["DOMAIN-SET,ads,REJECT", "FINAL,Proxy"],
     });

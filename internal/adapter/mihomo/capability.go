@@ -16,6 +16,6 @@ func (p *Parser) ParseCapabilities() []shared.Capability {
 
 func (r *Renderer) RenderCapabilities() []shared.Capability {
 	return []shared.Capability{
-		shared.CapabilityFor("mihomo-proxies", shared.DirectionRender, shared.AllNodeTypes(), false),
+		shared.CapabilityFor(r.Name(), shared.DirectionRender, shared.AllNodeTypes(), false),
 	}
 }
