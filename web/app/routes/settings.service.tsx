@@ -30,9 +30,19 @@ export default function SettingsServiceRoute() {
       overrides={app.settingsOverrides}
       restartRequired={app.restartRequired}
       scheduledRefreshResources={scheduledRefreshResources}
-      scheduledRefreshStatus={scheduledRefreshStatus}
+      scheduledRefreshStatus={scheduledRefreshStatus.status}
       settings={app.settings}
       onBack={() => navigate("/settings")}
+      onRunScheduledRefresh={async () => {
+        try {
+          await app.client.runScheduledRefresh();
+          await scheduledRefreshStatus.refresh();
+          app.showNotice(t("settings.scheduledRefresh.started"));
+        } catch (error) {
+          app.showNotice(t("settings.scheduledRefresh.startFailed"), "error");
+          throw error;
+        }
+      }}
       onSave={app.updateSettings}
     />
   );

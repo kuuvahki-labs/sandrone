@@ -414,6 +414,7 @@ describe("ApiClient", () => {
     await client.previewFile("client.yaml");
     await client.previewFile("client.yaml", { refresh: true });
     await client.getScheduledRefreshStatus();
+    await client.runScheduledRefresh();
 
     expect(calls).toEqual([
       { input: "/v1/subscriptions/provider/preview", method: "POST", body: undefined },
@@ -421,6 +422,7 @@ describe("ApiClient", () => {
       { input: "/v1/files/client.yaml?response=json", method: "GET", body: undefined },
       { input: "/v1/files/client.yaml?response=json&refresh=true", method: "GET", body: undefined },
       { input: "/v1/settings/scheduled-refresh-status", method: "GET", body: undefined },
+      { input: "/v1/settings/scheduled-refresh/run", method: "POST", body: undefined },
     ]);
   });
 

@@ -23,3 +23,15 @@ func (s *Server) putSettings(w http.ResponseWriter, r *http.Request) {
 func (s *Server) getScheduledRefreshStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.rt.Service.ScheduledRefreshStatus(r.Context()))
 }
+
+func (s *Server) runScheduledRefreshNow(w http.ResponseWriter, r *http.Request) {
+	if err := s.rt.Service.RunScheduledRefreshNow(r.Context()); err != nil {
+		if domain.IsCode(err, domain.CodeNotImplemented) {
+			writeError(w, err, http.StatusServiceUnavailable)
+			return
+		}
+		writeServiceError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]bool{"accepted": true})
+}

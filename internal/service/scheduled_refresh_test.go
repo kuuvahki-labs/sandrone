@@ -158,6 +158,77 @@ func TestScheduledRefreshSchedulerAppliesDynamicSettings(t *testing.T) {
 	}, time.Second, 10*time.Millisecond)
 }
 
+func TestScheduledRefreshRunsCurrentTargetsImmediately(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	coordinator := store.Coordinate(store.NewFSStore(fs))
+	repository := store.NewSettingsStore(coordinator)
+	value := projectsettings.Default()
+	svc := New(WithStore(coordinator), WithProjectSettings(repository, value, value, nil))
+	refreshed := make(chan domain.ScheduledRefreshTarget, 1)
+	release := make(chan struct{})
+	svc.scheduledRefreshTarget = func(_ context.Context, target domain.ScheduledRefreshTarget) error {
+		refreshed <- target
+		<-release
+		return nil
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() {
+		svc.RunScheduledRefresh(ctx)
+		close(done)
+	}()
+	t.Cleanup(func() {
+		cancel()
+		<-done
+	})
+
+	update := scheduledRefreshSettingsUpdate(value)
+	update.ScheduledRefresh = domain.ScheduledRefreshSettings{
+		Enabled: true, Schedule: "@every 1m",
+		Targets: []domain.ScheduledRefreshTarget{{Kind: "subscription", Name: "provider"}},
+	}
+	_, err := svc.PutSettings(t.Context(), update)
+	require.NoError(t, err)
+	require.NoError(t, svc.RunScheduledRefreshNow(t.Context()))
+	require.True(t, svc.ScheduledRefreshStatus(t.Context()).Running)
+
+	select {
+	case target := <-refreshed:
+		require.Equal(t, domain.ScheduledRefreshTarget{Kind: "subscription", Name: "provider"}, target)
+	case <-time.After(time.Second):
+		t.Fatal("immediate scheduled refresh did not start")
+	}
+	close(release)
+	require.Eventually(t, func() bool {
+		status := svc.ScheduledRefreshStatus(t.Context())
+		return !status.Running && status.LastSuccessCount == 1 && status.LastFailureCount == 0
+	}, time.Second, 10*time.Millisecond)
+}
+
+func TestScheduledRefreshRunNowRequiresEnabledConfiguration(t *testing.T) {
+	svc := New()
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() {
+		svc.RunScheduledRefresh(ctx)
+		close(done)
+	}()
+	t.Cleanup(func() {
+		cancel()
+		<-done
+	})
+
+	err := svc.RunScheduledRefreshNow(t.Context())
+	require.Error(t, err)
+	require.True(t, domain.IsCode(err, domain.CodeInvalidArgument))
+}
+
+func TestScheduledRefreshRunNowRejectsUnavailableScheduler(t *testing.T) {
+	err := New(WithSchedulerEnabled(false)).RunScheduledRefreshNow(t.Context())
+	require.Error(t, err)
+	require.True(t, domain.IsCode(err, domain.CodeNotImplemented))
+}
+
 func TestDisabledSchedulerPreservesStoredSettingsWithoutScheduling(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	coordinator := store.Coordinate(store.NewFSStore(fs))

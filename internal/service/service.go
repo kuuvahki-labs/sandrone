@@ -96,6 +96,7 @@ type Service struct {
 	scheduledRefreshMu      sync.Mutex
 	scheduledRefreshStatus  domain.ScheduledRefreshStatus
 	scheduledRefreshUpdates chan struct{}
+	scheduledRefreshRuns    chan scheduledRefreshRunRequest
 	scheduledRefreshTarget  func(context.Context, domain.ScheduledRefreshTarget) error
 	schedulerEnabled        bool
 }
@@ -229,6 +230,7 @@ func New(opts ...Option) *Service {
 		fetcher:                 fetcher.New(),
 		now:                     time.Now,
 		scheduledRefreshUpdates: make(chan struct{}, 1),
+		scheduledRefreshRuns:    make(chan scheduledRefreshRunRequest),
 		schedulerEnabled:        true,
 	}
 	nodeproc.Register(registry, processorProbeRunner{service: s})

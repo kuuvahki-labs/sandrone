@@ -176,6 +176,24 @@ target 的 `kind` 只能是 `subscription` 或 `file`，`name` 去除首尾空�
 检查目标当前是否存在，因此已删除资源仍能保留在设置中；实际触发时该目标失败，
 后续目标继续执行。调度与缓存的完整执行边界见[存储架构](../../architecture/storage.md#定时更新)。
 
+### `POST /v1/settings/scheduled-refresh/run`
+
+使用当前 effective 设置中的 targets 异步执行一次更新，不接收请求体。该动作要求
+运行时提供 `scheduler.enabled` 能力，并且当前定时更新设置已启用。成功登记运行状态后
+返回 `202 Accepted`：
+
+```json
+{
+  "accepted": true
+}
+```
+
+动作不会写入项目设置，也不改变 `next_run_at` 或下一次 cron 触发时间；执行结果通过
+下方状态接口观察。若已有更新正在运行，本次请求复用调度器的重叠保护，计入 skipped
+并不排队。定时更新未启用时返回 `400 invalid_argument`，当前运行模式不提供调度器时
+返回 `503 not_implemented`。Web UI 的“保存后立即执行一次”只是一项本地一次性选择：
+它先保存设置，再调用本接口，不进入 `settings.json` 或备份。
+
 ### `GET /v1/settings/scheduled-refresh-status`
 
 返回当前进程的内存状态，不重新读取或修改项目设置：

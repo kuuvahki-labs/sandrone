@@ -68,38 +68,63 @@ describe("useScheduledRefreshStatus", () => {
 
     await act(async () => Promise.resolve());
     expect(getScheduledRefreshStatus).toHaveBeenCalledTimes(1);
-    expect(result.current?.running).toBe(false);
+    expect(result.current.status?.running).toBe(false);
 
     await act(async () => vi.advanceTimersByTimeAsync(30_000));
     expect(getScheduledRefreshStatus).toHaveBeenCalledTimes(2);
-    expect(result.current?.running).toBe(true);
+    expect(result.current.status?.running).toBe(true);
 
     unmount();
     await vi.advanceTimersByTimeAsync(30_000);
     expect(getScheduledRefreshStatus).toHaveBeenCalledTimes(2);
   });
 
-	it("does not request or poll when scheduler is unavailable", async () => {
-		vi.useFakeTimers();
-		const getScheduledRefreshStatus = vi.fn();
-		const client = { getScheduledRefreshStatus } as unknown as ApiClient;
-		renderHook(() => useScheduledRefreshStatus(client), {
-			wrapper: ({ children }) => (
-				<UICapabilityProvider value={{
-					capabilities: [{ key: "scheduler.enabled", enabled: false }],
-					loaded: true,
-					hasFeature: () => false,
-					getFeature: (key) => ({ key, enabled: false }),
-				}}>
-					{children}
-				</UICapabilityProvider>
-			),
-		});
+  it("refreshes immediately with a fresh request", async () => {
+    const getScheduledRefreshStatus = vi.fn()
+      .mockResolvedValueOnce({ enabled: true, running: false, last_success_count: 0, last_failure_count: 0, skipped_count: 0 })
+      .mockResolvedValueOnce({ enabled: true, running: true, last_success_count: 0, last_failure_count: 0, skipped_count: 0 });
+    const client = { getScheduledRefreshStatus } as unknown as ApiClient;
+    const { result } = renderHook(() => useScheduledRefreshStatus(client), {
+      wrapper: ({ children }) => (
+        <UICapabilityProvider value={{
+          capabilities: [{ key: "scheduler.enabled", enabled: true }],
+          loaded: true,
+          hasFeature: (key) => key === "scheduler.enabled",
+          getFeature: (key) => key === "scheduler.enabled" ? { key, enabled: true } : undefined,
+        }}>
+          {children}
+        </UICapabilityProvider>
+      ),
+    });
 
-		await act(async () => Promise.resolve());
-		await act(async () => vi.advanceTimersByTimeAsync(30_000));
-		expect(getScheduledRefreshStatus).not.toHaveBeenCalled();
-	});
+    await waitFor(() => expect(result.current.status?.running).toBe(false));
+    await act(() => result.current.refresh());
+
+    expect(getScheduledRefreshStatus).toHaveBeenLastCalledWith({ fresh: true });
+    expect(result.current.status?.running).toBe(true);
+  });
+
+  it("does not request or poll when scheduler is unavailable", async () => {
+    vi.useFakeTimers();
+    const getScheduledRefreshStatus = vi.fn();
+    const client = { getScheduledRefreshStatus } as unknown as ApiClient;
+    renderHook(() => useScheduledRefreshStatus(client), {
+      wrapper: ({ children }) => (
+        <UICapabilityProvider value={{
+          capabilities: [{ key: "scheduler.enabled", enabled: false }],
+          loaded: true,
+          hasFeature: () => false,
+          getFeature: (key) => ({ key, enabled: false }),
+        }}>
+          {children}
+        </UICapabilityProvider>
+      ),
+    });
+
+    await act(async () => Promise.resolve());
+    await act(async () => vi.advanceTimersByTimeAsync(30_000));
+    expect(getScheduledRefreshStatus).not.toHaveBeenCalled();
+  });
 });
 
 const t = createTranslator("zh-CN");

@@ -4,12 +4,17 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/robfig/cron/v3"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
+
+type scheduledRefreshRunRequest struct {
+	result chan error
+}
 
 // RunScheduledRefresh runs the internal refresh scheduler until ctx is
 // cancelled. It is intended for long-lived serve entrypoints only.
@@ -55,15 +60,49 @@ func (s *Service) RunScheduledRefresh(ctx context.Context) {
 
 	configure()
 	runner.Start()
+	var manualRuns sync.WaitGroup
 	for {
 		select {
 		case <-ctx.Done():
 			stopCtx := runner.Stop()
 			<-stopCtx.Done()
+			manualRuns.Wait()
 			return
 		case <-s.scheduledRefreshUpdates:
 			configure()
+		case request := <-s.scheduledRefreshRuns:
+			settings := s.currentSettings().ScheduledRefresh
+			if !settings.Enabled {
+				request.result <- domain.NewError(domain.CodeInvalidArgument, "scheduled refresh is not enabled")
+				continue
+			}
+			started := make(chan struct{})
+			manualRuns.Go(func() {
+				s.runScheduledRefreshWithStartSignal(ctx, settings.Targets, nil, started)
+			})
+			<-started
+			request.result <- nil
 		}
+	}
+}
+
+// RunScheduledRefreshNow asks the long-lived scheduler to execute the current
+// effective targets once without changing their next scheduled run.
+func (s *Service) RunScheduledRefreshNow(ctx context.Context) error {
+	if !s.schedulerEnabled {
+		return domain.NewError(domain.CodeNotImplemented, "scheduled refresh is not available")
+	}
+	request := scheduledRefreshRunRequest{result: make(chan error, 1)}
+	select {
+	case s.scheduledRefreshRuns <- request:
+	case <-ctx.Done():
+		return context.Cause(ctx)
+	}
+	select {
+	case err := <-request.result:
+		return err
+	case <-ctx.Done():
+		return context.Cause(ctx)
 	}
 }
 
@@ -88,6 +127,15 @@ func (s *Service) setScheduledRefreshConfiguration(enabled bool, next *time.Time
 }
 
 func (s *Service) runScheduledRefresh(ctx context.Context, targets []domain.ScheduledRefreshTarget, schedule cron.Schedule) {
+	s.runScheduledRefreshWithStartSignal(ctx, targets, schedule, nil)
+}
+
+func (s *Service) runScheduledRefreshWithStartSignal(
+	ctx context.Context,
+	targets []domain.ScheduledRefreshTarget,
+	schedule cron.Schedule,
+	startSignal chan<- struct{},
+) {
 	started := s.now()
 	s.scheduledRefreshMu.Lock()
 	if s.scheduledRefreshStatus.Running {
@@ -98,6 +146,7 @@ func (s *Service) runScheduledRefresh(ctx context.Context, targets []domain.Sche
 			s.scheduledRefreshStatus.NextRunAt = cloneTime(&next)
 		}
 		s.scheduledRefreshMu.Unlock()
+		signalScheduledRefreshStarted(startSignal)
 		s.log(ctx, slog.LevelWarn, "scheduled refresh skipped because the previous run is still active")
 		return
 	}
@@ -108,6 +157,7 @@ func (s *Service) runScheduledRefresh(ctx context.Context, targets []domain.Sche
 		s.scheduledRefreshStatus.NextRunAt = cloneTime(&next)
 	}
 	s.scheduledRefreshMu.Unlock()
+	signalScheduledRefreshStarted(startSignal)
 
 	successCount := 0
 	failureCount := 0
@@ -139,6 +189,12 @@ func (s *Service) runScheduledRefresh(ctx context.Context, targets []domain.Sche
 		}
 		successCount++
 		s.log(ctx, slog.LevelInfo, "scheduled refresh target completed", "target_kind", target.Kind, "target_name", target.Name)
+	}
+}
+
+func signalScheduledRefreshStarted(started chan<- struct{}) {
+	if started != nil {
+		close(started)
 	}
 }
 

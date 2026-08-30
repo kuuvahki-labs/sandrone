@@ -2,6 +2,7 @@ package httpapi_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -150,6 +152,56 @@ func TestScheduledRefreshStatusEndpointUsesAuthenticationAndStableShape(t *testi
 	require.Zero(t, status.LastSuccessCount)
 	require.Zero(t, status.LastFailureCount)
 	require.Zero(t, status.SkippedCount)
+}
+
+func TestScheduledRefreshRunEndpointAcceptsCurrentConfiguration(t *testing.T) {
+	rt := testRuntime(t, app.Config{})
+	server := httpapi.New(rt)
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() {
+		rt.Service.RunScheduledRefresh(ctx)
+		close(done)
+	}()
+	t.Cleanup(func() {
+		cancel()
+		<-done
+	})
+
+	update := settingsUpdate()
+	update.ScheduledRefresh = domain.ScheduledRefreshSettings{
+		Enabled: true, Schedule: "@daily",
+		Targets: []domain.ScheduledRefreshTarget{{Kind: "file", Name: "missing.yaml"}},
+	}
+	put := httptest.NewRecorder()
+	server.Handler().ServeHTTP(put, httptest.NewRequest(http.MethodPut, "/v1/settings", jsonBody(t, update)))
+	require.Equal(t, http.StatusOK, put.Code)
+
+	run := httptest.NewRecorder()
+	server.Handler().ServeHTTP(run, httptest.NewRequest(http.MethodPost, "/v1/settings/scheduled-refresh/run", nil))
+	require.Equal(t, http.StatusAccepted, run.Code)
+	require.JSONEq(t, `{"accepted":true}`, run.Body.String())
+	require.Eventually(t, func() bool {
+		status := rt.Service.ScheduledRefreshStatus(t.Context())
+		return !status.Running && status.LastFailureCount == 1
+	}, time.Second, 10*time.Millisecond)
+}
+
+func TestScheduledRefreshRunEndpointRejectsUnavailableScheduler(t *testing.T) {
+	cfg := app.Config{DataDir: t.TempDir()}
+	rt, err := app.NewRuntimeContext(t.Context(), cfg, nil, app.WithSchedulerEnabled(false))
+	require.NoError(t, err)
+	server := httpapi.New(rt)
+
+	response := httptest.NewRecorder()
+	server.Handler().ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/v1/settings/scheduled-refresh/run", nil))
+	require.Equal(t, http.StatusServiceUnavailable, response.Code)
+	require.JSONEq(t, `{
+		"error": {
+			"code": "not_implemented",
+			"message": "scheduled refresh is not available"
+		}
+	}`, response.Body.String())
 }
 
 func TestSettingsEndpointExcludesOverriddenStartupPathsFromRestartRequired(t *testing.T) {

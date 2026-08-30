@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useSandrone } from "~/core/provider/context";
 import type { SandroneContextValue } from "~/core/provider/types";
 import { defaultProjectSettings } from "~/features/settings/model/project-settings";
+import { UICapabilityProvider } from "~/shared/capabilities/context";
 import { I18nProvider } from "~/shared/i18n/context";
 
 import SettingsRoute from "./settings";
@@ -102,6 +103,52 @@ describe("SettingsServiceRoute", () => {
     expect(client.downloadBackup).not.toHaveBeenCalled();
   });
 
+  it("runs scheduled refresh after saving when requested", async () => {
+    const user = userEvent.setup();
+    const settings = {
+      ...defaultProjectSettings,
+      scheduled_refresh: {
+        ...defaultProjectSettings.scheduled_refresh,
+        enabled: true,
+        targets: [{ kind: "subscription" as const, name: "provider" }],
+      },
+    };
+    const { client, showNotice, updateSettings } = mockSettingsServiceApp(settings);
+
+    renderSettingsServiceRoute(true);
+    const runAfterSave = await screen.findByRole("checkbox", { name: "保存后立即执行一次" });
+    await user.click(runAfterSave);
+    await user.click(screen.getByRole("button", { name: "保存设置" }));
+
+    await waitFor(() => expect(client.runScheduledRefresh).toHaveBeenCalledTimes(1));
+    expect(updateSettings.mock.invocationCallOrder[0]).toBeLessThan(client.runScheduledRefresh.mock.invocationCallOrder[0]);
+    expect(client.getScheduledRefreshStatus).toHaveBeenCalledWith({ fresh: true });
+    expect(showNotice).toHaveBeenCalledWith("已启动一次更新");
+  });
+
+  it("reports a saved setting when the immediate run cannot start", async () => {
+    const user = userEvent.setup();
+    const settings = {
+      ...defaultProjectSettings,
+      scheduled_refresh: {
+        ...defaultProjectSettings.scheduled_refresh,
+        enabled: true,
+        targets: [{ kind: "file" as const, name: "client.yaml" }],
+      },
+    };
+    const { client, showNotice, updateSettings } = mockSettingsServiceApp(settings);
+    client.runScheduledRefresh.mockRejectedValueOnce(new Error("unavailable"));
+
+    renderSettingsServiceRoute(true);
+    const runAfterSave = await screen.findByRole("checkbox", { name: "保存后立即执行一次" });
+    await user.click(runAfterSave);
+    await user.click(screen.getByRole("button", { name: "保存设置" }));
+
+    await waitFor(() => expect(showNotice).toHaveBeenCalledWith("设置已保存，但立即更新启动失败", "error"));
+    expect(updateSettings).toHaveBeenCalledTimes(1);
+    expect(runAfterSave).toBeChecked();
+  });
+
   it("returns to the settings overview", async () => {
     const user = userEvent.setup();
     mockSettingsServiceApp();
@@ -144,13 +191,20 @@ function renderSettingsDataRoute() {
   );
 }
 
-function renderSettingsServiceRoute() {
+function renderSettingsServiceRoute(schedulerEnabled = false) {
   const router = createMemoryRouter([
     { path: "/settings/service", element: <SettingsServiceRoute /> },
   ], { initialEntries: ["/settings/service"] });
   return render(
     <I18nProvider>
-      <RouterProvider router={router} />
+      <UICapabilityProvider value={{
+        capabilities: [{ key: "scheduler.enabled", enabled: schedulerEnabled }],
+        loaded: true,
+        hasFeature: (key) => key === "scheduler.enabled" && schedulerEnabled,
+        getFeature: (key) => key === "scheduler.enabled" ? { key, enabled: schedulerEnabled } : undefined,
+      }}>
+        <RouterProvider router={router} />
+      </UICapabilityProvider>
     </I18nProvider>,
   );
 }
@@ -193,7 +247,7 @@ function mockSettingsDataApp() {
   return client;
 }
 
-function mockSettingsServiceApp() {
+function mockSettingsServiceApp(settings = defaultProjectSettings) {
   const client = {
     downloadBackup: vi.fn(),
     getScheduledRefreshStatus: vi.fn().mockResolvedValue({
@@ -211,15 +265,17 @@ function mockSettingsServiceApp() {
     listFiles: vi.fn().mockResolvedValue({ files: [] }),
     listSubscriptions: vi.fn().mockResolvedValue({ subscriptions: [] }),
     restoreBackup: vi.fn(),
+    runScheduledRefresh: vi.fn().mockResolvedValue({ accepted: true }),
   };
   const updateSettings = vi.fn().mockResolvedValue(undefined);
+  const showNotice = vi.fn();
   vi.mocked(useSandrone).mockReturnValue({
     client,
     restartRequired: [],
-    settings: defaultProjectSettings,
+    settings,
     settingsOverrides: {},
-    showNotice: vi.fn(),
+    showNotice,
     updateSettings,
   } as unknown as SandroneContextValue);
-  return { client, updateSettings };
+  return { client, showNotice, updateSettings };
 }

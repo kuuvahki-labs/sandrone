@@ -296,8 +296,15 @@ export class ApiClient {
     return this.request("/v1/settings", { method: "PUT", body: settings });
   }
 
-  getScheduledRefreshStatus(): Promise<ScheduledRefreshStatus> {
+  getScheduledRefreshStatus(options: { fresh?: boolean } = {}): Promise<ScheduledRefreshStatus> {
+    if (options.fresh) {
+      return this.replaceDedupedRequest("GET", "/v1/settings/scheduled-refresh-status");
+    }
     return this.dedupedRequest("GET", "/v1/settings/scheduled-refresh-status");
+  }
+
+  runScheduledRefresh(): Promise<{ accepted: boolean }> {
+    return this.request("/v1/settings/scheduled-refresh/run", { method: "POST" });
   }
 
   async downloadBackup(): Promise<{ blob: Blob; filename: string }> {

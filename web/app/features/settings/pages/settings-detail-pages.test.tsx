@@ -26,6 +26,7 @@ describe("settings service page", () => {
           scheduledRefreshResources={[]}
           settings={defaultProjectSettings}
           onBack={vi.fn()}
+          onRunScheduledRefresh={vi.fn()}
           onSave={vi.fn()}
         />
       </UICapabilityProvider>,
@@ -48,6 +49,7 @@ describe("settings service page", () => {
         scheduledRefreshResources={[]}
         settings={defaultProjectSettings}
         onBack={onBack}
+        onRunScheduledRefresh={vi.fn()}
         onSave={onSave}
       />,
     );
@@ -147,6 +149,7 @@ describe("settings service page", () => {
       scheduledRefreshResources: [],
       settings: defaultProjectSettings,
       onBack: vi.fn(),
+      onRunScheduledRefresh: vi.fn(),
       onSave,
     };
     const { rerender } = renderRuntimePage(
@@ -196,6 +199,7 @@ describe("settings service page", () => {
         ]}
         settings={settings}
         onBack={vi.fn()}
+        onRunScheduledRefresh={vi.fn()}
         onSave={onSave}
       />,
     );
@@ -213,6 +217,75 @@ describe("settings service page", () => {
         ],
       }),
     }));
+  });
+
+  it("runs the saved schedule once and clears the one-shot choice", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    const onRunScheduledRefresh = vi.fn().mockResolvedValue(undefined);
+    const settings = {
+      ...defaultProjectSettings,
+      scheduled_refresh: {
+        ...defaultProjectSettings.scheduled_refresh,
+        enabled: true,
+        targets: [{ kind: "subscription" as const, name: "provider" }],
+      },
+    };
+    renderRuntimePage(
+      <SettingsServicePage
+        overrides={{}}
+        restartRequired={[]}
+        scheduledRefreshResources={[{ kind: "subscription", name: "provider", label: "Provider" }]}
+        settings={settings}
+        onBack={vi.fn()}
+        onRunScheduledRefresh={onRunScheduledRefresh}
+        onSave={onSave}
+      />,
+    );
+
+    const runAfterSave = screen.getByRole("checkbox", { name: "保存后立即执行一次" });
+    await user.click(runAfterSave);
+    await user.click(screen.getByRole("button", { name: "保存设置" }));
+
+    await waitFor(() => expect(onRunScheduledRefresh).toHaveBeenCalledTimes(1));
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave.mock.invocationCallOrder[0]).toBeLessThan(onRunScheduledRefresh.mock.invocationCallOrder[0]);
+    expect(runAfterSave).not.toBeChecked();
+  });
+
+  it("disables the one-shot choice without targets or while running", () => {
+    const baseProps = {
+      overrides: {},
+      restartRequired: [],
+      scheduledRefreshResources: [],
+      settings: {
+        ...defaultProjectSettings,
+        scheduled_refresh: { ...defaultProjectSettings.scheduled_refresh, enabled: true },
+      },
+      onBack: vi.fn(),
+      onRunScheduledRefresh: vi.fn(),
+      onSave: vi.fn(),
+    };
+    const { rerender } = renderRuntimePage(<SettingsServicePage {...baseProps} />);
+
+    expect(screen.getByRole("checkbox", { name: "保存后立即执行一次" })).toBeDisabled();
+
+    rerender(
+      <UICapabilityProvider value={runtimeCapabilityValue}>
+        <SettingsServicePage
+          {...baseProps}
+          scheduledRefreshStatus={{ enabled: true, running: true, last_success_count: 0, last_failure_count: 0, skipped_count: 0 }}
+          settings={{
+            ...baseProps.settings,
+            scheduled_refresh: {
+              ...baseProps.settings.scheduled_refresh,
+              targets: [{ kind: "file", name: "client.yaml" }],
+            },
+          }}
+        />
+      </UICapabilityProvider>,
+    );
+    expect(screen.getByRole("checkbox", { name: "保存后立即执行一次" })).toBeDisabled();
   });
 });
 

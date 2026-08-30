@@ -1,6 +1,7 @@
 import Autocomplete from "@mui/material/Autocomplete";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
+import Checkbox from "@mui/material/Checkbox";
 import Chip from "@mui/material/Chip";
 import Collapse from "@mui/material/Collapse";
 import Divider from "@mui/material/Divider";
@@ -24,6 +25,8 @@ interface ResourceAutomationSettingsSectionProps {
   scheduledRefreshStatus?: ScheduledRefreshStatus;
   scheduledRefreshValue: SettingsView["scheduled_refresh"];
   subscriptionTrafficValue: boolean;
+  runScheduledRefreshAfterSave: boolean;
+  onRunScheduledRefreshAfterSaveChange: (enabled: boolean) => void;
   onScheduledRefreshChange: (value: SettingsView["scheduled_refresh"]) => void;
   onSubscriptionTrafficChange: (enabled: boolean) => void;
 }
@@ -34,6 +37,8 @@ export function ResourceAutomationSettingsSection({
   scheduledRefreshStatus,
   scheduledRefreshValue,
   subscriptionTrafficValue,
+  runScheduledRefreshAfterSave,
+  onRunScheduledRefreshAfterSaveChange,
   onScheduledRefreshChange,
   onSubscriptionTrafficChange,
 }: ResourceAutomationSettingsSectionProps) {
@@ -126,6 +131,17 @@ export function ResourceAutomationSettingsSection({
                       ...scheduledRefreshValue,
                       targets: next.map(({ kind, name }) => ({ kind, name })),
                     })}
+                  />
+                  <FormControlLabel
+                    className="m-0"
+                    control={(
+                      <Checkbox
+                        checked={runScheduledRefreshAfterSave}
+                        disabled={scheduledRefreshValue.targets.length === 0 || scheduledRefreshStatus?.running === true}
+                        onChange={(event) => onRunScheduledRefreshAfterSaveChange(event.target.checked)}
+                      />
+                    )}
+                    label={t("settings.scheduledRefresh.runAfterSave")}
                   />
                   <ScheduledRefreshStatusView status={scheduledRefreshStatus} />
                 </div>

@@ -194,10 +194,11 @@ report、最终正文、历史记录或额外产物。subscription preview 预�
 使用的 remote-fetch 与 probe 层；file render 可预热所引用订阅的快照层。
 
 一个进程只运行一个调度任务；上次触发尚未结束时，新触发会被计数并跳过，不会
-排队。单个目标失败只记录错误并继续后续目标，不立即重试。启动和计划热更新都
-等待下一次 cron 时间，不立即补跑；关闭时取消 service context，并等待当前任务
-返回。状态只保存在内存中，重启后清零。多个 Sandrone 实例之间没有 leader 选举
-或分布式锁，因此共享 Store 的部署必须自行确保只有预期实例启用调度。
+排队。单个目标失败只记录错误并继续后续目标，不立即重试。启动和计划热更新本身
+都等待下一次 cron 时间，不自动补跑；显式的一次性运行复用当前 effective targets
+和同一重叠保护，但不移动下一次 cron 时间。关闭时取消 service context，并等待
+当前任务返回。状态只保存在内存中，重启后清零。多个 Sandrone 实例之间没有 leader
+选举或分布式锁，因此共享 Store 的部署必须自行确保只有预期实例启用调度。
 
 设置 wire、cron 约束和状态接口见[项目设置接口](../reference/http-api/settings.md#定时更新)。
 

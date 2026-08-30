@@ -20,6 +20,7 @@ interface SettingsServicePageProps {
   scheduledRefreshResources: ScheduledRefreshResourceChoice[];
   scheduledRefreshStatus?: ScheduledRefreshStatus;
   onBack: () => void;
+  onRunScheduledRefresh: () => Promise<unknown> | unknown;
   onSave: (value: SettingsUpdate) => Promise<unknown> | unknown;
 }
 
@@ -31,15 +32,29 @@ export function SettingsServicePage({
   scheduledRefreshResources,
   scheduledRefreshStatus,
   onBack,
+  onRunScheduledRefresh,
   onSave,
 }: SettingsServicePageProps) {
   const { t } = useI18n();
   const { hasFeature } = useUICapabilities();
   const [draft, setDraft] = useState(settings);
+  const [runScheduledRefreshAfterSave, setRunScheduledRefreshAfterSave] = useState(false);
 
   useEffect(() => {
     setDraft(settings);
   }, [settings]);
+
+  const save = async () => {
+    try {
+      await onSave(settingsUpdateFromView(draft));
+      if (runScheduledRefreshAfterSave) {
+        await onRunScheduledRefresh();
+        setRunScheduledRefreshAfterSave(false);
+      }
+    } catch {
+      // The settings provider and action handler surface their own notices.
+    }
+  };
 
   return (
     <section className="grid gap-6">
@@ -50,7 +65,7 @@ export function SettingsServicePage({
           accessibleLabel: t("settings.save"),
           icon: <SaveIcon aria-hidden fontSize="small" />,
           label: t("actions.save"),
-          onSelect: () => void onSave(settingsUpdateFromView(draft)),
+          onSelect: () => void save(),
           variant: "contained",
         }}
         sticky
@@ -70,7 +85,14 @@ export function SettingsServicePage({
         scheduledRefreshStatus={scheduledRefreshStatus}
         scheduledRefreshValue={draft.scheduled_refresh}
         subscriptionTrafficValue={draft.subscriptions.auto_load_traffic}
-        onScheduledRefreshChange={(scheduledRefresh) => setDraft((current) => ({ ...current, scheduled_refresh: scheduledRefresh }))}
+        runScheduledRefreshAfterSave={runScheduledRefreshAfterSave}
+        onRunScheduledRefreshAfterSaveChange={setRunScheduledRefreshAfterSave}
+        onScheduledRefreshChange={(scheduledRefresh) => {
+          if (!scheduledRefresh.enabled || scheduledRefresh.targets.length === 0) {
+            setRunScheduledRefreshAfterSave(false);
+          }
+          setDraft((current) => ({ ...current, scheduled_refresh: scheduledRefresh }));
+        }}
         onSubscriptionTrafficChange={(enabled) => setDraft((current) => ({
           ...current,
           subscriptions: { auto_load_traffic: enabled },
