@@ -32,7 +32,9 @@ FileSpec(kind=registered typed kind) -> driver lookup -> read/build base -> opti
 
 公共 service 不读取 Mihomo、sing-box 或 Shadowrocket 的联合 settings，也不通过字段形状推断目标客户端。未知公共 config 字段会在领域解码时拒绝；unknown settings 字段和类型错误由选中的 driver 拒绝。
 
-省略 typed `config` 或 `settings` 等价于空 settings object。driver 可以为未出现的字段提供默认值；调用方显式提交的空数组保持为空，不能被默认集合覆盖。
+typed file 必须显式提交 `config.settings`，其中 `groups`、`rule_sets`、`rules`
+三个数组都必须出现。数组可以为空；省略任何一级或任何一个数组都返回
+`invalid_argument`。driver 只编译调用方已经完整物化的 settings，不在渲染时补业务默认值。
 
 字段级 wire 契约见 [`internal/domain/file.go`](../../internal/domain/file.go) 和 [FileSpec 参考](../reference/file-spec.md)。
 
@@ -95,7 +97,7 @@ config-only driver，因此不声明 renderer。
 
 typed file 有显式 source 时，其正文作为 base；`source.type` 为空时使用 driver 的内建 base。base 是客户端配置的输入，不是编译后的历史快照。
 
-具体默认模板内容属于 driver 和测试，不进入架构契约。调用方保存的显式 inline base 与后端 driver fallback 也是两个独立边界，不能互相隐式回填。
+具体内建模板内容属于 driver 和测试，不进入架构契约。调用方保存的显式 inline base 与后端内建 base 也是两个独立边界，不能互相隐式回填。
 
 ### Subscription materialization
 
@@ -129,7 +131,7 @@ settings，并负责：
 - 严格解码自身 settings。
 - 解析和校验 base。
 - 把节点、分组、规则集、规则或其它受管结构编译到客户端文档。
-- 保持显式空集合与默认值的区别。
+- 按显式提交的集合编译，不补 `groups`、`rule_sets` 或 `rules`。
 - 返回完整 YAML、JSON 或 INI 正文。
 
 节点 renderer 与 driver compiler 是正交边界：前者回答“这些节点如何写成目标片段”，后者回答“片段和策略如何组成完整客户端文件”。

@@ -130,6 +130,7 @@ export interface StructuredFileConfigurationAdapter {
   references: ConfigReferenceStrategy;
   relations: ConfigRelationStrategy;
   templates: ConfigTemplateStrategy;
+  validateSettings: (settings: unknown) => boolean;
   validate: (draft: ConfigEditorDraft) => ConfigValidationIssue[];
 }
 

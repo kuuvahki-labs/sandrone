@@ -10,7 +10,6 @@ import {
   parseJSONList,
   type RuleDraft,
   type RuleSetDraft,
-  type StructureSectionPresence,
 } from "~/features/files/config/model/editor-model";
 import type { ConfigNamingLocale } from "~/features/files/config/model/naming";
 import type {
@@ -38,7 +37,6 @@ export interface ConfigEditorStructureState {
   ruleSetPreset: string;
   ruleSets: RuleSetDraft[];
   rules: RuleDraft[];
-  sectionPresence: StructureSectionPresence;
 }
 
 export interface ConfigEditorState {
@@ -133,49 +131,35 @@ export function reduceConfigEditorState(
       return {
         ...state,
         settingsMode: "structured",
-        structure: {
-          ...state.structure,
-          sectionPresence: {
-            groups: true,
-            ruleSets: true,
-            rules: true,
-          },
-        },
       };
     case "change-groups":
       return updateStructureSection(
         state,
-        "groups",
         { groups: event.groups },
       );
     case "change-rule-sets":
       return updateStructureSection(
         state,
-        "ruleSets",
         { ruleSets: event.ruleSets },
       );
     case "change-rules":
       return updateStructureSection(
         state,
-        "rules",
         { rules: event.rules },
       );
     case "change-advanced-groups":
       return updateStructureSection(
         state,
-        "groups",
         { advancedGroupsText: event.text },
       );
     case "change-advanced-rule-sets":
       return updateStructureSection(
         state,
-        "ruleSets",
         { advancedRuleSetsText: event.text },
       );
     case "change-advanced-rules":
       return updateStructureSection(
         state,
-        "rules",
         { advancedRulesText: event.text },
       );
     case "change-adaptive-options":
@@ -204,11 +188,6 @@ export function applyConfigEditorTemplate(
     adaptiveWarnings: [],
     structure: {
       ...structureFromDraft(next),
-      sectionPresence: {
-        groups: true,
-        ruleSets: true,
-        rules: true,
-      },
     },
     structureRevision: state.structureRevision + 1,
     templateUndo: copyStructure(state.structure),
@@ -261,10 +240,6 @@ export function applyConfigEditorAdaptiveGeneration(
       structure: {
         ...state.structure,
         groups: projectedGroups,
-        sectionPresence: {
-          ...state.structure.sectionPresence,
-          groups: true,
-        },
       },
       structureRevision: state.structureRevision + 1,
       templateUndo: null,
@@ -290,10 +265,6 @@ export function applyConfigEditorCatalogRuleSet(
       structure: {
         ...state.structure,
         ruleSets: result.ruleSets,
-        sectionPresence: {
-          ...state.structure.sectionPresence,
-          ruleSets: true,
-        },
       },
       templateUndo: null,
     },
@@ -316,12 +287,7 @@ export function deriveConfigEditorOutput(
     ...structuredDraft,
     subscriptions: envelopeSubscriptions,
   });
-  const effectiveAdaptiveConfig = state.structure.sectionPresence.groups
-    ? nativeConfig
-    : {
-      ...nativeConfig,
-      groups: adapter.groups.serialize(state.structure.groups),
-    };
+  const effectiveAdaptiveConfig = nativeConfig;
   const encoded = adapter.encode({
     ...structuredDraft,
     subscriptions: envelopeSubscriptions,
@@ -342,6 +308,7 @@ export function deriveConfigEditorOutput(
     serialized,
     multipleSubscriptions,
     rawSettingsError: rawSettings.error,
+    rawSettingsValid: rawSettings.error === undefined && adapter.validateSettings(rawSettings.value),
   };
 }
 
@@ -379,7 +346,7 @@ export function deriveConfigEditorValidity(
   const valid = !output.multipleSubscriptions
     && previewValidation.valid
     && (state.settingsMode === "raw"
-      ? output.rawSettingsError === undefined
+      ? output.rawSettingsValid
       : structureValid && !adaptiveStale);
 
   return {
@@ -436,7 +403,6 @@ function structureFromDraft(
     ruleSetPreset: draft.ruleSetPreset,
     ruleSets: draft.ruleSets,
     rules: draft.rules,
-    sectionPresence: { ...draft.sectionPresence },
   };
 }
 
@@ -448,13 +414,11 @@ function copyStructure(
     groups: [...structure.groups],
     ruleSets: [...structure.ruleSets],
     rules: [...structure.rules],
-    sectionPresence: { ...structure.sectionPresence },
   };
 }
 
 function updateStructureSection(
   state: ConfigEditorState,
-  section: keyof StructureSectionPresence,
   patch: Partial<ConfigEditorStructureState>,
 ): ConfigEditorState {
   return {
@@ -462,10 +426,6 @@ function updateStructureSection(
     structure: {
       ...state.structure,
       ...patch,
-      sectionPresence: {
-        ...state.structure.sectionPresence,
-        [section]: true,
-      },
     },
   };
 }
@@ -493,7 +453,6 @@ function structuredDraftFromState(
     ruleSetPreset: structure.ruleSetPreset,
     ruleSets: structure.ruleSets,
     rules: structure.rules,
-    sectionPresence: structure.sectionPresence,
   };
 }
 
@@ -516,7 +475,6 @@ function isEditorDraft(
 ): value is ConfigEditorDraft {
   return Boolean(
     value
-      && "sectionPresence" in value
       && "advancedGroupsText" in value,
   );
 }

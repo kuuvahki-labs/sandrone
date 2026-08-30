@@ -37,7 +37,7 @@ describe("structured file driver editor models", () => {
   );
 
   it.each(["mihomo", "sing-box", "shadowrocket"])(
-    "%s distinguishes missing, empty-object, and explicit empty sections",
+    "%s materializes missing sections and preserves explicit empty sections",
     (kind) => {
       const adapter = structuredAdapter(kind);
       const missing = adapter.decode({ subscriptions: ["one", "two"], settingsPresent: false }, "en-US");
@@ -47,26 +47,29 @@ describe("structured file driver editor models", () => {
         settings: { groups: [], rule_sets: [], rules: [] },
       }, "en-US");
 
-      expect(missing).toMatchObject({
-        subscriptions: ["one", "two"],
-        settingsMode: "structured",
-        sectionPresence: { groups: false, ruleSets: false, rules: false },
-      });
-      expect(empty).toMatchObject({
-        settingsMode: "structured",
-        sectionPresence: { groups: false, ruleSets: false, rules: false },
-      });
+      expect(missing).toMatchObject({ subscriptions: ["one", "two"], settingsMode: "structured" });
+      expect(empty).toMatchObject({ settingsMode: "structured" });
+      expect(missing?.groups.length).toBeGreaterThan(0);
+      expect(missing?.rules.length).toBeGreaterThan(0);
+      expect(empty?.groups.length).toBeGreaterThan(0);
+      expect(empty?.rules.length).toBeGreaterThan(0);
       expect(explicit).toMatchObject({
         settingsMode: "structured",
         mode: "wizard",
         groups: [],
         ruleSets: [],
         rules: [],
-        sectionPresence: { groups: true, ruleSets: true, rules: true },
       });
-      expect(adapter.encode(missing!)).toEqual({ subscriptions: ["one", "two"], settings: {} });
-      expect(adapter.encode(empty!)).toEqual({ settings: {} });
+      expect(adapter.encode(missing!)).toMatchObject({
+        subscriptions: ["one", "two"],
+        settings: { groups: expect.any(Array), rule_sets: expect.any(Array), rules: expect.any(Array) },
+      });
+      expect(adapter.encode(empty!)).toMatchObject({
+        settings: { groups: expect.any(Array), rule_sets: expect.any(Array), rules: expect.any(Array) },
+      });
       expect(adapter.encode(explicit!)).toEqual({ settings: { groups: [], rule_sets: [], rules: [] } });
+      expect(adapter.validateSettings({ groups: [], rule_sets: [], rules: [] })).toBe(true);
+      expect(adapter.validateSettings({ groups: [], rules: [] })).toBe(false);
     },
   );
 

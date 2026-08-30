@@ -80,8 +80,6 @@ export const shadowrocketConfigurationAdapter = createStructuredConfigurationAda
   defaults: {
     ruleSets: () => [],
     rules: defaultRules,
-    runtimeGroups: () => [{ name: "Proxy", type: "select", proxies: ["PROXY", "DIRECT"] }],
-    runtimeRules: () => runtimeRules(),
   },
   validate: (draft) => validateDraft(draft, {
     groups: {
@@ -346,16 +344,6 @@ function defaultRules(locale: ConfigNamingLocale): string[] {
     "IP-CIDR,192.168.0.0/16,DIRECT,no-resolve",
     "GEOIP,CN,DIRECT,no-resolve",
     `FINAL,${configAnchorName(locale)}`,
-  ];
-}
-
-function runtimeRules(): string[] {
-  return [
-    "IP-CIDR,10.0.0.0/8,DIRECT,no-resolve",
-    "IP-CIDR,172.16.0.0/12,DIRECT,no-resolve",
-    "IP-CIDR,192.168.0.0/16,DIRECT,no-resolve",
-    "GEOIP,CN,DIRECT",
-    "FINAL,Proxy",
   ];
 }
 

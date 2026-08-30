@@ -34,6 +34,7 @@ func TestServiceShadowrocketFileUsesAppProxyWithoutSubscriptions(t *testing.T) {
 			"groups": []map[string]any{
 				{"name": "Proxy", "type": "select", "proxies": []string{"PROXY", "DIRECT", "REJECT"}},
 			},
+			"rules": []string{"FINAL,Proxy"},
 		})},
 	}
 
@@ -96,6 +97,7 @@ func TestServiceShadowrocketPreservesRulePolicyExtensionParameters(t *testing.T)
 				"AND,((DOMAIN,www.example.com),(DST-PORT,123)),DIRECT",
 				"FINAL,Proxy",
 			},
+			"groups": []map[string]any{{"name": "Proxy", "type": "select", "proxies": []string{"PROXY", "DIRECT"}}},
 		})},
 	}
 
@@ -188,6 +190,10 @@ func TestServiceShadowrocketReplacesOwnedSectionsAndPreservesBase(t *testing.T) 
 	spec := domain.FileSpec{
 		Name: "preserve.conf", Kind: domain.FileKindShadowrocket,
 		Source: domain.FileSource{Type: "inline", Content: base},
+		Config: &domain.FileConfig{Settings: shadowrocketSettings(t, map[string]any{
+			"groups": []map[string]any{{"name": "Proxy", "type": "select", "proxies": []string{"PROXY", "DIRECT"}}},
+			"rules":  []string{"FINAL,Proxy"},
+		})},
 	}
 
 	result, err := service.New().GetFile(context.Background(), domain.FileRequest{Spec: &spec})
@@ -250,9 +256,11 @@ func TestServiceShadowrocketSettingsValidation(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			var settings map[string]any
+			require.NoError(t, json.Unmarshal([]byte(test.settings), &settings))
 			spec := domain.FileSpec{
 				Name: "bad.conf", Kind: domain.FileKindShadowrocket,
-				Config: &domain.FileConfig{Settings: json.RawMessage(test.settings)},
+				Config: &domain.FileConfig{Settings: completeTypedSettings(t, settings)},
 			}
 
 			_, err := service.New().GetFile(context.Background(), domain.FileRequest{Spec: &spec})
@@ -273,13 +281,14 @@ func TestServiceShadowrocketRejectsUnresolvedPoliciesAfterRenderingNodes(t *test
 		{name: "group member", settings: `{"groups":[{"name":"Proxy","type":"select","proxies":["missing"]}],"rules":[]}`, path: "config.settings.groups[0].proxies"},
 		{name: "rule-only policy used as group member", settings: `{"groups":[{"name":"Proxy","type":"select","proxies":["TAILSCALE"]}],"rules":[]}`, path: "config.settings.groups[0].proxies"},
 		{name: "rule policy", settings: `{"groups":[],"rules":["FINAL,missing"]}`, path: "config.settings.rules[0]"},
-		{name: "implicit final without Proxy", settings: `{"groups":[]}`, path: "config.settings.rules[4]"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			var settings map[string]any
+			require.NoError(t, json.Unmarshal([]byte(test.settings), &settings))
 			spec := domain.FileSpec{
 				Name: "bad.conf", Kind: domain.FileKindShadowrocket,
-				Config: &domain.FileConfig{Settings: json.RawMessage(test.settings)},
+				Config: &domain.FileConfig{Settings: completeTypedSettings(t, settings)},
 			}
 
 			_, err := service.New().GetFile(context.Background(), domain.FileRequest{Spec: &spec})
@@ -293,7 +302,7 @@ func TestServiceShadowrocketRejectsUnresolvedPoliciesAfterRenderingNodes(t *test
 func TestServiceShadowrocketRejectsNodesMacro(t *testing.T) {
 	spec := domain.FileSpec{
 		Name: "invalid.conf", Kind: domain.FileKindShadowrocket,
-		Config: &domain.FileConfig{Settings: json.RawMessage(`{"groups":[{"name":"Proxy","type":"select","proxies":["$nodes"]}],"rules":[]}`)},
+		Config: &domain.FileConfig{Settings: json.RawMessage(`{"groups":[{"name":"Proxy","type":"select","proxies":["$nodes"]}],"rule_sets":[],"rules":[]}`)},
 	}
 
 	_, err := service.New().GetFile(context.Background(), domain.FileRequest{Spec: &spec})
@@ -306,6 +315,10 @@ func TestServiceShadowrocketINIOverrideRunsAfterTypedCompilation(t *testing.T) {
 	spec := domain.FileSpec{
 		Name: "override.conf", Kind: domain.FileKindShadowrocket,
 		Source: domain.FileSource{Type: "inline", Content: "[General]\nmode = rule\n"},
+		Config: &domain.FileConfig{Settings: shadowrocketSettings(t, map[string]any{
+			"groups": []map[string]any{{"name": "Proxy", "type": "select", "proxies": []string{"PROXY", "DIRECT"}}},
+			"rules":  []string{"FINAL,Proxy"},
+		})},
 		Processors: []domain.ProcessorSpec{{
 			Type: "merge", Stage: domain.StageFile,
 			Params: params(t, map[string]any{
@@ -324,11 +337,9 @@ func TestServiceShadowrocketINIOverrideRunsAfterTypedCompilation(t *testing.T) {
 	require.Contains(t, body, "FINAL,Proxy\nDOMAIN,example.com,DIRECT")
 }
 
-func shadowrocketSettings(t *testing.T, value any) json.RawMessage {
+func shadowrocketSettings(t *testing.T, value map[string]any) json.RawMessage {
 	t.Helper()
-	body, err := json.Marshal(value)
-	require.NoError(t, err)
-	return body
+	return completeTypedSettings(t, value)
 }
 
 func countSection(body, name string) int {

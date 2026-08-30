@@ -46,7 +46,9 @@ func TestDecodeShadowrocketSettingsRejectsIncompleteKnownRules(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			raw, err := json.Marshal(map[string]any{"rules": []string{test.rule}})
+			raw, err := json.Marshal(map[string]any{
+				"groups": []any{}, "rule_sets": []any{}, "rules": []string{test.rule},
+			})
 			require.NoError(t, err)
 
 			_, err = decodeShadowrocketFileSettings(raw)
@@ -57,7 +59,7 @@ func TestDecodeShadowrocketSettingsRejectsIncompleteKnownRules(t *testing.T) {
 }
 
 func TestDecodeShadowrocketSettingsRejectsUnbalancedLogicalRules(t *testing.T) {
-	raw := json.RawMessage(`{"rules":["AND,((DOMAIN,example.com),(DST-PORT,443))),DIRECT"]}`)
+	raw := json.RawMessage(`{"groups":[],"rule_sets":[],"rules":["AND,((DOMAIN,example.com),(DST-PORT,443))),DIRECT"]}`)
 
 	_, err := decodeShadowrocketFileSettings(raw)
 
@@ -66,7 +68,9 @@ func TestDecodeShadowrocketSettingsRejectsUnbalancedLogicalRules(t *testing.T) {
 
 func TestDecodeShadowrocketSettingsKeepsUnknownRulesOpen(t *testing.T) {
 	raw := json.RawMessage(`{
-		"rules":[
+			"groups":[],
+			"rule_sets":[],
+			"rules":[
 			"PROCESS-NAME,Safari,opaque-policy",
 			"IP-CIDR6,2001:db8::/32,opaque-policy,no-resolve",
 			"FUTURE-RULE,custom,opaque-policy,extension"
@@ -92,7 +96,4 @@ func TestCompileShadowrocketGroupsUsesRuntimeProxyPolicy(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, []string{"Proxy = select,PROXY,DIRECT"}, lines)
-	defaults, err := compileShadowrocketGroups(nil)
-	require.NoError(t, err)
-	require.Equal(t, []string{"Proxy = select,PROXY,DIRECT"}, defaults)
 }

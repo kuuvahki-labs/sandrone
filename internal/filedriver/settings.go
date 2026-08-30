@@ -22,15 +22,15 @@ type MihomoFileSettings struct {
 // MihomoFileCapabilitySettings is the public settings surface for capabilities.
 // The real decoder remains broader for legacy HTTP and Web compatibility.
 type MihomoFileCapabilitySettings struct {
-	Groups   []map[string]any `json:"groups,omitempty" jsonschema:"Explicit Mihomo proxy-group objects"`
-	RuleSets []map[string]any `json:"rule_sets,omitempty" jsonschema:"Explicit Mihomo rule-provider objects"`
-	Rules    []string         `json:"rules,omitempty" jsonschema:"Ordered Mihomo rule strings"`
+	Groups   []map[string]any `json:"groups" jsonschema:"Explicit Mihomo proxy-group objects"`
+	RuleSets []map[string]any `json:"rule_sets" jsonschema:"Explicit Mihomo rule-provider objects"`
+	Rules    []string         `json:"rules" jsonschema:"Ordered Mihomo rule strings"`
 }
 
 type SingBoxFileSettings struct {
-	Groups   []map[string]any `json:"groups,omitempty" jsonschema:"Explicit sing-box selector or URL-test outbounds"`
-	RuleSets []map[string]any `json:"rule_sets,omitempty" jsonschema:"Explicit sing-box route rule-set objects"`
-	Rules    []map[string]any `json:"rules,omitempty" jsonschema:"Explicit sing-box route rule objects"`
+	Groups   []map[string]any `json:"groups" jsonschema:"Explicit sing-box selector or URL-test outbounds"`
+	RuleSets []map[string]any `json:"rule_sets" jsonschema:"Explicit sing-box route rule-set objects"`
+	Rules    []map[string]any `json:"rules" jsonschema:"Explicit sing-box route rule objects"`
 }
 
 func decodeMihomoFileSettings(raw json.RawMessage) (MihomoFileSettings, error) {
@@ -41,7 +41,7 @@ func decodeMihomoFileSettings(raw json.RawMessage) (MihomoFileSettings, error) {
 		)
 	}
 	var settings MihomoFileSettings
-	if err := decodeTypedFileSettings(domain.FileKindMihomo, raw, &settings); err != nil {
+	if err := decodeTypedFileSettings(domain.FileKindMihomo, raw, &settings, "groups", "rule_sets", "rules"); err != nil {
 		return MihomoFileSettings{}, err
 	}
 	return settings, nil
@@ -74,15 +74,15 @@ func validateMihomoAdaptiveGroupFields(raw json.RawMessage) error {
 
 func decodeSingBoxFileSettings(raw json.RawMessage) (SingBoxFileSettings, error) {
 	var settings SingBoxFileSettings
-	if err := decodeTypedFileSettings(domain.FileKindSingBox, raw, &settings); err != nil {
+	if err := decodeTypedFileSettings(domain.FileKindSingBox, raw, &settings, "groups", "rule_sets", "rules"); err != nil {
 		return SingBoxFileSettings{}, err
 	}
 	return settings, nil
 }
 
-func decodeTypedFileSettings[T any](kind domain.FileKind, raw json.RawMessage, out *T) error {
+func decodeTypedFileSettings[T any](kind domain.FileKind, raw json.RawMessage, out *T, requiredFields ...string) error {
 	if len(bytes.TrimSpace(raw)) == 0 {
-		raw = json.RawMessage(`{}`)
+		return domain.NewError(domain.CodeInvalidArgument, fmt.Sprintf("file kind %q config.settings is required", kind))
 	}
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &fields); err != nil || fields == nil {
@@ -110,6 +110,11 @@ func decodeTypedFileSettings[T any](kind domain.FileKind, raw json.RawMessage, o
 	}
 	if err := ensureJSONEOF(decoder); err != nil {
 		return domain.NewError(domain.CodeInvalidArgument, fmt.Sprintf("file kind %q config.settings: %v", kind, err))
+	}
+	for _, name := range requiredFields {
+		if _, ok := fields[name]; !ok {
+			return domain.NewError(domain.CodeInvalidArgument, fmt.Sprintf("file kind %q config.settings.%s is required", kind, name))
+		}
 	}
 	return nil
 }

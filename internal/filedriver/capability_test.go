@@ -36,8 +36,10 @@ func TestCapabilities(t *testing.T) {
 		require.NotEmpty(t, capability.Syntax, "%s", capability.Kind)
 		require.NotEmpty(t, capability.DefaultExtension, "%s", capability.Kind)
 		require.NotEmpty(t, capability.Defaults, "%s", capability.Kind)
-		_, err := jsonschema.ForType(reflect.TypeOf(capability.SettingsPrototype), nil)
+		schema, err := jsonschema.ForType(reflect.TypeOf(capability.SettingsPrototype), nil)
 		require.NoError(t, err, "%s settings prototype must support schema reflection", capability.Kind)
+		require.ElementsMatch(t, []string{"groups", "rule_sets", "rules"}, schema.Required,
+			"%s settings schema must require complete materialization", capability.Kind)
 
 		raw, err := json.Marshal(capability.SettingsPrototype)
 		require.NoError(t, err)
@@ -86,9 +88,11 @@ func TestMihomoFileDriverKeepsLegacyAdaptiveGroupsCompatibleWithExplicitGroups(t
 	driver, err := New().Lookup(domain.FileKindMihomo)
 	require.NoError(t, err)
 	settings := json.RawMessage(`{
-  "adaptive_groups": {"type": "url-test", "regions": ["hk", "jp"]},
-  "groups": [{"name": "Manual", "type": "select", "proxies": ["hk-node", "DIRECT"]}]
-}`)
+	  "adaptive_groups": {"type": "url-test", "regions": ["hk", "jp"]},
+	  "groups": [{"name": "Manual", "type": "select", "proxies": ["hk-node", "DIRECT"]}],
+	  "rule_sets": [],
+	  "rules": []
+	}`)
 	require.NoError(t, driver.ValidateSettings(settings))
 	result, err := driver.Compile(context.Background(), CompileInput{
 		Base: driver.Descriptor().DefaultBase,

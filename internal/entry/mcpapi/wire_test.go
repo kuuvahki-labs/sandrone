@@ -143,6 +143,11 @@ func TestTypedFileEmptySourceUsesBuiltinBaseForPut(t *testing.T) {
 			"name":   "builtin.yaml",
 			"kind":   "mihomo",
 			"source": map[string]any{},
+			"config": map[string]any{"settings": map[string]any{
+				"groups":    []any{},
+				"rule_sets": []any{},
+				"rules":     []any{},
+			}},
 		},
 	})
 	require.NoError(t, err)

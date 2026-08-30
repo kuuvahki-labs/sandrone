@@ -69,6 +69,7 @@ func TestPublishedSchemasMatchRealProcessorAndFileDecoders(t *testing.T) {
 			continue
 		}
 		require.True(t, document.SettingsSupported)
+		require.ElementsMatch(t, []string{"groups", "rule_sets", "rules"}, document.SettingsSchema.Required, uri)
 		resolved, err := document.SettingsSchema.Resolve(nil)
 		require.NoError(t, err, uri)
 		for index, example := range document.Examples {

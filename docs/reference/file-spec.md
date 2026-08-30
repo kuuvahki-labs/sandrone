@@ -62,11 +62,13 @@ typed 文件的公共 `config` **只有**两个字段：
 | 字段 | 类型 | 语义 |
 | --- | --- | --- |
 | `subscriptions` | string[] | 仅适用于声明了节点 renderer 的 typed kind；按数组顺序解析订阅并拼接节点。Shadowrocket 不允许非空值。 |
-| `settings` | JSON object | 原样交给当前 kind 的 driver 严格解码。 |
+| `settings` | JSON object | typed kind 必填；原样交给当前 kind 的 driver 严格解码。 |
 
 `config` 的其他字段会被拒绝。组、规则集和规则必须放在
-`config.settings`。`settings` 必须是 JSON object，不能是数组、标量或
-`null`；未知顶层字段以及已知字段上的 `null` 均报 `invalid_argument`。
+`config.settings`。typed kind 的 `config`、`settings` 以及其中的 `groups`、
+`rule_sets`、`rules` 都不能省略；三个字段必须是数组，但允许显式为空。
+`settings` 不能是数组、标量或 `null`；未知顶层字段以及已知字段上的 `null`
+均报 `invalid_argument`。
 
 在 MCP tool 的 JSON wire 上，`config.settings` 直接是 object；调用方不应把
 它编码成 JSON 字符串。各 canonical kind 的可发现 schema、source rules 与
@@ -77,18 +79,18 @@ examples 见 [MCP resources](mcp.md#resources-与-schema-templates)。
 不解析订阅，非空 `subscriptions` 返回 `invalid_argument`；其节点订阅通过
 `shadowrocket-proxies` 独立交付。
 
-## typed settings 与空值
+## typed settings 完整性
 
-三个 driver 都区分“字段未出现”和“显式空数组”：
+三个 driver 都只接受调用方已经完整物化的 settings：
 
-| kind | `settings` 允许的顶层字段 | 字段未出现 | 显式 `[]` |
+| kind | `settings` 允许的顶层字段 | 必填字段 | 显式 `[]` |
 | --- | --- | --- | --- |
-| `mihomo` | `adaptive_groups`、`groups`、`rule_sets`、`rules` | `groups`、`rule_sets`、`rules` 使用内建默认值 | 对应的 `proxy-groups`、`rule-providers` 或 `rules` 为空 |
-| `sing-box` | `groups`、`rule_sets`、`rules` | 三者使用内建默认值 | 对应的 selector、`route.rule_set` 或 `route.rules` 为空 |
-| `shadowrocket` | `adaptive_groups`、`groups`、`rule_sets`、`rules` | 生成默认 `Proxy` 组和默认规则 | 对应的 `[Proxy Group]`、规则集映射或 `[Rule]` 不生成条目 |
+| `mihomo` | `adaptive_groups`、`groups`、`rule_sets`、`rules` | `groups`、`rule_sets`、`rules` | 对应的 `proxy-groups`、`rule-providers` 或 `rules` 为空 |
+| `sing-box` | `groups`、`rule_sets`、`rules` | `groups`、`rule_sets`、`rules` | 对应的 selector、`route.rule_set` 或 `route.rules` 为空 |
+| `shadowrocket` | `adaptive_groups`、`groups`、`rule_sets`、`rules` | `groups`、`rule_sets`、`rules` | 对应的 `[Proxy Group]`、规则集映射或 `[Rule]` 不生成条目 |
 
-省略整个 `config`、省略 `settings` 与 `settings: {}` 对上述默认选择等价。
-空数组只覆盖它对应的字段，不会隐式清空其他字段。
+省略整个 `config`、省略 `settings`、提交 `settings: {}` 或漏掉任一必填字段都返回
+`invalid_argument`。空数组表示调用方明确选择该输出集合为空，不触发任何后端默认值。
 
 Mihomo 与 sing-box 的 `groups`、`rule_sets`、`rules` 使用客户端结构：
 
@@ -136,7 +138,13 @@ kind: mihomo
 source: {}
 config:
   subscriptions: [provider]
-  settings: {}
+  settings:
+    groups:
+      - name: Proxy
+        type: select
+        proxies: [$nodes, DIRECT]
+    rule_sets: []
+    rules: [MATCH,Proxy]
 ```
 
 ### sing-box
@@ -148,10 +156,14 @@ source: {}
 config:
   subscriptions: [provider]
   settings:
-    rules: []
+    groups:
+      - type: selector
+        tag: Proxy
+        outbounds: [$nodes, direct]
+    rule_sets: []
+    rules:
+      - outbound: Proxy
 ```
-
-这里的 `rules: []` 明确禁止内建 route rules；若想使用默认规则，应省略该字段。
 
 ### Shadowrocket
 
@@ -165,6 +177,8 @@ config:
       - name: Proxy
         type: select
         proxies: [PROXY, DIRECT]
+    rule_sets: []
+    rules: [FINAL,Proxy]
 ```
 
 这三个示例都使用内建 base。Shadowrocket 的节点订阅须另行添加

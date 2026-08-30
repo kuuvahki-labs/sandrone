@@ -18,20 +18,24 @@ type shadowrocketFileDriver struct{}
 
 func (shadowrocketFileDriver) Descriptor() Descriptor {
 	return Descriptor{
-		Kind:              domain.FileKindShadowrocket,
-		Description:       "Compile a node-free Shadowrocket INI configuration for separately managed subscriptions.",
-		MediaType:         "text/plain; charset=utf-8",
-		Syntax:            "ini",
-		DefaultExtension:  ".conf",
-		SettingsPrototype: ShadowrocketFileCapabilitySettings{},
+		Kind:             domain.FileKindShadowrocket,
+		Description:      "Compile a node-free Shadowrocket INI configuration for separately managed subscriptions.",
+		MediaType:        "text/plain; charset=utf-8",
+		Syntax:           "ini",
+		DefaultExtension: ".conf",
+		SettingsPrototype: ShadowrocketFileCapabilitySettings{
+			Groups: []ShadowrocketGroupSettings{}, RuleSets: []ShadowrocketRuleSetSettings{}, Rules: []string{},
+		},
 		SourceRules: filekind.SourceRules{
 			AllowedTypes: []string{"inline", "remote"},
 		},
-		Defaults: map[string]any{"source": "built-in", "settings": map[string]any{}},
+		Defaults: map[string]any{"source": "built-in"},
 		Examples: []map[string]any{{
 			"name": "shadowrocket.conf", "kind": string(domain.FileKindShadowrocket),
 			"config": map[string]any{
-				"settings": map[string]any{"groups": []any{}},
+				"settings": map[string]any{
+					"groups": []any{}, "rule_sets": []any{}, "rules": []any{},
+				},
 			},
 		}},
 		DefaultBase: []byte("[General]\n"),
@@ -70,9 +74,6 @@ func (shadowrocketFileDriver) Compile(_ context.Context, in CompileInput) ([]byt
 }
 
 func compileShadowrocketGroups(groups []ShadowrocketGroupSettings) ([]string, error) {
-	if groups == nil {
-		return []string{"Proxy = select,PROXY,DIRECT"}, nil
-	}
 	groupNames := make(map[string]bool, len(groups))
 	for _, group := range groups {
 		groupNames[group.Name] = true
@@ -134,15 +135,6 @@ func shadowrocketBool(value bool) string {
 }
 
 func compileShadowrocketRules(ruleSets []ShadowrocketRuleSetSettings, rules []string, groupLines []string) ([]string, error) {
-	if rules == nil {
-		rules = []string{
-			"IP-CIDR,10.0.0.0/8,DIRECT,no-resolve",
-			"IP-CIDR,172.16.0.0/12,DIRECT,no-resolve",
-			"IP-CIDR,192.168.0.0/16,DIRECT,no-resolve",
-			"GEOIP,CN,DIRECT",
-			"FINAL,Proxy",
-		}
-	}
 	sets := make(map[string]ShadowrocketRuleSetSettings, len(ruleSets))
 	for _, item := range ruleSets {
 		sets[item.Name] = item

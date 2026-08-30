@@ -90,7 +90,10 @@ func TestImportedProbeProcessorWarnsAndContinuesWithoutBackend(t *testing.T) {
 
 	file, err := target.GetFile(ctx, domain.FileRequest{Spec: &domain.FileSpec{
 		Name: "config.yaml", Kind: domain.FileKindMihomo,
-		Config: &domain.FileConfig{Subscriptions: []string{"imported"}},
+		Config: &domain.FileConfig{
+			Subscriptions: []string{"imported"},
+			Settings:      completeTypedSettings(t, map[string]any{}),
+		},
 	}})
 	require.NoError(t, err)
 	requireWarningCode(t, file.Report.Warnings, "probe_skipped_backend_unavailable")

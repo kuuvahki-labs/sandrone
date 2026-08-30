@@ -30,7 +30,9 @@ describe("file form drivers", () => {
     );
 
     expect(screen.queryByRole("combobox", { name: "订阅" })).not.toBeInTheDocument();
-    expect(currentConfig()).toEqual({ settings: {} });
+    expect(currentConfig()).toMatchObject({
+      settings: { groups: expect.any(Array), rule_sets: [], rules: expect.any(Array) },
+    });
   });
 
   it("shows a subscription display title while serializing its canonical name", async () => {

@@ -57,8 +57,12 @@ func TestSubscriptionSnapshotCacheIsSharedAcrossPreviewRenderAndTypedFile(t *tes
 	require.Equal(t, 1, processorCalls)
 
 	for _, spec := range []domain.FileSpec{
-		{Name: "mihomo.yaml", Kind: domain.FileKindMihomo, Config: &domain.FileConfig{Subscriptions: []string{"shared"}}},
-		{Name: "sing-box.json", Kind: domain.FileKindSingBox, Config: &domain.FileConfig{Subscriptions: []string{"shared"}}},
+		{Name: "mihomo.yaml", Kind: domain.FileKindMihomo, Config: &domain.FileConfig{
+			Subscriptions: []string{"shared"}, Settings: completeTypedSettings(t, map[string]any{}),
+		}},
+		{Name: "sing-box.json", Kind: domain.FileKindSingBox, Config: &domain.FileConfig{
+			Subscriptions: []string{"shared"}, Settings: completeTypedSettings(t, map[string]any{}),
+		}},
 	} {
 		_, err := svc.GetFile(ctx, domain.FileRequest{Spec: &spec})
 		require.NoError(t, err)

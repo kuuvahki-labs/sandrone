@@ -27,7 +27,7 @@ func TestServiceStaticFileKindRemainsCompatible(t *testing.T) {
 	require.Equal(t, "static", result.File.Kind)
 }
 
-func TestServiceMihomoFileGeneratesCompleteConfig(t *testing.T) {
+func TestServiceMihomoFileRendersExplicitConfig(t *testing.T) {
 	ctx := context.Background()
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
 	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
@@ -42,6 +42,10 @@ func TestServiceMihomoFileGeneratesCompleteConfig(t *testing.T) {
 		Source: domain.FileSource{},
 		Config: &domain.FileConfig{
 			Subscriptions: []string{"default"},
+			Settings: completeTypedSettings(t, map[string]any{
+				"groups": []map[string]any{{"name": "Proxy", "type": "select", "proxies": []any{"$nodes", "DIRECT"}}},
+				"rules":  []string{"MATCH,Proxy"},
+			}),
 		},
 	}
 
@@ -56,14 +60,11 @@ func TestServiceMihomoFileGeneratesCompleteConfig(t *testing.T) {
 	require.Len(t, proxies, 1)
 	require.Equal(t, "hk-node", proxies[0].(map[string]any)["name"])
 	groups := doc["proxy-groups"].([]any)
-	require.NotEmpty(t, groups)
+	require.Len(t, groups, 1)
 	require.Equal(t, "Proxy", groups[0].(map[string]any)["name"])
-	require.Equal(t, "Auto", groups[1].(map[string]any)["name"])
-	require.Equal(t, "https://cp.cloudflare.com", groups[1].(map[string]any)["url"])
 	require.Contains(t, doc, "rule-providers")
 	rules := doc["rules"].([]any)
-	require.Contains(t, rules, "RULE-SET,private,DIRECT")
-	require.Contains(t, rules, "MATCH,Proxy")
+	require.Equal(t, []any{"MATCH,Proxy"}, rules)
 }
 
 func TestServiceMihomoFileUsesExplicitGroupsRuleSetsAndRules(t *testing.T) {
@@ -81,7 +82,7 @@ func TestServiceMihomoFileUsesExplicitGroupsRuleSetsAndRules(t *testing.T) {
 		Source: domain.FileSource{},
 		Config: &domain.FileConfig{
 			Subscriptions: []string{"default"},
-			Settings: raw(t, map[string]any{
+			Settings: completeTypedSettings(t, map[string]any{
 				"groups": []map[string]any{{
 					"name":    "Manual",
 					"type":    "select",
@@ -147,7 +148,7 @@ rule-providers: {}
 rules: []`},
 		Config: &domain.FileConfig{
 			Subscriptions: []string{"default"},
-			Settings: raw(t, map[string]any{
+			Settings: completeTypedSettings(t, map[string]any{
 				"groups":    []map[string]any{{"name": "Manual", "type": "select", "proxies": []any{"hk-node", "DIRECT"}}},
 				"rule_sets": []map[string]any{{"name": "manual", "type": "inline", "behavior": "classical", "payload": []any{"DOMAIN-SUFFIX,example.com"}}},
 				"rules":     []string{"RULE-SET,manual,Manual", "MATCH,DIRECT"},
@@ -178,7 +179,7 @@ rules: []`},
 	require.Equal(t, []any{"10.0.0.0/8", "100.64.0.0/10", "fd7a:115c:a1e0::/48"}, doc["lan-allowed-ips"])
 }
 
-func TestServiceSingBoxFileGeneratesCompleteConfig(t *testing.T) {
+func TestServiceSingBoxFileRendersExplicitConfig(t *testing.T) {
 	ctx := context.Background()
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
 	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
@@ -193,6 +194,10 @@ func TestServiceSingBoxFileGeneratesCompleteConfig(t *testing.T) {
 		Source: domain.FileSource{},
 		Config: &domain.FileConfig{
 			Subscriptions: []string{"default"},
+			Settings: completeTypedSettings(t, map[string]any{
+				"groups": []map[string]any{{"type": "selector", "tag": "Proxy", "outbounds": []any{"$nodes", "direct"}}},
+				"rules":  []map[string]any{{"outbound": "Proxy"}},
+			}),
 		},
 	}
 
@@ -207,14 +212,11 @@ func TestServiceSingBoxFileGeneratesCompleteConfig(t *testing.T) {
 	require.NotEmpty(t, outbounds)
 	require.Equal(t, "selector", outbounds[0].(map[string]any)["type"])
 	require.Equal(t, "Proxy", outbounds[0].(map[string]any)["tag"])
-	require.Equal(t, "Auto", outbounds[1].(map[string]any)["tag"])
-	require.Equal(t, "https://cp.cloudflare.com", outbounds[1].(map[string]any)["url"])
 	require.True(t, containsOutboundTag(outbounds, "sg-node"))
 	route := doc["route"].(map[string]any)
-	require.NotEmpty(t, route["rule_set"])
+	require.Empty(t, route["rule_set"])
 	rules := route["rules"].([]any)
-	require.Equal(t, "direct", rules[0].(map[string]any)["outbound"])
-	require.Equal(t, "Proxy", rules[len(rules)-1].(map[string]any)["outbound"])
+	require.Equal(t, []any{map[string]any{"outbound": "Proxy"}}, rules)
 }
 
 func TestServiceSingBoxFileUsesExplicitGroupsRuleSetsAndRules(t *testing.T) {
@@ -232,7 +234,7 @@ func TestServiceSingBoxFileUsesExplicitGroupsRuleSetsAndRules(t *testing.T) {
 		Source: domain.FileSource{},
 		Config: &domain.FileConfig{
 			Subscriptions: []string{"default"},
-			Settings: raw(t, map[string]any{
+			Settings: completeTypedSettings(t, map[string]any{
 				"groups": []map[string]any{{
 					"type":      "selector",
 					"tag":       "Manual",
@@ -285,7 +287,7 @@ func TestServiceSingBoxFilePreservesExplicitRouteFinal(t *testing.T) {
 			Type:    "inline",
 			Content: `{"route":{"final":"🚀 节点选择"}}`,
 		},
-		Config: &domain.FileConfig{Settings: raw(t, map[string]any{
+		Config: &domain.FileConfig{Settings: completeTypedSettings(t, map[string]any{
 			"groups":    []map[string]any{{"type": "selector", "tag": "🚀 节点选择", "outbounds": []any{"direct"}}},
 			"rule_sets": []map[string]any{},
 			"rules":     []map[string]any{{"outbound": "🚀 节点选择"}},
@@ -304,7 +306,7 @@ func TestServiceTypedConfigRejectsUnknownSetting(t *testing.T) {
 		Name:   "default.yaml",
 		Kind:   domain.FileKindMihomo,
 		Source: domain.FileSource{},
-		Config: &domain.FileConfig{Settings: raw(t, map[string]any{"group_preset": "basic"})},
+		Config: &domain.FileConfig{Settings: completeTypedSettings(t, map[string]any{"group_preset": "basic"})},
 	}
 
 	_, err := service.New().GetFile(context.Background(), domain.FileRequest{Spec: &spec})
@@ -320,7 +322,7 @@ func TestServiceTypedConfigRunsFileProcessorsAfterGeneration(t *testing.T) {
 		Name:   "default.yaml",
 		Kind:   domain.FileKindMihomo,
 		Source: domain.FileSource{},
-		Config: &domain.FileConfig{},
+		Config: &domain.FileConfig{Settings: completeTypedSettings(t, map[string]any{})},
 		Processors: []domain.ProcessorSpec{
 			{
 				Type:  "merge",
@@ -413,7 +415,10 @@ func TestServiceTypedFileScriptSourceCyclesFailAcrossNodeStage(t *testing.T) {
 				Name:   "a.yaml",
 				Kind:   domain.FileKindMihomo,
 				Source: domain.FileSource{},
-				Config: &domain.FileConfig{Subscriptions: []string{"nodes"}},
+				Config: &domain.FileConfig{
+					Subscriptions: []string{"nodes"},
+					Settings:      completeTypedSettings(t, map[string]any{}),
+				},
 			}
 
 			_, err := svc.GetFile(ctx, domain.FileRequest{Spec: &outer})
@@ -470,7 +475,10 @@ func TestServiceTypedFileScriptSourcesReuseFileMemoAndRecordDependencies(t *test
 		Name:   "config.yaml",
 		Kind:   domain.FileKindMihomo,
 		Source: domain.FileSource{},
-		Config: &domain.FileConfig{Subscriptions: []string{"first", "second"}},
+		Config: &domain.FileConfig{
+			Subscriptions: []string{"first", "second"},
+			Settings:      completeTypedSettings(t, map[string]any{}),
+		},
 	}
 
 	result, err := svc.GetFile(ctx, domain.FileRequest{Spec: &spec})
@@ -499,7 +507,10 @@ func TestServiceSubscriptionNodesAreCanonicalAcrossPreviewRenderAndTypedFile(t *
 	}))
 	require.NoError(t, svc.PutFile(ctx, domain.FileSpec{
 		Name: "config.yaml", Kind: domain.FileKindMihomo,
-		Config: &domain.FileConfig{Subscriptions: []string{"canonical"}},
+		Config: &domain.FileConfig{
+			Subscriptions: []string{"canonical"},
+			Settings:      completeTypedSettings(t, map[string]any{}),
+		},
 	}))
 
 	preview, err := svc.PreviewSubscription(ctx, "canonical")
@@ -549,7 +560,10 @@ func TestServiceTypedNodeScriptsDoNotGainFileAPIFromResolutionContext(t *testing
 		Name:   "config.yaml",
 		Kind:   domain.FileKindMihomo,
 		Source: domain.FileSource{},
-		Config: &domain.FileConfig{Subscriptions: []string{"nodes"}},
+		Config: &domain.FileConfig{
+			Subscriptions: []string{"nodes"},
+			Settings:      completeTypedSettings(t, map[string]any{}),
+		},
 	}
 
 	result, err := svc.GetFile(ctx, domain.FileRequest{Spec: &spec})

@@ -138,7 +138,14 @@ func TestFileEndpointStoresAndRendersTypedConfigFile(t *testing.T) {
 	  "adaptive_groups": {
 		"type": "url-test",
 		"regions": ["hk", "jp"]
-	  }
+	  },
+	  "groups": [{
+		"name": "Proxy",
+		"type": "select",
+		"proxies": ["$nodes", "DIRECT"]
+	  }],
+	  "rule_sets": [],
+	  "rules": []
     }
   }
 }`)
@@ -153,7 +160,12 @@ func TestFileEndpointStoresAndRendersTypedConfigFile(t *testing.T) {
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &spec))
 	require.Equal(t, domain.FileKindMihomo, spec.Kind)
 	require.Equal(t, []string{"provider"}, spec.Config.Subscriptions)
-	require.JSONEq(t, `{"adaptive_groups":{"type":"url-test","regions":["hk","jp"]}}`, string(spec.Config.Settings))
+	require.JSONEq(t, `{
+	  "adaptive_groups":{"type":"url-test","regions":["hk","jp"]},
+	  "groups":[{"name":"Proxy","type":"select","proxies":["$nodes","DIRECT"]}],
+	  "rule_sets":[],
+	  "rules":[]
+	}`, string(spec.Config.Settings))
 
 	w = httptest.NewRecorder()
 	server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/v1/files/default.yaml", nil))
@@ -294,7 +306,11 @@ func TestFileEndpointExposesSourceAsBodyOrJSONWithoutChangingSpec(t *testing.T) 
 		Name:   "default.yaml",
 		Kind:   domain.FileKindMihomo,
 		Source: domain.FileSource{Type: "inline", Content: "mixed-port: 7891\nmarker: source\n"},
-		Config: &domain.FileConfig{},
+		Config: &domain.FileConfig{Settings: json.RawMessage(`{
+			"groups": [],
+			"rule_sets": [],
+			"rules": []
+		}`)},
 	}))
 	server := httpapi.New(rt)
 

@@ -17,6 +17,21 @@ func raw(t *testing.T, v any) json.RawMessage {
 	require.NoError(t, err)
 	return b
 }
+
+func completeTypedSettings(t *testing.T, settings map[string]any) json.RawMessage {
+	t.Helper()
+	complete := make(map[string]any, len(settings)+3)
+	for name, value := range settings {
+		complete[name] = value
+	}
+	for _, name := range []string{"groups", "rule_sets", "rules"} {
+		if _, ok := complete[name]; !ok {
+			complete[name] = []any{}
+		}
+	}
+	return raw(t, complete)
+}
+
 func params(t *testing.T, m map[string]any) map[string]json.RawMessage {
 	t.Helper()
 	out := map[string]json.RawMessage{}

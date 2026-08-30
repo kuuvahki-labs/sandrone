@@ -412,7 +412,10 @@ func TestDiagnoseStoredFileTracesSubscriptionAndFileProcessors(t *testing.T) {
 	}))
 	require.NoError(t, svc.PutFile(context.Background(), domain.FileSpec{
 		Name: "client.yaml", Kind: domain.FileKindMihomo,
-		Config: &domain.FileConfig{Subscriptions: []string{"provider"}},
+		Config: &domain.FileConfig{
+			Subscriptions: []string{"provider"},
+			Settings:      json.RawMessage(`{"groups":[],"rule_sets":[],"rules":[]}`),
+		},
 		Processors: []domain.ProcessorSpec{{
 			Type: "merge", Stage: domain.StageFile,
 			Params: diagnoseParams(t, map[string]any{"mode": "yaml_override", "content": "mode: global"}),

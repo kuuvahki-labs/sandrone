@@ -97,7 +97,7 @@ func singBoxWebDefaultSpec(t *testing.T, autoMembers []any) *domain.FileSpec {
 }`},
 		Config: &domain.FileConfig{
 			Subscriptions: []string{"default"},
-			Settings: raw(t, map[string]any{
+			Settings: completeTypedSettings(t, map[string]any{
 				"groups": []map[string]any{
 					{"type": "selector", "tag": "Proxy", "outbounds": []any{"Auto", "$nodes", "direct", "block"}},
 					{

@@ -172,6 +172,6 @@ curl -fsS \
 - Mihomo/sing-box 的 `config.subscriptions` 引用了不存在或无法生成节点的订阅，
   或 Shadowrocket FileSpec 携带了非空 `config.subscriptions`；
 - 分组、规则或规则集互相引用的名称不一致；
-- 显式空数组保持为空；它与省略字段并不等价。
+- typed file 的 `config.settings.groups`、`rule_sets`、`rules` 不能省略；需要空输出时显式提交 `[]`。
 
 需要结构化修改编译结果时使用 file-stage `merge`；只有开放式逻辑才使用 `script`。两者都写在 `processors` 中，并按声明顺序执行。详情见 [processor 参考](../reference/processors.md)。

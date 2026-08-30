@@ -22,9 +22,9 @@ type ShadowrocketFileSettings struct {
 // ShadowrocketFileCapabilitySettings is the public settings surface for capabilities.
 // The real decoder remains broader for legacy HTTP and Web compatibility.
 type ShadowrocketFileCapabilitySettings struct {
-	Groups   []ShadowrocketGroupSettings   `json:"groups,omitempty" jsonschema:"Explicit Shadowrocket proxy groups"`
-	RuleSets []ShadowrocketRuleSetSettings `json:"rule_sets,omitempty" jsonschema:"Named remote rule-set declarations"`
-	Rules    []string                      `json:"rules,omitempty" jsonschema:"Ordered Shadowrocket rules"`
+	Groups   []ShadowrocketGroupSettings   `json:"groups" jsonschema:"Explicit Shadowrocket proxy groups"`
+	RuleSets []ShadowrocketRuleSetSettings `json:"rule_sets" jsonschema:"Named remote rule-set declarations"`
+	Rules    []string                      `json:"rules" jsonschema:"Ordered Shadowrocket rules"`
 }
 
 type ShadowrocketAdaptiveGroupSettings struct {
@@ -51,7 +51,7 @@ type ShadowrocketRuleSetSettings struct {
 
 func decodeShadowrocketFileSettings(raw json.RawMessage) (ShadowrocketFileSettings, error) {
 	if len(bytes.TrimSpace(raw)) == 0 {
-		raw = json.RawMessage(`{}`)
+		return ShadowrocketFileSettings{}, shadowrocketSettingsError(fmt.Errorf("config.settings is required"))
 	}
 	fields, err := strictJSONObject(raw, "config.settings")
 	if err != nil {
@@ -65,6 +65,11 @@ func decodeShadowrocketFileSettings(raw json.RawMessage) (ShadowrocketFileSettin
 	}
 	if err := rejectUnknownJSONFields(fields, allowed, "config.settings"); err != nil {
 		return ShadowrocketFileSettings{}, shadowrocketSettingsError(err)
+	}
+	for _, name := range []string{"groups", "rule_sets", "rules"} {
+		if _, ok := fields[name]; !ok {
+			return ShadowrocketFileSettings{}, shadowrocketSettingsError(fmt.Errorf("config.settings.%s is required", name))
+		}
 	}
 
 	var settings ShadowrocketFileSettings

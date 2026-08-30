@@ -84,7 +84,7 @@ func TestServiceCommunityPresetOrderedNTPUsesExactRawAssets(t *testing.T) {
 				Name:   test.filename,
 				Kind:   test.kind,
 				Source: domain.FileSource{Type: "inline", Content: test.source},
-				Config: &domain.FileConfig{Settings: raw(t, test.settings)},
+				Config: &domain.FileConfig{Settings: completeTypedSettings(t, test.settings)},
 				Processors: []domain.ProcessorSpec{
 					processor,
 					processor,
@@ -106,7 +106,7 @@ func TestServiceCommunityPresetMihomoOrderedScenariosUseExactRawAsset(t *testing
 		Name:   "mihomo-scenarios.yaml",
 		Kind:   domain.FileKindMihomo,
 		Source: domain.FileSource{Type: "inline", Content: "{}\n"},
-		Config: &domain.FileConfig{Settings: raw(t, map[string]any{
+		Config: &domain.FileConfig{Settings: completeTypedSettings(t, map[string]any{
 			"rules": []string{
 				"RULE-SET,private,DIRECT",
 				"MATCH,Proxy",
@@ -179,7 +179,7 @@ tun:
 				Name:   "mihomo-merge-scenario.yaml",
 				Kind:   domain.FileKindMihomo,
 				Source: domain.FileSource{Type: "inline", Content: "{}\n"},
-				Config: &domain.FileConfig{Settings: raw(t, map[string]any{
+				Config: &domain.FileConfig{Settings: completeTypedSettings(t, map[string]any{
 					"rules": []string{"MATCH,Proxy"},
 				})},
 				Processors: []domain.ProcessorSpec{
@@ -233,7 +233,7 @@ tun:
 `},
 		Config: &domain.FileConfig{
 			Subscriptions: []string{"native-node"},
-			Settings: raw(t, map[string]any{
+			Settings: completeTypedSettings(t, map[string]any{
 				"rules": []string{
 					"DOMAIN,user.example,DIRECT",
 					"RULE-SET,private,DIRECT",
@@ -303,7 +303,7 @@ tun:
 `},
 		Config: &domain.FileConfig{
 			Subscriptions: []string{"external-node"},
-			Settings: raw(t, map[string]any{
+			Settings: completeTypedSettings(t, map[string]any{
 				"rules": []string{
 					"DOMAIN,user.example,DIRECT",
 					"RULE-SET,private,DIRECT",
@@ -360,7 +360,7 @@ func TestServiceCommunityPresetMihomoTailscaleNativeRejectsIncompatibleNamedProx
 		Source: domain.FileSource{Type: "inline", Content: "dns: {}\ntun: {}\n"},
 		Config: &domain.FileConfig{
 			Subscriptions: []string{"incompatible-node"},
-			Settings: raw(t, map[string]any{
+			Settings: completeTypedSettings(t, map[string]any{
 				"rules": []string{"MATCH,LockedFinal"},
 			}),
 		},
@@ -421,7 +421,7 @@ func TestServiceCommunityPresetSingBoxStructureScenariosUseExactRawAsset(t *test
 				Name:   "sing-box-" + test.operation + ".json",
 				Kind:   domain.FileKindSingBox,
 				Source: domain.FileSource{Type: "inline", Content: base},
-				Config: &domain.FileConfig{Settings: raw(t, map[string]any{
+				Config: &domain.FileConfig{Settings: completeTypedSettings(t, map[string]any{
 					"rules": []map[string]any{{"outbound": "LockedFinal"}},
 				})},
 				Processors: []domain.ProcessorSpec{singBoxStructureProcessor(t, script, test.operation)},
@@ -460,7 +460,7 @@ func TestServiceCommunityPresetSingBoxStructureRejectsAmbiguousTunWithoutPartial
 			],
 			"route":{"rules":[]}
 		}`},
-		Config: &domain.FileConfig{Settings: raw(t, map[string]any{
+		Config: &domain.FileConfig{Settings: completeTypedSettings(t, map[string]any{
 			"rules": []map[string]any{{"outbound": "LockedFinal"}},
 		})},
 		Processors: []domain.ProcessorSpec{singBoxStructureProcessor(t, script, "udp-p2p-eim")},
@@ -480,7 +480,7 @@ func TestServiceCommunityPresetSingBoxStructureRejectsManagedOperationOverride(t
 		Name:   "sing-box-managed-operation.json",
 		Kind:   domain.FileKindSingBox,
 		Source: domain.FileSource{Type: "inline", Content: singBoxStructureScenarioBase()},
-		Config: &domain.FileConfig{Settings: raw(t, map[string]any{
+		Config: &domain.FileConfig{Settings: completeTypedSettings(t, map[string]any{
 			"rules": []map[string]any{{"outbound": "LockedFinal"}},
 		})},
 		Processors: []domain.ProcessorSpec{singBoxStructureProcessor(t, script, "mptcp-direct")},
@@ -510,7 +510,7 @@ func TestServiceCommunityPresetSingBoxOrderedScenariosUseExactRawAsset(t *testin
 				"rules": []
 			}
 		}`},
-		Config: &domain.FileConfig{Settings: raw(t, map[string]any{
+		Config: &domain.FileConfig{Settings: completeTypedSettings(t, map[string]any{
 			"rules": []map[string]any{
 				{"domain_suffix": []string{"user.example"}, "outbound": "direct"},
 				{"rule_set": []string{"private"}, "outbound": "direct"},
@@ -569,7 +569,7 @@ func TestServiceCommunityPresetSingBoxTailscaleNativeGeneratesFullFile(t *testin
 		}`},
 		Config: &domain.FileConfig{
 			Subscriptions: []string{"sing-box-native-node"},
-			Settings: raw(t, map[string]any{
+			Settings: completeTypedSettings(t, map[string]any{
 				"rules": []map[string]any{
 					{"domain_suffix": []string{"user.example"}, "outbound": "direct"},
 					{"rule_set": []string{"private"}, "outbound": "direct"},
@@ -661,7 +661,7 @@ func TestServiceCommunityPresetSingBoxTailscaleExternalGeneratesDistinctFullFile
 		}`},
 		Config: &domain.FileConfig{
 			Subscriptions: []string{"sing-box-external-node"},
-			Settings: raw(t, map[string]any{
+			Settings: completeTypedSettings(t, map[string]any{
 				"rules": []map[string]any{
 					{"domain_suffix": []string{"user.example"}, "outbound": "direct"},
 					{"rule_set": []string{"private"}, "outbound": "direct"},
@@ -725,7 +725,7 @@ func TestServiceCommunityPresetShadowrocketTailscaleNativeGeneratesConfigOnlyFil
 		Kind:   domain.FileKindShadowrocket,
 		Source: domain.FileSource{Type: "inline", Content: "[General]\nprofile = keep\n"},
 		Config: &domain.FileConfig{
-			Settings: raw(t, map[string]any{
+			Settings: completeTypedSettings(t, map[string]any{
 				"groups": []map[string]any{
 					{"name": "Proxy", "type": "select", "proxies": []string{"PROXY", "DIRECT"}},
 				},
@@ -779,7 +779,7 @@ func TestServiceCommunityPresetShadowrocketTailscaleExternalGeneratesFullFile(t 
 			"tun-excluded-routes = 192.168.0.0/16\n\n" +
 			"[Host]\nexample.com = 192.0.2.1\n"},
 		Config: &domain.FileConfig{
-			Settings: raw(t, map[string]any{
+			Settings: completeTypedSettings(t, map[string]any{
 				"groups": []map[string]any{
 					{"name": "Proxy", "type": "select", "proxies": []string{"PROXY", "DIRECT"}},
 				},
@@ -870,7 +870,7 @@ func TestServiceCommunityPresetOrderedNTPRejectsNoSafeAnchorWithoutPartial(t *te
 			spec := domain.FileSpec{
 				Name:       test.filename,
 				Kind:       test.kind,
-				Config:     &domain.FileConfig{Settings: raw(t, test.settings)},
+				Config:     &domain.FileConfig{Settings: completeTypedSettings(t, test.settings)},
 				Processors: []domain.ProcessorSpec{orderedNTPProcessor(t, communityPresetRawScript(t, test.asset), test.rulesJSON)},
 			}
 
@@ -946,7 +946,7 @@ func TestServiceCommunityPresetOrderedNTPRejectsManagedRequestArgOverrides(t *te
 					spec := domain.FileSpec{
 						Name:       test.filename,
 						Kind:       test.kind,
-						Config:     &domain.FileConfig{Settings: raw(t, test.settings)},
+						Config:     &domain.FileConfig{Settings: completeTypedSettings(t, test.settings)},
 						Processors: []domain.ProcessorSpec{orderedNTPProcessor(t, communityPresetRawScript(t, test.asset), test.rulesJSON)},
 					}
 

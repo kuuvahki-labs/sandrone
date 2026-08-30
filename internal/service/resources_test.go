@@ -37,8 +37,9 @@ func TestServiceGetFileSourceReturnsStoredAndBuiltinContentBeforeCompilation(t *
 		Source: domain.FileSource{Type: "inline", Content: "custom: true\n"},
 	}))
 	require.NoError(t, svc.PutFile(ctx, domain.FileSpec{
-		Name: "default.json",
-		Kind: domain.FileKindSingBox,
+		Name:   "default.json",
+		Kind:   domain.FileKindSingBox,
+		Config: &domain.FileConfig{Settings: completeTypedSettings(t, map[string]any{})},
 	}))
 
 	stored, err := svc.GetFileSource(ctx, "stored/base.yaml")
@@ -66,8 +67,9 @@ func TestServiceGetFileSourceReturnsShadowrocketBuiltinBase(t *testing.T) {
 	ctx := context.Background()
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
 	require.NoError(t, svc.PutFile(ctx, domain.FileSpec{
-		Name: "default.conf",
-		Kind: domain.FileKindShadowrocket,
+		Name:   "default.conf",
+		Kind:   domain.FileKindShadowrocket,
+		Config: &domain.FileConfig{Settings: completeTypedSettings(t, map[string]any{})},
 	}))
 
 	builtin, err := svc.GetFileSource(ctx, "default.conf")
@@ -127,7 +129,10 @@ func TestServiceListFilesExposesTypedConfigKind(t *testing.T) {
 		Name:   "default.yaml",
 		Kind:   domain.FileKindMihomo,
 		Source: domain.FileSource{},
-		Config: &domain.FileConfig{Subscriptions: []string{"default"}},
+		Config: &domain.FileConfig{
+			Subscriptions: []string{"default"},
+			Settings:      completeTypedSettings(t, map[string]any{}),
+		},
 	}))
 
 	files, err := svc.ListFiles(ctx)

@@ -6,12 +6,6 @@ export type ProxyGroupMemberMode = "fixed" | "runtime-filter";
 
 export type RuleSetSource = "inline" | "remote";
 
-export interface StructureSectionPresence {
-  groups: boolean;
-  ruleSets: boolean;
-  rules: boolean;
-}
-
 /** Target-neutral proxy-group state consumed by the shared workbench. */
 export interface GroupDraft {
   adapterState?: unknown;
@@ -87,7 +81,6 @@ export interface ConfigEditorDraft {
   ruleSetPreset: string;
   ruleSets: RuleSetDraft[];
   rules: RuleDraft[];
-  sectionPresence: StructureSectionPresence;
   settingsMode: "structured" | "raw";
   subscriptions?: string[];
 }

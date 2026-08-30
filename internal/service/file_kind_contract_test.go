@@ -89,10 +89,10 @@ func TestServiceTypedSettingsAreStrictPerKind(t *testing.T) {
 	}{
 		{name: "settings null", kind: domain.FileKindMihomo, settings: `null`, path: "config.settings"},
 		{name: "settings array", kind: domain.FileKindMihomo, settings: `[]`, path: "config.settings"},
-		{name: "unknown field", kind: domain.FileKindMihomo, settings: `{"future":true}`, path: "config.settings.future"},
-		{name: "removed adaptive count", kind: domain.FileKindMihomo, settings: `{"adaptive_groups":{"minimum_node_count":2}}`, path: "config.settings.adaptive_groups.minimum_node_count"},
-		{name: "mihomo object rule", kind: domain.FileKindMihomo, settings: `{"rules":[{"outbound":"direct"}]}`, path: "config.settings.rules"},
-		{name: "sing-box string rule", kind: domain.FileKindSingBox, settings: `{"rules":["MATCH,direct"]}`, path: "config.settings.rules"},
+		{name: "unknown field", kind: domain.FileKindMihomo, settings: `{"groups":[],"rule_sets":[],"rules":[],"future":true}`, path: "config.settings.future"},
+		{name: "removed adaptive count", kind: domain.FileKindMihomo, settings: `{"groups":[],"rule_sets":[],"rules":[],"adaptive_groups":{"minimum_node_count":2}}`, path: "config.settings.adaptive_groups.minimum_node_count"},
+		{name: "mihomo object rule", kind: domain.FileKindMihomo, settings: `{"groups":[],"rule_sets":[],"rules":[{"outbound":"direct"}]}`, path: "config.settings.rules"},
+		{name: "sing-box string rule", kind: domain.FileKindSingBox, settings: `{"groups":[],"rule_sets":[],"rules":["MATCH,direct"]}`, path: "config.settings.rules"},
 		{name: "null field", kind: domain.FileKindSingBox, settings: `{"groups":null}`, path: "config.settings.groups"},
 	}
 	for _, test := range tests {
@@ -106,6 +106,36 @@ func TestServiceTypedSettingsAreStrictPerKind(t *testing.T) {
 			require.ErrorContains(t, err, string(test.kind))
 			require.ErrorContains(t, err, test.path)
 		})
+	}
+}
+
+func TestServiceTypedSettingsRequireCompleteSections(t *testing.T) {
+	for _, kind := range []domain.FileKind{
+		domain.FileKindMihomo,
+		domain.FileKindSingBox,
+		domain.FileKindShadowrocket,
+	} {
+		for _, test := range []struct {
+			name     string
+			settings json.RawMessage
+			path     string
+		}{
+			{name: "settings", path: "config.settings"},
+			{name: "groups", settings: json.RawMessage(`{"rule_sets":[],"rules":[]}`), path: "config.settings.groups"},
+			{name: "rule sets", settings: json.RawMessage(`{"groups":[],"rules":[]}`), path: "config.settings.rule_sets"},
+			{name: "rules", settings: json.RawMessage(`{"groups":[],"rule_sets":[]}`), path: "config.settings.rules"},
+		} {
+			t.Run(string(kind)+"/"+test.name, func(t *testing.T) {
+				spec := domain.FileSpec{
+					Name: "incomplete", Kind: kind,
+					Config: &domain.FileConfig{Settings: test.settings},
+				}
+				_, err := service.New().GetFile(context.Background(), domain.FileRequest{Spec: &spec})
+				require.True(t, domain.IsCode(err, domain.CodeInvalidArgument), "got %v", err)
+				require.ErrorContains(t, err, test.path)
+				require.ErrorContains(t, err, "is required")
+			})
+		}
 	}
 }
 

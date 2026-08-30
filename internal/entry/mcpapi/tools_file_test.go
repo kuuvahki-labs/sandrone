@@ -145,6 +145,13 @@ func filePutArguments(name, kind, content string, processors []any) map[string]a
 		},
 		"meta": map[string]any{"scope": "lifecycle"},
 	}
+	if kind != "static" {
+		arguments["config"] = map[string]any{"settings": map[string]any{
+			"groups":    []any{},
+			"rule_sets": []any{},
+			"rules":     []any{},
+		}}
+	}
 	if len(processors) > 0 {
 		arguments["processors"] = processors
 	}

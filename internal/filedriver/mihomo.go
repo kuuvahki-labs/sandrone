@@ -15,17 +15,19 @@ type mihomoFileDriver struct{}
 
 func (mihomoFileDriver) Descriptor() Descriptor {
 	return Descriptor{
-		Kind:              domain.FileKindMihomo,
-		Description:       "Compile subscriptions into a complete Mihomo YAML configuration.",
-		MediaType:         "application/yaml",
-		Syntax:            "yaml",
-		DefaultExtension:  ".yaml",
-		NodeRenderFormat:  "mihomo-proxies",
-		SettingsPrototype: MihomoFileCapabilitySettings{},
+		Kind:             domain.FileKindMihomo,
+		Description:      "Compile subscriptions into a complete Mihomo YAML configuration.",
+		MediaType:        "application/yaml",
+		Syntax:           "yaml",
+		DefaultExtension: ".yaml",
+		NodeRenderFormat: "mihomo-proxies",
+		SettingsPrototype: MihomoFileCapabilitySettings{
+			Groups: []map[string]any{}, RuleSets: []map[string]any{}, Rules: []string{},
+		},
 		SourceRules: filekind.SourceRules{
 			AllowedTypes: []string{"inline", "remote"},
 		},
-		Defaults: map[string]any{"source": "built-in", "settings": map[string]any{}},
+		Defaults: map[string]any{"source": "built-in"},
 		Examples: []map[string]any{{
 			"name": "mihomo.yaml", "kind": string(domain.FileKindMihomo),
 			"config": map[string]any{
@@ -76,29 +78,17 @@ func (mihomoFileDriver) Compile(_ context.Context, in CompileInput) ([]byte, err
 	}
 	names := namesFromMihomoProxies(proxies)
 	doc["proxies"] = proxies
-	if settings.Groups == nil {
-		doc["proxy-groups"] = mihomoGroups("basic", names)
-	} else {
-		doc["proxy-groups"] = expandConfigGroups(settings.Groups, names)
+	doc["proxy-groups"] = expandConfigGroups(settings.Groups, names)
+	ruleProviders, err := mihomoRuleProvidersFromConfig(settings.RuleSets)
+	if err != nil {
+		return nil, err
 	}
-	if settings.RuleSets == nil {
-		doc["rule-providers"] = mihomoRuleProviders("default")
-	} else {
-		ruleProviders, err := mihomoRuleProvidersFromConfig(settings.RuleSets)
-		if err != nil {
-			return nil, err
-		}
-		doc["rule-providers"] = ruleProviders
+	doc["rule-providers"] = ruleProviders
+	rules := make([]any, len(settings.Rules))
+	for i := range settings.Rules {
+		rules[i] = settings.Rules[i]
 	}
-	if settings.Rules == nil {
-		doc["rules"] = mihomoRules()
-	} else {
-		rules := make([]any, len(settings.Rules))
-		for i := range settings.Rules {
-			rules[i] = settings.Rules[i]
-		}
-		doc["rules"] = rules
-	}
+	doc["rules"] = rules
 	out, err := yaml.Marshal(doc)
 	if err != nil {
 		return nil, domain.WrapError(domain.CodeInvalidArgument, `file kind "mihomo": encode config`, err)

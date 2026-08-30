@@ -140,14 +140,21 @@ describe("file driver codecs", () => {
     ["shadowrocket", {}],
     ["shadowrocket", { type: "url-test" }],
     ["shadowrocket", { regions: ["us", "hk"] }],
-  ] as const)("round-trips partial %s adaptive settings without filling or reordering fields", (kind, adaptiveGroups) => {
+  ] as const)("materializes partial %s adaptive settings without reordering metadata", (kind, adaptiveGroups) => {
     const adapter = structuredAdapter(kind);
     const settings = { adaptive_groups: adaptiveGroups };
 
     const decoded = adapter.decode({ settingsPresent: true, settings }, "en-US");
 
     expect(decoded).toMatchObject({ settingsMode: "structured", adaptiveGroups });
-    expect(adapter.encode(decoded!)).toEqual({ settings });
+    expect(adapter.encode(decoded!)).toMatchObject({
+      settings: {
+        adaptive_groups: adaptiveGroups,
+        groups: expect.any(Array),
+        rule_sets: expect.any(Array),
+        rules: expect.any(Array),
+      },
+    });
   });
 
   it.each([
@@ -197,7 +204,7 @@ describe("file driver codecs", () => {
       .toBe("source_remote_url_invalid");
   });
 
-  it("round-trips strict Shadowrocket settings and preserves omitted versus explicit empty arrays", () => {
+  it("round-trips complete Shadowrocket settings and materializes omitted sections", () => {
     const adapter = structuredAdapter("shadowrocket");
     const settings = {
       adaptive_groups: { type: "url-test", regions: [] },
@@ -219,9 +226,11 @@ describe("file driver codecs", () => {
     });
     expect(adapter.encode(decoded!)).toEqual({ settings });
     expect(adapter.encode(adapter.initialize({ settingsMode: "structured", groups: [], rules: [] }))).toEqual({
-      settings: { groups: [], rules: [] },
+      settings: { groups: [], rule_sets: [], rules: [] },
     });
-    expect(adapter.encode(adapter.initialize({ settingsMode: "structured" }))).toEqual({ settings: {} });
+    expect(adapter.encode(adapter.initialize({ settingsMode: "structured" }))).toMatchObject({
+      settings: { groups: expect.any(Array), rule_sets: [], rules: expect.any(Array) },
+    });
   });
 
   it.each([
@@ -244,7 +253,9 @@ describe("file driver codecs", () => {
     };
     const decoded = adapter.decode({ settingsPresent: true, settings })!;
     expect(decoded.groups[0]).toMatchObject({ hidden: true });
-    expect(adapter.encode(decoded)).toEqual({ settings });
+    expect(adapter.encode(decoded)).toMatchObject({
+      settings: { groups: settings.groups, rule_sets: expect.any(Array), rules: expect.any(Array) },
+    });
   });
 
   it("defaults only new Mihomo url-test groups to tolerance 50", () => {
@@ -329,7 +340,9 @@ describe("file driver codecs", () => {
 
     const decoded = adapter.decode({ settingsPresent: true, settings });
     expect(decoded).toMatchObject({ settingsMode: "structured", mode: "advanced" });
-    expect(adapter.encode(decoded!)).toEqual({ settings });
+    expect(adapter.encode(decoded!)).toMatchObject({
+      settings: { groups: expect.any(Array), rule_sets: settings.rule_sets, rules: expect.any(Array) },
+    });
   });
 
   it.each([

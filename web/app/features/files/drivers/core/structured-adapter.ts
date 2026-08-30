@@ -24,10 +24,7 @@ export interface StructuredConfigurationAdapterSpec {
   defaults: {
     ruleSets: () => ConfigMap[];
     rules: (namingLocale: ConfigNamingLocale) => unknown[];
-    runtimeGroups?: (namingLocale: ConfigNamingLocale) => ConfigMap[];
-    runtimeRuleSets?: () => ConfigMap[];
-    runtimeRules?: (namingLocale: ConfigNamingLocale) => unknown[];
-	};
+  };
 	templates: StructuredFileConfigurationAdapter["templates"];
 	validate: StructuredFileConfigurationAdapter["validate"];
 }
@@ -37,23 +34,13 @@ export function createStructuredConfigurationAdapter(
 ): StructuredFileConfigurationAdapter {
   const initialize = (draft?: FileConfigDraft, namingLocale: ConfigNamingLocale = "en-US"): ConfigEditorDraft => {
     const value = draft ?? {};
-    const existing = draft !== undefined;
-    const groupPreset = value.group_preset || "basic";
-    const runtimeGroups = existing && spec.defaults.runtimeGroups
-      ? spec.defaults.runtimeGroups(namingLocale)
-      : undefined;
+      const groupPreset = value.group_preset || "basic";
     const projectedGroups = value.groups !== undefined
       ? spec.groups.project(value.groups)
-      : runtimeGroups
-        ? spec.groups.project(runtimeGroups)
-        : spec.groups.defaults(groupPreset, namingLocale);
-    const nativeGroups = value.groups ?? runtimeGroups ?? spec.groups.serialize(projectedGroups ?? []);
-    const nativeRuleSets = value.rule_sets
-      ?? (existing && spec.defaults.runtimeRuleSets ? spec.defaults.runtimeRuleSets() : spec.defaults.ruleSets());
-    const nativeRules = value.rules
-      ?? (existing && spec.defaults.runtimeRules
-        ? spec.defaults.runtimeRules(namingLocale)
-        : spec.defaults.rules(namingLocale));
+      : spec.groups.defaults(groupPreset, namingLocale);
+    const nativeGroups = value.groups ?? spec.groups.serialize(projectedGroups ?? []);
+    const nativeRuleSets = value.rule_sets ?? spec.defaults.ruleSets();
+    const nativeRules = value.rules ?? spec.defaults.rules(namingLocale);
     const ruleSets = spec.ruleSets.project(nativeRuleSets);
     const rules = spec.rules.project(nativeRules);
     return {
@@ -70,11 +57,6 @@ export function createStructuredConfigurationAdapter(
       ruleSetPreset: value.ruleset_preset || "default",
       ruleSets: ruleSets ?? [],
       rules: rules ?? [],
-      sectionPresence: {
-        groups: Object.hasOwn(value, "groups"),
-        ruleSets: Object.hasOwn(value, "rule_sets"),
-        rules: Object.hasOwn(value, "rules"),
-      },
     };
   };
 
@@ -94,15 +76,9 @@ export function createStructuredConfigurationAdapter(
       group_preset: draft.groupPreset,
       ruleset_preset: draft.ruleSetPreset,
       adaptive_groups: draft.adaptiveGroups,
-      ...(draft.sectionPresence.groups ? {
-        groups: draft.mode === "wizard" ? spec.groups.serialize(draft.groups) : advancedGroups,
-      } : {}),
-      ...(draft.sectionPresence.ruleSets ? {
-        rule_sets: draft.mode === "wizard" ? spec.ruleSets.serialize(draft.ruleSets) : advancedRuleSets,
-      } : {}),
-      ...(draft.sectionPresence.rules ? {
-        rules: draft.mode === "wizard" ? spec.rules.serialize(draft.rules) : advancedRules,
-      } : {}),
+      groups: draft.mode === "wizard" ? spec.groups.serialize(draft.groups) : advancedGroups,
+      rule_sets: draft.mode === "wizard" ? spec.ruleSets.serialize(draft.ruleSets) : advancedRuleSets,
+      rules: draft.mode === "wizard" ? spec.rules.serialize(draft.rules) : advancedRules,
     };
   };
 
@@ -148,9 +124,19 @@ export function createStructuredConfigurationAdapter(
 		ruleSets: spec.ruleSets,
 		rules: spec.rules,
 		templates: spec.templates,
+		validateSettings(settings) {
+			return completeSettingsObject(settings) && spec.decodeSettings(settings) !== null;
+		},
 		validate: spec.validate,
   };
   return Object.freeze(adapter);
+}
+
+function completeSettingsObject(value: unknown): value is ConfigMap {
+  if (!isRecord(value)) return false;
+  return ["groups", "rule_sets", "rules"].every((name) => (
+    Object.hasOwn(value, name) && Array.isArray(value[name])
+  ));
 }
 
 export function strictSettingsObject(

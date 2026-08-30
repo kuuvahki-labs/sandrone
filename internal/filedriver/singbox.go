@@ -13,22 +13,26 @@ type singBoxFileDriver struct{}
 
 func (singBoxFileDriver) Descriptor() Descriptor {
 	return Descriptor{
-		Kind:              domain.FileKindSingBox,
-		Description:       "Compile subscriptions into a complete sing-box JSON configuration.",
-		MediaType:         "application/json",
-		Syntax:            "json",
-		DefaultExtension:  ".json",
-		NodeRenderFormat:  "sing-box-outbounds",
-		SettingsPrototype: SingBoxFileSettings{},
+		Kind:             domain.FileKindSingBox,
+		Description:      "Compile subscriptions into a complete sing-box JSON configuration.",
+		MediaType:        "application/json",
+		Syntax:           "json",
+		DefaultExtension: ".json",
+		NodeRenderFormat: "sing-box-outbounds",
+		SettingsPrototype: SingBoxFileSettings{
+			Groups: []map[string]any{}, RuleSets: []map[string]any{}, Rules: []map[string]any{},
+		},
 		SourceRules: filekind.SourceRules{
 			AllowedTypes: []string{"inline", "remote"},
 		},
-		Defaults: map[string]any{"source": "built-in", "settings": map[string]any{}},
+		Defaults: map[string]any{"source": "built-in"},
 		Examples: []map[string]any{{
 			"name": "sing-box.json", "kind": string(domain.FileKindSingBox),
 			"config": map[string]any{
 				"subscriptions": []any{},
-				"settings":      map[string]any{"groups": []any{}},
+				"settings": map[string]any{
+					"groups": []any{}, "rule_sets": []any{}, "rules": []any{},
+				},
 			},
 		}},
 		DefaultBase: []byte(`{
@@ -67,25 +71,13 @@ func (singBoxFileDriver) Compile(_ context.Context, in CompileInput) ([]byte, er
 	nodeOutbounds := anyList(renderedDoc["outbounds"])
 	nodeEndpoints := anyList(renderedDoc["endpoints"])
 	names := namesFromSingBoxOutbounds(nodeOutbounds, nodeEndpoints)
-	if settings.Groups == nil {
-		doc["outbounds"] = singBoxOutbounds("basic", names, nodeOutbounds)
-	} else {
-		doc["outbounds"] = singBoxOutboundsWithGroups(settings.Groups, names, nodeOutbounds)
-	}
+	doc["outbounds"] = singBoxOutboundsWithGroups(settings.Groups, names, nodeOutbounds)
 	if len(nodeEndpoints) > 0 {
 		doc["endpoints"] = nodeEndpoints
 	}
 	route := mapValue(doc["route"])
-	if settings.RuleSets == nil {
-		route["rule_set"] = singBoxRuleSets("default")
-	} else {
-		route["rule_set"] = configMapList(settings.RuleSets)
-	}
-	if settings.Rules == nil {
-		route["rules"] = singBoxRules()
-	} else {
-		route["rules"] = configMapList(settings.Rules)
-	}
+	route["rule_set"] = configMapList(settings.RuleSets)
+	route["rules"] = configMapList(settings.Rules)
 	if final, ok := route["final"].(string); !ok || strings.TrimSpace(final) == "" {
 		route["final"] = "Proxy"
 	}

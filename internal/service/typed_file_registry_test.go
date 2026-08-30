@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -22,7 +23,10 @@ func (warningTestRenderer) RenderWithReport(context.Context, []domain.NodeIR, do
 func TestTypedFileCompilationReturnsNodeRendererWarnings(t *testing.T) {
 	svc := New()
 	svc.renderers["mihomo-proxies"] = warningTestRenderer{}
-	spec := domain.FileSpec{Name: "warnings.yaml", Kind: domain.FileKindMihomo}
+	spec := domain.FileSpec{
+		Name: "warnings.yaml", Kind: domain.FileKindMihomo,
+		Config: &domain.FileConfig{Settings: json.RawMessage(`{"groups":[],"rule_sets":[],"rules":[]}`)},
+	}
 
 	result, err := svc.GetFile(context.Background(), domain.FileRequest{Spec: &spec})
 

@@ -15,7 +15,7 @@ import {
 } from "./editor-state";
 
 describe("config editor state initialization and output", () => {
-  it("preserves omitted sections, partial adaptive metadata, and legacy multi-subscriptions", () => {
+  it("materializes omitted sections while preserving adaptive metadata and legacy multi-subscriptions", () => {
     const adapter = structuredAdapter("mihomo");
     const state = initializeConfigEditorState(adapter, {
       defaultValue: {
@@ -28,17 +28,15 @@ describe("config editor state initialization and output", () => {
 
     const output = deriveConfigEditorOutput(adapter, state);
 
-    expect(state.structure.sectionPresence).toEqual({
-      groups: false,
-      ruleSets: false,
-      rules: false,
-    });
     expect(state.structure.groups.length).toBeGreaterThan(0);
     expect(output.multipleSubscriptions).toBe(true);
     expect(output.encoded).toEqual({
       subscriptions: ["one", "two"],
       settings: {
         adaptive_groups: { regions: ["hk"] },
+        groups: expect.any(Array),
+        rule_sets: expect.any(Array),
+        rules: expect.any(Array),
       },
     });
     expect(JSON.parse(output.serialized)).toEqual(output.encoded);
@@ -58,11 +56,6 @@ describe("config editor state initialization and output", () => {
 
     const output = deriveConfigEditorOutput(adapter, state);
 
-    expect(state.structure.sectionPresence).toEqual({
-      groups: true,
-      ruleSets: true,
-      rules: true,
-    });
     expect(output.encoded).toEqual({
       settings: {
         groups: [],
@@ -240,11 +233,6 @@ describe("config editor structure transitions", () => {
 
     expect(applied.namingLocale).toBe("zh-CN");
     expect(applied.selectedSubscription).toBe("");
-    expect(applied.structure.sectionPresence).toEqual({
-      groups: true,
-      ruleSets: true,
-      rules: true,
-    });
     expect(applied.structure.groups.map((group) => group.name)).toContain("🤖 AI 服务");
     expect(applied.structure.groups.map((group) => group.name)).not.toContain("Hong Kong");
     expect(applied.templateUndo).toEqual(selectionCleared.structure);
@@ -272,7 +260,7 @@ describe("config editor structure transitions", () => {
     expect(undoConfigEditorTemplate(state)).toBe(state);
   });
 
-  it("marks each directly edited structure section present", () => {
+  it("updates each directly edited structure section", () => {
     const adapter = structuredAdapter("mihomo");
     const initial = initializeConfigEditorState(adapter, {
       defaultValue: { settingsMode: "structured" },
@@ -304,27 +292,12 @@ describe("config editor structure transitions", () => {
       text: '["MATCH,DIRECT"]',
     });
 
-    expect(groups.structure.sectionPresence).toEqual({
-      groups: true,
-      ruleSets: false,
-      rules: false,
-    });
-    expect(ruleSets.structure.sectionPresence).toEqual({
-      groups: false,
-      ruleSets: true,
-      rules: false,
-    });
-    expect(rules.structure.sectionPresence).toEqual({
-      groups: false,
-      ruleSets: false,
-      rules: true,
-    });
+    expect(groups.structure.groups).toEqual([]);
+    expect(ruleSets.structure.ruleSets).toEqual([]);
+    expect(rules.structure.rules).toEqual([]);
     expect(advancedGroups.structure.advancedGroupsText).toBe('[{"name":"Custom"}]');
-    expect(advancedGroups.structure.sectionPresence.groups).toBe(true);
     expect(advancedRuleSets.structure.advancedRuleSetsText).toBe('[{"name":"remote"}]');
-    expect(advancedRuleSets.structure.sectionPresence.ruleSets).toBe(true);
     expect(advancedRules.structure.advancedRulesText).toBe('["MATCH,DIRECT"]');
-    expect(advancedRules.structure.sectionPresence.rules).toBe(true);
   });
 
   it("replaces raw settings with explicitly present structured sections", () => {
@@ -332,7 +305,11 @@ describe("config editor structure transitions", () => {
     const state = initializeConfigEditorState(adapter, {
       defaultValue: {
         settingsMode: "raw",
-        rawSettings: { future: true },
+        rawSettings: {
+          groups: [{ name: "Proxy", type: "select", proxies: ["DIRECT"], future: true }],
+          rule_sets: [],
+          rules: [],
+        },
       },
       formMode: "edit",
     });
@@ -342,11 +319,6 @@ describe("config editor structure transitions", () => {
     });
 
     expect(replaced.settingsMode).toBe("structured");
-    expect(replaced.structure.sectionPresence).toEqual({
-      groups: true,
-      ruleSets: true,
-      rules: true,
-    });
   });
 });
 
@@ -370,7 +342,6 @@ describe("config editor adaptive and catalog transitions", () => {
       expect(first.applied).toBe(true);
       expect(first.state.adaptiveEnabled).toBe(true);
       expect(first.state.adaptiveOptionsChanged).toBe(true);
-      expect(first.state.structure.sectionPresence.groups).toBe(true);
       expect(first.state.structureRevision).toBe(1);
       expect(adapter.adaptive.canonicalNames(output.nativeConfig.groups ?? []))
         .toEqual([
@@ -399,20 +370,21 @@ describe("config editor adaptive and catalog transitions", () => {
     },
   );
 
-  it("uses omitted Shadowrocket runtime defaults as the adaptive anchor", () => {
+  it("materializes Shadowrocket frontend defaults as the adaptive anchor", () => {
     const adapter = structuredAdapter("shadowrocket");
     const initial = initializeConfigEditorState(adapter, {
       defaultValue: {
-        subscriptions: ["provider"],
         settingsMode: "structured",
       },
       formMode: "edit",
     });
 
-    expect(initial.structure.sectionPresence.groups).toBe(false);
-    expect(deriveConfigEditorOutput(adapter, initial).encoded).toEqual({
-      subscriptions: ["provider"],
-      settings: {},
+    expect(deriveConfigEditorOutput(adapter, initial).encoded).toMatchObject({
+      settings: {
+        groups: expect.any(Array),
+        rule_sets: expect.any(Array),
+        rules: expect.any(Array),
+      },
     });
 
     const transition = applyConfigEditorAdaptiveGeneration(adapter, initial, {
@@ -507,7 +479,6 @@ describe("config editor adaptive and catalog transitions", () => {
     expect(added.state.structure.ruleSets).toHaveLength(
       withUndo.structure.ruleSets.length + 1,
     );
-    expect(added.state.structure.sectionPresence.ruleSets).toBe(true);
     expect(added.state.templateUndo).toBeNull();
 
     const duplicate = applyConfigEditorCatalogRuleSet(
@@ -526,7 +497,11 @@ describe("config editor derived validity", () => {
     const initial = initializeConfigEditorState(adapter, {
       defaultValue: {
         settingsMode: "raw",
-        rawSettings: { future: true },
+        rawSettings: {
+          groups: [{ name: "Proxy", type: "select", proxies: ["DIRECT"], future: true }],
+          rule_sets: [],
+          rules: [],
+        },
       },
       formMode: "edit",
     });

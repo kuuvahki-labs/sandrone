@@ -54,7 +54,7 @@ proxy-groups: []
 rule-providers: {}
 rules: []
 `},
-		Config: &domain.FileConfig{Settings: raw(t, map[string]any{
+		Config: &domain.FileConfig{Settings: completeTypedSettings(t, map[string]any{
 			"groups": []map[string]any{
 				{"name": "Proxy", "type": "select", "proxies": []any{"DIRECT"}},
 			},
@@ -139,7 +139,7 @@ proxy-providers:
 `},
 		Config: &domain.FileConfig{
 			Subscriptions: []string{"default"},
-			Settings: raw(t, map[string]any{
+			Settings: completeTypedSettings(t, map[string]any{
 				"groups": []map[string]any{
 					{
 						"name":    "Proxy",
