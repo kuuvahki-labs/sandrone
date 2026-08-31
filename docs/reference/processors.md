@@ -154,11 +154,16 @@ sing-box 和 Mihomo，省略 core 时默认 sing-box。
 处理结果由以下参数决定：
 
 - `fail_mode: keep`（缺省）：保留失败节点；
-- `fail_mode: drop`：丢弃失败节点；
-- `fail_mode: error`：遇到第一个失败结果即让整步失败；
+- `fail_mode: drop`：丢弃真正的探测失败节点；
+- `fail_mode: error`：遇到第一个真正的探测失败结果即让整步失败；
 - `annotate: true`：重写该节点所有 `probe.*` meta，写入 method、core、
   alive、duration、checked_at、error_code 等已有结果；
-- `sort: duration`：存活节点在前并按延迟升序；失败节点在后，平局保持输入顺序。
+- `sort: duration`：存活节点在前并按延迟升序，当前核心不支持的节点居中，真正的
+  失败节点在后；同组平局保持输入顺序。
+
+选定核心无法无损表达节点时，runner 返回 `probe_node_unsupported`。这表示没有产生
+可达性结论，不受 `fail_mode: drop/error` 处置，节点会保留给后续客户端 renderer；
+例如 sing-box 探测不支持 xHTTP，不应让同一 Subscription 的 Mihomo 输出丢失该节点。
 
 执行 runner 前，processor 会检查当前批次的 `NodeIR.Name`。只要存在重名，整次
 processor 就跳过探测，按原顺序原样返回全部节点，并只产生一条
@@ -178,10 +183,9 @@ method/core 也继续返回对应错误，不按这条全局不可用规则跳�
 生产者/消费者规则见[存储与并发](../architecture/storage.md#缓存层)。
 
 runner 返回的结果数必须与输入节点数相同。probe report warning 会并入 processor
-warning；runner 错误直接终止链。使用 sing-box core 时，核心目标不能表达的节点
-由 runner 在原位置返回 `probe_invalid_target`，而不是让可探测的同批节点失败；
-因此 `fail_mode` 在 runner 返回后按节点结果执行。这个 node-level isolation 保证
-目前不适用于 Mihomo，其 runner 错误仍会终止 processor 链。Hysteria v1 的
+warning；runner 错误直接终止链。核心目标不能表达的节点由 sing-box 和 Mihomo
+runner 在原位置返回 `probe_node_unsupported`，而不是让可探测的同批节点失败；
+无法解析已渲染核心配置等真正的 runner 错误仍会终止 processor 链。Hysteria v1 的
 canonical 字段与单位边界见
 [Hysteria v1 带宽规范化](capabilities.md#hysteria-v1-带宽规范化)，本页不重复定义。
 

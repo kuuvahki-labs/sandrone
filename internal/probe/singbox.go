@@ -76,6 +76,7 @@ func (b *SingBoxBackend) Probe(ctx context.Context, backendReq BackendRequest, n
 	if err != nil {
 		return nil, err
 	}
+	skipped := rendererSkippedNodeMessages(backendReq.Payload, "sing-box-outbounds", len(nodes))
 	instance, err := box.New(box.Options{
 		Context: boxCtx,
 		Options: options,
@@ -97,6 +98,13 @@ func (b *SingBoxBackend) Probe(ctx context.Context, backendReq BackendRequest, n
 	for i, node := range nodes {
 		wg.Go(func() {
 			defer recoverProbeWorkerPanic(&results[i], req, node, string(domain.CodeProbeCoreAPIFailed))
+			if message, ok := skipped[i]; ok {
+				if message == "" {
+					message = "sing-box outbound was skipped by renderer"
+				}
+				results[i] = resultForError(req, node, string(domain.CodeProbeNodeUnsupported), errors.New(message), b.now())
+				return
+			}
 			select {
 			case sem <- struct{}{}:
 				defer func() { <-sem }()
@@ -188,6 +196,7 @@ func (b *SingBoxNTPBackend) Probe(ctx context.Context, backendReq BackendRequest
 	if err != nil {
 		return nil, err
 	}
+	skipped := rendererSkippedNodeMessages(backendReq.Payload, "sing-box-outbounds", len(nodes))
 	instance, err := box.New(box.Options{
 		Context: boxCtx,
 		Options: options,
@@ -209,6 +218,13 @@ func (b *SingBoxNTPBackend) Probe(ctx context.Context, backendReq BackendRequest
 	for i, node := range nodes {
 		wg.Go(func() {
 			defer recoverProbeWorkerPanic(&results[i], req, node, string(domain.CodeProbeUDPNTPFailed))
+			if message, ok := skipped[i]; ok {
+				if message == "" {
+					message = "sing-box outbound was skipped by renderer"
+				}
+				results[i] = resultForError(req, node, string(domain.CodeProbeNodeUnsupported), errors.New(message), b.now())
+				return
+			}
 			select {
 			case sem <- struct{}{}:
 				defer func() { <-sem }()

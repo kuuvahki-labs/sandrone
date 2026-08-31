@@ -114,7 +114,10 @@ func TestServiceMihomoURLTestIsolatesCustomECHDNSTransport(t *testing.T) {
 	require.Len(t, result.Results, 2)
 	require.True(t, result.Results[0].Alive)
 	require.False(t, result.Results[1].Alive)
-	require.Equal(t, string(domain.CodeProbeInvalidTarget), result.Results[1].ErrorCode)
+	require.Equal(t, string(domain.CodeProbeNodeUnsupported), result.Results[1].ErrorCode)
+	require.Equal(t, 1, result.Report.Probe.SuccessCount)
+	require.Equal(t, 1, result.Report.Probe.UnsupportedCount)
+	require.Zero(t, result.Report.Probe.FailureCount)
 	require.True(t, containsWarning(result.Report.Warnings, "render_node_skipped", "vless"))
 }
 

@@ -1,10 +1,11 @@
 package node
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"maps"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -164,7 +165,8 @@ func (p *probeProc) ApplyNodes(ctx context.Context, in domain.NodeProcessInput) 
 		if !ok {
 			return domain.NodeProcessOutput{}, &domain.AppError{Code: domain.CodeNodeProcessorFailed, Message: fmt.Sprintf("probe result missing for node %q", node.Name), Processor: "probe"}
 		}
-		if p.params.FailMode == "error" && !probeResult.Alive {
+		failed := !probeResult.Alive && probeResult.ErrorCode != string(domain.CodeProbeNodeUnsupported)
+		if p.params.FailMode == "error" && failed {
 			return domain.NodeProcessOutput{}, &domain.AppError{
 				Code:      domain.CodeNodeProcessorFailed,
 				Message:   fmt.Sprintf("probe failed for node %q", node.Name),
@@ -172,7 +174,7 @@ func (p *probeProc) ApplyNodes(ctx context.Context, in domain.NodeProcessInput) 
 				Cause:     fmt.Errorf("%s: %s", probeResult.ErrorCode, probeResult.Error),
 			}
 		}
-		if p.params.FailMode == "drop" && !probeResult.Alive {
+		if p.params.FailMode == "drop" && failed {
 			continue
 		}
 		outNode := node
@@ -188,16 +190,16 @@ func (p *probeProc) ApplyNodes(ctx context.Context, in domain.NodeProcessInput) 
 		})
 	}
 	if p.params.Sort == "duration" {
-		sort.SliceStable(items, func(i, j int) bool {
-			left := items[i].result
-			right := items[j].result
-			if left.Alive != right.Alive {
-				return left.Alive
+		slices.SortStableFunc(items, func(leftItem, rightItem probeItem) int {
+			left := leftItem.result
+			right := rightItem.result
+			if order := cmp.Compare(probeResultSortOrder(left), probeResultSortOrder(right)); order != 0 {
+				return order
 			}
 			if left.Alive && right.Alive && left.DurationMS != right.DurationMS {
-				return left.DurationMS < right.DurationMS
+				return cmp.Compare(left.DurationMS, right.DurationMS)
 			}
-			return items[i].index < items[j].index
+			return cmp.Compare(leftItem.index, rightItem.index)
 		})
 	}
 	out := make([]domain.NodeIR, len(items))
@@ -229,6 +231,16 @@ type probeItem struct {
 	node   domain.NodeIR
 	result domain.NodeProbeResult
 	index  int
+}
+
+func probeResultSortOrder(result domain.NodeProbeResult) int {
+	if result.Alive {
+		return 0
+	}
+	if result.ErrorCode == string(domain.CodeProbeNodeUnsupported) {
+		return 1
+	}
+	return 2
 }
 
 func annotateProbeMeta(meta map[string]string, result domain.NodeProbeResult) map[string]string {

@@ -128,6 +128,8 @@ nodes-stage processor 接收节点切片、目标、来源上下文和请求 met
 已保存 Subscription 的 nodes-stage 结果是客户端无关的 canonical 结果，因此该
 执行作用域中的 `target` 为空。目标格式只在后续 renderer 或 file driver 边界生效。
 一次性 parse/render/convert 的 processor 仍可接收其调用方明确给出的 target。
+因此 probe 所选核心无法表达某节点时，只能记录 `probe_node_unsupported` 并保留节点；
+不能在这一阶段删除它，最终客户端 renderer 会按自己的能力决定输出或跳过。
 
 执行规则是稳定契约：
 

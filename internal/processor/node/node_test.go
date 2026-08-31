@@ -403,10 +403,11 @@ func TestProbeProcessorRejectsUnsupportedMethod(t *testing.T) {
 	require.True(t, domain.IsCode(err, domain.CodeProcessorConfigInvalid))
 }
 
-func TestProbeProcessorDropsInvalidTargetAndRetainsWarnings(t *testing.T) {
+func TestProbeProcessorDropsFailuresButRetainsUnsupportedNodesAndWarnings(t *testing.T) {
 	runner := &stubProbeRunner{result: &domain.ProbeResult{
 		Results: []domain.NodeProbeResult{
 			{NodeName: "invalid-hysteria", Method: "url_test", Alive: false, ErrorCode: "probe_invalid_target"},
+			{NodeName: "unsupported-xhttp", Method: "url_test", Alive: false, ErrorCode: string(domain.CodeProbeNodeUnsupported)},
 			{NodeName: "valid-http", Method: "url_test", Alive: true},
 		},
 		Report: domain.Report{Warnings: []domain.Warning{
@@ -418,16 +419,35 @@ func TestProbeProcessorDropsInvalidTargetAndRetainsWarnings(t *testing.T) {
 
 	out, err := proc.ApplyNodes(context.Background(), domain.NodeProcessInput{Nodes: []domain.NodeIR{
 		{Name: "invalid-hysteria", Server: "invalid.example", Port: 443},
+		{Name: "unsupported-xhttp", Server: "xhttp.example", Port: 443},
 		{Name: "valid-http", Server: "valid.example", Port: 443},
 	}})
 
 	require.NoError(t, err)
-	require.Len(t, out.Nodes, 1)
-	require.Equal(t, "valid-http", out.Nodes[0].Name)
+	require.Equal(t, []string{"unsupported-xhttp", "valid-http"}, []string{out.Nodes[0].Name, out.Nodes[1].Name})
 	require.Equal(t, []domain.Warning{
 		{Code: "parse_unknown_field"},
 		{Code: "render_node_skipped"},
 	}, out.Warnings)
+}
+
+func TestProbeProcessorErrorModeRetainsUnsupportedNode(t *testing.T) {
+	runner := &stubProbeRunner{result: &domain.ProbeResult{
+		Results: []domain.NodeProbeResult{{
+			NodeName: "unsupported-xhttp", Method: "url_test", Alive: false,
+			ErrorCode: string(domain.CodeProbeNodeUnsupported), Error: "sing-box cannot render xhttp",
+		}},
+	}}
+	proc := buildNode(t, makeProbeRegistry(runner), "probe", map[string]any{"fail_mode": "error", "annotate": true})
+
+	out, err := proc.ApplyNodes(t.Context(), domain.NodeProcessInput{Nodes: []domain.NodeIR{{
+		Name: "unsupported-xhttp", Server: "xhttp.example", Port: 443,
+	}}})
+
+	require.NoError(t, err)
+	require.Len(t, out.Nodes, 1)
+	require.Equal(t, "false", out.Nodes[0].Meta["probe.alive"])
+	require.Equal(t, string(domain.CodeProbeNodeUnsupported), out.Nodes[0].Meta["probe.error_code"])
 }
 
 func TestProbeProcessorLeavesRuntimeDefaultsToRunner(t *testing.T) {

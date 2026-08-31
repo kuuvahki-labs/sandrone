@@ -26,9 +26,12 @@ func dimensionsForResults(results []domain.NodeProbeResult) []domain.ProbeReport
 			}
 			byKey[k] = dim
 		}
-		if result.Alive {
+		switch {
+		case result.Alive:
 			dim.SuccessCount++
-		} else {
+		case result.ErrorCode == string(domain.CodeProbeNodeUnsupported):
+			dim.UnsupportedCount++
+		default:
 			dim.FailureCount++
 			if result.ErrorCode != "" {
 				dim.ErrorCounts[result.ErrorCode]++
@@ -103,6 +106,10 @@ func ReportForResults(backend, version, method, core string, nodes []domain.Node
 		}
 		if result.Alive {
 			probeReport.SuccessCount++
+			continue
+		}
+		if result.ErrorCode == string(domain.CodeProbeNodeUnsupported) {
+			probeReport.UnsupportedCount++
 			continue
 		}
 		probeReport.FailureCount++

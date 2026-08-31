@@ -129,6 +129,28 @@ func TestTCPConnectDialFailure(t *testing.T) {
 	require.Equal(t, uint16(443), result.Report.Warnings[0].NodeContext.Port)
 }
 
+func TestReportForResultsSeparatesUnsupportedNodesFromFailures(t *testing.T) {
+	nodes := []domain.NodeIR{
+		{Name: "alive"},
+		{Name: "unsupported"},
+		{Name: "failed"},
+	}
+	results := []domain.NodeProbeResult{
+		{NodeName: "alive", Method: "url_test", Core: "sing-box", Alive: true},
+		{NodeName: "unsupported", Method: "url_test", Core: "sing-box", ErrorCode: string(domain.CodeProbeNodeUnsupported)},
+		{NodeName: "failed", Method: "url_test", Core: "sing-box", ErrorCode: string(domain.CodeProbeTimeout)},
+	}
+
+	report := probe.ReportForResults("singbox_url_test", "test", "url_test", "sing-box", nodes, results)
+
+	require.Equal(t, 1, report.Probe.SuccessCount)
+	require.Equal(t, 1, report.Probe.UnsupportedCount)
+	require.Equal(t, 1, report.Probe.FailureCount)
+	require.Equal(t, map[string]int{string(domain.CodeProbeTimeout): 1}, report.Probe.ErrorCounts)
+	require.Equal(t, 1, report.Probe.Dimensions[0].UnsupportedCount)
+	require.Len(t, report.Warnings, 2)
+}
+
 func TestTCPConnectWorkerPanicBecomesSanitizedFailureAndBatchContinues(t *testing.T) {
 	const sensitivePanic = "secret-node-credential"
 	dialer := &panicFirstDialer{panicValue: sensitivePanic}

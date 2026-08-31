@@ -153,6 +153,7 @@ endpoint 级限制以 [HTTP API 参考](http-api/README.md)为准。
 | `error_code` | 含义 |
 | --- | --- |
 | `probe_node_invalid` | TCP probe 节点缺少 server 或 port |
+| `probe_node_unsupported` | 选定探测核心无法无损表达该节点；没有产生可达性结论 |
 | `probe_invalid_target` | 核心无法定位该节点或构造目标 |
 | `probe_timeout` | 单节点尝试超时 |
 | `probe_context_canceled` | context 在该节点完成前取消 |
@@ -160,9 +161,11 @@ endpoint 级限制以 [HTTP API 参考](http-api/README.md)为准。
 | `probe_core_api_failed` | URL 请求失败或响应状态不符合 `expected_status` |
 | `probe_udp_ntp_failed` | UDP NTP 失败，且不是超时或取消 |
 
-成功节点的 `error_code` 和 `error` 为空。每个失败节点还会在顶层 report 中产生
-同 code 的 warning；`report.probe.error_counts` 以及每个 dimension 的
-`error_counts` 按 code 汇总。
+成功节点的 `error_code` 和 `error` 为空。`probe_node_unsupported` 节点保持
+`alive=false`，但它表示当前核心没有执行探测，不属于可达性失败。顶层 report 的
+`success_count`、`unsupported_count` 和 `failure_count` 分开计数；
+`error_counts` 只汇总真正的失败。每个非成功节点仍产生同 code 的 warning，供调用方
+说明为什么没有成功结果。
 
 ## Warning
 

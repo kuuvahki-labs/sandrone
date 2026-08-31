@@ -63,6 +63,7 @@ func Register(r *processor.Registry, probes ...ProbeRunner) {
 			domain.CodeProbeCoreUnavailable,
 			domain.CodeProbeCoreStartFailed,
 			domain.CodeProbeCoreAPIFailed,
+			domain.CodeProbeNodeUnsupported,
 			domain.CodeProbeInvalidTarget,
 			domain.CodeProbeTimeout,
 			domain.CodeProbeTCPFailed,

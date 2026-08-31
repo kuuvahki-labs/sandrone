@@ -336,7 +336,7 @@ func TestServiceSingBoxProbeIsolatesInvalidHysteriaBandwidth(t *testing.T) {
 	require.Len(t, result.Results, 2)
 	require.Equal(t, "invalid-hysteria", result.Results[0].NodeName)
 	require.False(t, result.Results[0].Alive)
-	require.Equal(t, string(domain.CodeProbeInvalidTarget), result.Results[0].ErrorCode)
+	require.Equal(t, string(domain.CodeProbeNodeUnsupported), result.Results[0].ErrorCode)
 	require.Equal(t, "valid-http", result.Results[1].NodeName)
 	require.True(t, result.Results[1].Alive)
 	warningCodes := make([]string, 0, len(result.Report.Warnings))
@@ -415,10 +415,13 @@ func TestServiceSingBoxProbeDoesNotStartSemanticallyDowngradedOutbounds(t *testi
 	for i, name := range []string{"vless-xhttp", "vless-encryption", "hysteria2-range", "hysteria-range", "vless-missing-transport-type", "vless-ech-dns"} {
 		require.Equal(t, name, result.Results[i].NodeName)
 		require.False(t, result.Results[i].Alive)
-		require.Equal(t, string(domain.CodeProbeInvalidTarget), result.Results[i].ErrorCode)
+		require.Equal(t, string(domain.CodeProbeNodeUnsupported), result.Results[i].ErrorCode)
 	}
 	require.Equal(t, "valid-http", result.Results[6].NodeName)
 	require.True(t, result.Results[6].Alive)
+	require.Equal(t, 1, result.Report.Probe.SuccessCount)
+	require.Equal(t, 6, result.Report.Probe.UnsupportedCount)
+	require.Zero(t, result.Report.Probe.FailureCount)
 	renderSkips := 0
 	for _, warning := range result.Report.Warnings {
 		if warning.Code == "render_node_skipped" {

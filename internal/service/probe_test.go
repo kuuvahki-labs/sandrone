@@ -395,7 +395,10 @@ func TestServiceProbePartialCacheKeepsAllSkippedMissesNodeLocal(t *testing.T) {
 	require.True(t, result.Results[0].CacheHit)
 	require.False(t, result.Results[1].CacheHit)
 	require.False(t, result.Results[1].Alive)
-	require.Equal(t, string(domain.CodeProbeInvalidTarget), result.Results[1].ErrorCode)
+	require.Equal(t, string(domain.CodeProbeNodeUnsupported), result.Results[1].ErrorCode)
+	require.Equal(t, 1, result.Report.Probe.SuccessCount)
+	require.Equal(t, 1, result.Report.Probe.UnsupportedCount)
+	require.Zero(t, result.Report.Probe.FailureCount)
 	require.True(t, containsWarning(result.Report.Warnings, "render_node_skipped", string(domain.NodeTypeSnell)))
 }
 

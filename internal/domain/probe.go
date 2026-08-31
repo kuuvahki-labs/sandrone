@@ -15,6 +15,7 @@ const (
 	CodeProbeCoreUnavailable    ErrorCode = "probe_core_unavailable"
 	CodeProbeCoreStartFailed    ErrorCode = "probe_core_start_failed"
 	CodeProbeCoreAPIFailed      ErrorCode = "probe_core_api_failed"
+	CodeProbeNodeUnsupported    ErrorCode = "probe_node_unsupported"
 	CodeProbeInvalidTarget      ErrorCode = "probe_invalid_target"
 	CodeProbeTimeout            ErrorCode = "probe_timeout"
 	CodeProbeTCPFailed          ErrorCode = "probe_tcp_failed"
@@ -56,22 +57,24 @@ type NodeProbeResult struct {
 }
 
 type ProbeReport struct {
-	Backend        string                 `json:"backend,omitempty" yaml:"backend,omitempty"`
-	BackendVersion string                 `json:"backend_version,omitempty" yaml:"backend_version,omitempty"`
-	Method         string                 `json:"method,omitempty" yaml:"method,omitempty"`
-	Core           string                 `json:"core,omitempty" yaml:"core,omitempty"`
-	SuccessCount   int                    `json:"success_count" yaml:"success_count"`
-	FailureCount   int                    `json:"failure_count" yaml:"failure_count"`
-	CacheHitCount  int                    `json:"cache_hit_count,omitempty" yaml:"cache_hit_count,omitempty"`
-	ErrorCounts    map[string]int         `json:"error_counts,omitempty" yaml:"error_counts,omitempty"`
-	Dimensions     []ProbeReportDimension `json:"dimensions,omitempty" yaml:"dimensions,omitempty"`
+	Backend          string                 `json:"backend,omitempty" yaml:"backend,omitempty"`
+	BackendVersion   string                 `json:"backend_version,omitempty" yaml:"backend_version,omitempty"`
+	Method           string                 `json:"method,omitempty" yaml:"method,omitempty"`
+	Core             string                 `json:"core,omitempty" yaml:"core,omitempty"`
+	SuccessCount     int                    `json:"success_count" yaml:"success_count"`
+	UnsupportedCount int                    `json:"unsupported_count,omitzero" yaml:"unsupported_count,omitempty"`
+	FailureCount     int                    `json:"failure_count" yaml:"failure_count"`
+	CacheHitCount    int                    `json:"cache_hit_count,omitempty" yaml:"cache_hit_count,omitempty"`
+	ErrorCounts      map[string]int         `json:"error_counts,omitempty" yaml:"error_counts,omitempty"`
+	Dimensions       []ProbeReportDimension `json:"dimensions,omitempty" yaml:"dimensions,omitempty"`
 }
 
 type ProbeReportDimension struct {
-	Method        string         `json:"method,omitempty" yaml:"method,omitempty"`
-	Core          string         `json:"core,omitempty" yaml:"core,omitempty"`
-	SuccessCount  int            `json:"success_count" yaml:"success_count"`
-	FailureCount  int            `json:"failure_count" yaml:"failure_count"`
-	CacheHitCount int            `json:"cache_hit_count,omitempty" yaml:"cache_hit_count,omitempty"`
-	ErrorCounts   map[string]int `json:"error_counts,omitempty" yaml:"error_counts,omitempty"`
+	Method           string         `json:"method,omitempty" yaml:"method,omitempty"`
+	Core             string         `json:"core,omitempty" yaml:"core,omitempty"`
+	SuccessCount     int            `json:"success_count" yaml:"success_count"`
+	UnsupportedCount int            `json:"unsupported_count,omitzero" yaml:"unsupported_count,omitempty"`
+	FailureCount     int            `json:"failure_count" yaml:"failure_count"`
+	CacheHitCount    int            `json:"cache_hit_count,omitempty" yaml:"cache_hit_count,omitempty"`
+	ErrorCounts      map[string]int `json:"error_counts,omitempty" yaml:"error_counts,omitempty"`
 }

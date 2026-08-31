@@ -48,16 +48,19 @@ type probeNodeGroup struct {
 	MissIndex     int
 }
 
+const probeResultSemanticsVersion = 1
+
 type probeCacheSelector struct {
-	Method         string `json:"method"`
-	Core           string `json:"core,omitempty"`
-	Backend        string `json:"backend,omitempty"`
-	BackendVersion string `json:"backend_version,omitempty"`
-	URL            string `json:"url,omitempty"`
-	NTPServer      string `json:"ntp_server,omitempty"`
-	ExpectedStatus string `json:"expected_status,omitempty"`
-	TimeoutMS      int    `json:"timeout_ms,omitempty"`
-	Attempts       int    `json:"attempts,omitempty"`
+	ResultSemanticsVersion int    `json:"result_semantics_version"`
+	Method                 string `json:"method"`
+	Core                   string `json:"core,omitempty"`
+	Backend                string `json:"backend,omitempty"`
+	BackendVersion         string `json:"backend_version,omitempty"`
+	URL                    string `json:"url,omitempty"`
+	NTPServer              string `json:"ntp_server,omitempty"`
+	ExpectedStatus         string `json:"expected_status,omitempty"`
+	TimeoutMS              int    `json:"timeout_ms,omitempty"`
+	Attempts               int    `json:"attempts,omitempty"`
 }
 
 type probeCacheGroup struct {
@@ -311,7 +314,7 @@ func (e *probeExecution) finish() *domain.ProbeResult {
 	result := &domain.ProbeResult{Results: e.results, Report: report}
 	processor.RecordProbe(e.ctx, result)
 
-	success, failure, cacheHits := probeCounts(result)
+	success, unsupported, failure, cacheHits := probeCounts(result)
 	nodeCount := len(e.nodeSet.Nodes)
 	e.service.log(e.ctx, slog.LevelInfo, "service probe completed",
 		"operation", "probe",
@@ -319,6 +322,7 @@ func (e *probeExecution) finish() *domain.ProbeResult {
 		"core", e.req.Core,
 		"node_count", nodeCount,
 		"success_count", success,
+		"unsupported_count", unsupported,
 		"failure_count", failure,
 		"cache_hit_count", cacheHits,
 		"cache_hit", nodeCount > 0 && cacheHits == nodeCount,
@@ -403,7 +407,7 @@ func (s *Service) unrenderableProbeResult(req domain.ProbeRequest, backend domai
 			RuntimeID: domain.NodeRuntimeID(node), NodeName: node.Name,
 			Method: string(req.Method), Target: target, Core: req.Core,
 			Backend: backend.Name, Alive: false, CheckedAt: s.now().UTC(),
-			ErrorCode: string(domain.CodeProbeInvalidTarget), Error: message,
+			ErrorCode: string(domain.CodeProbeNodeUnsupported), Error: message,
 		}
 	}
 	return &domain.ProbeResult{Results: results, Report: probe.ReportForResults(backend.Name, backend.Version, string(req.Method), req.Core, nodes, results)}
@@ -560,7 +564,8 @@ func newProbeCacheSelector(req domain.ProbeRequest, backend domain.ProbeBackendS
 		req.ExpectedStatus = ""
 	}
 	return probeCacheSelector{
-		Method: string(req.Method), Core: req.Core, Backend: backend.Name, BackendVersion: backend.Version,
+		ResultSemanticsVersion: probeResultSemanticsVersion,
+		Method:                 string(req.Method), Core: req.Core, Backend: backend.Name, BackendVersion: backend.Version,
 		URL: req.URL, NTPServer: req.NTPServer, ExpectedStatus: req.ExpectedStatus,
 		TimeoutMS: req.TimeoutMS, Attempts: req.Attempts,
 	}

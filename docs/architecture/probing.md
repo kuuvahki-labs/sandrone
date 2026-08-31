@@ -8,7 +8,7 @@
 
 - `NodeIR` 表达可转换的节点配置。
 - `NodeProbeResult` 表达单个节点的一次观测。
-- `ProbeReport` 汇总一次调用的后端、成功/失败、缓存命中和错误维度。
+- `ProbeReport` 汇总一次调用的后端、成功/不支持/失败、缓存命中和错误维度。
 
 探测不会隐式修改输入节点。只有调用方显式使用 nodes-stage `probe` processor 或脚本时，结果摘要才可以用于过滤、排序或写入 `NodeIR.Meta`；这些 metadata 仍不是稳定协议字段。
 
@@ -62,7 +62,10 @@ method 是唯一的探测行为选择器，必须显式属于以下三种：
 
 请求指定 core 时，只能选择该 core 注册的 backend。所需 backend 未编译、core 不存在或多个候选无法唯一选择时返回结构化错误，不静默降级为 TCP；否则“探测成功”会表达另一种语义。
 
-核心启动或 payload 准备失败同样是整次调用错误。节点级连接失败则保留为 `alive=false` 结果，使调用方能够区分“backend 无法运行”和“backend 成功观察到节点失败”。
+核心启动或 payload 准备失败同样是整次调用错误。节点级连接失败则保留为
+`alive=false` 结果，使调用方能够区分“backend 无法运行”和“backend 成功观察到节点
+失败”。选定核心的 renderer 无法表达某个节点时返回 `probe_node_unsupported`；它同样
+保持 `alive=false`，但明确表示 backend 没有执行该节点，不能当作不可达结论。
 
 ## 执行与并发
 
@@ -84,6 +87,7 @@ cache。它不是写入 `NodeIR` 的状态，也不是长期历史数据库。
 - 规范化的 method、core，以及实际选择的 backend 名称和版本。
 - 应用默认值后的 URL、NTP server、预期状态等目标参数。
 - 影响单次探测语义的 timeout 与 attempts。
+- 内部结果语义版本，确保分类契约变化时不复用旧观测。
 
 节点名称、标签、metadata、来源格式、数组顺序和 concurrency 不改变连接或探测目标，
 因此不进入 key。连接字段、有效探测参数或核心版本变化会形成新 key。
@@ -112,7 +116,9 @@ A，不跨资源复用相同连接。
 
 ## Report 与失败语义
 
-每个 `NodeProbeResult` 记录节点身份、method、core、backend、存活状态、duration、检查时间和可选错误。`ProbeReport` 汇总成功、失败、cache hit 和 error code，并按 method、core 提供 dimensions。
+每个 `NodeProbeResult` 记录节点身份、method、core、backend、存活状态、duration、
+检查时间和可选错误。`ProbeReport` 分别汇总成功、不支持、失败和 cache hit；
+`error_counts` 只统计真正的失败，并按 method、core 提供 dimensions。
 
 service 在 cache miss 时合并：
 
@@ -121,7 +127,9 @@ service 在 cache miss 时合并：
 - backend 的节点失败和能力 warnings。
 - dependency 与 source trace。
 
-单节点失败保留在 results 中并对应结构化 warning。backend 未注册、核心启动失败、payload 无法安全渲染或引擎返回无效结果属于调用级错误，不伪装成成功的空结果集。
+单节点失败和不支持都保留在 results 中并对应结构化 warning。单个节点无法由选定核心
+安全渲染时归为不支持；backend 未注册、核心启动失败、payload 整体构造失败或引擎返回
+无效结果属于调用级错误，不伪装成成功的空结果集。
 
 report 随本次结果返回，不写回 subscription 或 file。内部 cache 可以暂存单节点观测，但不提供长期审计、趋势或历史窗口；需要监控历史时应由外部可观测系统消费结果。
 

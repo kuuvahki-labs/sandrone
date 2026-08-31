@@ -19,23 +19,28 @@ func elapsedMillis(start time.Time) int64 {
 	return time.Since(start).Milliseconds()
 }
 
-func probeCounts(result *domain.ProbeResult) (int, int, int) {
+func probeCounts(result *domain.ProbeResult) (int, int, int, int) {
 	if result == nil {
-		return 0, 0, 0
+		return 0, 0, 0, 0
 	}
 	success := 0
+	unsupported := 0
 	failure := 0
 	cacheHits := 0
 	if result.Report.Probe != nil {
 		success = result.Report.Probe.SuccessCount
+		unsupported = result.Report.Probe.UnsupportedCount
 		failure = result.Report.Probe.FailureCount
 		cacheHits = result.Report.Probe.CacheHitCount
 	}
-	if success == 0 && failure == 0 {
+	if success == 0 && unsupported == 0 && failure == 0 {
 		for _, item := range result.Results {
-			if item.Alive {
+			switch {
+			case item.Alive:
 				success++
-			} else {
+			case item.ErrorCode == string(domain.CodeProbeNodeUnsupported):
+				unsupported++
+			default:
 				failure++
 			}
 		}
@@ -47,5 +52,5 @@ func probeCounts(result *domain.ProbeResult) (int, int, int) {
 			}
 		}
 	}
-	return success, failure, cacheHits
+	return success, unsupported, failure, cacheHits
 }

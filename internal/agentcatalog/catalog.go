@@ -329,7 +329,8 @@ func scriptMethodCatalog() ([]ScriptMethodDocument, error) {
 			codes: []domain.ErrorCode{
 				domain.CodeInvalidArgument, domain.CodeProbeBackendUnavailable,
 				domain.CodeProbeCoreUnavailable, domain.CodeProbeCoreStartFailed,
-				domain.CodeProbeCoreAPIFailed, domain.CodeProbeInvalidTarget,
+				domain.CodeProbeCoreAPIFailed, domain.CodeProbeNodeUnsupported,
+				domain.CodeProbeInvalidTarget,
 				domain.CodeProbeTimeout, domain.CodeProbeTCPFailed,
 				domain.CodeProbeUDPNTPFailed, domain.CodeScriptRuntime,
 			},
