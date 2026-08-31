@@ -14,6 +14,7 @@ import {
   subscriptions,
   subscriptionTraffic,
 } from "~/features/subscriptions/test-data";
+import { WarningPreferencesProvider } from "~/shared/resources/warning-preferences";
 
 import { SubscriptionPreviewPage } from "./subscription-preview-page";
 import { SubscriptionsPage } from "./subscriptions-page";
@@ -74,6 +75,33 @@ describe("SubscriptionPreviewPage", () => {
     await user.click(within(warningRegion).getByRole("button", { name: "展开预览警告" }));
 
     expect(within(warningRegion).getByText("2 个节点或位置受到影响")).toBeInTheDocument();
+  });
+
+  it("hides globally ignored warning classes from the summary and panel", () => {
+    const preview: SubscriptionPreview = {
+      ...subscriptionPreview,
+      warnings: [{
+        code: "parse_unknown_field",
+        field: "uri.query.mode",
+        message: "field preserved in NodeIR Raw",
+        node: "node-a",
+        source: "uri-list",
+      }],
+    };
+
+    render(
+      <WarningPreferencesProvider ignoredWarnings={[{
+        code: "parse_unknown_field",
+        field: "uri.query.mode",
+        source: "uri-list",
+      }]}>
+        <SubscriptionPreviewPage {...previewPageActions} item={subscriptions[0]} preview={preview} />
+      </WarningPreferencesProvider>,
+    );
+
+    const summary = screen.getByLabelText("预览统计");
+    expect(Array.from(summary.querySelectorAll("strong"), (node) => node.textContent)).toEqual(["2 → 1", "1", "0"]);
+    expect(screen.queryByRole("region", { name: "预览警告" })).not.toBeInTheDocument();
   });
 
   it("renders source preview cards with filters and expandable details", async () => {

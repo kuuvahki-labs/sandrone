@@ -4,6 +4,7 @@ import Alert from "@mui/material/Alert";
 
 import { settingsUpdateFromView } from "~/features/settings/model/project-settings";
 import type { ScheduledRefreshResourceChoice } from "~/features/settings/model/scheduled-refresh-targets";
+import { IgnoredWarningsSettingsSection } from "~/features/settings/sections/ignored-warnings-settings-section";
 import { ResourceAutomationSettingsSection } from "~/features/settings/sections/resource-automation-settings-section";
 import { RuntimeSettingsSection } from "~/features/settings/sections/runtime-settings-section";
 import { StartupSettingsSection } from "~/features/settings/sections/startup-settings-section";
@@ -95,7 +96,20 @@ export function SettingsServicePage({
         }}
         onSubscriptionTrafficChange={(enabled) => setDraft((current) => ({
           ...current,
-          subscriptions: { auto_load_traffic: enabled },
+          subscriptions: {
+            ...current.subscriptions,
+            auto_load_traffic: enabled,
+          },
+        }))}
+      />
+      <IgnoredWarningsSettingsSection
+        value={draft.subscriptions.ignored_warnings}
+        onChange={(ignoredWarnings) => setDraft((current) => ({
+          ...current,
+          subscriptions: {
+            ...current.subscriptions,
+            ignored_warnings: ignoredWarnings,
+          },
         }))}
       />
       <StartupSettingsSection

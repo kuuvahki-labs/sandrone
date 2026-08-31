@@ -1,8 +1,9 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { CollapsibleWarningPanel } from "~/shared/resources/warning-panel";
+import { WarningPreferencesProvider } from "~/shared/resources/warning-preferences";
 import { WarningList } from "~/shared/resources/warnings";
 
 describe("warning list", () => {
@@ -145,5 +146,33 @@ describe("warning list", () => {
     expect(screen.getByText("probe_timeout · probe_timeout: dial tcp 192.0.2.1:443: i/o timeout")).toBeInTheDocument();
     expect(screen.getByText("node-b")).toBeInTheDocument();
     expect(screen.getByText("probe_core_api_failed · probe_core_api_failed: read tcp 192.0.2.2:443: connection reset by peer")).toBeInTheDocument();
+  });
+
+  it("ignores one stable warning class without persisting instance context", async () => {
+    const user = userEvent.setup();
+    const onIgnore = vi.fn();
+    render(
+      <WarningPreferencesProvider ignoredWarnings={[]} onIgnore={onIgnore}>
+        <WarningList
+          warnings={[{
+            code: "parse_unknown_field",
+            field: "uri.query.mode",
+            message: "field preserved in NodeIR Raw",
+            node: "node-a",
+            node_index: 7,
+            source: "uri-list",
+          }]}
+        />
+      </WarningPreferencesProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: /node-a/ }));
+    await user.click(screen.getByRole("button", { name: "忽略同类警告" }));
+
+    expect(onIgnore).toHaveBeenCalledWith({
+      code: "parse_unknown_field",
+      field: "uri.query.mode",
+      source: "uri-list",
+    });
   });
 });

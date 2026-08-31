@@ -80,6 +80,45 @@ func TestServiceSettingsCanClearRemoteUserAgent(t *testing.T) {
 	require.Empty(t, readBack.Effective.RemoteDefaults.UserAgent)
 }
 
+func TestServiceSettingsPersistsIgnoredWarnings(t *testing.T) {
+	svc := newProjectSettingsService()
+	before, err := svc.GetSettings(t.Context())
+	require.NoError(t, err)
+	update := settingsUpdate(before.Settings)
+	update.Subscriptions.IgnoredWarnings = []domain.IgnoredWarning{{
+		Code:   " parse_unknown_field ",
+		Field:  " uri.query.mode ",
+		Source: " uri-list ",
+	}}
+
+	after, err := svc.PutSettings(t.Context(), update)
+
+	require.NoError(t, err)
+	want := []domain.IgnoredWarning{{
+		Code:   "parse_unknown_field",
+		Field:  "uri.query.mode",
+		Source: "uri-list",
+	}}
+	require.Equal(t, want, after.Settings.Subscriptions.IgnoredWarnings)
+	require.Equal(t, want, after.Effective.Subscriptions.IgnoredWarnings)
+	readBack, err := svc.GetSettings(t.Context())
+	require.NoError(t, err)
+	require.Equal(t, want, readBack.Settings.Subscriptions.IgnoredWarnings)
+}
+
+func TestServiceSettingsRejectsDuplicateIgnoredWarnings(t *testing.T) {
+	svc := newProjectSettingsService()
+	before, err := svc.GetSettings(t.Context())
+	require.NoError(t, err)
+	update := settingsUpdate(before.Settings)
+	ignored := domain.IgnoredWarning{Code: "probe_timeout"}
+	update.Subscriptions.IgnoredWarnings = []domain.IgnoredWarning{ignored, ignored}
+
+	_, err = svc.PutSettings(t.Context(), update)
+
+	require.ErrorContains(t, err, "duplicate ignored warning")
+}
+
 func TestServiceSettingsApplyScriptTimeoutToSubsequentProcessors(t *testing.T) {
 	svc := newProjectSettingsService()
 	before, err := svc.GetSettings(context.Background())

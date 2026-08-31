@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ConfigNodePreviewInput } from "~/features/files/config/model/node-source";
 import type { ResourceOption } from "~/shared/resources/types";
+import { WarningPreferencesProvider } from "~/shared/resources/warning-preferences";
 
 import {
   ConfigNodeSourceSection,
@@ -144,6 +145,37 @@ describe("config node source section", () => {
       status: "ready",
       preview: { options: [{ name: "duplicate" }] },
     });
+  });
+
+  it("hides globally ignored warnings while preserving subscription nodes", async () => {
+    const user = userEvent.setup();
+    const warningPreview: ConfigNodePreviewInput = {
+      ...preview,
+      warnings: [{
+        code: "parse_unknown_field",
+        field: "uri.query.mode",
+        message: "field preserved in NodeIR Raw",
+        node: "hk",
+        source: "uri-list",
+      }],
+    };
+    render(
+      <WarningPreferencesProvider ignoredWarnings={[{
+        code: "parse_unknown_field",
+        field: "uri.query.mode",
+        source: "uri-list",
+      }]}>
+        <NodeSourceHarness loadPreview={vi.fn().mockResolvedValue(warningPreview)} />
+      </WarningPreferencesProvider>,
+    );
+    const section = screen.getByRole("group", { name: "节点来源" });
+
+    await selectSubscription(user, "provider");
+    expect(await within(section).findByText("已加载 1 个节点")).toBeInTheDocument();
+    await user.click(within(section).getByRole("button", { name: "展开" }));
+
+    expect(within(section).getByText("hk")).toBeInTheDocument();
+    expect(within(section).queryByRole("heading", { name: /告警/ })).not.toBeInTheDocument();
   });
 
   it("retries both generic errors and uncached preview identity mismatches", async () => {

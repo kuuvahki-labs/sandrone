@@ -98,7 +98,10 @@ describe("SettingsServiceRoute", () => {
     await user.click(screen.getByRole("switch", { name: "在订阅列表显示" }));
     await user.click(screen.getByRole("button", { name: "保存设置" }));
     await waitFor(() => expect(updateSettings).toHaveBeenCalledWith(expect.objectContaining({
-      subscriptions: { auto_load_traffic: true },
+      subscriptions: {
+        auto_load_traffic: true,
+        ignored_warnings: [],
+      },
     })));
     expect(client.downloadBackup).not.toHaveBeenCalled();
   });

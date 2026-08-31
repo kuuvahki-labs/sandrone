@@ -5,6 +5,7 @@ import {
   defaultProjectSettings,
   defaultSettingsEnvelope,
   optimisticSettingsEnvelope,
+  settingsUpdateFromView,
 } from "~/features/settings/model/project-settings";
 import type {
   ApiClient,
@@ -12,6 +13,8 @@ import type {
   SettingsUpdate,
 } from "~/shared/api/client";
 import type { Translator } from "~/shared/i18n/context";
+import type { IgnoredWarning } from "~/shared/resources/types";
+import { warningIgnoreKey } from "~/shared/resources/warning-groups";
 import {
   getLocaleModePreference,
   loadThemePreference,
@@ -109,12 +112,27 @@ export function useProjectSettings({
     }
   }, [applyAppearance, client]);
 
+  const ignoreWarning = useCallback(async (warning: IgnoredWarning) => {
+    const current = envelopeRef.current.settings;
+    const ignoredWarnings = current.subscriptions.ignored_warnings;
+    const key = warningIgnoreKey(warning);
+    if (ignoredWarnings.some((item) => warningIgnoreKey(item) === key)) return envelopeRef.current;
+    return updateSettings(settingsUpdateFromView({
+      ...current,
+      subscriptions: {
+        ...current.subscriptions,
+        ignored_warnings: [...ignoredWarnings, warning],
+      },
+    }));
+  }, [updateSettings]);
+
   return {
     settings: envelope.settings,
     effectiveSettings: envelope.effective,
     settingsLoaded,
     settingsOverrides: envelope.overrides,
     restartRequired: envelope.restart_required,
+    ignoreWarning,
     reloadSettings,
     updateSettings,
   };
@@ -129,6 +147,7 @@ function initialEnvelope(): SettingsEnvelope {
     },
     subscriptions: {
       auto_load_traffic: false,
+      ignored_warnings: [],
     },
   });
   return defaultSettingsEnvelope(cached);

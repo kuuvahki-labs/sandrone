@@ -81,6 +81,7 @@ export const enUS: Record<TranslationKey, string> = {
   "warnings.collapsePanel": "Collapse {label}",
   "warnings.affectedLocations": "{count} affected nodes or locations",
   "warnings.groupWithTitle": "Expand {count} matching warnings for {title}",
+  "warnings.ignoreSimilar": "Ignore similar warnings",
   "warnings.occurrenceList": "Matching warning nodes",
   "warnings.probeFailure": "Node probe failures",
   "warnings.lineTitle": "Line {line}",

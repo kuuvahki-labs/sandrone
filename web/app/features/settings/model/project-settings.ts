@@ -47,6 +47,7 @@ export const defaultProjectSettings: SettingsView = {
   },
   subscriptions: {
     auto_load_traffic: false,
+    ignored_warnings: [],
   },
   scheduled_refresh: {
     enabled: false,

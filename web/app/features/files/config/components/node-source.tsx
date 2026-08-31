@@ -17,6 +17,7 @@ import {
 import { useI18n } from "~/shared/i18n/context";
 import { resourceOptionText } from "~/shared/resources/labels";
 import type { ResourceOption } from "~/shared/resources/types";
+import { useVisiblePreviewWarnings } from "~/shared/resources/warning-preferences";
 import { WarningList } from "~/shared/resources/warnings";
 
 import { WorkbenchGroupSection } from "./editor-shared";
@@ -57,6 +58,7 @@ export function ConfigNodeSourceSection({ disabled = false, loadPreview, onSelec
   const stateChangeRef = useRef(onStateChange);
   const selectedItem = subscriptions.find((item) => item.name === selected) ?? null;
   const mismatchError = t("files.config.nodeSourceMismatch");
+  const visibleWarnings = useVisiblePreviewWarnings(preview?.warnings);
 
   useEffect(() => {
     stateChangeRef.current = onStateChange;
@@ -153,8 +155,8 @@ export function ConfigNodeSourceSection({ disabled = false, loadPreview, onSelec
         <div className="grid gap-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <Typography color="text.secondary" role="status" variant="body2">
-              {preview.warnings.length
-                ? t("files.config.nodeSourceLoadedWithWarnings", { count: preview.nodes.length, warningCount: preview.warnings.length })
+              {visibleWarnings.length
+                ? t("files.config.nodeSourceLoadedWithWarnings", { count: preview.nodes.length, warningCount: visibleWarnings.length })
                 : t("files.config.nodeSourceLoaded", { count: preview.nodes.length })}
             </Typography>
             <div className="flex flex-wrap gap-1">
@@ -171,13 +173,13 @@ export function ConfigNodeSourceSection({ disabled = false, loadPreview, onSelec
           </div>
           <Collapse in={nodesExpanded} timeout="auto" unmountOnExit>
             <div className="grid gap-3">
-              {preview.warnings.length ? (
+              {visibleWarnings.length ? (
                 <section aria-labelledby="config-node-source-warnings" className="grid gap-2">
                   <Typography className="flex items-center gap-1 font-semibold" color="warning.main" component="h4" id="config-node-source-warnings" variant="body2">
                     <WarningAmberOutlinedIcon aria-hidden fontSize="small" />
-                    {t("files.config.nodeSourceWarnings", { count: preview.warnings.length })}
+                    {t("files.config.nodeSourceWarnings", { count: visibleWarnings.length })}
                   </Typography>
-                  <WarningList className="max-h-[min(30vh,12rem)] overflow-y-auto" warnings={preview.warnings} />
+                  <WarningList className="max-h-[min(30vh,12rem)] overflow-y-auto" warnings={visibleWarnings} />
                 </section>
               ) : null}
               {preview.duplicateNames.length || preview.unnamedCount ? (

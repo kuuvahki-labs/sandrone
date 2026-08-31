@@ -97,7 +97,15 @@ type AppearanceSettings struct {
 }
 
 type SubscriptionSettings struct {
-	AutoLoadTraffic bool `json:"auto_load_traffic"`
+	AutoLoadTraffic bool             `json:"auto_load_traffic"`
+	IgnoredWarnings []IgnoredWarning `json:"ignored_warnings"`
+}
+
+type IgnoredWarning struct {
+	Code   string `json:"code"`
+	Field  string `json:"field,omitempty"`
+	Source string `json:"source,omitempty"`
+	Target string `json:"target,omitempty"`
 }
 
 type ScheduledRefreshTarget struct {

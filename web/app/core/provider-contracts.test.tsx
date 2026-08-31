@@ -2,11 +2,12 @@ import { act, render, renderHook, screen, waitFor } from "@testing-library/react
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  completeProjectSettings,
   defaultProjectSettings,
   defaultSettingsEnvelope,
   settingsUpdateFromView,
 } from "~/features/settings/model/project-settings";
-import type { ApiClient, SettingsEnvelope } from "~/shared/api/client";
+import type { ApiClient, SettingsEnvelope, SettingsUpdate } from "~/shared/api/client";
 import { I18nProvider } from "~/shared/i18n/context";
 
 import type { SandroneContextValue } from "./provider/types";
@@ -38,7 +39,10 @@ describe("useProjectSettings", () => {
 
     pending.resolve(defaultSettingsEnvelope({
       ...defaultProjectSettings,
-      subscriptions: { auto_load_traffic: true },
+      subscriptions: {
+        ...defaultProjectSettings.subscriptions,
+        auto_load_traffic: true,
+      },
     }));
     await waitFor(() => expect(result.current.settingsLoaded).toBe(true));
     expect(result.current.effectiveSettings.subscriptions.auto_load_traffic).toBe(true);
@@ -73,6 +77,42 @@ describe("useProjectSettings", () => {
 
     expect(result.current.effectiveSettings.appearance).toEqual(loaded.effective.appearance);
     expect(setLocaleMode).toHaveBeenLastCalledWith("en-US");
+  });
+
+  it("persists one global ignored warning rule and deduplicates repeated actions", async () => {
+    const loaded = defaultSettingsEnvelope(defaultProjectSettings);
+    const client = {
+      getSettings: vi.fn().mockResolvedValue(loaded),
+      updateSettings: vi.fn(async (update: SettingsUpdate) => defaultSettingsEnvelope(completeProjectSettings(update))),
+    } as unknown as ApiClient;
+    const setLocaleMode = vi.fn();
+    const showNotice = vi.fn();
+    const { result } = renderHook(() => useProjectSettings({
+      client,
+      setLocaleMode,
+      showNotice,
+      t,
+    }));
+    await waitFor(() => expect(result.current.settingsLoaded).toBe(true));
+    const ignored = {
+      code: "parse_unknown_field",
+      field: "uri.query.mode",
+      source: "uri-list",
+    };
+
+    await act(async () => {
+      await result.current.ignoreWarning(ignored);
+      await result.current.ignoreWarning(ignored);
+    });
+
+    expect(client.updateSettings).toHaveBeenCalledTimes(1);
+    expect(client.updateSettings).toHaveBeenCalledWith(expect.objectContaining({
+      subscriptions: {
+        auto_load_traffic: false,
+        ignored_warnings: [ignored],
+      },
+    }));
+    expect(result.current.settings.subscriptions.ignored_warnings).toEqual([ignored]);
   });
 });
 

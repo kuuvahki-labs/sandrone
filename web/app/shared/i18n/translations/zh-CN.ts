@@ -80,6 +80,7 @@ export const zhCN = {
   "warnings.collapsePanel": "收起{label}",
   "warnings.affectedLocations": "{count} 个节点或位置受到影响",
   "warnings.groupWithTitle": "展开 {title} 的 {count} 条同类警告",
+  "warnings.ignoreSimilar": "忽略同类警告",
   "warnings.occurrenceList": "同类警告节点",
   "warnings.probeFailure": "节点测活失败",
   "warnings.lineTitle": "第 {line} 行",

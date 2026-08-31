@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import type { PreviewWarning } from "~/shared/resources/types";
-import { groupPreviewWarnings } from "~/shared/resources/warning-groups";
+import {
+  groupPreviewWarnings,
+  ignoredWarningFromPreview,
+  visiblePreviewWarnings,
+  warningIgnoreKey,
+} from "~/shared/resources/warning-groups";
 
 describe("groupPreviewWarnings", () => {
   it("groups by the public diagnostic fingerprint without using node context", () => {
@@ -68,6 +73,22 @@ describe("groupPreviewWarnings", () => {
 
     expect(groups).toHaveLength(2);
     expect(groups.map((group) => group.kind)).toEqual(["probe-failure", "diagnostic"]);
+  });
+
+  it("uses stable warning semantics for global ignore rules", () => {
+    const first = warning({ message: "first message", node: "node-a", node_index: 0 });
+    const repeated = warning({ message: "changed message", node: "node-b", node_index: 1 });
+    const differentField = warning({ field: "uri.query.spx", node: "node-c" });
+    const ignored = ignoredWarningFromPreview(first);
+
+    expect(ignored).toEqual({
+      code: "parse_unknown_field",
+      field: "uri.query.mode",
+      source: "uri-list",
+      target: "mihomo",
+    });
+    expect(warningIgnoreKey(ignored)).toBe(warningIgnoreKey(repeated));
+    expect(visiblePreviewWarnings([first, repeated, differentField], [ignored])).toEqual([differentField]);
   });
 });
 

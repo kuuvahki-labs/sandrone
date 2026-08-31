@@ -3,6 +3,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react
 import { ApiClient, type UICapability } from "~/shared/api/client";
 import { UICapabilityProvider } from "~/shared/capabilities/context";
 import { useI18n } from "~/shared/i18n/context";
+import { WarningPreferencesProvider } from "~/shared/resources/warning-preferences";
 
 import { SandroneContext } from "./provider/context";
 import type { SandroneContextValue } from "./provider/types";
@@ -90,7 +91,12 @@ export function SandroneProvider({ children }: { children: ReactNode }) {
   return (
     <SandroneContext.Provider value={value}>
       <UICapabilityProvider value={{ capabilities: uiCapabilities, loaded: uiCapabilitiesLoaded, hasFeature, getFeature }}>
-        {children}
+        <WarningPreferencesProvider
+          ignoredWarnings={project.settings.subscriptions.ignored_warnings}
+          onIgnore={project.ignoreWarning}
+        >
+          {children}
+        </WarningPreferencesProvider>
       </UICapabilityProvider>
     </SandroneContext.Provider>
   );

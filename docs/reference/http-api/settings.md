@@ -63,7 +63,7 @@ SettingsEnvelope {
     "subscription_snapshot_ttl_seconds": 0
   },
   "appearance": {"theme_mode": "dark", "locale": "auto"},
-  "subscriptions": {"auto_load_traffic": false},
+  "subscriptions": {"auto_load_traffic": false, "ignored_warnings": []},
   "scheduled_refresh": {
     "enabled": false,
     "schedule": "@every 10m",
@@ -126,7 +126,12 @@ SettingsEnvelope {
     "subscription_snapshot_ttl_seconds": 300
   },
   "appearance": {"theme_mode": "system", "locale": "auto"},
-  "subscriptions": {"auto_load_traffic": false},
+  "subscriptions": {
+    "auto_load_traffic": false,
+    "ignored_warnings": [
+      {"code": "parse_unknown_field", "field": "uri.query.mode", "source": "uri-list"}
+    ]
+  },
   "scheduled_refresh": {
     "enabled": true,
     "schedule": "@every 10m",
@@ -147,6 +152,12 @@ concurrency 归一化后必须为正数。`script_defaults.timeout_ms` 省略或
 或 probe TTL，此时表示用户选择在更长时间内冻结节点、测活观测和处理器排序结果。
 主题接受 `system`、`light`、`dark`，语言接受 `auto`、
 `zh-CN`、`en-US`。
+
+`subscriptions.ignored_warnings` 是服务器持久化的全局订阅 warning 展示规则；每条
+规则必须包含非空 `code`，并可用 `field`、`source`、`target` 缩小范围。四个字段
+完全相同时视为重复并拒绝保存。Web UI 使用这些字段匹配所有订阅预览，不使用易变的
+`message`、节点名称、节点序号或 `node_context`。规则只隐藏前端展示和计数，不改写
+订阅执行结果，也不从 HTTP、CLI 或诊断 report 删除原始 warning。
 
 远程、probe、script、cache、appearance、subscriptions 和 scheduled-refresh 组保存后立即生效。
 缓存默认值只控制已保存 Subscription/File 作用域；临时输入不创建持久缓存。

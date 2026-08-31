@@ -1,6 +1,7 @@
-import { useId, useState } from "react";
+import { useCallback, useId, useState } from "react";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
+import Button from "@mui/material/Button";
 import ButtonBase from "@mui/material/ButtonBase";
 import Collapse from "@mui/material/Collapse";
 import List from "@mui/material/List";
@@ -10,12 +11,22 @@ import Typography from "@mui/material/Typography";
 
 import { useI18n } from "~/shared/i18n/context";
 import type { PreviewWarning } from "~/shared/resources/types";
-import { groupPreviewWarnings, type PreviewWarningGroup } from "~/shared/resources/warning-groups";
+import {
+  groupPreviewWarnings,
+  ignoredWarningFromPreview,
+  type PreviewWarningGroup,
+} from "~/shared/resources/warning-groups";
+import { useWarningPreferences } from "~/shared/resources/warning-preferences";
 import { CodeBlock } from "~/shared/ui/code-editor";
 
 export function WarningList({ className, showSummary = true, warnings }: { className?: string; showSummary?: boolean; warnings: readonly PreviewWarning[] }) {
   const { t } = useI18n();
+  const { onIgnore } = useWarningPreferences();
   const groups = groupPreviewWarnings(warnings);
+  const ignoreWarning = useCallback((warning: PreviewWarning) => {
+    if (!onIgnore) return;
+    void Promise.resolve(onIgnore(ignoredWarningFromPreview(warning))).catch(() => undefined);
+  }, [onIgnore]);
 
   return (
     <div className={["grid min-w-0 gap-2", className].filter(Boolean).join(" ")}>
@@ -27,15 +38,15 @@ export function WarningList({ className, showSummary = true, warnings }: { class
       <List className="grid gap-2 p-0">
         {groups.map((group, index) => (
           group.kind === "diagnostic" && group.warnings.length === 1
-            ? <WarningListItem key={index} warning={group.warning} />
-            : <WarningGroupListItem group={group} key={index} />
+            ? <WarningListItem key={index} warning={group.warning} onIgnore={onIgnore ? ignoreWarning : undefined} />
+            : <WarningGroupListItem group={group} key={index} onIgnore={onIgnore ? ignoreWarning : undefined} />
         ))}
       </List>
     </div>
   );
 }
 
-function WarningGroupListItem({ group }: { group: PreviewWarningGroup }) {
+function WarningGroupListItem({ group, onIgnore }: { group: PreviewWarningGroup; onIgnore?: (warning: PreviewWarning) => void }) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const detailsId = useId();
@@ -66,9 +77,14 @@ function WarningGroupListItem({ group }: { group: PreviewWarningGroup }) {
         </ButtonBase>
         <Collapse id={detailsId} in={expanded} timeout="auto" unmountOnExit>
           <div className="min-w-0 border-t border-divider p-3">
+            {!isProbeFailure && onIgnore ? (
+              <Button size="small" type="button" onClick={() => onIgnore(group.warning)}>
+                {t("warnings.ignoreSimilar")}
+              </Button>
+            ) : null}
             <List aria-label={t("warnings.occurrenceList")} className="grid gap-2 p-0">
               {group.warnings.map((warning, index) => (
-                <WarningOccurrenceItem key={index} showDiagnostic={isProbeFailure} warning={warning} />
+                <WarningOccurrenceItem key={index} onIgnore={isProbeFailure ? onIgnore : undefined} showDiagnostic={isProbeFailure} warning={warning} />
               ))}
             </List>
           </div>
@@ -78,7 +94,7 @@ function WarningGroupListItem({ group }: { group: PreviewWarningGroup }) {
   );
 }
 
-function WarningListItem({ warning }: { warning: PreviewWarning }) {
+function WarningListItem({ onIgnore, warning }: { onIgnore?: (warning: PreviewWarning) => void; warning: PreviewWarning }) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const detailsId = useId();
@@ -101,7 +117,12 @@ function WarningListItem({ warning }: { warning: PreviewWarning }) {
           <WarningSummary context={context} expanded={expanded} title={title} />
         </ButtonBase>
         <Collapse id={detailsId} in={expanded} timeout="auto" unmountOnExit>
-          <div className="min-w-0 border-t border-divider p-3">
+          <div className="grid min-w-0 gap-2 border-t border-divider p-3">
+            {onIgnore ? (
+              <Button className="justify-self-start" size="small" type="button" onClick={() => onIgnore(warning)}>
+                {t("warnings.ignoreSimilar")}
+              </Button>
+            ) : null}
             <CodeBlock label={t("warnings.detailLabel")} language="json" value={stableStringify(warning)} />
           </div>
         </Collapse>
@@ -110,7 +131,7 @@ function WarningListItem({ warning }: { warning: PreviewWarning }) {
   );
 }
 
-function WarningOccurrenceItem({ showDiagnostic, warning }: { showDiagnostic: boolean; warning: PreviewWarning }) {
+function WarningOccurrenceItem({ onIgnore, showDiagnostic, warning }: { onIgnore?: (warning: PreviewWarning) => void; showDiagnostic: boolean; warning: PreviewWarning }) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const detailsId = useId();
@@ -137,7 +158,12 @@ function WarningOccurrenceItem({ showDiagnostic, warning }: { showDiagnostic: bo
           />
         </ButtonBase>
         <Collapse id={detailsId} in={expanded} timeout="auto" unmountOnExit>
-          <div className="min-w-0 border-t border-divider p-3">
+          <div className="grid min-w-0 gap-2 border-t border-divider p-3">
+            {onIgnore ? (
+              <Button className="justify-self-start" size="small" type="button" onClick={() => onIgnore(warning)}>
+                {t("warnings.ignoreSimilar")}
+              </Button>
+            ) : null}
             <CodeBlock label={t("warnings.detailLabel")} language="json" value={stableStringify(warning)} />
           </div>
         </Collapse>

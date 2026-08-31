@@ -32,7 +32,13 @@ const subscriptionPreview = {
       },
     },
   }],
-  warnings: [],
+  warnings: [{
+    code: "parse_unknown_field",
+    field: "uri.query.mode",
+    message: "field preserved in NodeIR Raw",
+    node: "node-with-known-mode-field",
+    source: "uri-list",
+  }],
 };
 const filePreview = {
   content_type: "application/yaml",
@@ -92,7 +98,7 @@ const uiCapabilities = {
   ],
 };
 
-function settingsEnvelope() {
+function settingsEnvelope(ignoredWarnings: Array<{ code: string; field?: string; source?: string; target?: string }> = []) {
   const settings = {
     schema_version: 1,
     http: { listen: "127.0.0.1:1137" },
@@ -115,7 +121,7 @@ function settingsEnvelope() {
     subscription_snapshot_ttl_seconds: 0,
     },
     appearance: { theme_mode: "dark", locale: "zh-CN" },
-    subscriptions: { auto_load_traffic: false },
+    subscriptions: { auto_load_traffic: false, ignored_warnings: ignoredWarnings },
     scheduled_refresh: { enabled: false, schedule: "@every 10m", targets: [] },
   };
   return {
@@ -127,6 +133,7 @@ function settingsEnvelope() {
 }
 
 test.beforeEach(async ({ page }) => {
+  let ignoredWarnings: Array<{ code: string; field?: string; source?: string; target?: string }> = [];
   await page.addInitScript(() => {
     localStorage.setItem("sandrone.locale", "zh-CN");
     localStorage.setItem("sandrone.publicBaseUrl", "https://example.com");
@@ -153,7 +160,13 @@ test.beforeEach(async ({ page }) => {
     await route.fulfill({ json: { items: [] } });
   });
   await page.route("**/v1/settings", async (route) => {
-    await route.fulfill({ json: settingsEnvelope() });
+    if (route.request().method() === "PUT") {
+      const update = route.request().postDataJSON() as {
+        subscriptions?: { ignored_warnings?: typeof ignoredWarnings };
+      };
+      ignoredWarnings = update.subscriptions?.ignored_warnings ?? ignoredWarnings;
+    }
+    await route.fulfill({ json: settingsEnvelope(ignoredWarnings) });
   });
   await page.route("**/v1/settings/scheduled-refresh-status", async (route) => {
     await route.fulfill({
@@ -218,6 +231,55 @@ test("settings overview opens service settings", async ({ page }) => {
   await expect(page).toHaveURL(/\/settings\/service$/);
   await expect(page.getByRole("heading", { exact: true, level: 2, name: "服务设置" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "远程请求" })).toBeVisible();
+  expect(consoleIssues).toEqual([]);
+});
+
+test("ignored subscription warnings persist and can be restored", async ({ page }) => {
+  const consoleIssues: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error" || message.type() === "warning") {
+      consoleIssues.push(`${message.type()}: ${message.text()}`);
+    }
+  });
+  await page.goto("/subscriptions/remote/provider/preview");
+
+  await page.getByRole("button", { name: "展开预览警告" }).click();
+  await page.getByRole("button", { name: /node-with-known-mode-field/ }).click();
+  const ignoredRequest = page.waitForRequest((request) => (
+    request.method() === "PUT" && new URL(request.url()).pathname === "/v1/settings"
+  ));
+  await page.getByRole("button", { name: "忽略同类警告" }).click();
+  const ignoredBody = (await ignoredRequest).postDataJSON() as {
+    subscriptions: { ignored_warnings: unknown[] };
+  };
+
+  expect(ignoredBody.subscriptions.ignored_warnings).toEqual([{
+    code: "parse_unknown_field",
+    field: "uri.query.mode",
+    source: "uri-list",
+  }]);
+  await expect(page.getByRole("button", { name: "展开预览警告" })).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole("button", { name: "展开预览警告" })).toHaveCount(0);
+
+  await page.goto("/settings/service");
+  const ignoredWarnings = page.getByRole("article").filter({
+    has: page.getByRole("heading", { name: "已忽略的订阅警告" }),
+  });
+  await expect(ignoredWarnings).toContainText("uri.query.mode");
+  await expect(ignoredWarnings).toContainText("1 条规则");
+  await ignoredWarnings.getByRole("button", { name: "恢复 uri.query.mode" }).click();
+  const restoredRequest = page.waitForRequest((request) => (
+    request.method() === "PUT" && new URL(request.url()).pathname === "/v1/settings"
+  ));
+  await page.getByRole("button", { name: "保存设置" }).click();
+  const restoredBody = (await restoredRequest).postDataJSON() as {
+    subscriptions: { ignored_warnings: unknown[] };
+  };
+  expect(restoredBody.subscriptions.ignored_warnings).toEqual([]);
+
+  await page.goto("/subscriptions/remote/provider/preview");
+  await expect(page.getByRole("button", { name: "展开预览警告" })).toBeVisible();
   expect(consoleIssues).toEqual([]);
 });
 

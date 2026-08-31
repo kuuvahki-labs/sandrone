@@ -134,6 +134,7 @@ func Default() domain.Settings {
 		},
 		Subscriptions: domain.SubscriptionSettings{
 			AutoLoadTraffic: false,
+			IgnoredWarnings: []domain.IgnoredWarning{},
 		},
 		ScheduledRefresh: domain.ScheduledRefreshSettings{
 			Schedule: "@every 10m",
@@ -195,7 +196,10 @@ func Normalize(value domain.Settings) (domain.Settings, error) {
 	if err := validateAppearance(out.Appearance); err != nil {
 		return domain.Settings{}, err
 	}
-	out.Subscriptions = value.Subscriptions
+	out.Subscriptions, err = normalizeSubscriptionSettings(value.Subscriptions)
+	if err != nil {
+		return domain.Settings{}, err
+	}
 	out.ScheduledRefresh, err = normalizeScheduledRefresh(value.ScheduledRefresh, defaults.ScheduledRefresh)
 	if err != nil {
 		return domain.Settings{}, err
@@ -234,6 +238,29 @@ func View(value domain.Settings) domain.SettingsView {
 		Subscriptions:    value.Subscriptions,
 		ScheduledRefresh: value.ScheduledRefresh,
 	}
+}
+
+func normalizeSubscriptionSettings(value domain.SubscriptionSettings) (domain.SubscriptionSettings, error) {
+	out := domain.SubscriptionSettings{
+		AutoLoadTraffic: value.AutoLoadTraffic,
+		IgnoredWarnings: make([]domain.IgnoredWarning, 0, len(value.IgnoredWarnings)),
+	}
+	seen := make(map[domain.IgnoredWarning]struct{}, len(value.IgnoredWarnings))
+	for _, warning := range value.IgnoredWarnings {
+		warning.Code = strings.TrimSpace(warning.Code)
+		warning.Field = strings.TrimSpace(warning.Field)
+		warning.Source = strings.TrimSpace(warning.Source)
+		warning.Target = strings.TrimSpace(warning.Target)
+		if warning.Code == "" {
+			return domain.SubscriptionSettings{}, invalid("ignored warning code is required")
+		}
+		if _, ok := seen[warning]; ok {
+			return domain.SubscriptionSettings{}, invalid("duplicate ignored warning %q", warning.Code)
+		}
+		seen[warning] = struct{}{}
+		out.IgnoredWarnings = append(out.IgnoredWarnings, warning)
+	}
+	return out, nil
 }
 
 func normalizeScheduledRefresh(value, defaults domain.ScheduledRefreshSettings) (domain.ScheduledRefreshSettings, error) {

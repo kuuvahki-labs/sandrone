@@ -1,3 +1,4 @@
+import type { IgnoredWarning } from "~/shared/resources/types";
 import { getAdminToken } from "~/shared/storage/preferences";
 
 export type Fetcher = typeof fetch;
@@ -124,6 +125,7 @@ export interface SettingsView {
   };
   subscriptions: {
     auto_load_traffic: boolean;
+    ignored_warnings: IgnoredWarning[];
   };
   scheduled_refresh: {
     enabled: boolean;

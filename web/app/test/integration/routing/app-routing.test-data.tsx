@@ -230,6 +230,7 @@ export function projectSettingsEnvelope(options: {
       locale: options.locale ?? defaultProjectSettings.appearance.locale,
     },
     subscriptions: {
+      ...defaultProjectSettings.subscriptions,
       auto_load_traffic: options.autoLoadTraffic ?? false,
     },
   };

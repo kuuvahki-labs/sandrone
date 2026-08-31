@@ -133,7 +133,10 @@ describe("settings service page", () => {
         subscription_snapshot_ttl_seconds: 300,
       }),
       mcp: expect.objectContaining({ path: "/agent" }),
-      subscriptions: { auto_load_traffic: true },
+      subscriptions: {
+        auto_load_traffic: true,
+        ignored_warnings: [],
+      },
     }));
 
     await user.click(screen.getByRole("button", { name: "返回" }));

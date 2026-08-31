@@ -54,3 +54,10 @@ export interface PreviewWarning {
   source?: string;
   target?: string;
 }
+
+export interface IgnoredWarning {
+  code: string;
+  field?: string;
+  source?: string;
+  target?: string;
+}

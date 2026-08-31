@@ -23,6 +23,7 @@ import { type Translator, useI18n } from "~/shared/i18n/context";
 import { PreviewPendingStatus } from "~/shared/preview/preview-pending-status";
 import { groupPreviewWarnings } from "~/shared/resources/warning-groups";
 import { CollapsibleWarningPanel } from "~/shared/resources/warning-panel";
+import { useVisiblePreviewWarnings } from "~/shared/resources/warning-preferences";
 import { CodeBlock } from "~/shared/ui/code-editor";
 import { Metric, MetricGroup, PageHeader } from "~/shared/ui/page";
 
@@ -51,6 +52,7 @@ export function SubscriptionPreviewPage({ backLabel, elapsedSeconds = 0, failed 
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
   const previewNodes = preview?.nodes;
+  const visibleWarnings = useVisiblePreviewWarnings(preview?.warnings);
   const visibleNodes = useMemo(() => {
     const normalizedQuery = deferredQuery.trim().toLowerCase();
     return (previewNodes ?? []).filter((node) => {
@@ -58,7 +60,7 @@ export function SubscriptionPreviewPage({ backLabel, elapsedSeconds = 0, failed 
       return !normalizedQuery || previewNodeSearchText(node, filter === "final").includes(normalizedQuery);
     });
   }, [deferredQuery, filter, previewNodes]);
-  const warningGroupCount = preview ? groupPreviewWarnings(preview.warnings).length : undefined;
+  const warningGroupCount = preview ? groupPreviewWarnings(visibleWarnings).length : undefined;
 
   return (
     <section className="grid gap-6">
@@ -133,8 +135,8 @@ export function SubscriptionPreviewPage({ backLabel, elapsedSeconds = 0, failed 
             </div>
           </div>
 
-          {preview.warnings.length ? (
-            <CollapsibleWarningPanel label={t("subscriptions.preview.warnings")} warnings={preview.warnings} />
+          {visibleWarnings.length ? (
+            <CollapsibleWarningPanel label={t("subscriptions.preview.warnings")} warnings={visibleWarnings} />
           ) : null}
 
           <List aria-label={t("subscriptions.preview.nodeList")} className="grid gap-3 p-0">

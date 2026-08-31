@@ -29,6 +29,11 @@ func TestSettingsEndpointRoundTripOmitsRemovedStartupFields(t *testing.T) {
 	update.HTTP.Listen = "127.0.0.1:2237"
 	update.Appearance.ThemeMode = "light"
 	update.Subscriptions.AutoLoadTraffic = true
+	update.Subscriptions.IgnoredWarnings = []domain.IgnoredWarning{{
+		Code:   "parse_unknown_field",
+		Field:  "uri.query.mode",
+		Source: "uri-list",
+	}}
 	update.ScriptDefaults.TimeoutMS = 3500
 	update.ScheduledRefresh = domain.ScheduledRefreshSettings{
 		Enabled:  true,
@@ -53,6 +58,7 @@ func TestSettingsEndpointRoundTripOmitsRemovedStartupFields(t *testing.T) {
 	require.Equal(t, "127.0.0.1:2237", snapshot.Settings.HTTP.Listen)
 	require.Equal(t, "light", snapshot.Effective.Appearance.ThemeMode)
 	require.True(t, snapshot.Effective.Subscriptions.AutoLoadTraffic)
+	require.Equal(t, update.Subscriptions.IgnoredWarnings, snapshot.Effective.Subscriptions.IgnoredWarnings)
 	require.Equal(t, 3500, snapshot.Effective.ScriptDefaults.TimeoutMS)
 	require.Equal(t, update.ScheduledRefresh, snapshot.Effective.ScheduledRefresh)
 	require.Contains(t, snapshot.RestartRequired, "http.listen")
@@ -63,6 +69,7 @@ func TestSettingsEndpointRoundTripOmitsRemovedStartupFields(t *testing.T) {
 	require.NotContains(t, string(body), `"transport"`)
 	require.NotContains(t, string(body), `"webui"`)
 	require.Contains(t, string(body), `"scheduled_refresh"`)
+	require.Contains(t, string(body), `"ignored_warnings"`)
 }
 
 func TestSettingsEndpointIgnoresRemovedStartupFields(t *testing.T) {

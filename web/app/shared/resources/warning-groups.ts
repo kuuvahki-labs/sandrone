@@ -1,4 +1,4 @@
-import type { PreviewWarning } from "~/shared/resources/types";
+import type { IgnoredWarning, PreviewWarning } from "~/shared/resources/types";
 
 export interface PreviewWarningGroup {
   fingerprint: string;
@@ -30,6 +30,33 @@ export function groupPreviewWarnings(warnings: readonly PreviewWarning[]): Previ
   }
 
   return groups;
+}
+
+export function ignoredWarningFromPreview(warning: PreviewWarning): IgnoredWarning {
+  return {
+    code: warning.code,
+    ...(stringValue(warning.field) ? { field: stringValue(warning.field) } : {}),
+    ...(stringValue(warning.source) ? { source: stringValue(warning.source) } : {}),
+    ...(stringValue(warning.target) ? { target: stringValue(warning.target) } : {}),
+  };
+}
+
+export function warningIgnoreKey(warning: IgnoredWarning): string {
+  return JSON.stringify([
+    warning.code,
+    stringValue(warning.field),
+    stringValue(warning.source),
+    stringValue(warning.target),
+  ]);
+}
+
+export function visiblePreviewWarnings(
+  warnings: readonly PreviewWarning[],
+  ignoredWarnings: readonly IgnoredWarning[],
+): PreviewWarning[] {
+  if (!ignoredWarnings.length) return [...warnings];
+  const ignoredKeys = new Set(ignoredWarnings.map(warningIgnoreKey));
+  return warnings.filter((warning) => !ignoredKeys.has(warningIgnoreKey(warning)));
 }
 
 function warningGroupKind(warning: PreviewWarning): PreviewWarningGroup["kind"] {
