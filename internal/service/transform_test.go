@@ -19,6 +19,8 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/service"
 )
 
+const testRealityPublicKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+
 func TestServiceParseURISubscription(t *testing.T) {
 	svc := service.New()
 	result, err := svc.Parse(context.Background(), domain.ParseRequest{
@@ -114,7 +116,7 @@ func TestServiceCanonicalizesVMessAndVLESSUserIDsAcrossEntryPointsAndTargets(t *
 
 func TestServiceDefaultsRealityClientFingerprintAcrossEntryPointsAndTargets(t *testing.T) {
 	svc := service.New()
-	const raw = "vless://11111111-1111-1111-1111-111111111111@example.com:443?encryption=none&security=reality&pbk=public-key&sid=01&type=tcp#reality"
+	const raw = "vless://11111111-1111-1111-1111-111111111111@example.com:443?encryption=none&security=reality&pbk=" + testRealityPublicKey + "&sid=01&type=tcp#reality"
 
 	parsed, err := svc.Parse(context.Background(), domain.ParseRequest{Format: "uri-list", Content: []byte(raw)})
 	require.NoError(t, err)
@@ -130,7 +132,7 @@ func TestServiceDefaultsRealityClientFingerprintAcrossEntryPointsAndTargets(t *t
 		UUID: "11111111-1111-1111-1111-111111111111", Encryption: "none",
 		TLS: &domain.TLSOptions{
 			Enabled: true, ServerName: "example.com",
-			Reality: &domain.RealityOptions{Enabled: true, PublicKey: "public-key", ShortID: "01"},
+			Reality: &domain.RealityOptions{Enabled: true, PublicKey: testRealityPublicKey, ShortID: "01"},
 		},
 	}
 
@@ -229,6 +231,98 @@ func TestServiceDropsUnsupportedTLSClientFingerprintAcrossInputs(t *testing.T) {
 			require.Len(t, result.Report.Warnings, 1)
 			require.Equal(t, "node_validation_dropped", result.Report.Warnings[0].Code)
 			require.Equal(t, "tls.client_fingerprint", result.Report.Warnings[0].Field)
+		})
+	}
+}
+
+func TestServiceDropsInvalidRealityPublicKeysAcrossInputs(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		format  string
+		content string
+	}{
+		{
+			name:   "uri list",
+			format: "uri-list",
+			content: strings.Join([]string{
+				"ss://aes-128-gcm:secret@example.com:8388#valid",
+				"vless://11111111-1111-1111-1111-111111111111@example.com:443?encryption=none&security=reality#invalid",
+			}, "\n"),
+		},
+		{
+			name:   "mihomo",
+			format: "mihomo",
+			content: `proxies:
+  - {name: valid, type: ss, server: example.com, port: 8388, cipher: aes-128-gcm, password: secret}
+  - {name: invalid, type: vless, server: example.com, port: 443, uuid: 11111111-1111-1111-1111-111111111111, tls: true, reality-opts: {}}`,
+		},
+		{
+			name:   "sing-box",
+			format: "sing-box",
+			content: `{"outbounds":[
+  {"tag":"valid","type":"shadowsocks","server":"example.com","server_port":8388,"method":"aes-128-gcm","password":"secret"},
+  {"tag":"invalid","type":"vless","server":"example.com","server_port":443,"uuid":"11111111-1111-1111-1111-111111111111","tls":{"enabled":true,"reality":{"enabled":true}}}
+]}`,
+		},
+		{
+			name:   "json nodes",
+			format: "json-nodes",
+			content: `[
+  {"name":"valid","type":"ss","server":"example.com","port":8388,"cipher":"aes-128-gcm","password":"secret"},
+  {"name":"invalid","type":"vless","server":"example.com","port":443,"uuid":"11111111-1111-1111-1111-111111111111","tls":{"enabled":true,"reality":{"enabled":true}}}
+]`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			result, err := service.New().Parse(t.Context(), domain.ParseRequest{
+				Format: tc.format, Content: []byte(tc.content),
+			})
+
+			require.NoError(t, err)
+			require.Len(t, result.Nodes, 1)
+			require.Equal(t, "valid", result.Nodes[0].Name)
+			require.Len(t, result.Report.Warnings, 1)
+			require.Equal(t, "node_validation_dropped", result.Report.Warnings[0].Code)
+			require.Equal(t, "tls.reality.public_key", result.Report.Warnings[0].Field)
+		})
+	}
+}
+
+func TestServiceDropsInvalidRealityPublicKeyAcrossTargets(t *testing.T) {
+	t.Parallel()
+
+	nodes := []domain.NodeIR{
+		{
+			Name: "valid", Type: domain.NodeTypeShadowsocks, Server: "example.com", Port: 8388,
+			Cipher: "aes-128-gcm", Password: "secret",
+		},
+		{
+			Name: "invalid", Type: domain.NodeTypeVLESS, Server: "example.com", Port: 443,
+			UUID: "11111111-1111-1111-1111-111111111111", Encryption: "none",
+			TLS: &domain.TLSOptions{Enabled: true, Reality: &domain.RealityOptions{Enabled: true}},
+		},
+	}
+
+	for _, format := range []string{"mihomo-proxies", "sing-box-outbounds"} {
+		t.Run(format, func(t *testing.T) {
+			t.Parallel()
+			result, err := service.New().Render(t.Context(), domain.RenderRequest{
+				Format: format,
+				Target: format,
+				Nodes:  nodes,
+			})
+
+			require.NoError(t, err)
+			require.Equal(t, 1, result.Report.Render.SuccessCount)
+			require.Len(t, result.Report.Warnings, 1)
+			require.Equal(t, "node_validation_dropped", result.Report.Warnings[0].Code)
+			require.Equal(t, "tls.reality.public_key", result.Report.Warnings[0].Field)
+			require.Equal(t, format, result.Report.Warnings[0].Target)
 		})
 	}
 }

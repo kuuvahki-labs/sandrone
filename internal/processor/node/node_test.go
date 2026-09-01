@@ -403,7 +403,7 @@ func TestProbeProcessorRejectsUnsupportedMethod(t *testing.T) {
 	require.True(t, domain.IsCode(err, domain.CodeProcessorConfigInvalid))
 }
 
-func TestProbeProcessorDropsFailuresButRetainsUnsupportedNodesAndWarnings(t *testing.T) {
+func TestProbeProcessorDropModeKeepsOnlyAliveNodesAndWarnings(t *testing.T) {
 	runner := &stubProbeRunner{result: &domain.ProbeResult{
 		Results: []domain.NodeProbeResult{
 			{NodeName: "invalid-hysteria", Method: "url_test", Alive: false, ErrorCode: "probe_invalid_target"},
@@ -417,14 +417,14 @@ func TestProbeProcessorDropsFailuresButRetainsUnsupportedNodesAndWarnings(t *tes
 	}}
 	proc := buildNode(t, makeProbeRegistry(runner), "probe", map[string]any{"fail_mode": "drop"})
 
-	out, err := proc.ApplyNodes(context.Background(), domain.NodeProcessInput{Nodes: []domain.NodeIR{
+	out, err := proc.ApplyNodes(t.Context(), domain.NodeProcessInput{Nodes: []domain.NodeIR{
 		{Name: "invalid-hysteria", Server: "invalid.example", Port: 443},
 		{Name: "unsupported-xhttp", Server: "xhttp.example", Port: 443},
 		{Name: "valid-http", Server: "valid.example", Port: 443},
 	}})
 
 	require.NoError(t, err)
-	require.Equal(t, []string{"unsupported-xhttp", "valid-http"}, []string{out.Nodes[0].Name, out.Nodes[1].Name})
+	require.Equal(t, []string{"valid-http"}, []string{out.Nodes[0].Name})
 	require.Equal(t, []domain.Warning{
 		{Code: "parse_unknown_field"},
 		{Code: "render_node_skipped"},

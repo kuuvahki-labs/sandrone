@@ -174,7 +174,7 @@ func (p *probeProc) ApplyNodes(ctx context.Context, in domain.NodeProcessInput) 
 				Cause:     fmt.Errorf("%s: %s", probeResult.ErrorCode, probeResult.Error),
 			}
 		}
-		if p.params.FailMode == "drop" && failed {
+		if p.params.FailMode == "drop" && !probeResult.Alive {
 			continue
 		}
 		outNode := node

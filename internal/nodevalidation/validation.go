@@ -2,6 +2,7 @@
 package nodevalidation
 
 import (
+	"encoding/base64"
 	"net"
 	"strconv"
 	"strings"
@@ -187,6 +188,14 @@ func validateTLS(options *domain.TLSOptions, prefix string, add func(string, str
 	}
 	if (options.Certificate == "") != (options.PrivateKey == "") {
 		add("node_validation_conflict", prefix+".certificate", "TLS certificate and private key must be configured together")
+	}
+	if reality := options.Reality; reality != nil {
+		field := prefix + ".reality.public_key"
+		if strings.TrimSpace(reality.PublicKey) == "" {
+			add("node_validation_required", field, "Reality public key is required")
+		} else if publicKey, err := base64.RawURLEncoding.DecodeString(reality.PublicKey); err != nil || len(publicKey) != 32 {
+			add("node_validation_invalid", field, "Reality public key must be a 32-byte URL-safe base64 value without padding")
+		}
 	}
 	if options.ECH != nil {
 		switch options.ECH.ForceQuery {

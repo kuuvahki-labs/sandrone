@@ -121,6 +121,11 @@ renderer 或 probe core。当前值域为 `chrome`、`firefox`、`edge`、`safar
 映射。规范化后的值写入 `NodeIR`，因此 URI、Mihomo、sing-box 和 JSON Nodes 输出
 使用同一有效语义，而不是由单个目标 renderer 私自选择默认值。
 
+Reality client 的 `public_key` 是连接必需字段，必须是无 padding 的 URL-safe
+Base64，且解码后恰好 32 字节。字段缺失或非法时，节点在 shared validation 阶段以
+`tls.reality.public_key` 隔离，不会让单个无效 Reality 节点阻断整批 renderer 或
+probe core，也不会由目标客户端退化成普通 TLS。
+
 ## 输出格式
 
 | format | 产物 |

@@ -10,6 +10,8 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/nodevalidation"
 )
 
+const validRealityPublicKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+
 func TestValidateKeepsValidNodesAndReportsInvalidNodesWithoutSecrets(t *testing.T) {
 	t.Parallel()
 
@@ -155,6 +157,46 @@ func TestValidateTLSClientFingerprint(t *testing.T) {
 			result := nodevalidation.Validate([]domain.NodeIR{node}, nodevalidation.StageNormalized, "")
 			require.Equal(t, 1, result.Counts.Invalid)
 			require.Equal(t, []string{"tls.client_fingerprint"}, issueFields(result.Issues))
+		})
+	}
+}
+
+func TestValidateRealityPublicKey(t *testing.T) {
+	t.Parallel()
+
+	base := domain.NodeIR{
+		Name: "vless", Type: domain.NodeTypeVLESS, Server: "example.com", Port: 443,
+		UUID: "11111111-1111-1111-1111-111111111111", Encryption: "none",
+	}
+	tests := []struct {
+		name string
+		key  string
+		code string
+	}{
+		{name: "valid", key: validRealityPublicKey},
+		{name: "missing", code: "node_validation_required"},
+		{name: "invalid encoding", key: "not+a-reality-key", code: "node_validation_invalid"},
+		{name: "wrong length", key: "c2hvcnQ", code: "node_validation_invalid"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			node := base
+			node.TLS = &domain.TLSOptions{
+				Enabled: true,
+				Reality: &domain.RealityOptions{Enabled: true, PublicKey: tt.key},
+			}
+
+			result := nodevalidation.Validate([]domain.NodeIR{node}, nodevalidation.StageNormalized, "")
+			if tt.code == "" {
+				require.Equal(t, 1, result.Counts.Valid)
+				return
+			}
+			require.Equal(t, 1, result.Counts.Invalid)
+			require.Len(t, result.Issues, 1)
+			require.Equal(t, tt.code, result.Issues[0].Code)
+			require.Equal(t, "tls.reality.public_key", result.Issues[0].Field)
 		})
 	}
 }

@@ -154,7 +154,7 @@ sing-box 和 Mihomo，省略 core 时默认 sing-box。
 处理结果由以下参数决定：
 
 - `fail_mode: keep`（缺省）：保留失败节点；
-- `fail_mode: drop`：丢弃真正的探测失败节点；
+- `fail_mode: drop`：只保留本次探测成功的节点；真正失败和当前核心不支持的节点均丢弃；
 - `fail_mode: error`：遇到第一个真正的探测失败结果即让整步失败；
 - `annotate: true`：重写该节点所有 `probe.*` meta，写入 method、core、
   alive、duration、checked_at、error_code 等已有结果；
@@ -162,8 +162,9 @@ sing-box 和 Mihomo，省略 core 时默认 sing-box。
   失败节点在后；同组平局保持输入顺序。
 
 选定核心无法无损表达节点时，runner 返回 `probe_node_unsupported`。这表示没有产生
-可达性结论，不受 `fail_mode: drop/error` 处置，节点会保留给后续客户端 renderer；
-例如 sing-box 探测不支持 xHTTP，不应让同一 Subscription 的 Mihomo 输出丢失该节点。
+可达性结论；`fail_mode: drop` 会将其删除，`keep` 和 `error` 则保留给后续客户端
+renderer。共享 Subscription 使用 `drop` 时，调用方应确认所选 probe core 的表达能力
+符合最终输出范围，因为该选择会删除其它客户端原本可能支持的节点。
 
 执行 runner 前，processor 会检查当前批次的 `NodeIR.Name`。只要存在重名，整次
 processor 就跳过探测，按原顺序原样返回全部节点，并只产生一条
