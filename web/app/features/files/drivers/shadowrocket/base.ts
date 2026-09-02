@@ -1,4 +1,4 @@
-const SHADOWROCKET_BASE = `# 基于官方群组【懒人配置.conf 2026-06-17】更新
+const SHADOWROCKET_BASE = `# 基于 https://github.com/LOWERTOP/Shadowrocket 更新
 [General]
 # Shadowrocket 快速使用方法：
 # 1、首页 > 添加节点。
