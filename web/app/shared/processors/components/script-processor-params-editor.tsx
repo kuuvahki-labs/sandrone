@@ -283,7 +283,8 @@ function objectValue(value: unknown): Record<string, unknown> {
 }
 
 function defaultScriptContent(): string {
-  return `// input is the current object: node processors receive node lists, and file processors receive file content.
+  return `// Guide: https://github.com/kuuvahki-labs/sandrone/blob/main/docs/how-to/write-processor-script.md
+// input is the current object: node processors receive node lists, and file processors receive file content.
 // Return the modified input; api exposes controlled helper capabilities.
 function main(input, api) {
   return input;
