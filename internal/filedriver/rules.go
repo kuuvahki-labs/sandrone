@@ -1,7 +1,9 @@
 package filedriver
 
 import (
+	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
@@ -16,6 +18,17 @@ func singBoxOutboundsWithGroups(groups []map[string]any, names []string, nodeOut
 
 func normalizeConfigMap(value any) any {
 	switch typed := value.(type) {
+	case json.Number:
+		if integer, err := typed.Int64(); err == nil {
+			return integer
+		}
+		if unsigned, err := strconv.ParseUint(typed.String(), 10, 64); err == nil {
+			return unsigned
+		}
+		if decimal, err := typed.Float64(); err == nil {
+			return decimal
+		}
+		return typed.String()
 	case map[string]any:
 		out := make(map[string]any, len(typed))
 		for key, value := range typed {
