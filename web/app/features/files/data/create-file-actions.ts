@@ -23,13 +23,13 @@ export function createFileActions({
   showNotice: FileNotice;
   t?: Translator;
 }) {
-  async function createFile(kind: string, form: FormData) {
+  async function createFile(kind: string, form: FormData, existing?: FileItem) {
     const name = String(form.get("name") ?? "").trim();
     if (!name) throw new Error("file name is required");
     assertRegisteredFileKind(kind);
     const displayName = String(form.get("display_name") ?? "").trim();
     const description = String(form.get("description") ?? "").trim();
-    const timestamps = fileTimestamps(undefined);
+    const timestamps = fileTimestamps(existing);
     const config = parseOptionalObjectField(form, "config");
     assertSingleSubscription(config);
     await client.createFile({
@@ -47,7 +47,7 @@ export function createFileActions({
     });
     await refreshResources();
     closeSheet();
-    showNotice(t("messages.fileSaved"));
+    showNotice(t(existing ? "messages.fileOverwritten" : "messages.fileSaved"));
     navigate(fileEditPath(name));
   }
 
@@ -94,7 +94,7 @@ function assertSingleSubscription(config: Record<string, unknown> | undefined): 
   }
 }
 
-function fileTimestamps(detail: FileDetail | null | undefined): Pick<FileSpecInput, "created_at" | "updated_at"> {
+function fileTimestamps(detail: Pick<FileDetail, "createdAt" | "updatedAt"> | null | undefined): Pick<FileSpecInput, "created_at" | "updated_at"> {
   const now = new Date().toISOString();
   if (!detail) {
     return { created_at: now, updated_at: now };

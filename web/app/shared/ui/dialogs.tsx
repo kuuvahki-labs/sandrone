@@ -52,3 +52,39 @@ export function DiscardChangesDialog({ onCancel, onConfirm }: { onCancel: () => 
     </Dialog>
   );
 }
+
+export function OverwriteResourceDialog({
+  name,
+  onCancel,
+  onConfirm,
+  pending = false,
+  resource,
+}: {
+  name: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+  pending?: boolean;
+  resource: "file" | "subscription";
+}) {
+  const { t } = useI18n();
+  const title = t(resource === "file" ? "dialog.overwrite.fileTitle" : "dialog.overwrite.subscriptionTitle");
+  const body = t(resource === "file" ? "dialog.overwrite.fileBody" : "dialog.overwrite.subscriptionBody", { name });
+  return (
+    <Dialog
+      open
+      aria-labelledby="overwrite-title"
+      onClose={() => {
+        if (!pending) onCancel();
+      }}
+    >
+      <DialogTitle id="overwrite-title">{title}</DialogTitle>
+      <DialogContent>
+        <DialogContentText>{body}</DialogContentText>
+      </DialogContent>
+      <DialogActions>
+        <Button disabled={pending} type="button" onClick={onCancel}>{t("actions.cancel")}</Button>
+        <Button color="error" disabled={pending} type="button" variant="contained" onClick={onConfirm}>{t("actions.overwrite")}</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}

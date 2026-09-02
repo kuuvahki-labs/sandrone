@@ -36,6 +36,30 @@ describe("file actions", () => {
     }));
   });
 
+  it("preserves created_at and reports an overwrite when creating over an existing file", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-27T04:05:06.000Z"));
+    const { client, createFile, showNotice } = setupActions();
+    const existing: FileItem = {
+      name: "default.yaml",
+      title: "default.yaml",
+      kind: "mihomo",
+      createdAt: "2026-06-27T01:02:03.000Z",
+      updatedAt: "2026-06-27T02:03:04.000Z",
+    };
+    const form = new FormData();
+    form.set("name", "default.yaml");
+
+    await createFile("static", form, existing);
+
+    expect(client.createFile).toHaveBeenCalledWith(expect.objectContaining({
+      created_at: "2026-06-27T01:02:03.000Z",
+      updated_at: "2026-06-27T04:05:06.000Z",
+      kind: "static",
+    }));
+    expect(showNotice).toHaveBeenCalledWith("File overwritten");
+  });
+
   it("creates an exact minimal file payload", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-27T01:02:03.000Z"));

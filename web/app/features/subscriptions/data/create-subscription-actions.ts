@@ -27,16 +27,16 @@ export function createSubscriptionActions({
   showNotice: SubscriptionNotice;
   t?: Translator;
 }) {
-  async function createSubscription(form: FormData) {
+  async function createSubscription(form: FormData, existing?: SubscriptionItem) {
     assertCreatableSubscription(form, t);
-    const subscription = subscriptionInputFromForm(form, undefined, undefined, showNotice, t);
+    const subscription = subscriptionInputFromForm(form, existing, undefined, showNotice, t);
     if (!subscription) {
       return;
     }
     await client.createSubscription(subscription);
     await refreshResources();
     closeSheet();
-    showNotice(t("messages.subscriptionAdded"));
+    showNotice(t(existing ? "messages.subscriptionOverwritten" : "messages.subscriptionAdded"));
     navigate(subscriptionEditPath(subscription.type, subscription.name));
   }
 
@@ -87,8 +87,7 @@ function subscriptionInputFromForm(
   t: Translator,
 ): SubscriptionInput | null {
   const type = subscriptionTypeFromForm(form, item);
-  const submittedName = String(form.get("name") ?? "").trim();
-  const name = item?.name || submittedName || defaultSubscriptionName(type, sourceInputFromForm(form));
+  const name = item?.name || subscriptionCreateName(form);
   const displayName = String(form.get("display_name") ?? "").trim();
   const format = sourceFormatForPayload(String(form.get("format") ?? ""));
   const timestamps = subscriptionTimestamps(item, definition);
@@ -175,9 +174,15 @@ function subscriptionTimestamps(
     return { created_at: now, updated_at: now };
   }
   return {
-    created_at: definition?.createdAt || definition?.updatedAt || now,
+    created_at: definition?.createdAt || item.createdAt || definition?.updatedAt || item.updatedAt || now,
     updated_at: now,
   };
+}
+
+export function subscriptionCreateName(form: FormData): string {
+  const type = subscriptionTypeFromForm(form);
+  const submittedName = String(form.get("name") ?? "").trim();
+  return submittedName || defaultSubscriptionName(type, sourceInputFromForm(form));
 }
 
 function subscriptionTypeFromForm(form: FormData, item?: SubscriptionItem): SubscriptionInput["type"] {
@@ -188,10 +193,7 @@ function subscriptionTypeFromForm(form: FormData, item?: SubscriptionItem): Subs
   return item?.kind ?? "remote";
 }
 
-function defaultSubscriptionName(type: SubscriptionInput["type"], sourceInput: string, item?: SubscriptionItem): string {
-  if (item?.name) {
-    return item.name;
-  }
+function defaultSubscriptionName(type: SubscriptionInput["type"], sourceInput: string): string {
   if (type === "remote") {
     return sourceNameFromUrl(sourceInput);
   }

@@ -43,6 +43,7 @@ export default function NewFileRoute() {
 
   return (
     <FileNewPage
+      existingFiles={files.items}
       loadSubscriptionPreview={loadSubscriptionPreview}
       loadRuleSetCatalog={loadRuleSetCatalog}
       source={source}

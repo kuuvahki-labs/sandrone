@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { requireFileDriver } from "~/features/files/drivers/registry";
+import type { FileItem } from "~/features/files/model/types";
 import {
   configNodePreview,
   noop,
@@ -13,6 +14,45 @@ import {
 import { FileNewPage } from "./file-new-page";
 
 describe("FileNewPage", () => {
+  it("requires confirmation before overwriting an existing file", async () => {
+    const user = userEvent.setup();
+    const existing: FileItem = {
+      name: "existing.txt",
+      title: "existing.txt",
+      kind: "static",
+      createdAt: "2026-06-27T01:02:03.000Z",
+    };
+    const onSave = vi.fn(async (_kind: string, _form: FormData, _existing?: FileItem) => undefined);
+
+    render(
+      <FileNewPage
+        existingFiles={[existing]}
+        source="local"
+        onBack={noop}
+        onSave={onSave}
+      />,
+    );
+
+    await user.type(screen.getByRole("textbox", { name: "名称" }), existing.name);
+    await user.click(screen.getByRole("button", { name: "保存文件" }));
+
+    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "覆盖同名文件？" })).toHaveTextContent(
+      "文件“existing.txt”已经存在。继续操作会完整覆盖现有文件。",
+    );
+
+    await user.click(screen.getByRole("button", { name: "取消" }));
+    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog", { name: "覆盖同名文件？" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "保存文件" }));
+    await user.click(screen.getByRole("button", { name: "覆盖" }));
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave.mock.calls[0]?.[0]).toBe("static");
+    expect(onSave.mock.calls[0]?.[2]).toBe(existing);
+  });
+
   it("blocks a new sing-box file until preview, then submits its resolved driver", async () => {
     const user = userEvent.setup();
     const loadSubscriptionPreview = vi.fn().mockResolvedValue(configNodePreview("provider", ["Node 1"]));

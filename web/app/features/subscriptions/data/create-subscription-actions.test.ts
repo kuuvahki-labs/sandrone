@@ -165,6 +165,34 @@ describe("subscription actions", () => {
     }));
   });
 
+  it("preserves created_at and reports an overwrite when creating over an existing subscription", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-27T04:05:06.000Z"));
+    const { client, createSubscription, showNotice } = setupActions();
+    const existing: SubscriptionItem = {
+      kind: "remote",
+      name: "example.com",
+      title: "example.com",
+      label: "远程订阅",
+      status: "ready",
+      createdAt: "2026-06-27T01:02:03.000Z",
+      updatedAt: "2026-06-27T02:03:04.000Z",
+    };
+    const form = new FormData();
+    form.set("subscription_type", "remote");
+    form.set("source_input", "https://www.example.com/sub");
+    form.set("processors", "[]");
+
+    await createSubscription(form, existing);
+
+    expect(client.createSubscription).toHaveBeenCalledWith(expect.objectContaining({
+      created_at: "2026-06-27T01:02:03.000Z",
+      updated_at: "2026-06-27T04:05:06.000Z",
+      name: "example.com",
+    }));
+    expect(showNotice).toHaveBeenCalledWith("订阅已覆盖");
+  });
+
   it("creates subscriptions with display name and multiline description payload", async () => {
     const { client, createSubscription } = setupActions();
     const form = new FormData();
