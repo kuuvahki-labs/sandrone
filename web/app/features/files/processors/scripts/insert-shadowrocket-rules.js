@@ -3,11 +3,11 @@
 // Parameters:
 // - preset_id: stable preset identifier; request args must not override it.
 // - rules_json: JSON array of Shadowrocket rule strings inserted by this preset.
-// - insert_mode: optional "top" or "anchor" insertion mode; request args must not override it.
+// - insert_mode: optional "top" insertion mode; request args must not override it.
 function main(input, api) {
   rejectManagedRequestArgOverrides(input);
   const presetID = stringArgument(input, "preset_id");
-  const insertMode = optionalInsertMode(input);
+  validateTopInsertMode(input, presetID);
   const presetRules = api.json.parse(stringArgument(input, "rules_json"));
   if (!Array.isArray(presetRules) || presetRules.some((rule) => typeof rule !== "string")) {
     throw new Error("Sandrone preset " + presetID + " requires an array of Shadowrocket rule strings");
@@ -29,13 +29,7 @@ function main(input, api) {
   ));
   if (additions.length === 0) return input;
 
-  const anchor = insertMode === "top"
-    ? firstRuleSection(ruleSections)
-    : firstPhysicalAnchor(ruleSections, [
-      "IP-CIDR,10.0.0.0/8,",
-      "GEOIP,CN,",
-      "FINAL,",
-    ]);
+  const anchor = firstRuleSection(ruleSections);
   if (!anchor) throw safeAnchorError(presetID);
 
   anchor.section.lines.splice(anchor.index, 0, ...additions);
@@ -61,18 +55,6 @@ function firstRuleSection(sections) {
   return sections.length > 0 ? { section: sections[0], index: 0 } : null;
 }
 
-function firstPhysicalAnchor(sections, prefixes) {
-  for (const prefix of prefixes) {
-    for (const section of sections) {
-      const index = section.lines.findIndex((line) => (
-        typeof line === "string" && line.startsWith(prefix)
-      ));
-      if (index >= 0) return { section, index };
-    }
-  }
-  return null;
-}
-
 function isObject(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -85,14 +67,10 @@ function stringArgument(input, name) {
   return value;
 }
 
-function optionalInsertMode(input) {
+function validateTopInsertMode(input, presetID) {
   const value = input.args && input.args.insert_mode;
-  if (value === undefined) {
-    return input.args && input.args.preset_id === "tailscale-native" ? "top" : "anchor";
-  }
-  if (value === "anchor") return value;
-  if (value === "top") return value;
-  throw new Error("Sandrone ordered rule preset requires insert_mode to be anchor or top");
+  if (value === "top" || value === undefined && presetID === "tailscale-native") return;
+  throw new Error("Sandrone Shadowrocket ordered rule preset requires insert_mode top");
 }
 
 function safeAnchorError(presetID) {

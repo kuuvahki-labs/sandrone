@@ -22,24 +22,11 @@ const en = createTranslator("en-US");
 const zh = createTranslator("zh-CN");
 
 describe("Mihomo processor presets", () => {
-  it("uses Sniffer, traditional NTP direct, and the rule source mirror as the new-file default chain", () => {
+  it("uses Sniffer and the rule source mirror as the new-file default chain", () => {
     expect(defaultMihomoProcessors(en).map((processor) => processor.name)).toEqual([
       "Sniffer",
-      "Traditional NTP Direct",
       "GitHub acceleration",
     ]);
-    expect(mihomoProcessorPreset("ntp-direct")).toMatchObject({
-      name: "Traditional NTP Direct",
-      type: "script",
-      stage: "file",
-      params: {
-        source: { type: "inline", content: expect.any(String) },
-        args: {
-          preset_id: "ntp-direct",
-          rules_json: JSON.stringify(["AND,((NETWORK,UDP),(DST-PORT,123)),DIRECT"]),
-        },
-      },
-    });
   });
 
   it.each([["en-US", en], ["zh-CN", zh]] as const)("uses every preset label as its %s processor name", (_locale, t) => {
@@ -168,29 +155,6 @@ describe("Mihomo processor presets", () => {
       dns: { "fake-ip-filter+": ["rule-set:sandrone-fakeip-shellcrash"] },
     });
 
-    expect(presetContent("udp-p2p-eim")).toBe(`# sandrone:mihomo-preset=udp-p2p-eim
-tun:
-  endpoint-independent-nat: true`);
-    expect(presetYAML("udp-p2p-eim")).toEqual({
-      tun: { "endpoint-independent-nat": true },
-    });
-
-    expect(presetContent("linux-tun-acceleration")).toBe(`# sandrone:mihomo-preset=linux-tun-acceleration
-find-process-mode: strict
-tun:
-  auto-route: true
-  auto-redirect: true`);
-    expect(presetYAML("linux-tun-acceleration")).toEqual({
-      "find-process-mode": "strict",
-      tun: { "auto-route": true, "auto-redirect": true },
-    });
-
-    expect(presetContent("windows-relaxed-route")).toBe(`# sandrone:mihomo-preset=windows-relaxed-route
-tun:
-  strict-route: false`);
-    expect(presetYAML("windows-relaxed-route")).toEqual({
-      tun: { "strict-route": false },
-    });
   });
 
   it("builds native Tailscale with editable auth_key and recognizes its managed params", () => {
@@ -396,15 +360,11 @@ tun:
     expect(mihomoProcessorPresets.map((preset) => preset.id)).toEqual([
       "sniffer",
       "tun",
-      "ntp-direct",
       "github-rule-source-mirror",
       "fake-ip-compat",
       "fake-ip-openclash",
       "fake-ip-shellcrash",
       "quic-fallback",
-      "udp-p2p-eim",
-      "linux-tun-acceleration",
-      "windows-relaxed-route",
       "tailscale-native",
       "tailscale-external",
       "tailnet-share",
@@ -452,9 +412,6 @@ tun:
     ]);
     const scenarioIDs = [
       "quic-fallback",
-      "udp-p2p-eim",
-      "linux-tun-acceleration",
-      "windows-relaxed-route",
     ] as const;
     expect(scenarioIDs.map((id) => {
       const preset = presetDescriptor(id);
@@ -466,9 +423,6 @@ tun:
       };
     })).toEqual([
       { id: "quic-fallback", defaultOn: false, dependencies: [], conflicts: [] },
-      { id: "udp-p2p-eim", defaultOn: false, dependencies: [], conflicts: [] },
-      { id: "linux-tun-acceleration", defaultOn: false, dependencies: ["tun"], conflicts: [] },
-      { id: "windows-relaxed-route", defaultOn: false, dependencies: [], conflicts: [] },
     ]);
 
     const editedTailnetShare = mihomoProcessorPreset("tailnet-share");
@@ -510,9 +464,6 @@ tun:
 
   it.each([
     "tailscale-external",
-    "udp-p2p-eim",
-    "linux-tun-acceleration",
-    "windows-relaxed-route",
   ] as const)("recognizes only exact YAML override content for %s", (id) => {
     const preset = mihomoProcessorPreset(id);
     expect(recognizedFileProcessorPresetID(mihomoProcessorPresets, preset)).toBe(id);

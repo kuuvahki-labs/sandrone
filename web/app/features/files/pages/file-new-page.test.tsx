@@ -71,25 +71,13 @@ describe("FileNewPage", () => {
       },
     });
     const processors = JSON.parse(String(saved.get("processors")));
-    expect(processors).toHaveLength(3);
+    expect(processors).toHaveLength(2);
     expect(processors).toMatchObject([
       {
         name: "流量嗅探与 DNS 劫持",
         type: "merge",
         stage: "file",
         params: { mode: "json_override" },
-      },
-      {
-        name: "传统 NTP 直连",
-        type: "script",
-        stage: "file",
-        params: {
-          source: { type: "inline", content: expect.any(String) },
-          args: {
-            preset_id: "ntp-direct",
-            rules_json: JSON.stringify([{ network: "udp", port: 123, outbound: "direct" }]),
-          },
-        },
       },
       {
         name: "GitHub 加速",

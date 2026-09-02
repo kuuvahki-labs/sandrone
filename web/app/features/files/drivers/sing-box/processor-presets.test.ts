@@ -19,12 +19,11 @@ const en = createTranslator("en-US");
 const zh = createTranslator("zh-CN");
 
 describe("sing-box file processor defaults", () => {
-  it("uses sniff, traditional NTP direct, and GitHub acceleration as the new-file defaults", () => {
+  it("uses sniff and GitHub acceleration as the new-file defaults", () => {
     const processors = defaultSingBoxProcessors(en);
 
     expect(processors.map((processor) => processor.name)).toEqual([
       "Sniff & DNS Hijack",
-      "Traditional NTP Direct",
       "GitHub acceleration",
     ]);
     expect(processors[0]).toMatchObject({
@@ -32,18 +31,6 @@ describe("sing-box file processor defaults", () => {
       type: "merge",
       stage: "file",
       params: { mode: "json_override" },
-    });
-    expect(processors[1]).toMatchObject({
-      name: "Traditional NTP Direct",
-      type: "script",
-      stage: "file",
-      params: {
-        source: { type: "inline", content: expect.any(String) },
-        args: {
-          preset_id: "ntp-direct",
-          rules_json: JSON.stringify([{ network: "udp", port: 123, outbound: "direct" }]),
-        },
-      },
     });
     expect(JSON.parse(String(processors[0].params?.content))).toEqual({
       route: {
@@ -95,42 +82,16 @@ describe("sing-box file processor defaults", () => {
     });
   });
 
-  it.each([
-    ["udp-p2p-eim", "UDP/P2P compatibility", "udp-p2p-eim"],
-    ["linux-tun-acceleration", "Linux/OpenWrt TUN acceleration", "linux-tun-acceleration"],
-    ["mptcp-direct", "MPTCP direct", "mptcp-direct"],
-    ["windows-relaxed-route", "Windows relaxed routing", "windows-relaxed-route"],
-  ] as const)("builds the exact %s structural processor", (id, name, operation) => {
-    expect(singBoxProcessorPreset(id)).toEqual({
-      name,
-      type: "script",
-      stage: "file",
-      params: {
-        source: { type: "inline", content: expect.any(String) },
-        args: { operation },
-      },
-    });
-  });
-
   it("declares the complete dependency, conflict, and default matrix", () => {
     expect(singBoxProcessorPresets.map((preset) => preset.id)).toEqual([
       "sniff",
-      "ntp-direct",
       "github-rule-source-mirror",
       "quic-fallback",
-      "udp-p2p-eim",
-      "linux-tun-acceleration",
-      "mptcp-direct",
-      "windows-relaxed-route",
       "tailscale-native",
       "tailscale-external",
     ]);
     const scenarioIDs = [
       "quic-fallback",
-      "udp-p2p-eim",
-      "linux-tun-acceleration",
-      "mptcp-direct",
-      "windows-relaxed-route",
     ] as const;
     expect(scenarioIDs.map((id) => {
       const preset = presetDescriptor(id);
@@ -142,14 +103,8 @@ describe("sing-box file processor defaults", () => {
       };
     })).toEqual([
       { id: "quic-fallback", defaultOn: false, dependencies: ["sniff"], conflicts: [] },
-      { id: "udp-p2p-eim", defaultOn: false, dependencies: [], conflicts: [] },
-      { id: "linux-tun-acceleration", defaultOn: false, dependencies: [], conflicts: [] },
-      { id: "mptcp-direct", defaultOn: false, dependencies: ["linux-tun-acceleration"], conflicts: [] },
-      { id: "windows-relaxed-route", defaultOn: false, dependencies: [], conflicts: [] },
     ]);
 
-    expect(planFileProcessorPresetAddition(singBoxProcessorPresets, "mptcp-direct", [], en).addedPresetIDs)
-      .toEqual(["linux-tun-acceleration", "mptcp-direct"]);
     expect(planFileProcessorPresetAddition(singBoxProcessorPresets, "quic-fallback", [], en).addedPresetIDs)
       .toEqual(["sniff", "quic-fallback"]);
   });
@@ -538,10 +493,6 @@ describe("sing-box file processor defaults", () => {
 
   it.each([
     "quic-fallback",
-    "udp-p2p-eim",
-    "linux-tun-acceleration",
-    "mptcp-direct",
-    "windows-relaxed-route",
   ] as const)("recognizes only the exact managed processor for %s", (id) => {
     const preset = singBoxProcessorPreset(id);
     expect(recognizedFileProcessorPresetID(singBoxProcessorPresets, preset)).toBe(id);

@@ -17,24 +17,10 @@ const en = createTranslator("en-US");
 const zh = createTranslator("zh-CN");
 
 describe("Shadowrocket processor presets", () => {
-  it("uses traditional NTP direct and GitHub acceleration as the new-file defaults", () => {
+  it("uses GitHub acceleration as the new-file default", () => {
     const processors = defaultShadowrocketProcessors(en);
 
-    expect(processors.map((processor) => processor.name)).toEqual([
-      "Traditional NTP Direct",
-      "GitHub acceleration",
-    ]);
-    expect(processors[0]).toMatchObject({
-      type: "script",
-      stage: "file",
-      params: {
-        source: { type: "inline", content: expect.any(String) },
-        args: {
-          preset_id: "ntp-direct",
-          rules_json: JSON.stringify(["AND,((PROTOCOL,UDP),(DST-PORT,123)),DIRECT"]),
-        },
-      },
-    });
+    expect(processors.map((processor) => processor.name)).toEqual(["GitHub acceleration"]);
   });
 
   it.each([["en-US", en], ["zh-CN", zh]] as const)("uses every preset label as its %s processor name", (_locale, t) => {
@@ -43,30 +29,14 @@ describe("Shadowrocket processor presets", () => {
     }
   });
 
-  it("recognizes only the exact managed NTP script", () => {
-    const preset = defaultShadowrocketProcessors(en)[0]!;
-
-    expect(recognizedFileProcessorPresetID(shadowrocketProcessorPresets, preset)).toBe("ntp-direct");
-    expect(recognizedFileProcessorPresetID(shadowrocketProcessorPresets, {
-      ...preset,
-      params: {
-        ...preset.params,
-        args: { preset_id: "ntp-direct", rules_json: "[]" },
-      },
-    })).toBeNull();
-  });
-
   it("declares only the supported presets", () => {
     expect(shadowrocketProcessorPresets.map((descriptor) => descriptor.id)).toEqual([
-      "ntp-direct",
       "github-rule-source-mirror",
       "tailscale-native",
       "tailscale-external",
     ]);
-    expect(defaultShadowrocketProcessors(en).map((processor) => processor.name)).toEqual([
-      "Traditional NTP Direct",
-      "GitHub acceleration",
-    ]);
+    expect(defaultShadowrocketProcessors(en).map((processor) => processor.name))
+      .toEqual(["GitHub acceleration"]);
   });
 
   it("builds the exact native Tailscale ordered rules without a module warning", () => {

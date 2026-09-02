@@ -12,23 +12,25 @@ import {
 
 const CASES: readonly OrderedRuleProcessorPresetOptions[] = [
   {
-    id: "ntp-direct",
+    id: "quic-fallback",
     kind: "mihomo",
-    rules: ["AND,((NETWORK,UDP),(DST-PORT,123)),DIRECT"],
+    rules: ["AND,((NETWORK,UDP),(DST-PORT,443)),REJECT"],
   },
   {
-    id: "ntp-direct",
+    id: "quic-fallback",
     kind: "sing-box",
-    rules: [{ network: "udp", port: 123, outbound: "direct" }],
-  },
-  {
-    id: "ntp-direct",
-    kind: "shadowrocket",
-    rules: ["AND,((PROTOCOL,UDP),(DST-PORT,123)),DIRECT"],
+    rules: [{ protocol: "quic", action: "reject" }],
   },
 ];
 
-const LOCALIZED_NAME = "传统 NTP 直连";
+const SHADOWROCKET_TOP_OPTIONS: OrderedRuleProcessorPresetOptions = {
+  id: "tailscale-native",
+  kind: "shadowrocket",
+  insertMode: "top",
+  rules: ["IP-CIDR,100.64.0.0/10,TAILSCALE,no-resolve"],
+};
+
+const LOCALIZED_NAME = "QUIC 强制回退";
 
 describe("ordered rule processor presets", () => {
   it.each(CASES)("documents the managed $kind parameters in the script header", (options) => {
@@ -37,11 +39,7 @@ describe("ordered rule processor presets", () => {
     expect(header).toContain("// Parameters:");
     expect(header).toContain("// - preset_id:");
     expect(header).toContain("// - rules_json:");
-    if (options.kind === "shadowrocket") {
-      expect(header).toContain("// - insert_mode:");
-    } else {
-      expect(header).not.toContain("insert_mode");
-    }
+    expect(header).not.toContain("insert_mode");
   });
 
   it.each(CASES)("builds the exact editable $kind inline script params", (options) => {
@@ -100,7 +98,7 @@ describe("ordered rule processor presets", () => {
       "  - DOMAIN,user.example,DIRECT",
       "  - MATCH,Proxy",
       "  - GEOIP,CN,DIRECT",
-      "  - AND,((NETWORK,UDP),(DST-PORT,123)),DIRECT",
+      "  - AND,((NETWORK,UDP),(DST-PORT,443)),REJECT",
       "  - RULE-SET,private,DIRECT",
     ].join("\n"));
   });
@@ -123,46 +121,13 @@ describe("ordered rule processor presets", () => {
     expect(output.route.rules).toEqual([
       { domain_suffix: ["user.example"], outbound: "direct" },
       { action: "route", outbound: "service", network: "tcp" },
-      { network: "udp", port: 123, outbound: "direct" },
+      { protocol: "quic", action: "reject" },
       { action: "route", outbound: "Proxy" },
     ]);
   });
 
-  it("inserts into the physical Shadowrocket Rule section that owns the preferred anchor", () => {
-    const document = {
-      bom: false,
-      newline: "\n",
-      trailing_newline: true,
-      preamble: [],
-      sections: [
-        { name: "Rule", lines: ["DOMAIN,user.example,DIRECT", "FINAL,First"] },
-        { name: "Host", lines: ["example.com = 192.0.2.1"] },
-        { name: "Rule", lines: ["IP-CIDR,10.0.0.0/8,DIRECT,no-resolve", "FINAL,Second"] },
-      ],
-    };
-
-    const output = JSON.parse(runPreset(CASES[2], JSON.stringify(document), iniModelAPI())) as typeof document;
-
-    expect(output.sections).toEqual([
-      { name: "Rule", lines: ["DOMAIN,user.example,DIRECT", "FINAL,First"] },
-      { name: "Host", lines: ["example.com = 192.0.2.1"] },
-      {
-        name: "Rule",
-        lines: [
-          "AND,((PROTOCOL,UDP),(DST-PORT,123)),DIRECT",
-          "IP-CIDR,10.0.0.0/8,DIRECT,no-resolve",
-          "FINAL,Second",
-        ],
-      },
-    ]);
-  });
-
   it("supports top insertion for Shadowrocket rules that must beat remote LAN rule sets", () => {
-    const options: OrderedRuleProcessorPresetOptions = {
-      ...CASES[2],
-      insertMode: "top",
-      rules: ["IP-CIDR,100.64.0.0/10,TAILSCALE,no-resolve"],
-    };
+    const options = SHADOWROCKET_TOP_OPTIONS;
     const document = {
       bom: false,
       newline: "\n",
@@ -185,14 +150,13 @@ describe("ordered rule processor presets", () => {
       "IP-CIDR,100.64.0.0/10,TAILSCALE,no-resolve",
       ...document.sections[0].lines,
     ]);
+    expect(inlineSource(orderedRuleProcessorPreset(options)).split("function main")[0])
+      .toContain("// - insert_mode:");
     expect(recognizeOrderedRuleProcessorPreset(orderedRuleProcessorPreset(options), options)).toBe(true);
   });
 
   it("recognizes the legacy top-mode Tailscale processor", () => {
-    const options: OrderedRuleProcessorPresetOptions = {
-      ...CASES[2],
-      insertMode: "top",
-    };
+    const options = SHADOWROCKET_TOP_OPTIONS;
     const processor = orderedRuleProcessorPreset(options);
     const params = processor.params as { args: Record<string, string>; source: Record<string, string> };
     const legacyProcessor = {

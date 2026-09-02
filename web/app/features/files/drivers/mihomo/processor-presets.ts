@@ -12,29 +12,22 @@ import type { ProcessorDetail } from "~/shared/resources/types";
 import fakeIPCompatContent from "./preset-content/fake-ip-compat.yaml?raw";
 import fakeIPOpenClashContent from "./preset-content/fake-ip-openclash.yaml?raw";
 import fakeIPShellCrashContent from "./preset-content/fake-ip-shellcrash.yaml?raw";
-import linuxTunAccelerationContent from "./preset-content/linux-tun-acceleration.yaml?raw";
 import snifferContent from "./preset-content/sniffer.yaml?raw";
 import tailnetShareContent from "./preset-content/tailnet-share.yaml?raw";
 import tailscaleExternalContent from "./preset-content/tailscale-external.yaml?raw";
 import tunContent from "./preset-content/tun.yaml?raw";
-import udpP2PEIMContent from "./preset-content/udp-p2p-eim.yaml?raw";
-import windowsRelaxedRouteContent from "./preset-content/windows-relaxed-route.yaml?raw";
 
 export type MihomoProcessorPresetID =
   | "sniffer"
   | "tun"
-  | "ntp-direct"
   | "fake-ip-compat"
   | "fake-ip-openclash"
   | "fake-ip-shellcrash"
   | "quic-fallback"
-  | "udp-p2p-eim"
-  | "linux-tun-acceleration"
-  | "windows-relaxed-route"
   | "tailscale-native"
   | "tailscale-external"
   | "tailnet-share";
-type MihomoOrderedRuleProcessorPresetID = "ntp-direct" | "quic-fallback";
+type MihomoOrderedRuleProcessorPresetID = "quic-fallback";
 type MihomoNativeProcessorPresetID = "tailscale-native";
 type MihomoMergeProcessorPresetID = Exclude<
   MihomoProcessorPresetID,
@@ -47,9 +40,6 @@ const PRESET_CONTENT: Record<MihomoMergeProcessorPresetID, string> = {
   "fake-ip-compat": withoutTrailingNewline(fakeIPCompatContent),
   "fake-ip-openclash": withoutTrailingNewline(fakeIPOpenClashContent),
   "fake-ip-shellcrash": withoutTrailingNewline(fakeIPShellCrashContent),
-  "udp-p2p-eim": withoutTrailingNewline(udpP2PEIMContent),
-  "linux-tun-acceleration": withoutTrailingNewline(linuxTunAccelerationContent),
-  "windows-relaxed-route": withoutTrailingNewline(windowsRelaxedRouteContent),
   "tailscale-external": withoutTrailingNewline(tailscaleExternalContent),
   "tailnet-share": withoutTrailingNewline(tailnetShareContent),
 };
@@ -58,11 +48,6 @@ function withoutTrailingNewline(content: string): string {
 }
 
 const ORDERED_RULE_PRESETS: Record<MihomoOrderedRuleProcessorPresetID, OrderedRuleProcessorPresetOptions> = {
-  "ntp-direct": {
-    id: "ntp-direct",
-    kind: "mihomo",
-    rules: ["AND,((NETWORK,UDP),(DST-PORT,123)),DIRECT"],
-  },
   "quic-fallback": {
     id: "quic-fallback",
     kind: "mihomo",
@@ -93,12 +78,6 @@ export const mihomoProcessorPresets: readonly FileProcessorPreset[] = [
     "network",
     "processor.mihomoPreset.tun",
   ),
-  orderedRuleDescriptor(
-    ORDERED_RULE_PRESETS["ntp-direct"],
-    "network",
-    "processors.filePreset.ntpDirect.label",
-    true,
-  ),
   githubRuleSourceMirrorPreset,
   versionedDescriptor(
     "fake-ip-compat",
@@ -128,25 +107,6 @@ export const mihomoProcessorPresets: readonly FileProcessorPreset[] = [
     ORDERED_RULE_PRESETS["quic-fallback"],
     "network",
     "processors.filePreset.mihomo.quicFallback.label",
-  ),
-  descriptor(
-    "udp-p2p-eim",
-    "network",
-    "processors.filePreset.mihomo.udpP2pEim.label",
-    false,
-    [],
-  ),
-  descriptor(
-    "linux-tun-acceleration",
-    "platform",
-    "processors.filePreset.mihomo.linuxTunAcceleration.label",
-    false,
-    ["tun"],
-  ),
-  descriptor(
-    "windows-relaxed-route",
-    "platform",
-    "processors.filePreset.mihomo.windowsRelaxedRoute.label",
   ),
   mihomoTailscaleNativeDescriptor(),
   descriptor(
@@ -301,5 +261,5 @@ function isExactRecord(
 }
 
 function isOrderedRulePresetID(id: MihomoProcessorPresetID): id is MihomoOrderedRuleProcessorPresetID {
-  return id === "ntp-direct" || id === "quic-fallback";
+  return id === "quic-fallback";
 }

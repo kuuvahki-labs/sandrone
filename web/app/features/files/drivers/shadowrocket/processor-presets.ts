@@ -12,15 +12,8 @@ import type { Translator } from "~/shared/i18n/context";
 import type { ProcessorDetail } from "~/shared/resources/types";
 
 export type ShadowrocketProcessorPresetID =
-  | "ntp-direct"
   | "tailscale-native"
   | "tailscale-external";
-
-const NTP_DIRECT_PRESET: OrderedRuleProcessorPresetOptions = {
-  id: "ntp-direct",
-  kind: "shadowrocket",
-  rules: ["AND,((PROTOCOL,UDP),(DST-PORT,123)),DIRECT"],
-};
 
 const TAILSCALE_NATIVE_PRESET: OrderedRuleProcessorPresetOptions = {
   id: "tailscale-native",
@@ -34,16 +27,6 @@ const TAILSCALE_NATIVE_PRESET: OrderedRuleProcessorPresetOptions = {
 };
 
 export const shadowrocketProcessorPresets: readonly FileProcessorPreset[] = [
-  {
-    id: NTP_DIRECT_PRESET.id,
-    category: "network",
-    labelKey: "processors.filePreset.ntpDirect.label",
-    defaultOn: true,
-    dependencies: [],
-    conflicts: [],
-    build: (t) => orderedRuleProcessorPreset(NTP_DIRECT_PRESET, t("processors.filePreset.ntpDirect.label")),
-    recognize: (processor) => recognizeOrderedRuleProcessorPreset(processor, NTP_DIRECT_PRESET),
-  },
   githubRuleSourceMirrorPreset,
   {
     id: TAILSCALE_NATIVE_PRESET.id,

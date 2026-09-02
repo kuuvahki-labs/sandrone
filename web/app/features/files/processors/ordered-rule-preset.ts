@@ -5,7 +5,7 @@ import insertShadowrocketRulesScript from "./scripts/insert-shadowrocket-rules.j
 import insertSingBoxRulesScript from "./scripts/insert-sing-box-rules.js?raw";
 
 export type OrderedRuleProcessorKind = "mihomo" | "sing-box" | "shadowrocket";
-export type OrderedRuleProcessorInsertMode = "anchor" | "top";
+export type OrderedRuleProcessorInsertMode = "top";
 
 export interface OrderedRuleProcessorPresetOptions {
   readonly id: string;

@@ -143,7 +143,7 @@ describe("FileProcessorBuilder", () => {
         kind="sing-box"
         defaultValue={[
           before,
-          singBoxProcessorPreset("mptcp-direct", "MPTCP direct"),
+          singBoxProcessorPreset("quic-fallback", "Force QUIC fallback"),
           after,
         ]}
       />,
@@ -153,18 +153,18 @@ describe("FileProcessorBuilder", () => {
     expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue("Before");
 
     await user.click(screen.getByRole("combobox", { name: "Type" }));
-    expect(screen.getByRole("option", { name: "MPTCP direct" })).toBeInTheDocument();
-    await user.click(screen.getByRole("option", { name: "MPTCP direct" }));
+    expect(screen.getByRole("option", { name: "Force QUIC fallback" })).toBeInTheDocument();
+    await user.click(screen.getByRole("option", { name: "Force QUIC fallback" }));
     await user.click(screen.getByRole("button", { name: "Add processor" }));
 
     expect(currentProcessors().map((processor) => processor.name)).toEqual([
       "Before",
-      "Linux/OpenWrt TUN acceleration",
-      "MPTCP direct",
+      "Sniff & DNS Hijack",
+      "Force QUIC fallback",
       "After",
     ]);
     expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue("Before");
-    expect(screen.getByRole("alert")).toHaveTextContent("Added dependencies: Linux/OpenWrt TUN acceleration");
+    expect(screen.getByRole("alert")).toHaveTextContent("Added dependencies: Sniff & DNS Hijack");
     expect(screen.getByRole("alert")).not.toHaveTextContent("Description");
   });
 

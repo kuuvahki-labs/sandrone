@@ -9,7 +9,7 @@
 下文默认值只用于 **Web 新建** Mihomo 文件：
 
 - 新建表单把 Web driver 的 inline base 写入 `FileSpec.source`；
-- 新文件默认获得 `Sniffer` 与传统 NTP 直连 processor；base 不输出 TUN，只有显式添加 TUN processor 才生成并开启；
+- 新文件默认获得 `Sniffer` processor；base 不输出 TUN，只有显式添加 TUN processor 才生成并开启；
 - 编辑已有文件时沿用已保存的 source 和 processors，不自动回填此默认；
 - 通过 API、CLI 或嵌入式 service 创建文件时，若调用方未提交同一 source，不应假定会得到 Web 默认。服务端 Mihomo driver 的内置空基线不是本页所列配置。
 
