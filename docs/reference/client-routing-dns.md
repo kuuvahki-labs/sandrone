@@ -12,8 +12,9 @@ DNS 路径与 IP 兜底语义的现行契约。它描述默认生成结果，不
 - canonical 中国域名可以交给直连的中国加密 DNS；DNS 服务商仍会知道查询名，
   但本地网络只能看到加密 DNS 连接。这是为国内 CDN 和可用性保留的显式取舍。
 - 已知境外域名和应用自带的已知 DoH/DoT 流量优先进入代理保护的路径。
-- 未知域名在 Mihomo、sing-box 中使用代理保护的境外 DNS；Shadowrocket 为执行
-  中国 IP 兜底，可能先使用中国加密 DNS，具体限制见下文。
+- 未知域名在 Mihomo 中使用不绑定路由规则的境外加密 DNS，sing-box 使用经代理
+  转发的境外加密 DNS；Shadowrocket 为执行中国 IP 兜底，可能先使用中国加密 DNS，
+  具体限制见下文。
 - LAN、私有域名可以使用本地/系统 resolver。
 - Shadowrocket 的 `*.apple.com`、`*.icloud.com = server:system` 是有意保留的
   iOS 兼容例外。系统 resolver 是否使用明文传输由当前网络决定；该例外不扩展成
@@ -41,9 +42,20 @@ DNS 路径与 IP 兜底语义的现行契约。它描述默认生成结果，不
 策略组默认以 `DIRECT` 为首选项，因此默认路径仍然直连，但用户切换策略后会作用于
 完整服务。
 
-存在包含关系时，具体子服务必须先于宽泛父列表。例如 OneDrive 和 Xbox 先于
-Microsoft，iCloud 和 Apple TV+ 先于 Apple，Hulu 先于 Disney，npm 先于
-GitHub。这样各子服务策略组不会被父列表提前截流。
+同一策略下优先使用上游维护的聚合集合：AI 使用 `category-ai-!cn`，Microsoft 和
+Apple 分别直接使用其父集合，Meta 使用 `meta`，新闻使用 `category-media`。这能
+避免重复下载同义 provider。不同策略间即使存在包含关系，具体子服务仍必须先于
+宽泛父列表，例如 Xbox 先于 Microsoft、Apple TV+ 先于 Apple、Hulu 先于 Disney、
+npm 先于 GitHub；这样各子服务策略组不会被父列表提前截流。
+
+三个客户端的标准和完整模板都提供 `Static/CDN Resources`；静态/CDN 域名使用
+Sukka 的 Mihomo text、sing-box source JSON，以及 Shadowrocket 可解析的
+DOMAIN-SET/RULE-SET 文本，并位于私有网络之后、普通服务规则之前。
+
+Mihomo 和 Shadowrocket 还输出原生 `Fallback`，并让主代理组可以选择它；sing-box
+没有有序 fallback outbound，因此不生成一个实际只是普通 selector 的同名替代品。
+Mihomo 与 Shadowrocket 的广告组同时提供 `REJECT`、`REJECT-DROP` 和 `DIRECT`；
+sing-box 使用其原生 `block` outbound，不伪造丢包拒绝策略。
 
 Mihomo 和 sing-box 分别使用 MetaCubeX 的 `cn-ip` MRS/SRS 规则集；
 Shadowrocket 使用 `GEOIP,CN`。三者都是域名规则之后的**解析型兜底**：它们能
@@ -64,19 +76,41 @@ Shadowrocket 使用 `GEOIP,CN`。三者都是域名规则之后的**解析型兜
 因此，请求以域名进入时，专用 IP 规则不会抢先触发本地解析；只有到达最终中国 IP
 兜底前才执行受控解析。请求本来就是 IP 地址时，`no-resolve` 不妨碍 IP 规则匹配。
 
+## TUN 与 Fake-IP 能力边界
+
+三种产物只对齐路由和 DNS 的结果语义，不强求客户端字段相同：
+
+- Mihomo base 不含 `tun`；用户显式选择 TUN processor 后才生成并开启完整 TUN
+  块。base 默认使用 fake-IP，并由基础 `fake-ip-filter` 和三个互斥的可选扩展控制
+  哪些域名返回真实 IP。
+- sing-box base 直接包含 TUN inbound 和仅监听本机的 mixed inbound。sing-box 没有
+  Mihomo 式的 `tun.enable` 开关；删除这个 inbound 会把产物改成仅供显式设置系统
+  代理的本地端口配置。当前 DNS 没有配置 FakeIP server，所有查询都返回上游真实
+  IP，因此不需要再生成 fake-IP 例外列表。
+- Shadowrocket 是否以 TUN 接管流量由 App 的代理类型或 `compatibility-mode` 决定；
+  `tun-excluded-routes` 和 `hijack-dns` 只描述启用后的处理方式。其 TUN DNS 支持
+  fake IP，也可用 `always-real-ip` 指定真实 IP 例外；当前 base 不默认扩大该列表，
+  Apple/iCloud 的系统解析例外仍由 `[Host]` 承担。
+
+所以，“Mihomo 默认不开 TUN”不能机械转换成删除 sing-box TUN inbound，也不能转换
+成删除 Shadowrocket 的 TUN 旁路参数；“Mihomo 有 fake-IP-filter”也不意味着另外两端
+必须生成同名或等长列表。
+
 ## 各客户端 DNS 路径
 
 ### Mihomo
 
 - bootstrap、节点域名和直连域名使用直连的阿里 IP DoH；不配置明文 bootstrap；
 - `rule-set:cn` 使用同一组中国 DoH，`geosite:private` 是唯一常规 system 例外；
-- 默认 resolver 是经 `#RULES` 路由的 Cloudflare/Google DoH；
+- 默认 resolver 是不绑定路由规则的 Cloudflare/Google DoH；
 - `category-doh` 与端口 `853` 先进入主代理策略；
-- TUN processor 开启 `strict-route` 并劫持 TCP/UDP 53，同时把 mDNS 目标
+- 显式选择 TUN processor 后，它开启 `strict-route` 并劫持 TCP/UDP 53，同时把 mDNS 目标
   `224.0.0.251/32`、`ff02::fb/128` 排除在 TUN 自动路由之外。
 
-这里的 `#DIRECT`、`#RULES` 决定 DNS 请求自身的出站路径；
-`respect-rules: true` 让 resolver 连接遵守路由。`fake-ip-filter` 只决定返回真实 IP
+这里的 `#DIRECT` 明确固定中国 DNS 请求自身的出站路径。默认境外 DoH URL 不携带
+`#RULES`，base 也不启用 `respect-rules`；这避免与 `prefer-h3: true` 组成上游不建议的
+组合，但不保证境外 DoH 连接本身经过代理。查询内容仍由 HTTPS 加密，不会交给中国
+或系统 resolver。`fake-ip-filter` 只决定返回真实 IP
 还是 fake IP，不决定查询应交给哪个 resolver。fake-IP 的独立边界见
 [Mihomo fake-IP 默认与边界](mihomo-fake-ip.md)。
 
@@ -90,6 +124,9 @@ Shadowrocket 使用 `GEOIP,CN`。三者都是域名规则之后的**解析型兜
 - TUN 启用 `strict_route`，默认 processor 以逻辑规则劫持 protocol DNS 或目标
   端口 53；`224.0.0.251/32`、`ff02::fb/128` 则在进入该识别规则前绕开 TUN，
   让 mDNS 留在本地链路，同时保留对其他非标准端口明文 DNS 的协议识别。
+
+`strict_route` 是配置层的跨平台默认；sing-box for Android 的 VpnService 当前不实现
+该选项，不能把桌面端的 fail-closed 行为直接视为 Android 保证。
 
 sing-box 新版不依赖已弃用的 legacy GeoIP 数据库；中国 IP 兜底由远程 IP-CIDR
 SRS 规则集完成。
@@ -127,7 +164,7 @@ resolver 最小暴露之间的折中，不应描述为严格的按域名双路 D
 - 中国 IP 兜底位于境外域名规则之后，且没有 `no-resolve`；
 - 没有明文公网 nameserver 或全局 system fallback；
 - 应用 DoH/DoT 规则位于普通服务规则之前；
-- TUN 与 DNS hijack processor 仍存在且顺序正确。
+- 若选择了 TUN，其 DNS hijack 与路由配置仍存在且顺序正确。
 
 自定义 source、手动删除模板 rule set、改变 processor 顺序或使用全局路由模式，
 都可能改变上述结果。

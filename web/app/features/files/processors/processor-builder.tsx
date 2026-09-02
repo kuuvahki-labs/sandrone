@@ -58,6 +58,7 @@ const FILE_PROCESSOR_PRESET_CATALOGS = FILE_DRIVER_REGISTRY.drivers
 type PresetNotice = {
   dependencyLabels: string[];
   removedLabels: string[];
+  updatedLabels: string[];
 };
 
 export function FileProcessorBuilder({ defaultValue = [], kind, onDirty, onValidityChange, remoteDefaults = emptyRemoteDefaults, scriptFiles = [], scriptTimeoutMS }: { defaultValue?: ProcessorDetail[]; kind: FileKind; onDirty?: () => void; onValidityChange?: (valid: boolean) => void; remoteDefaults?: RemoteInputDefaults; scriptFiles?: ResourceOption[]; scriptTimeoutMS?: number }) {
@@ -113,8 +114,13 @@ export function FileProcessorBuilder({ defaultValue = [], kind, onDirty, onValid
           .filter((id) => addedIDs.has(id))
           .map((id) => presetLabel(driver, id, t)),
         removedLabels: plan.removedPresetIDs.map((id) => presetLabel(driver, id, t)),
+        updatedLabels: plan.updatedPresetIDs.map((id) => presetLabel(driver, id, t)),
       };
-      setPresetNotice(notice.dependencyLabels.length || notice.removedLabels.length ? notice : null);
+      setPresetNotice(
+        notice.dependencyLabels.length || notice.removedLabels.length || notice.updatedLabels.length
+          ? notice
+          : null,
+      );
       return applyFileProcessorPresetPlan(current, plan);
     }
     return [...current, { enabled: true, id: createProcessorID(), name: "", type, params: defaultParams(type, kind) }];
@@ -148,6 +154,9 @@ export function FileProcessorBuilder({ defaultValue = [], kind, onDirty, onValid
             ) : null}
             {presetNotice.removedLabels.length ? (
               <div><strong>{t("processors.filePreset.notice.removedConflicts")}:</strong> {presetNotice.removedLabels.join(", ")}</div>
+            ) : null}
+            {presetNotice.updatedLabels.length ? (
+              <div><strong>{t("processors.filePreset.notice.updatedPresets")}:</strong> {presetNotice.updatedLabels.join(", ")}</div>
             ) : null}
           </div>
         </Alert>

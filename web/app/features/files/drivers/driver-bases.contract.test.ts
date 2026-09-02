@@ -20,13 +20,13 @@ describe("file driver default bases", () => {
       ipv6: false,
       "unified-delay": true,
       "tcp-concurrent": true,
+      "disable-keep-alive": true,
       profile: { "store-selected": true, "store-fake-ip": true },
       dns: {
         enable: true,
         ipv6: false,
+        "prefer-h3": true,
         "enhanced-mode": "fake-ip",
-        "fake-ip-range": "198.18.0.1/16",
-        "fake-ip-filter-mode": "blacklist",
         "fake-ip-filter": [
           "*",
           "geosite:private",
@@ -36,6 +36,9 @@ describe("file driver default bases", () => {
           "+.market.xiaomi.com",
           "Mijia Cloud",
           "dig.io.mi.com",
+          "localhost.ptlogin2.qq.com",
+          "localhost.sec.qq.com",
+          "localhost.*.weixin.qq.com",
           "*.icloud.com",
           "time.*.com",
           "ntp.*.com",
@@ -55,8 +58,8 @@ describe("file driver default bases", () => {
           ],
         },
         nameserver: [
-          "https://cloudflare-dns.com/dns-query#RULES",
-          "https://dns.google/dns-query#RULES",
+          "https://cloudflare-dns.com/dns-query",
+          "https://dns.google/dns-query",
         ],
         "proxy-server-nameserver": [
           "https://223.5.5.5/dns-query#DIRECT",
@@ -66,8 +69,6 @@ describe("file driver default bases", () => {
           "https://223.5.5.5/dns-query#DIRECT",
           "https://223.6.6.6/dns-query#DIRECT",
         ],
-        "direct-nameserver-follow-policy": false,
-        "respect-rules": true,
       },
       proxies: [],
       "proxy-groups": [],
@@ -80,8 +81,10 @@ describe("file driver default bases", () => {
     expect(parsed).not.toHaveProperty("sniffer");
     expect(parsed).not.toHaveProperty("tun");
     expect(parsed).not.toHaveProperty("geox-url");
+    expect(parsed).not.toHaveProperty("dns.fake-ip-range");
+    expect(parsed).not.toHaveProperty("dns.fake-ip-filter-mode");
+    expect(parsed).not.toHaveProperty("dns.direct-nameserver-follow-policy");
     expect(base).not.toContain("tailscale");
-    expect(base).not.toContain("100.64.0.0/10");
   });
 
   it("exposes the explicit sing-box base used by new files", () => {

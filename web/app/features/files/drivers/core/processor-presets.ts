@@ -12,6 +12,8 @@ export interface FileProcessorPreset {
   readonly conflicts: readonly string[];
   build(t: Translator): ProcessorDetail;
   recognize(processor: Pick<ProcessorDetail, "type" | "params">): boolean;
+  isCurrent?(processor: Pick<ProcessorDetail, "type" | "params">): boolean;
+  readonly replaceConflictsInPlace?: boolean;
 }
 
 export interface FileProcessorPresetPlan {
@@ -20,6 +22,7 @@ export interface FileProcessorPresetPlan {
   readonly dependencyPresetIDs: readonly string[];
   readonly removeIndices: readonly number[];
   readonly removedPresetIDs: readonly string[];
+  readonly updatedPresetIDs: readonly string[];
   readonly requestedPresetID: string;
 }
 
@@ -49,9 +52,23 @@ export function planFileProcessorPresetAddition(
     recognizedFileProcessorPresetID(catalog, processor)
   ));
   const removalIndices = new Set<number>();
+  const refreshIndices = new Set<number>();
+  const conflictIndices = new Set<number>();
 
   recognizedCurrent.forEach((presetID, index) => {
-    if (presetID !== null && conflictIDs.has(presetID)) removalIndices.add(index);
+    if (presetID === null || !requestedClosureIDs.has(presetID)) return;
+    const preset = byID.get(presetID)!;
+    if (preset.isCurrent && !preset.isCurrent(current[index])) {
+      refreshIndices.add(index);
+      removalIndices.add(index);
+    }
+  });
+
+  recognizedCurrent.forEach((presetID, index) => {
+    if (presetID !== null && conflictIDs.has(presetID)) {
+      conflictIndices.add(index);
+      removalIndices.add(index);
+    }
   });
   cascadeRemovedDependents(
     catalog,
@@ -62,10 +79,20 @@ export function planFileProcessorPresetAddition(
 
   const removeIndices = current.flatMap((_, index) => removalIndices.has(index) ? [index] : []);
   const removedPresetIDs: string[] = [];
+  const updatedPresetIDs: string[] = [];
   const seenRemovedPresetIDs = new Set<string>();
+  const seenUpdatedPresetIDs = new Set<string>();
   removeIndices.forEach((index) => {
     const presetID = recognizedCurrent[index];
-    if (presetID === null || seenRemovedPresetIDs.has(presetID)) return;
+    if (presetID === null) return;
+    if (refreshIndices.has(index)) {
+      if (!seenUpdatedPresetIDs.has(presetID)) {
+        seenUpdatedPresetIDs.add(presetID);
+        updatedPresetIDs.push(presetID);
+      }
+      return;
+    }
+    if (seenRemovedPresetIDs.has(presetID)) return;
     seenRemovedPresetIDs.add(presetID);
     removedPresetIDs.push(presetID);
   });
@@ -75,17 +102,22 @@ export function planFileProcessorPresetAddition(
   )));
   const additions: FileProcessorPresetAddition[] = [];
   const addedPresetIDs: string[] = [];
+  const replacementBeforeIndex = ordered.some((preset) => preset.replaceConflictsInPlace)
+    ? firstIndex(refreshIndices, conflictIndices)
+    : firstIndex(refreshIndices);
   for (const preset of ordered) {
     if (survivingPresetIDs.has(preset.id)) continue;
     additions.push({
       presetID: preset.id,
       processor: preset.build(t),
-      beforeIndex: earliestSurvivingConsumerIndex(
-        preset.id,
-        byID,
-        recognizedCurrent,
-        removedIndices,
-      ),
+      beforeIndex: firstRefreshIndex(preset.id, recognizedCurrent, refreshIndices)
+        ?? earliestSurvivingConsumerIndex(
+          preset.id,
+          byID,
+          recognizedCurrent,
+          removedIndices,
+        )
+        ?? replacementBeforeIndex,
     });
     addedPresetIDs.push(preset.id);
     survivingPresetIDs.add(preset.id);
@@ -97,8 +129,30 @@ export function planFileProcessorPresetAddition(
     dependencyPresetIDs,
     removeIndices,
     removedPresetIDs,
+    updatedPresetIDs,
     requestedPresetID,
   };
+}
+
+function firstIndex(...sets: readonly ReadonlySet<number>[]): number | null {
+  let first: number | null = null;
+  for (const values of sets) {
+    for (const value of values) {
+      if (first === null || value < first) first = value;
+    }
+  }
+  return first;
+}
+
+function firstRefreshIndex(
+  presetID: string,
+  recognizedCurrent: readonly (string | null)[],
+  refreshIndices: ReadonlySet<number>,
+): number | null {
+  const index = recognizedCurrent.findIndex((recognizedID, candidateIndex) => (
+    recognizedID === presetID && refreshIndices.has(candidateIndex)
+  ));
+  return index >= 0 ? index : null;
 }
 
 function cascadeRemovedDependents(

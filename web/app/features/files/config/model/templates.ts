@@ -75,27 +75,28 @@ export interface ConfigTemplateStrategy {
 }
 
 const MODULES: readonly ConfigTemplateModule[] = [
-  module("select"), module("auto", "url-test"), module("ad", "reject-first", ["category-ads-all"]),
+  module("select"), module("auto", "url-test"), module("fallback"),
+  module("cdn-resources", "select", ["cdn-domainset", "cdn-classical"]), module("ad", "reject-first", ["category-ads-all"]),
   module("private", "direct-first", ["private", "private-ip"]), module("cn", "direct-first", ["cn", "cn-ip"]),
-  module("global", "select", ["geolocation-!cn"]), module("final"), module("ai", "select", ["openai", "anthropic", "category-ai-chat-!cn"]),
-  module("youtube", "select", ["youtube"]), module("google", "select", ["google", "google-ip"]), module("microsoft", "direct-first", ["onedrive", "microsoft"]),
-  module("apple", "direct-first", ["icloud", "apple"]), module("telegram", "select", ["telegram", "telegram-ip"]), module("twitter", "select", ["twitter", "twitter-ip"]),
-  module("meta", "select", ["facebook", "instagram", "whatsapp", "facebook-ip"]), module("discord", "select", ["discord"]),
+  module("global", "select", ["geolocation-!cn"]), module("final"), module("ai", "select", ["category-ai-!cn"]),
+  module("youtube", "select", ["youtube"]), module("google", "select", ["google", "google-ip"]), module("microsoft", "direct-first", ["microsoft"]),
+  module("apple", "direct-first", ["apple"]), module("telegram", "select", ["telegram", "telegram-ip"]), module("twitter", "select", ["twitter", "twitter-ip"]),
+  module("meta", "select", ["meta", "facebook-ip"]), module("discord", "select", ["discord"]),
   module("social-other", "select", ["tiktok", "line", "reddit", "linkedin", "snap", "pinterest", "tumblr"]), module("netflix", "select", ["netflix", "netflix-ip"]),
   module("disney", "select", ["disney"]), module("streaming-west", "select", ["hbo", "hulu", "primevideo", "apple-tvplus", "spotify", "twitch", "dazn"]),
   module("streaming-asia", "select", ["bahamut", "biliintl", "niconico", "abema", "viu", "kktv"]), module("bilibili", "direct-first", ["bilibili"]), module("steam", "select", ["steam"]),
   module("gaming-pc", "select", ["epicgames", "ea", "ubisoft", "blizzard", "gog", "riot"]), module("gaming-console", "select", ["playstation", "xbox", "nintendo"]),
   module("github", "select", ["github", "gitlab", "atlassian"]), module("cloud", "select", ["aws", "azure", "cloudflare", "digitalocean", "vercel", "netlify", "cloudflare-ip"]),
   module("dev-tools", "select", ["docker", "npmjs", "jetbrains", "stackexchange"]), module("storage", "select", ["dropbox", "notion"]),
-  module("payment", "select", ["paypal", "stripe", "wise"]), module("crypto", "select", ["binance"]),
+  module("payment", "select", ["paypal", "stripe", "wise"]),
   module("education", "select", ["category-scholar-!cn", "coursera", "udemy", "edx", "khanacademy", "wikimedia"]),
-  module("news", "select", ["bbc", "cnn", "nytimes", "wsj", "bloomberg"]), module("shopping", "select", ["amazon", "ebay"]),
+  module("news", "select", ["category-media"]), module("shopping", "select", ["amazon", "ebay"]),
 ];
 
 const MODULE_BY_ID = new Map(MODULES.map((item) => [item.id, item]));
 const MINIMAL_MODULES = ["select", "auto", "ad", "private", "cn", "global", "final"];
 const STANDARD_MODULES = [
-  "select", "auto", "ad", "private", "cn", "global", "ai", "youtube", "google", "microsoft", "apple", "netflix", "telegram", "final",
+  "select", "auto", "fallback", "cdn-resources", "ad", "private", "cn", "global", "ai", "youtube", "google", "microsoft", "apple", "netflix", "telegram", "final",
 ];
 const TEMPLATE_IDS = ["minimal", "standard", "full"] as const satisfies readonly ConfigTemplateID[];
 const TEMPLATE_MODULES: Record<ConfigTemplateID, readonly string[]> = {
@@ -110,14 +111,14 @@ const TEMPLATE_METADATA: Record<ConfigTemplateID, { name: string; description: s
 };
 
 const GROUP_ORDER: readonly ConfigGroupID[] = [
-  "select", "auto", "ad", "ai", "youtube", "google", "microsoft", "apple", "telegram", "twitter", "meta", "discord", "social-other",
+  "select", "auto", "fallback", "ad", "cdn-resources", "ai", "youtube", "google", "microsoft", "apple", "telegram", "twitter", "meta", "discord", "social-other",
   "netflix", "disney", "streaming-west", "streaming-asia", "bilibili", "steam", "gaming-pc", "gaming-console", "github", "cloud", "dev-tools", "storage",
-  "payment", "crypto", "education", "news", "shopping", "private", "cn", "global", "final",
+  "payment", "education", "news", "shopping", "private", "cn", "global", "final",
 ];
 const RULE_ORDER: readonly ConfigGroupID[] = [
-  "ad", "private", "ai", "youtube", "education", "cloud", "dev-tools", "google", "telegram", "github", "gaming-console", "microsoft", "streaming-west", "apple", "twitter", "meta",
+  "ad", "private", "cdn-resources", "ai", "youtube", "education", "cloud", "dev-tools", "google", "telegram", "github", "gaming-console", "microsoft", "streaming-west", "apple", "twitter", "meta",
   "discord", "social-other", "netflix", "disney", "streaming-asia", "bilibili", "steam", "gaming-pc",
-  "storage", "payment", "crypto", "news", "shopping", "cn", "global",
+  "storage", "payment", "news", "shopping", "cn", "global",
 ];
 const RULE_PRELUDE: readonly ConfigTemplateRulePrelude[] = [
   { moduleID: "select", requiresModuleID: "select", ruleID: "category-doh" },

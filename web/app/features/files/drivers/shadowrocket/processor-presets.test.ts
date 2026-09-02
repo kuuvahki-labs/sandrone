@@ -17,10 +17,13 @@ const en = createTranslator("en-US");
 const zh = createTranslator("zh-CN");
 
 describe("Shadowrocket processor presets", () => {
-  it("uses traditional NTP direct as the only new-file default", () => {
+  it("uses traditional NTP direct and GitHub acceleration as the new-file defaults", () => {
     const processors = defaultShadowrocketProcessors(en);
 
-    expect(processors.map((processor) => processor.name)).toEqual(["Traditional NTP Direct"]);
+    expect(processors.map((processor) => processor.name)).toEqual([
+      "Traditional NTP Direct",
+      "GitHub acceleration",
+    ]);
     expect(processors[0]).toMatchObject({
       type: "script",
       stage: "file",
@@ -62,6 +65,7 @@ describe("Shadowrocket processor presets", () => {
     ]);
     expect(defaultShadowrocketProcessors(en).map((processor) => processor.name)).toEqual([
       "Traditional NTP Direct",
+      "GitHub acceleration",
     ]);
   });
 

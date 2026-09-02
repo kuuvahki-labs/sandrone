@@ -52,15 +52,17 @@ const METACUBEX_RULE_BASE = "https://raw.githubusercontent.com/MetaCubeX/meta-ru
 const METACUBEX_RULE_IDS = new Set([
   "aws",
   "azure",
-  "category-ai-chat-!cn",
+  "category-ai-!cn",
+  "category-ads-all",
   "category-doh",
+  "category-media",
   "coursera",
   "edx",
   "khanacademy",
+  "meta",
   "netlify",
   "udemy",
   "wise",
-  "wsj",
 ]);
 
 const relations = shadowrocketRelations();
@@ -327,9 +329,7 @@ function shadowrocketTemplates(
   return createConfigTemplateStrategy({
     groupNames: (groups) => groups.map((group) => trimmedString(group.name)).filter(Boolean),
     materialize: materializeShadowrocketTemplate,
-    moduleIDs: (_id, moduleIDs) => moduleIDs.filter((moduleID) => (
-      moduleID !== "auto" && moduleID !== "ad"
-    )),
+    moduleIDs: (_id, moduleIDs) => moduleIDs.filter((moduleID) => moduleID !== "auto"),
     normalizeRecognition: (config) => {
       const adaptiveLayer = adaptiveStrategy.recognizesCanonicalLayer(config);
       const stripped = adaptiveLayer ? adaptiveStrategy.strip(config) : { changed: false, config, strippedGroupNames: [] };
@@ -342,14 +342,20 @@ function shadowrocketTemplates(
 function materializeShadowrocketTemplate(
   blueprint: Readonly<ConfigTemplateBlueprint>,
 ): FileConfigDraft {
+  const fallbackName = blueprint.enabled.has("fallback") ? configGroupName("fallback", blueprint.namingLocale) : undefined;
   const groups = blueprint.groups.map((item) => {
     const name = configGroupName(item.id, blueprint.namingLocale);
     const selectName = blueprint.enabled.has("select") ? configGroupName("select", blueprint.namingLocale) : undefined;
     const autoName = blueprint.enabled.has("auto") ? configGroupName("auto", blueprint.namingLocale) : undefined;
+    if (item.id === "fallback") {
+      return { name, type: "fallback", "policy-regex-filter": "(?i)", interval: 300, timeout: 5 };
+    }
     const targets = [...new Set([
       ...(item.id === "select" ? ["PROXY"] : []),
       ...templateGroupTargets(item, selectName, autoName, "DIRECT", "REJECT"),
     ].filter((target) => target !== name && target !== "$nodes"))];
+    if (item.id === "select" && fallbackName) targets.splice(1, 0, fallbackName);
+    if (item.id === "ad") targets.splice(1, 0, "REJECT-DROP");
     return item.groupMode === "url-test"
       ? { name, type: "url-test", proxies: targets, interval: 300, timeout: 5, tolerance: 50 }
       : { name, type: "select", proxies: targets };
@@ -382,9 +388,9 @@ function materializeShadowrocketTemplate(
 
 const ARTIFACT_NAMES: Readonly<Record<string, string>> = {
   private: "Lan", cn: "China", "geolocation-cn": "China", "geolocation-!cn": "Global",
-  openai: "OpenAI", anthropic: "Anthropic", youtube: "YouTube", google: "Google", microsoft: "Microsoft",
-  onedrive: "OneDrive", apple: "Apple", icloud: "iCloud", github: "GitHub", gitlab: "GitLab", atlassian: "Atlassian",
-  telegram: "Telegram", twitter: "Twitter", facebook: "Facebook", instagram: "Instagram", whatsapp: "Whatsapp",
+  youtube: "YouTube", google: "Google", microsoft: "Microsoft",
+  apple: "Apple", github: "GitHub", gitlab: "GitLab", atlassian: "Atlassian",
+  telegram: "Telegram", twitter: "Twitter",
   discord: "Discord", linkedin: "LinkedIn", tiktok: "TikTok", line: "Line", reddit: "Reddit", snap: "Snap",
   pinterest: "Pinterest", tumblr: "Tumblr", netflix: "Netflix", disney: "Disney", hbo: "HBO", hulu: "Hulu",
   primevideo: "AmazonPrimeVideo", "apple-tvplus": "AppleTV", spotify: "Spotify", twitch: "Twitch", dazn: "DAZN",
@@ -392,7 +398,7 @@ const ARTIFACT_NAMES: Readonly<Record<string, string>> = {
   steam: "Steam", epicgames: "Epic", ea: "EA", ubisoft: "Ubisoft", blizzard: "Blizzard", gog: "Gog", riot: "Riot",
   playstation: "PlayStation", xbox: "Xbox", nintendo: "Nintendo", cloudflare: "Cloudflare", digitalocean: "DigitalOcean",
   vercel: "Vercel", docker: "Docker", npmjs: "Npmjs", jetbrains: "Jetbrains", stackexchange: "Stackexchange",
-  dropbox: "Dropbox", notion: "Notion", paypal: "PayPal", stripe: "Stripe", binance: "Binance",
+  dropbox: "Dropbox", notion: "Notion", paypal: "PayPal", stripe: "Stripe",
   "category-scholar-!cn": "Scholar", wikimedia: "Wikimedia", bbc: "BBC", cnn: "CNN", nytimes: "NYTimes",
   bloomberg: "Bloomberg", amazon: "Amazon", ebay: "eBay",
 };
@@ -413,7 +419,22 @@ interface ShadowrocketRuleArtifact {
   url: string;
 }
 
+const CUSTOM_RULE_ARTIFACTS: Readonly<Record<string, readonly ShadowrocketRuleArtifact[]>> = {
+  "cdn-domainset": [{
+    id: "cdn-domainset",
+    type: "domain-set",
+    url: "https://ruleset.skk.moe/List/domainset/cdn.conf",
+  }],
+  "cdn-classical": [{
+    id: "cdn-classical",
+    type: "rule-set",
+    url: "https://ruleset.skk.moe/List/non_ip/cdn.conf",
+  }],
+};
+
 function ruleArtifacts(ruleID: string): ShadowrocketRuleArtifact[] {
+  const custom = CUSTOM_RULE_ARTIFACTS[ruleID];
+  if (custom) return [...custom];
   if (METACUBEX_RULE_IDS.has(ruleID)) {
     return [{ id: ruleID, type: "domain-set", url: `${METACUBEX_RULE_BASE}/${ruleID}.list` }];
   }

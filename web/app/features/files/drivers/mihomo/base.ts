@@ -14,6 +14,7 @@ log-level: info
 ipv6: false
 unified-delay: true
 tcp-concurrent: true
+disable-keep-alive: true
 profile:
   store-selected: true
   store-fake-ip: true
@@ -21,9 +22,8 @@ profile:
 dns:
   enable: true
   ipv6: false
+  prefer-h3: true
   enhanced-mode: fake-ip
-  fake-ip-range: 198.18.0.1/16
-  fake-ip-filter-mode: blacklist
   fake-ip-filter:
     - "*"
     - geosite:private
@@ -33,6 +33,9 @@ dns:
     - "+.market.xiaomi.com"
     - "Mijia Cloud"
     - "dig.io.mi.com"
+    - "localhost.ptlogin2.qq.com"
+    - "localhost.sec.qq.com"
+    - "localhost.*.weixin.qq.com"
     - "*.icloud.com"
     - "time.*.com"
     - "ntp.*.com"
@@ -49,16 +52,14 @@ dns:
       - "https://223.5.5.5/dns-query#DIRECT"
       - "https://223.6.6.6/dns-query#DIRECT"
   nameserver:
-    - "https://cloudflare-dns.com/dns-query#RULES"
-    - "https://dns.google/dns-query#RULES"
+    - "https://cloudflare-dns.com/dns-query"
+    - "https://dns.google/dns-query"
   proxy-server-nameserver:
     - "https://223.5.5.5/dns-query#DIRECT"
     - "https://223.6.6.6/dns-query#DIRECT"
   direct-nameserver:
     - "https://223.5.5.5/dns-query#DIRECT"
     - "https://223.6.6.6/dns-query#DIRECT"
-  direct-nameserver-follow-policy: false
-  respect-rules: true
 
 proxies: []
 proxy-groups: []

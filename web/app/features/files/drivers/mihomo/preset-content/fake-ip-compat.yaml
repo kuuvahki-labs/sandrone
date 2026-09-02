@@ -1,20 +1,26 @@
 # sandrone:mihomo-preset=fake-ip-compat
 dns:
   fake-ip-filter+:
-    # Extended NTP endpoints used by common systems and Chinese cloud services.
+    # Extended time and NTP patterns used by common systems.
     - "time-ios.apple.com"
-    - "ntp1.aliyun.com"
-    - "ntp2.aliyun.com"
-    - "ntp3.aliyun.com"
-    - "ntp4.aliyun.com"
-    - "ntp5.aliyun.com"
-    - "ntp6.aliyun.com"
-    - "ntp7.aliyun.com"
-    - "time1.cloud.tencent.com"
-    - "time2.cloud.tencent.com"
-    - "time3.cloud.tencent.com"
-    - "time4.cloud.tencent.com"
-    - "time5.cloud.tencent.com"
+    - "time.*.gov"
+    - "time.*.edu.cn"
+    - "time.*.apple.com"
+    - "time1.*.com"
+    - "time2.*.com"
+    - "time3.*.com"
+    - "time4.*.com"
+    - "time5.*.com"
+    - "time6.*.com"
+    - "time7.*.com"
+    - "ntp1.*.com"
+    - "ntp2.*.com"
+    - "ntp3.*.com"
+    - "ntp4.*.com"
+    - "ntp5.*.com"
+    - "ntp6.*.com"
+    - "ntp7.*.com"
+    - "*.time.edu.cn"
     - "*.ntp.org.cn"
     - "ntp.ntsc.ac.cn"
     # Apple software update endpoints.
@@ -40,7 +46,6 @@ dns:
     - "*.kuwo.cn"
     - "music.migu.cn"
     - "*.music.migu.cn"
-    - "localhost.*.weixin.qq.com"
     - "*.mcdn.bilivideo.cn"
     # Banking, P2P, accelerator, and remote-access compatibility endpoints.
     - "+.cmbchina.com"

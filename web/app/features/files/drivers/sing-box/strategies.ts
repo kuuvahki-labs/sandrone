@@ -43,6 +43,16 @@ const ADAPTIVE_TYPE_OPTIONS = [
   { value: "urltest", label: "urltest" },
 ] as const;
 const RULE_BASE = "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo";
+const CUSTOM_RULE_SOURCES: Readonly<Record<string, SingBoxTemplateRuleSource>> = {
+  "cdn-domainset": {
+    format: "source",
+    url: "https://ruleset.skk.moe/sing-box/domainset/cdn.json",
+  },
+  "cdn-classical": {
+    format: "source",
+    url: "https://ruleset.skk.moe/sing-box/non_ip/cdn.json",
+  },
+};
 
 const relations = singBoxRelations();
 const adaptive = singBoxAdaptive(singBoxAdaptiveDialect(relations));
@@ -299,7 +309,7 @@ function singBoxTemplates(
   return createConfigTemplateStrategy({
     groupNames: (groups) => groups.map((group) => trimmedString(group.tag)).filter(Boolean),
     materialize: materializeSingBoxTemplate,
-    moduleIDs: (_id, moduleIDs) => moduleIDs,
+    moduleIDs: (_id, moduleIDs) => moduleIDs.filter((moduleID) => moduleID !== "fallback"),
     normalizeRecognition: (config) => {
       const adaptiveLayer = adaptiveStrategy.recognizesCanonicalLayer(config);
       const stripped = adaptiveLayer ? adaptiveStrategy.strip(config) : { changed: false, config, strippedGroupNames: [] };
@@ -327,9 +337,9 @@ function materializeSingBoxTemplate(
     return {
       type: "remote",
       tag: ruleID,
-      format: "binary",
+      format: source.format,
       update_interval: "1d",
-      url: `${RULE_BASE}/${source.directory}/${source.file}.srs`,
+      url: source.url,
     };
   });
   const domainEntries = blueprint.ruleEntries.filter(({ ruleID }) => !ruleID.endsWith("-ip"));
@@ -392,8 +402,15 @@ function isFinalRule(rule: Record<string, unknown>): boolean {
   return Object.keys(rule).every((key) => routingKeys.has(key));
 }
 
-function ruleSource(ruleID: string): { directory: "geosite" | "geoip"; file: string } {
-  return ruleID.endsWith("-ip")
-    ? { directory: "geoip", file: ruleID.slice(0, -3) }
-    : { directory: "geosite", file: ruleID };
+interface SingBoxTemplateRuleSource {
+  format: "binary" | "source";
+  url: string;
+}
+
+function ruleSource(ruleID: string): SingBoxTemplateRuleSource {
+  const custom = CUSTOM_RULE_SOURCES[ruleID];
+  if (custom) return custom;
+  const directory = ruleID.endsWith("-ip") ? "geoip" : "geosite";
+  const file = ruleID.endsWith("-ip") ? ruleID.slice(0, -3) : ruleID;
+  return { format: "binary", url: `${RULE_BASE}/${directory}/${file}.srs` };
 }

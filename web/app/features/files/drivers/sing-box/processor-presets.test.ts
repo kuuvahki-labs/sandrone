@@ -19,12 +19,13 @@ const en = createTranslator("en-US");
 const zh = createTranslator("zh-CN");
 
 describe("sing-box file processor defaults", () => {
-  it("uses sniff and DNS hijack, then traditional NTP direct as the new-file defaults", () => {
+  it("uses sniff, traditional NTP direct, and GitHub acceleration as the new-file defaults", () => {
     const processors = defaultSingBoxProcessors(en);
 
     expect(processors.map((processor) => processor.name)).toEqual([
       "Sniff & DNS Hijack",
       "Traditional NTP Direct",
+      "GitHub acceleration",
     ]);
     expect(processors[0]).toMatchObject({
       name: "Sniff & DNS Hijack",

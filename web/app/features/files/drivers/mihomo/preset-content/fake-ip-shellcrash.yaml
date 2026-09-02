@@ -1,0 +1,12 @@
+# sandrone:mihomo-preset=fake-ip-shellcrash
+rule-providers:
+  sandrone-fakeip-shellcrash:
+    type: http
+    behavior: domain
+    format: text
+    path: ./ruleset/sandrone-fakeip-shellcrash.list
+    url: https://cdn.jsdelivr.net/gh/juewuy/ShellCrash@dev/public/fake_ip_filter.list
+    interval: 86400
+dns:
+  fake-ip-filter+:
+    - rule-set:sandrone-fakeip-shellcrash

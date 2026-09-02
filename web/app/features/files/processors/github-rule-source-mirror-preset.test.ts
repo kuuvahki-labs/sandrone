@@ -17,17 +17,17 @@ import {
 describe("GitHub rule source mirror preset", () => {
   it("uses the localized shortcut label as the generated processor name", () => {
     expect(githubRuleSourceMirrorPreset.build(createTranslator("zh-CN")).name)
-      .toBe("GitHub 规则源镜像替换");
+      .toBe("GitHub 加速");
     expect(githubRuleSourceMirrorPreset.build(createTranslator("en-US")).name)
-      .toBe("GitHub rule source mirror replacement");
+      .toBe("GitHub acceleration");
   });
 
   it("serializes an editable parameterized inline file script", () => {
-    const processor = githubRuleSourceMirrorProcessorPreset("GitHub 规则源镜像替换");
+    const processor = githubRuleSourceMirrorProcessorPreset("GitHub 加速");
     const content = inlineScriptContent(processor);
 
     expect(processor).toMatchObject({
-      name: "GitHub 规则源镜像替换",
+      name: "GitHub 加速",
       type: "script",
       stage: "file",
       params: {
@@ -104,7 +104,7 @@ describe("GitHub rule source mirror preset", () => {
   });
 
   it("recognizes edited new parameters and legacy marker processors", () => {
-    const processor = githubRuleSourceMirrorProcessorPreset("GitHub 规则源镜像替换");
+    const processor = githubRuleSourceMirrorProcessorPreset("GitHub 加速");
     const source = processor.params?.source as Record<string, unknown>;
     const args = processor.params?.args as Record<string, unknown>;
 
@@ -141,7 +141,7 @@ function inlineScriptContent(processor: ProcessorDetail): string {
 }
 
 function processorArgs(): Record<string, unknown> {
-  const processor = githubRuleSourceMirrorProcessorPreset("GitHub 规则源镜像替换");
+  const processor = githubRuleSourceMirrorProcessorPreset("GitHub 加速");
   return structuredClone(processor.params?.args as Record<string, unknown>);
 }
 
@@ -164,7 +164,7 @@ function runEnvelopeWithArgs<T extends Record<string, unknown>>(input: T, args: 
     input: envelope,
   };
   runInNewContext(
-    `${inlineScriptContent(githubRuleSourceMirrorProcessorPreset("GitHub 规则源镜像替换"))}\nglobalThis.output = main(input, api);`,
+    `${inlineScriptContent(githubRuleSourceMirrorProcessorPreset("GitHub 加速"))}\nglobalThis.output = main(input, api);`,
     context,
   );
   if (!context.output) throw new Error("expected script output");

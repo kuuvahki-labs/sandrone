@@ -44,6 +44,18 @@ const ADAPTIVE_TYPE_OPTIONS = [
   { value: "load-balance", label: "load-balance" },
 ] as const;
 const RULE_BASE = "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo";
+const CUSTOM_RULE_SOURCES: Readonly<Record<string, MihomoTemplateRuleSource>> = {
+  "cdn-domainset": {
+    behavior: "domain",
+    format: "text",
+    url: "https://ruleset.skk.moe/Clash/domainset/cdn.txt",
+  },
+  "cdn-classical": {
+    behavior: "classical",
+    format: "text",
+    url: "https://ruleset.skk.moe/Clash/non_ip/cdn.txt",
+  },
+};
 
 const relations = mihomoRelations();
 const adaptive = mihomoAdaptive(mihomoAdaptiveDialect(relations));
@@ -274,29 +286,36 @@ function mihomoTemplates(
 function materializeMihomoTemplate(
   blueprint: Readonly<ConfigTemplateBlueprint>,
 ): FileConfigDraft {
+  const selectName = blueprint.enabled.has("select") ? configGroupName("select", blueprint.namingLocale) : undefined;
+  const autoName = blueprint.enabled.has("auto") ? configGroupName("auto", blueprint.namingLocale) : undefined;
+  const fallbackName = blueprint.enabled.has("fallback") ? configGroupName("fallback", blueprint.namingLocale) : undefined;
   const groups = blueprint.groups.map((item) => {
     const name = configGroupName(item.id, blueprint.namingLocale);
-    const selectName = blueprint.enabled.has("select") ? configGroupName("select", blueprint.namingLocale) : undefined;
-    const autoName = blueprint.enabled.has("auto") ? configGroupName("auto", blueprint.namingLocale) : undefined;
+    if (item.id === "fallback") {
+      return { name, type: "fallback", proxies: ["$nodes"], url: DEFAULT_PROBE_URL, interval: 300 };
+    }
     const targets = templateGroupTargets(item, selectName, autoName, "DIRECT", "REJECT")
       .filter((target) => target !== name);
+    if (item.id === "select" && fallbackName) targets.splice(1, 0, fallbackName);
+    if (item.id === "ad") targets.splice(1, 0, "REJECT-DROP");
     return item.groupMode === "url-test"
       ? { name, type: "url-test", proxies: targets, url: DEFAULT_PROBE_URL, interval: 300, tolerance: 50 }
       : { name, type: "select", proxies: targets };
   });
-  const ruleSets = blueprint.ruleEntries.map(({ ruleID }) => {
+  const ruleEntries = blueprint.ruleEntries;
+  const ruleSets = ruleEntries.map(({ ruleID }) => {
     const source = ruleSource(ruleID);
     return {
       name: ruleID,
       type: "http",
       behavior: source.behavior,
-      format: "mrs",
+      format: source.format,
       interval: 86400,
-      url: `${RULE_BASE}/${source.directory}/${source.file}.mrs`,
+      url: source.url,
     };
   });
-  const domainEntries = blueprint.ruleEntries.filter(({ ruleID }) => !ruleID.endsWith("-ip"));
-  const ipEntries = blueprint.ruleEntries.filter(({ ruleID }) => ruleID.endsWith("-ip"));
+  const domainEntries = ruleEntries.filter(({ ruleID }) => !ruleID.endsWith("-ip"));
+  const ipEntries = ruleEntries.filter(({ ruleID }) => ruleID.endsWith("-ip"));
   const materializeRule = ({ module, ruleID }: ConfigTemplateBlueprint["ruleEntries"][number]) => (
     `RULE-SET,${ruleID},${configGroupName(module.id, blueprint.namingLocale)}${ruleID !== "cn-ip" && ruleID.endsWith("-ip") ? ",no-resolve" : ""}`
   );
@@ -315,15 +334,27 @@ function materializeMihomoTemplate(
   };
 }
 
-function ruleSource(ruleID: string): {
-  behavior: "domain" | "ipcidr";
-  directory: "geosite" | "geoip";
-  file: string;
-} {
+interface MihomoTemplateRuleSource {
+  behavior: "classical" | "domain" | "ipcidr";
+  format: "mrs" | "text";
+  url: string;
+}
+
+function ruleSource(ruleID: string): MihomoTemplateRuleSource {
+  const custom = CUSTOM_RULE_SOURCES[ruleID];
+  if (custom) return custom;
   if (ruleID.endsWith("-ip")) {
-    return { behavior: "ipcidr", directory: "geoip", file: ruleID.slice(0, -3) };
+    return {
+      behavior: "ipcidr",
+      format: "mrs",
+      url: `${RULE_BASE}/geoip/${ruleID.slice(0, -3)}.mrs`,
+    };
   }
-  return { behavior: "domain", directory: "geosite", file: ruleID };
+  return {
+    behavior: "domain",
+    format: "mrs",
+    url: `${RULE_BASE}/geosite/${ruleID}.mrs`,
+  };
 }
 
 function anchorProblem(groups: readonly ConfigMap[]): AdaptiveGroupAnchorProblem | null {

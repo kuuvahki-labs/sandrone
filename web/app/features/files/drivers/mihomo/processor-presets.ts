@@ -10,6 +10,8 @@ import type { Translator } from "~/shared/i18n/context";
 import type { ProcessorDetail } from "~/shared/resources/types";
 
 import fakeIPCompatContent from "./preset-content/fake-ip-compat.yaml?raw";
+import fakeIPOpenClashContent from "./preset-content/fake-ip-openclash.yaml?raw";
+import fakeIPShellCrashContent from "./preset-content/fake-ip-shellcrash.yaml?raw";
 import linuxTunAccelerationContent from "./preset-content/linux-tun-acceleration.yaml?raw";
 import snifferContent from "./preset-content/sniffer.yaml?raw";
 import tailnetShareContent from "./preset-content/tailnet-share.yaml?raw";
@@ -23,6 +25,8 @@ export type MihomoProcessorPresetID =
   | "tun"
   | "ntp-direct"
   | "fake-ip-compat"
+  | "fake-ip-openclash"
+  | "fake-ip-shellcrash"
   | "quic-fallback"
   | "udp-p2p-eim"
   | "linux-tun-acceleration"
@@ -41,13 +45,14 @@ const PRESET_CONTENT: Record<MihomoMergeProcessorPresetID, string> = {
   sniffer: withoutTrailingNewline(snifferContent),
   tun: withoutTrailingNewline(tunContent),
   "fake-ip-compat": withoutTrailingNewline(fakeIPCompatContent),
+  "fake-ip-openclash": withoutTrailingNewline(fakeIPOpenClashContent),
+  "fake-ip-shellcrash": withoutTrailingNewline(fakeIPShellCrashContent),
   "udp-p2p-eim": withoutTrailingNewline(udpP2PEIMContent),
   "linux-tun-acceleration": withoutTrailingNewline(linuxTunAccelerationContent),
   "windows-relaxed-route": withoutTrailingNewline(windowsRelaxedRouteContent),
   "tailscale-external": withoutTrailingNewline(tailscaleExternalContent),
   "tailnet-share": withoutTrailingNewline(tailnetShareContent),
 };
-
 function withoutTrailingNewline(content: string): string {
   return content.endsWith("\n") ? content.slice(0, -1) : content;
 }
@@ -87,7 +92,6 @@ export const mihomoProcessorPresets: readonly FileProcessorPreset[] = [
     "tun",
     "network",
     "processor.mihomoPreset.tun",
-    true,
   ),
   orderedRuleDescriptor(
     ORDERED_RULE_PRESETS["ntp-direct"],
@@ -96,10 +100,29 @@ export const mihomoProcessorPresets: readonly FileProcessorPreset[] = [
     true,
   ),
   githubRuleSourceMirrorPreset,
-  descriptor(
+  versionedDescriptor(
     "fake-ip-compat",
     "network",
     "processor.mihomoPreset.fakeIpCompat",
+    false,
+    [],
+    ["fake-ip-openclash", "fake-ip-shellcrash"],
+  ),
+  versionedDescriptor(
+    "fake-ip-openclash",
+    "network",
+    "processors.filePreset.mihomo.fakeIpOpenClash.label",
+    false,
+    [],
+    ["fake-ip-compat", "fake-ip-shellcrash"],
+  ),
+  versionedDescriptor(
+    "fake-ip-shellcrash",
+    "network",
+    "processors.filePreset.mihomo.fakeIpShellCrash.label",
+    false,
+    [],
+    ["fake-ip-compat", "fake-ip-openclash"],
   ),
   orderedRuleDescriptor(
     ORDERED_RULE_PRESETS["quic-fallback"],
@@ -170,6 +193,39 @@ function descriptor(
       processor.type === "merge"
       && processor.params?.mode === "yaml_override"
       && processor.params.content === content
+    ),
+  };
+}
+
+function versionedDescriptor(
+  id: MihomoMergeProcessorPresetID,
+  category: FileProcessorPresetCategory,
+  labelKey: FileProcessorPreset["labelKey"],
+  defaultOn = false,
+  dependencies: readonly MihomoProcessorPresetID[] = [],
+  conflicts: readonly MihomoProcessorPresetID[] = [],
+): FileProcessorPreset {
+  const content = PRESET_CONTENT[id];
+  const marker = `# sandrone:mihomo-preset=${id}`;
+  const recognizesIdentity = (processor: Pick<ProcessorDetail, "type" | "params">) => (
+    processor.type === "merge"
+    && processor.params?.mode === "yaml_override"
+    && typeof processor.params.content === "string"
+    && (processor.params.content === marker || processor.params.content.startsWith(`${marker}\n`))
+  );
+  return {
+    id,
+    category,
+    labelKey,
+    defaultOn,
+    dependencies,
+    conflicts,
+    replaceConflictsInPlace: true,
+    build: (t) => mihomoProcessorPreset(id, t(labelKey)),
+    recognize: recognizesIdentity,
+    isCurrent: (processor) => (
+      recognizesIdentity(processor)
+      && processor.params?.content === content
     ),
   };
 }

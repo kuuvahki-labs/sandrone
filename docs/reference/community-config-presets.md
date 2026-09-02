@@ -14,7 +14,10 @@
   创建的新分组。编辑已有文件或分组不会自动回填或迁移。
 - 选择预设会复制一个普通、可编辑的 file-stage `merge` 或 `script` processor。
   副本不会随 Sandrone 升级自动更新。只有内容仍与受管预设完全一致的副本才能被
-  冲突规划器识别并移除；编辑过或未知的 processor 始终归用户所有。
+  冲突规划器识别并移除；编辑过或未知的 processor 始终归用户所有。三个 Mihomo
+  Fake-IP 规则源是例外：它们通过内容首行的 Sandrone marker 保留预设身份；用户再次
+  选择同一来源时会显式刷新为当前版本，选择另一来源时会替换旧来源。删除 marker
+  后，该副本恢复为普通用户 processor，不再被自动刷新或冲突移除。
 - 依赖补齐和冲突移除在一次明确的添加操作中完成，并保留所有非冲突 processor 的
   相对顺序。界面只列出新增依赖和被移除的冲突项。
 - 有序规则固定为“用户/服务规则 → 按 processor 声明顺序生成的场景规则 → 私网、
@@ -30,7 +33,7 @@
 
 | 客户端 | 只对新对象生效的默认 | 风险/边界 | 来源 |
 | --- | --- | --- | --- |
-| Mihomo | `allow-lan: true`；`lan-allowed-ips` 只含 RFC1918 IPv4 与 `fc00::/7`；Geo 数据自动更新且间隔 24 小时；新建 `url-test` 分组写入 `tolerance: 50`。 | LAN 监听仍需配合端口和访问控制；不会给已有分组补写 tolerance。 | [Mihomo 全局配置](https://wiki.metacubex.one/en/config/general/)、[Mihomo TUN](https://wiki.metacubex.one/en/config/inbound/tun/) |
+| Mihomo | `allow-lan: true`；`lan-allowed-ips` 只含 RFC1918 IPv4 与 `fc00::/7`；Geo 数据自动更新且间隔 24 小时；显式设置 `disable-keep-alive: true`；不输出 TUN；新建 `url-test` 分组写入 `tolerance: 50`。 | LAN 监听仍需配合端口和访问控制；只有显式添加 TUN 预设才生成并开启 TUN；不会给已有分组补写 tolerance。 | [Mihomo 全局配置](https://wiki.metacubex.one/en/config/general/)、[Mihomo TUN](https://wiki.metacubex.one/en/config/inbound/tun/) |
 | sing-box | 新建 selector/urltest 分组可表达 `interrupt_exist_connections`；默认关闭且 false 在序列化时省略，已有值原样保留。 | urltest 开启后，自动切换出站会中断现有连接。 | [sing-box Selector](https://sing-box.sagernet.org/configuration/outbound/selector/)、[sing-box URLTest](https://sing-box.sagernet.org/configuration/outbound/urltest/) |
 | Shadowrocket | `close-if-proxy-chain-missing=true`、`dns-direct-fallback-proxy=false`、`udp-policy-not-supported-behaviour=REJECT`、`block-quic=all-proxy`、`ipv6=true`、`prefer-ipv6=false`。 | 兼容性放宽必须显式选择下表中的可选预设。 | [Shadowrocket 社区配置](https://github.com/LOWERTOP/Shadowrocket/blob/5f1916b5897fc59fb7172aca59ae52050a3532fe/lazy.conf) |
 
@@ -41,9 +44,11 @@
 | 预设 | 动机与客户端 | 默认 | 精确生成行为 | 风险 | 依赖 / 冲突 | 主要来源 |
 | --- | --- | --- | --- | --- | --- | --- |
 | 传统 NTP 直连 | 让不支持代理的传统 NTP 正常校时；Mihomo、sing-box、Shadowrocket。 | 开 | 在通用规则前分别插入 `AND,((NETWORK,UDP),(DST-PORT,123)),DIRECT`、`{network:"udp",port:123,outbound:"direct"}`、`AND,((PROTOCOL,UDP),(DST-PORT,123)),DIRECT`；只匹配 UDP 目标端口 123。 | 流量绕过代理，暴露真实直连出口。 | 无。 | [RFC 5905](https://www.rfc-editor.org/rfc/rfc5905) |
-| Sniffer | 从 HTTP/TLS/QUIC 恢复目标域名；Mihomo。 | 开 | 强制替换 `sniffer` 为启用状态，开启 DNS mapping、pure-IP 解析和 destination override，使用预置 HTTP/TLS/QUIC 端口及精确 skip-domain。 | 会检查连接元数据。 | 无。 | [Mihomo Sniffer](https://wiki.metacubex.one/en/config/sniff/) |
-| TUN | 接管 Mihomo 系统路由和 DNS；Mihomo。 | 开 | 启用 mixed stack、auto-route、strict-route、auto-detect-interface 与 UDP/TCP 53 DNS hijack；保留预置私网、link-local、ULA 和 mDNS exclusions。 | 平台路由或 DNS 不匹配会中断连接。 | Tailscale、Linux 加速等预设可依赖它。 | [Mihomo TUN](https://wiki.metacubex.one/en/config/inbound/tun/) |
-| Fake-IP 兼容扩展 | 为常见校时、软件更新、媒体、本地登录、银行、P2P、加速器和远控端点返回真实 IP；Mihomo。 | 关 | 仅通过 `fake-ip-filter+` 追加项目维护的静态精确清单；不改规则、resolver 或 TUN。完整清单见 [Mihomo fake-IP](mihomo-fake-ip.md#fake-ip-兼容扩展)。 | 例外域名的 DNS 与路由行为会改变；它们不会因此自动变成 `DIRECT`。 | 无。 | [Mihomo DNS](https://wiki.metacubex.one/en/config/dns/)、[社区配置索引](https://gui-for-cores.github.io/guide/gfs/community) |
+| Sniffer | 从 HTTP/TLS/QUIC 恢复目标域名；Mihomo。 | 开 | 强制替换 `sniffer` 为启用状态；沿用 Mihomo 默认的 DNS mapping 与 pure-IP 解析，不替换实际连接目标；仅嗅探 HTTP 80/8080/8880、TLS 443/8443、QUIC 443/8443，并保留精确 skip-domain。 | 会检查连接元数据。 | 无。 | [Mihomo Sniffer](https://wiki.metacubex.one/en/config/sniff/) |
+| TUN | 接管 Mihomo 系统路由和 DNS；Mihomo。 | 关 | 启用 mixed stack、auto-route、strict-route、auto-detect-interface 与 UDP/TCP 53 DNS hijack；保留预置私网、link-local、ULA 和 mDNS exclusions。 | 平台路由或 DNS 不匹配会中断连接。 | Tailscale、Linux 加速等预设可依赖它。 | [Mihomo TUN](https://wiki.metacubex.one/en/config/inbound/tun/) |
+| Fake-IP 兼容扩展（稳定） | 为常见校时、软件更新、媒体、本地登录、银行、P2P、加速器和远控端点返回真实 IP；Mihomo。 | 关 | 仅通过 `fake-ip-filter+` 追加项目维护的静态域名与通配清单；离线、自包含，不改规则、resolver 或 TUN。完整清单见 [Mihomo fake-IP](mihomo-fake-ip.md#稳定兼容扩展)。 | 例外域名的 DNS 与路由行为会改变；它们不会因此自动变成 `DIRECT`。 | 与 OpenClash、ShellCrash Fake-IP 规则互斥。 | [Mihomo DNS](https://wiki.metacubex.one/en/config/dns/)、[社区配置索引](https://gui-for-cores.github.io/guide/gfs/community) |
+| OpenClash Fake-IP 规则（跟随上游） | 使用 OpenClash 维护的完整兼容列表；Mihomo。 | 关 | 添加唯一 `domain`/`text` HTTP rule-provider，并通过 `fake-ip-filter+` 引用；每 86400 秒检查 jsDelivr 上的 OpenClash `master`。 | 初次下载失败时扩展列表不生效；列表包含 `+.qq.com` 等较宽规则，真实 IP 范围更大。 | 与稳定、ShellCrash Fake-IP 规则互斥。 | [OpenClash 列表](https://github.com/vernesong/OpenClash/blob/master/luci-app-openclash/root/etc/openclash/custom/openclash_custom_fake_filter.list) |
+| ShellCrash Fake-IP 规则（跟随上游） | 使用 ShellCrash 维护的完整兼容列表；Mihomo。 | 关 | 添加唯一 `domain`/`text` HTTP rule-provider，并通过 `fake-ip-filter+` 引用；每 86400 秒检查 jsDelivr 上的 ShellCrash `dev`。 | 初次下载失败时扩展列表不生效；上游变更会在用户未修改 FileSpec 时改变实际命中集合。 | 与稳定、OpenClash Fake-IP 规则互斥。 | [ShellCrash 列表](https://github.com/juewuy/ShellCrash/blob/dev/public/fake_ip_filter.list) |
 | QUIC 强制回退 | 绕开质量差或受限的 UDP/443 路径；Mihomo。 | 关 | 在通用规则前拒绝 UDP 目标端口 443。 | 强制 TCP 回退、失去 HTTP/3 优势；依赖 UDP/443 的应用可能失败。 | 无。 | [RFC 9000](https://www.rfc-editor.org/rfc/rfc9000)、[社区配置索引](https://gui-for-cores.github.io/guide/gfs/community) |
 | UDP/P2P 兼容 | 改善部分游戏、语音、P2P 和打洞；Mihomo。 | 关 | 写入 `tun.endpoint-independent-nat: true`。 | 可能轻微降低性能与隐私。 | 无。 | [Mihomo TUN](https://wiki.metacubex.one/en/config/inbound/tun/) |
 | Linux/OpenWrt TUN 加速 | 在支持平台减少 TUN 路由开销；Mihomo。 | 关 | 写入 `tun.auto-route: true`、`tun.auto-redirect: true`、`find-process-mode: strict`；不会生成 `off` 或 keepalive 字段。 | 仅适合 Linux/OpenWrt；依赖 auto-route，可能与 routing mark 冲突。`strict` 只在规则需要时查询进程数据，转发流量未必能对应本地进程。 | 依赖 TUN。 | [Mihomo TUN](https://wiki.metacubex.one/en/config/inbound/tun/)、[v1.19.25 process mode](https://github.com/MetaCubeX/mihomo/blob/v1.19.25/component/process/find_process_mode.go) |
@@ -104,9 +109,10 @@ sing-box 的固定目标 v1.13.14 在 route rule 使用 `preferred_by` 匹配 en
 `accept_default_resolvers`，因此普通查询不会把 Tailscale resolver 当作全局
 fallback。
 
-## 可编辑规则源镜像替换快捷项
+## 可编辑 GitHub 加速快捷项
 
-Mihomo、sing-box 和 Shadowrocket 还共享“GitHub 规则源镜像替换”快捷项。它默认
+Mihomo、sing-box 和 Shadowrocket 还共享“GitHub 加速”快捷项，并在三个客户端的
+新建文件中默认启用。它
 把项目已知的 MetaCubeX `meta`/`sing` 与 blackmatrix7 GitHub Raw 前缀改写为
 jsDelivr，未匹配内容保持原样且不产生 warning。它生成普通 inline script，并把
 有序替换表放在可编辑参数中，不是新的 processor type；删除或编辑副本即可改变

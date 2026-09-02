@@ -280,7 +280,7 @@ Web 中所有受管社区配置预设的默认状态、精确输出、风险、�
 `script` processor，不改变本页定义的 processor type 和执行顺序。
 
 Web 文件处理器编辑器为 Mihomo、sing-box 和 Shadowrocket 提供
-“GitHub 规则源镜像替换”快捷项。它不是新的 processor type；选择后会在链末尾
+“GitHub 加速”快捷项。它不是新的 processor type；选择后会在链末尾
 追加一个普通的 file-stage `script`。脚本源码是通用的有序字面量字符串替换器，
 具体映射由 processor 参数提供：
 

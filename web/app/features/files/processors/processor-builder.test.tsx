@@ -52,7 +52,7 @@ describe("FileProcessorBuilder", () => {
     render(<FileProcessorBuilder kind={kind} />);
 
     await user.click(screen.getByRole("combobox", { name: "类型" }));
-    expect(screen.getByRole("option", { name: "GitHub 规则源镜像替换" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "GitHub 加速" })).toBeInTheDocument();
   });
 
   it("does not offer the rule source mirror shortcut for static files", async () => {
@@ -60,7 +60,7 @@ describe("FileProcessorBuilder", () => {
     render(<FileProcessorBuilder kind="static" />);
 
     await user.click(screen.getByRole("combobox", { name: "类型" }));
-    expect(screen.queryByRole("option", { name: "GitHub 规则源镜像替换" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "GitHub 加速" })).not.toBeInTheDocument();
   });
 
   it("appends one editable parameterized script and suppresses a duplicate", async () => {
@@ -76,7 +76,7 @@ describe("FileProcessorBuilder", () => {
     await selectMuiOption(
       user,
       screen.getByRole("combobox", { name: "类型" }),
-      "GitHub 规则源镜像替换",
+      "GitHub 加速",
     );
     await user.click(screen.getByRole("button", { name: "添加处理器" }));
 
@@ -84,7 +84,7 @@ describe("FileProcessorBuilder", () => {
     expect(added).toHaveLength(2);
     expect(added[0]).toEqual(existing);
     expect(added[1]).toMatchObject({
-      name: "GitHub 规则源镜像替换",
+      name: "GitHub 加速",
       type: "script",
       stage: "file",
       params: {
@@ -118,7 +118,7 @@ describe("FileProcessorBuilder", () => {
     render(<FileProcessorBuilder kind="mihomo" defaultValue={[legacy]} />);
 
     expect(currentProcessors()).toEqual([legacy]);
-    await selectMuiOption(user, screen.getByRole("combobox", { name: "类型" }), "GitHub 规则源镜像替换");
+    await selectMuiOption(user, screen.getByRole("combobox", { name: "类型" }), "GitHub 加速");
     await user.click(screen.getByRole("button", { name: "添加处理器" }));
     expect(currentProcessors()).toEqual([legacy]);
   });

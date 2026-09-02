@@ -159,10 +159,35 @@ describe("file processor preset planner", () => {
       dependencyPresetIDs: ["tun", "linux-acceleration"],
       removeIndices: [],
       removedPresetIDs: [],
+      updatedPresetIDs: [],
       requestedPresetID: "mptcp",
     });
     expect(current).toEqual(before);
     current.forEach((processor, index) => expect(processor).toBe(before[index]));
+  });
+
+  it("replaces a recognized stale preset in place when explicitly requested", () => {
+    const versioned = versionedPreset("versioned", "Versioned");
+    const versionedCatalog = [...catalog, versioned];
+    const stale = {
+      ...versioned.build(t),
+      params: { mode: "yaml_override", content: "# preset:versioned\nold" },
+    };
+    const before = custom("before");
+    const after = custom("after");
+
+    const plan = planFileProcessorPresetAddition(versionedCatalog, "versioned", [before, stale, after]);
+
+    expect(plan.removeIndices).toEqual([1]);
+    expect(plan.removedPresetIDs).toEqual([]);
+    expect(plan.updatedPresetIDs).toEqual(["versioned"]);
+    expect(plan.additions).toEqual([{
+      presetID: "versioned",
+      processor: versioned.build(t),
+      beforeIndex: 1,
+    }]);
+    expect(applyPlan([before, stale, after], plan).map(nameOf))
+      .toEqual(["before", "Versioned", "after"]);
   });
 
   it("throws when the requested preset does not exist", () => {
@@ -244,6 +269,29 @@ function preset(
       processor.type === expected.type
       && exactParams(processor.params, expected.params)
     ),
+  };
+}
+
+function versionedPreset(id: string, name: string): FileProcessorPreset {
+  const current = builtProcessor(id, name);
+  const marker = `# preset:${id}`;
+  const recognize = (processor: Pick<ProcessorDetail, "type" | "params">) => (
+    processor.type === "merge"
+    && processor.params?.mode === "yaml_override"
+    && typeof processor.params.content === "string"
+    && processor.params.content.startsWith(marker)
+  );
+  return {
+    id,
+    category: "network",
+    labelKey: "files.kind.static",
+    defaultOn: false,
+    dependencies: [],
+    conflicts: [],
+    build: () => current,
+    recognize,
+    isCurrent: (processor) => recognize(processor)
+      && processor.params?.content === current.params?.content,
   };
 }
 

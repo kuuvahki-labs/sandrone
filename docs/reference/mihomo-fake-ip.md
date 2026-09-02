@@ -9,7 +9,7 @@
 下文默认值只用于 **Web 新建** Mihomo 文件：
 
 - 新建表单把 Web driver 的 inline base 写入 `FileSpec.source`；
-- 新文件同时获得 `Sniffer`、`TUN` 两个 file-stage processors，顺序固定为先 Sniffer、后 TUN；
+- 新文件默认获得 `Sniffer` 与传统 NTP 直连 processor；base 不输出 TUN，只有显式添加 TUN processor 才生成并开启；
 - 编辑已有文件时沿用已保存的 source 和 processors，不自动回填此默认；
 - 通过 API、CLI 或嵌入式 service 创建文件时，若调用方未提交同一 source，不应假定会得到 Web 默认。服务端 Mihomo driver 的内置空基线不是本页所列配置。
 
@@ -27,9 +27,8 @@ profile:
 dns:
   enable: true
   ipv6: false
+  prefer-h3: true
   enhanced-mode: fake-ip
-  fake-ip-range: 198.18.0.1/16
-  fake-ip-filter-mode: blacklist
   fake-ip-filter:
     - "*"
     - geosite:private
@@ -39,6 +38,9 @@ dns:
     - "+.market.xiaomi.com"
     - "Mijia Cloud"
     - "dig.io.mi.com"
+    - "localhost.ptlogin2.qq.com"
+    - "localhost.sec.qq.com"
+    - "localhost.*.weixin.qq.com"
     - "*.icloud.com"
     - "time.*.com"
     - "ntp.*.com"
@@ -55,7 +57,11 @@ resolver 设置参与实际 DNS 路径，但不改变 `fake-ip-filter` 的匹配
 
 ## `fake-ip-filter` 的效果
 
-当前 mode 是 `blacklist`。匹配过滤项的域名不获得 fake-IP 映射，而走真实解析；未匹配的域名可以从 `fake-ip-range` 获得 fake IP。Mihomo 官方说明见 [DNS 配置](https://wiki.metacubex.one/en/config/dns/)。
+Web base 显式设置 DNS `ipv6: false` 和 `prefer-h3: true`，仅省略 Mihomo 已提供的
+`fake-ip-range: 198.18.0.1/16` 与 `fake-ip-filter-mode: blacklist` 默认值。按当前核心
+默认语义，匹配过滤项的域名不获得
+fake-IP 映射，而走真实解析；未匹配的域名可以从默认 fake-IP 地址池获得 fake IP。
+Mihomo 官方说明见 [DNS 配置](https://wiki.metacubex.one/en/config/dns/)。
 
 该结果只回答“DNS 返回真实 IP 还是 fake IP”，不等价于：
 
@@ -90,6 +96,7 @@ Mihomo 的 DNS 域名通配符与路由规则中的 `DOMAIN-WILDCARD` 不是同�
 | 本地名称 | `"*"`、`geosite:private`、`+.lan`、`+.local` | 让单标签、私有或本地域名更容易交给真实 resolver；不保证对应 LAN/mDNS resolver 可达 |
 | 连通性探测 | `geosite:connectivity-check` | 覆盖范围由 geodata 决定；它不是强制门户或系统联网问题的完整修复 |
 | Xiaomi / 米家 | `+.market.xiaomi.com`、`Mijia Cloud`、`dig.io.mi.com` | 针对具体兼容场景，不放宽为整个 `mi.com` |
+| QQ / 微信登录 | `localhost.ptlogin2.qq.com`、`localhost.sec.qq.com`、`localhost.*.weixin.qq.com` | 属于远程扩展下载失败时也必须保留的登录兼容保障；不放宽为整个 `qq.com` |
 | Apple | `*.icloud.com` | 只匹配一层 `icloud.com` 子域名；不是 Apple 服务全量清单 |
 | NTP | `time.*.com`、`ntp.*.com`、`+.pool.ntp.org` | 只影响这些名称的 DNS 答复，不保证 UDP、系统时间服务或 TUN 路径 |
 | STUN | `stun.*.*`、`stun.*.*.*` | 是有限的层级模式，不等于匹配所有 STUN 服务，也不配置 UDP 路由 |
@@ -104,31 +111,43 @@ sniffer:
     - "+.push.apple.com"
 ```
 
-这控制域名嗅探是否改写连接目标，不是 fake-IP 过滤。默认 `TUN` processor 则启用 strict route 与 DNS hijack，并绕开 RFC 1918、IPv4/IPv6 link-local、IPv6 ULA，以及 `224.0.0.251/32`、`ff02::fb/128` 两个 mDNS 组播目标；它同样不会把域名加入 `fake-ip-filter`。
+这控制域名嗅探是否改写连接目标，不是 fake-IP 过滤。可选 `TUN` processor 则启用 strict route 与 DNS hijack，并绕开 RFC 1918、IPv4/IPv6 link-local、IPv6 ULA，以及 `224.0.0.251/32`、`ff02::fb/128` 两个 mDNS 组播目标；它同样不会把域名加入 `fake-ip-filter`。
 
-## Fake-IP 兼容扩展
+## Fake-IP 规则分层
 
-`Fake-IP 兼容扩展` 是 Web 中默认关闭的可选 file-stage processor preset，不属于
-Web base，也不在新建文件默认的 `Sniffer`、`TUN` 处理链中。选择后，它通过
+基础保障始终来自 Web base。下列三个扩展规则源都默认关闭且互相冲突；用户选择新来源
+时会移除已识别的旧来源。远程来源下载失败不会阻止基础 QQ/微信登录、NTP、STUN、
+局域网和设备兼容条目继续生效。
+
+### 稳定兼容扩展
+
+`Fake-IP 兼容扩展（稳定）` 是 Web 中默认关闭的可选 file-stage processor preset，不属于
+Web base，也不在新建文件默认处理链中。选择后，它通过
 `yaml_override` 的 `fake-ip-filter+` 运算追加以下静态清单：
 
 ```yaml
 dns:
   fake-ip-filter:
-    # 扩展 NTP
+    # 扩展校时与 NTP 匹配
     - "time-ios.apple.com"
-    - "ntp1.aliyun.com"
-    - "ntp2.aliyun.com"
-    - "ntp3.aliyun.com"
-    - "ntp4.aliyun.com"
-    - "ntp5.aliyun.com"
-    - "ntp6.aliyun.com"
-    - "ntp7.aliyun.com"
-    - "time1.cloud.tencent.com"
-    - "time2.cloud.tencent.com"
-    - "time3.cloud.tencent.com"
-    - "time4.cloud.tencent.com"
-    - "time5.cloud.tencent.com"
+    - "time.*.gov"
+    - "time.*.edu.cn"
+    - "time.*.apple.com"
+    - "time1.*.com"
+    - "time2.*.com"
+    - "time3.*.com"
+    - "time4.*.com"
+    - "time5.*.com"
+    - "time6.*.com"
+    - "time7.*.com"
+    - "ntp1.*.com"
+    - "ntp2.*.com"
+    - "ntp3.*.com"
+    - "ntp4.*.com"
+    - "ntp5.*.com"
+    - "ntp6.*.com"
+    - "ntp7.*.com"
+    - "*.time.edu.cn"
     - "*.ntp.org.cn"
     - "ntp.ntsc.ac.cn"
 
@@ -156,7 +175,6 @@ dns:
     - "*.kuwo.cn"
     - "music.migu.cn"
     - "*.music.migu.cn"
-    - "localhost.*.weixin.qq.com"
     - "*.mcdn.bilivideo.cn"
 
     # 银行、P2P、加速器与远控兼容
@@ -178,6 +196,35 @@ dns:
 `rule-set:cn` 或整个 `qq.com`、`163.com` 等宽泛后缀。某个条目只有在多数环境中
 可复现必须使用真实 IP 时，才考虑移入 Web base；单一应用或设备的兼容需求继续
 留在此可选 preset，用户也可以直接编辑其 YAML。
+
+### OpenClash 与 ShellCrash 上游规则
+
+另外两个可选 preset 不复制第三方完整清单，而是生成 Mihomo 原生远程
+`rule-provider`，再把它作为 `rule-set:` 条目追加到 `fake-ip-filter`：
+
+```yaml
+rule-providers:
+  sandrone-fakeip-shellcrash:
+    type: http
+    behavior: domain
+    format: text
+    path: ./ruleset/sandrone-fakeip-shellcrash.list
+    url: https://cdn.jsdelivr.net/gh/juewuy/ShellCrash@dev/public/fake_ip_filter.list
+    interval: 86400
+dns:
+  fake-ip-filter+:
+    - rule-set:sandrone-fakeip-shellcrash
+```
+
+OpenClash 使用独立的 `sandrone-fakeip-openclash` 名称和缓存路径，来源是
+[OpenClash custom fake filter](https://github.com/vernesong/OpenClash/blob/master/luci-app-openclash/root/etc/openclash/custom/openclash_custom_fake_filter.list)；
+ShellCrash 来源是
+[ShellCrash fake_ip_filter.list](https://github.com/juewuy/ShellCrash/blob/dev/public/fake_ip_filter.list)。
+两者通过 jsDelivr 分发，以免依赖另一个 processor 的执行顺序。首次下载失败且没有缓存
+时，Mihomo 可以继续使用基础配置，但该上游扩展当次不会命中。
+
+OpenClash 当前包含整个 `+.qq.com` 等较宽规则，ShellCrash 相对保守。选择它们表示接受
+上游后续变更；需要完全可复现或离线生成时应选择稳定扩展。
 
 ## Tailscale 与 MagicDNS
 

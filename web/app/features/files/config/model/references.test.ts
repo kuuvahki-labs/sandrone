@@ -96,6 +96,7 @@ describe("config reference options", () => {
       "builtin:PROXY",
       "builtin:DIRECT",
       "builtin:REJECT",
+      "builtin:REJECT-DROP",
     ]);
     expect(policyReferenceOptions("shadowrocket", shadowrocketNodes, groups).map(optionKey)).toEqual([
       "group:Proxy",

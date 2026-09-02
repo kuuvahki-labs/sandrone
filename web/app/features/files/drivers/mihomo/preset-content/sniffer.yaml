@@ -1,9 +1,7 @@
 # sandrone:mihomo-preset=sniffer
 sniffer!:
   enable: true
-  force-dns-mapping: true
-  parse-pure-ip: true
-  override-destination: true
+  override-destination: false
   skip-domain:
     - "Mijia Cloud"
     - "dlg.io.mi.com"
@@ -12,7 +10,8 @@ sniffer!:
     HTTP:
       ports:
         - 80
-        - "8080-8880"
+        - 8080
+        - 8880
     TLS:
       ports:
         - 443

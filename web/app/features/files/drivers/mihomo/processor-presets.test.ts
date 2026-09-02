@@ -22,11 +22,11 @@ const en = createTranslator("en-US");
 const zh = createTranslator("zh-CN");
 
 describe("Mihomo processor presets", () => {
-  it("uses Sniffer, TUN, then traditional NTP direct as the new-file default chain", () => {
+  it("uses Sniffer, traditional NTP direct, and the rule source mirror as the new-file default chain", () => {
     expect(defaultMihomoProcessors(en).map((processor) => processor.name)).toEqual([
       "Sniffer",
-      "TUN",
       "Traditional NTP Direct",
+      "GitHub acceleration",
     ]);
     expect(mihomoProcessorPreset("ntp-direct")).toMatchObject({
       name: "Traditional NTP Direct",
@@ -52,8 +52,14 @@ describe("Mihomo processor presets", () => {
     const sniffer = presetYAML("sniffer");
     expect(sniffer["sniffer!"]).toMatchObject({
       enable: true,
+      "override-destination": false,
       "skip-domain": ["Mijia Cloud", "dlg.io.mi.com", "+.push.apple.com"],
+      sniff: {
+        HTTP: { ports: [80, 8080, 8880] },
+      },
     });
+    expect(sniffer["sniffer!"]).not.toHaveProperty("force-dns-mapping");
+    expect(sniffer["sniffer!"]).not.toHaveProperty("parse-pure-ip");
 
     const tun = presetYAML("tun")["tun!"] as Record<string, unknown>;
     expect(tun).toMatchObject({
@@ -82,18 +88,24 @@ describe("Mihomo processor presets", () => {
       dns: {
         "fake-ip-filter+": [
           "time-ios.apple.com",
-          "ntp1.aliyun.com",
-          "ntp2.aliyun.com",
-          "ntp3.aliyun.com",
-          "ntp4.aliyun.com",
-          "ntp5.aliyun.com",
-          "ntp6.aliyun.com",
-          "ntp7.aliyun.com",
-          "time1.cloud.tencent.com",
-          "time2.cloud.tencent.com",
-          "time3.cloud.tencent.com",
-          "time4.cloud.tencent.com",
-          "time5.cloud.tencent.com",
+          "time.*.gov",
+          "time.*.edu.cn",
+          "time.*.apple.com",
+          "time1.*.com",
+          "time2.*.com",
+          "time3.*.com",
+          "time4.*.com",
+          "time5.*.com",
+          "time6.*.com",
+          "time7.*.com",
+          "ntp1.*.com",
+          "ntp2.*.com",
+          "ntp3.*.com",
+          "ntp4.*.com",
+          "ntp5.*.com",
+          "ntp6.*.com",
+          "ntp7.*.com",
+          "*.time.edu.cn",
           "*.ntp.org.cn",
           "ntp.ntsc.ac.cn",
           "mesu.apple.com",
@@ -117,7 +129,6 @@ describe("Mihomo processor presets", () => {
           "*.kuwo.cn",
           "music.migu.cn",
           "*.music.migu.cn",
-          "localhost.*.weixin.qq.com",
           "*.mcdn.bilivideo.cn",
           "+.cmbchina.com",
           "+.cmbimg.com",
@@ -129,6 +140,32 @@ describe("Mihomo processor presets", () => {
           "+.orayimg.com",
         ],
       },
+    });
+    expect(presetYAML("fake-ip-openclash")).toEqual({
+      "rule-providers": {
+        "sandrone-fakeip-openclash": {
+          type: "http",
+          behavior: "domain",
+          format: "text",
+          path: "./ruleset/sandrone-fakeip-openclash.list",
+          url: "https://cdn.jsdelivr.net/gh/vernesong/OpenClash@master/luci-app-openclash/root/etc/openclash/custom/openclash_custom_fake_filter.list",
+          interval: 86400,
+        },
+      },
+      dns: { "fake-ip-filter+": ["rule-set:sandrone-fakeip-openclash"] },
+    });
+    expect(presetYAML("fake-ip-shellcrash")).toEqual({
+      "rule-providers": {
+        "sandrone-fakeip-shellcrash": {
+          type: "http",
+          behavior: "domain",
+          format: "text",
+          path: "./ruleset/sandrone-fakeip-shellcrash.list",
+          url: "https://cdn.jsdelivr.net/gh/juewuy/ShellCrash@dev/public/fake_ip_filter.list",
+          interval: 86400,
+        },
+      },
+      dns: { "fake-ip-filter+": ["rule-set:sandrone-fakeip-shellcrash"] },
     });
 
     expect(presetContent("udp-p2p-eim")).toBe(`# sandrone:mihomo-preset=udp-p2p-eim
@@ -362,6 +399,8 @@ tun:
       "ntp-direct",
       "github-rule-source-mirror",
       "fake-ip-compat",
+      "fake-ip-openclash",
+      "fake-ip-shellcrash",
       "quic-fallback",
       "udp-p2p-eim",
       "linux-tun-acceleration",
@@ -375,6 +414,11 @@ tun:
       dependencies: ["tun"],
       conflicts: ["tailscale-external"],
     });
+    expect(presetDescriptor("github-rule-source-mirror")).toMatchObject({
+      defaultOn: true,
+      dependencies: [],
+      conflicts: [],
+    });
     expect(presetDescriptor("tailscale-external")).toMatchObject({
       defaultOn: false,
       dependencies: ["tun"],
@@ -382,6 +426,30 @@ tun:
     });
     expect(presetDescriptor("tailscale-external").dependencies).toEqual(["tun"]);
     expect(presetDescriptor("tailnet-share").dependencies).toEqual(["tun", "tailscale-external"]);
+    expect([
+      "fake-ip-compat",
+      "fake-ip-openclash",
+      "fake-ip-shellcrash",
+    ].map((id) => {
+      const preset = presetDescriptor(id as MihomoProcessorPresetID);
+      return { id, defaultOn: preset.defaultOn, conflicts: preset.conflicts };
+    })).toEqual([
+      {
+        id: "fake-ip-compat",
+        defaultOn: false,
+        conflicts: ["fake-ip-openclash", "fake-ip-shellcrash"],
+      },
+      {
+        id: "fake-ip-openclash",
+        defaultOn: false,
+        conflicts: ["fake-ip-compat", "fake-ip-shellcrash"],
+      },
+      {
+        id: "fake-ip-shellcrash",
+        defaultOn: false,
+        conflicts: ["fake-ip-compat", "fake-ip-openclash"],
+      },
+    ]);
     const scenarioIDs = [
       "quic-fallback",
       "udp-p2p-eim",
@@ -456,6 +524,45 @@ tun:
     expect(recognizedFileProcessorPresetID(mihomoProcessorPresets, { ...preset, params: { ...preset.params, mode: "yaml_overlay" } })).toBeNull();
   });
 
+  it.each([
+    "fake-ip-compat",
+    "fake-ip-openclash",
+    "fake-ip-shellcrash",
+  ] as const)("recognizes and explicitly refreshes an older managed %s snapshot", (id) => {
+    const preset = mihomoProcessorPreset(id);
+    const marker = `# sandrone:mihomo-preset=${id}`;
+    const stale = {
+      ...preset,
+      params: { mode: "yaml_override", content: `${marker}\ndns:\n  fake-ip-filter+: []` },
+    };
+
+    expect(recognizedFileProcessorPresetID(mihomoProcessorPresets, stale)).toBe(id);
+    const plan = planFileProcessorPresetAddition(mihomoProcessorPresets, id, [stale], en);
+    expect(plan.removeIndices).toEqual([0]);
+    expect(plan.updatedPresetIDs).toEqual([id]);
+    expect(plan.removedPresetIDs).toEqual([]);
+    expect(plan.additions).toMatchObject([{ presetID: id, beforeIndex: 0 }]);
+    expect(plan.additions[0]?.processor).toEqual(preset);
+  });
+
+  it("switches Fake-IP sources atomically while preserving unrelated processors", () => {
+    const before = mihomoProcessorPreset("sniffer");
+    const stable = mihomoProcessorPreset("fake-ip-compat");
+    const after = mihomoProcessorPreset("tun");
+    const plan = planFileProcessorPresetAddition(
+      mihomoProcessorPresets,
+      "fake-ip-shellcrash",
+      [before, stable, after],
+      en,
+    );
+
+    expect(plan.removeIndices).toEqual([1]);
+    expect(plan.removedPresetIDs).toEqual(["fake-ip-compat"]);
+    expect(plan.updatedPresetIDs).toEqual([]);
+    expect(plan.addedPresetIDs).toEqual(["fake-ip-shellcrash"]);
+    expect(plan.additions[0]?.beforeIndex).toBe(1);
+  });
+
   it.each(["quic-fallback"] as const)(
     "recognizes only the exact ordered-rule processor for %s",
     (id) => {
@@ -471,7 +578,7 @@ tun:
   );
 });
 
-function presetDescriptor(id: MihomoProcessorPresetID) {
+function presetDescriptor(id: MihomoProcessorPresetID | "github-rule-source-mirror") {
   const descriptor = mihomoProcessorPresets.find((preset) => preset.id === id);
   if (!descriptor) throw new Error(`missing Mihomo processor preset: ${id}`);
   return descriptor;

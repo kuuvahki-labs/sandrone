@@ -1,0 +1,12 @@
+# sandrone:mihomo-preset=fake-ip-openclash
+rule-providers:
+  sandrone-fakeip-openclash:
+    type: http
+    behavior: domain
+    format: text
+    path: ./ruleset/sandrone-fakeip-openclash.list
+    url: https://cdn.jsdelivr.net/gh/vernesong/OpenClash@master/luci-app-openclash/root/etc/openclash/custom/openclash_custom_fake_filter.list
+    interval: 86400
+dns:
+  fake-ip-filter+:
+    - rule-set:sandrone-fakeip-openclash
