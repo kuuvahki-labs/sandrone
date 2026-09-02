@@ -162,7 +162,7 @@ function ProcessorParamsEditor({ draft, onChange, probeCacheTTLSeconds, probeDef
           {showURLTarget ? (
             <>
               <ProbeURLField label={t("processors.probe.url")} placeholder={probeDefaults.url} value={stringValue(params.url)} onChange={(url) => onChange({ url })} />
-              <TextField fullWidth label={t("processors.probe.expectedStatus")} placeholder="200-299" value={stringValue(params.expected_status)} onChange={(event) => onChange({ expected_status: event.target.value })} />
+              <TextField fullWidth label={t("processors.probe.expectedStatus")} placeholder={probeDefaults.expected_status} value={stringValue(params.expected_status)} onChange={(event) => onChange({ expected_status: event.target.value })} />
             </>
           ) : null}
           <TextField fullWidth label={t("files.form.timeoutMs")} placeholder={millisecondsToSecondsInput(probeDefaults.timeout_ms)} slotProps={{ htmlInput: durationInputProps }} type="number" value={millisecondsToSecondsInput(params.timeout_ms)} onChange={(event) => onChange({ timeout_ms: secondsInputToMilliseconds(event.target.value) ?? "" })} />

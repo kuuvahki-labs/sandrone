@@ -118,13 +118,14 @@ func Default() domain.Settings {
 			TimeoutMS: int(fetcher.DefaultTimeout / time.Millisecond),
 		},
 		ProbeDefaults: domain.ProbeDefaults{
-			Method:      string(domain.ProbeURLTest),
-			Core:        "sing-box",
-			URL:         probe.URLTestTarget(domain.ProbeRequest{Method: domain.ProbeURLTest}),
-			NTPServer:   probe.NTPServerFromRequest(domain.ProbeRequest{}),
-			TimeoutMS:   5000,
-			Attempts:    1,
-			Concurrency: 10,
+			Method:         string(domain.ProbeURLTest),
+			Core:           "sing-box",
+			URL:            probe.URLTestTarget(domain.ProbeRequest{Method: domain.ProbeURLTest}),
+			NTPServer:      probe.NTPServerFromRequest(domain.ProbeRequest{}),
+			ExpectedStatus: "200-299",
+			TimeoutMS:      5000,
+			Attempts:       1,
+			Concurrency:    10,
 		},
 		ScriptDefaults: domain.ScriptDefaults{TimeoutMS: 2000},
 		CacheDefaults:  domain.CacheDefaults{},
@@ -350,6 +351,15 @@ func normalizeProbeDefaults(value, defaults domain.ProbeDefaults) (domain.ProbeD
 	if server := strings.TrimSpace(value.NTPServer); server != "" {
 		out.NTPServer = server
 	}
+	expectedStatus := strings.TrimSpace(value.ExpectedStatus)
+	if expectedStatus == "" {
+		expectedStatus = defaults.ExpectedStatus
+	}
+	expectedStatus, err := probe.NormalizeExpectedStatus(expectedStatus)
+	if err != nil {
+		return domain.ProbeDefaults{}, invalid("invalid probe expected_status: %v", err)
+	}
+	out.ExpectedStatus = expectedStatus
 	if value.TimeoutMS > 0 {
 		out.TimeoutMS = value.TimeoutMS
 	}

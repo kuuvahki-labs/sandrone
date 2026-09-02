@@ -25,10 +25,30 @@ func TestDefaultSettingsContainsWholeProject(t *testing.T) {
 	require.Zero(t, got.CacheDefaults.ProbeTTLSeconds)
 	require.Zero(t, got.CacheDefaults.SubscriptionSnapshotTTLSeconds)
 	require.Equal(t, "https://cp.cloudflare.com", got.ProbeDefaults.URL)
+	require.Equal(t, "200-299", got.ProbeDefaults.ExpectedStatus)
 	require.Equal(t, 2000, got.ScriptDefaults.TimeoutMS)
 	require.False(t, got.ScheduledRefresh.Enabled)
 	require.Equal(t, "@every 10m", got.ScheduledRefresh.Schedule)
 	require.Empty(t, got.ScheduledRefresh.Targets)
+}
+
+func TestNormalizeProbeExpectedStatus(t *testing.T) {
+	value := settings.Default()
+	value.ProbeDefaults.ExpectedStatus = ""
+
+	got, err := settings.Normalize(value)
+	require.NoError(t, err)
+	require.Equal(t, "200-299", got.ProbeDefaults.ExpectedStatus)
+
+	value.ProbeDefaults.ExpectedStatus = " 200, 204, 301-303 "
+
+	got, err = settings.Normalize(value)
+	require.NoError(t, err)
+	require.Equal(t, "200/204/301-303", got.ProbeDefaults.ExpectedStatus)
+
+	value.ProbeDefaults.ExpectedStatus = "299-200"
+	_, err = settings.Normalize(value)
+	require.ErrorContains(t, err, "invalid probe expected_status")
 }
 
 func TestStoredAndPublicSettingsOmitRemovedStartupFields(t *testing.T) {

@@ -12,13 +12,14 @@ type RemoteDefaults struct {
 }
 
 type ProbeDefaults struct {
-	Method      string `json:"method,omitempty" yaml:"method,omitempty"`
-	Core        string `json:"core,omitempty" yaml:"core,omitempty"`
-	URL         string `json:"url,omitempty" yaml:"url,omitempty"`
-	NTPServer   string `json:"ntp_server,omitempty" yaml:"ntp_server,omitempty"`
-	TimeoutMS   int    `json:"timeout_ms,omitempty" yaml:"timeout_ms,omitempty"`
-	Attempts    int    `json:"attempts,omitempty" yaml:"attempts,omitempty"`
-	Concurrency int    `json:"concurrency,omitempty" yaml:"concurrency,omitempty"`
+	Method         string `json:"method,omitempty" yaml:"method,omitempty"`
+	Core           string `json:"core,omitempty" yaml:"core,omitempty"`
+	URL            string `json:"url,omitempty" yaml:"url,omitempty"`
+	NTPServer      string `json:"ntp_server,omitempty" yaml:"ntp_server,omitempty"`
+	ExpectedStatus string `json:"expected_status" yaml:"expected_status"`
+	TimeoutMS      int    `json:"timeout_ms,omitempty" yaml:"timeout_ms,omitempty"`
+	Attempts       int    `json:"attempts,omitempty" yaml:"attempts,omitempty"`
+	Concurrency    int    `json:"concurrency,omitempty" yaml:"concurrency,omitempty"`
 }
 
 type ScriptDefaults struct {

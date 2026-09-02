@@ -52,6 +52,7 @@ export const settingsEnUS = {
   "settings.runtime.probeAttempts": "Attempts",
   "settings.runtime.probeResultCacheTTLSeconds": "Result cache (seconds)",
   "settings.runtime.probeConcurrency": "Concurrency",
+  "settings.runtime.probeExpectedStatus": "Expected status",
   "settings.runtime.probeMethod": "Probe method",
   "settings.runtime.probeMethodNtp": "UDP NTP",
   "settings.runtime.probeMethodTcp": "TCP connect",

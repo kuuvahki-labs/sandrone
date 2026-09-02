@@ -93,6 +93,9 @@ describe("settings service page", () => {
       target: { value: "300" },
     });
     const probeURL = within(probeGroup).getByRole("combobox", { name: "URL" });
+    const expectedStatus = within(probeGroup).getByRole("textbox", { name: "期望状态" });
+    expect(expectedStatus).toHaveValue("200-299");
+    fireEvent.change(expectedStatus, { target: { value: "204" } });
     await user.click(probeURL);
     await user.keyboard("{ArrowDown}");
     await user.click(await screen.findByRole("option", {
@@ -124,6 +127,7 @@ describe("settings service page", () => {
       }),
       probe_defaults: expect.objectContaining({
         core: "sing-box",
+        expected_status: "204",
         url: "http://cp.cloudflare.com/generate_204",
       }),
       script_defaults: { timeout_ms: 3500 },

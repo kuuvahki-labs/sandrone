@@ -81,6 +81,7 @@ export interface ProbeDefaultsInput {
   core: "mihomo" | "sing-box";
   url: string;
   ntp_server: string;
+  expected_status: string;
   timeout_ms: number;
   attempts: number;
   concurrency: number;

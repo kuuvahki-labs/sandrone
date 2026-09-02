@@ -14,6 +14,7 @@ const defaults: ProbeDefaultsInput = {
   core: "mihomo",
   url: "https://probe.example/generate_204",
   ntp_server: "time.example",
+  expected_status: "204",
   timeout_ms: 8000,
   attempts: 2,
   concurrency: 4,
@@ -24,6 +25,7 @@ describe("probe processor params", () => {
     expect(newProbeProcessorParams()).toEqual({
       annotate: true,
       fail_mode: "drop",
+      sort: "duration",
     });
   });
 

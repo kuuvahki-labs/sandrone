@@ -34,6 +34,7 @@ export const probeDefaults: ProbeDefaultsInput = {
   core: "sing-box",
   url: "https://cp.cloudflare.com",
   ntp_server: "time.apple.com",
+  expected_status: "200-299",
   timeout_ms: 5000,
   attempts: 1,
   concurrency: 10,

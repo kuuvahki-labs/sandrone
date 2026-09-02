@@ -50,6 +50,7 @@ SettingsEnvelope {
     "core": "sing-box",
     "url": "https://cp.cloudflare.com",
     "ntp_server": "time.apple.com",
+    "expected_status": "200-299",
     "timeout_ms": 5000,
     "attempts": 1,
     "concurrency": 10
@@ -113,6 +114,7 @@ SettingsEnvelope {
     "core": "sing-box",
     "url": "https://connectivity.example/generate_204",
     "ntp_server": "time.example",
+    "expected_status": "200-299",
     "timeout_ms": 5000,
     "attempts": 2,
     "concurrency": 10
@@ -145,7 +147,8 @@ SettingsEnvelope {
 
 远程 proxy 只接受带 host 的 `http`、`https` 或 `socks5` URL。probe method
 只接受 `tcp_connect`、`udp_ntp`、`url_test`，core 只接受 `mihomo` 或
-`sing-box`。TTL 必须非负；远程、probe 与 script 默认 timeout 以及 attempts 和
+`sing-box`。`expected_status` 使用 probe processor 的相同表达式语义，默认
+`200-299`；显式 `*` 接受任意状态。TTL 必须非负；远程、probe 与 script 默认 timeout 以及 attempts 和
 concurrency 归一化后必须为正数。`script_defaults.timeout_ms` 省略或为 `0` 时使用
 2000 ms；正数作为没有显式 `params.timeout_ms` 的 script processor 的执行时限。
 `subscription_snapshot_ttl_seconds` 独立控制订阅执行快照；它可以大于 remote

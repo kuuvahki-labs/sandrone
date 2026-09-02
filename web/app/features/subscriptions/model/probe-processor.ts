@@ -7,6 +7,7 @@ export function newProbeProcessorParams(): Record<string, unknown> {
   return {
     annotate: true,
     fail_mode: "drop",
+    sort: "duration",
   };
 }
 

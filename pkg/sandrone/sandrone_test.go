@@ -156,6 +156,7 @@ func TestEngineSettingsRoundTrip(t *testing.T) {
 	require.Empty(t, defaults.Settings.RemoteDefaults.UserAgent)
 	require.Equal(t, "url_test", defaults.Settings.ProbeDefaults.Method)
 	require.Equal(t, "sing-box", defaults.Settings.ProbeDefaults.Core)
+	require.Equal(t, "200-299", defaults.Settings.ProbeDefaults.ExpectedStatus)
 	require.Zero(t, defaults.Settings.CacheDefaults.SubscriptionSnapshotTTLSeconds)
 
 	update := sandrone.SettingsUpdate{
@@ -169,13 +170,14 @@ func TestEngineSettingsRoundTrip(t *testing.T) {
 			TimeoutMS: 7000,
 		},
 		ProbeDefaults: sandrone.ProbeDefaults{
-			Method:      "url_test",
-			Core:        "sing-box",
-			URL:         "https://example.com/generate_204",
-			NTPServer:   "time.cloudflare.com",
-			TimeoutMS:   9000,
-			Attempts:    2,
-			Concurrency: 12,
+			Method:         "url_test",
+			Core:           "sing-box",
+			URL:            "https://example.com/generate_204",
+			NTPServer:      "time.cloudflare.com",
+			ExpectedStatus: "204",
+			TimeoutMS:      9000,
+			Attempts:       2,
+			Concurrency:    12,
 		},
 		CacheDefaults: sandrone.CacheDefaults{
 			RemoteFetchTTLSeconds:          120,

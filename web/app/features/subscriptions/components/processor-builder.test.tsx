@@ -221,6 +221,7 @@ describe("ProcessorBuilder", () => {
 
     const probeGroup = screen.getByRole("group", { name: "处理器 测活" });
     expect(within(probeGroup).getByRole("checkbox", { name: "写入测活元数据" })).not.toBeChecked();
+    expect(within(probeGroup).getByRole("combobox", { name: "排序" })).toHaveTextContent("保持原顺序");
     expect(within(probeGroup).getByRole("combobox", { name: "失败处理" })).toHaveTextContent("保留");
     expect(serializedProcessors()[0]).not.toHaveProperty("params");
   });
@@ -259,6 +260,8 @@ describe("ProcessorBuilder", () => {
     const probeURL = within(probeGroup).getByRole("combobox", { name: "URL" });
     expect(probeURL).toHaveValue("");
     expect(probeURL).toHaveAttribute("placeholder", "https://cp.cloudflare.com");
+    expect(within(probeGroup).getByRole("textbox", { name: "期望状态" })).toHaveValue("");
+    expect(within(probeGroup).getByRole("textbox", { name: "期望状态" })).toHaveAttribute("placeholder", "200-299");
     expect(within(probeGroup).getByRole("spinbutton", { name: "超时（秒）" })).toHaveValue(null);
     expect(within(probeGroup).getByRole("spinbutton", { name: "超时（秒）" })).toHaveAttribute("placeholder", "5");
     expect(within(probeGroup).getByRole("spinbutton", { name: "尝试次数" })).toHaveValue(null);
@@ -267,6 +270,7 @@ describe("ProcessorBuilder", () => {
     expect(within(probeGroup).getByRole("spinbutton", { name: "并发数" })).toHaveAttribute("placeholder", "10");
     expect(within(probeGroup).getByRole("spinbutton", { name: "测活结果缓存（秒）" })).toHaveValue(null);
     expect(within(probeGroup).getByRole("spinbutton", { name: "测活结果缓存（秒）" })).toHaveAttribute("placeholder", "0");
+    expect(within(probeGroup).getByRole("combobox", { name: "排序" })).toHaveTextContent("按耗时");
 
     expect(serializedProcessors()).toEqual([
       {
@@ -275,6 +279,7 @@ describe("ProcessorBuilder", () => {
         params: {
           fail_mode: "drop",
           annotate: true,
+          sort: "duration",
         },
       },
     ]);
@@ -289,6 +294,7 @@ describe("ProcessorBuilder", () => {
         params: {
           fail_mode: "drop",
           annotate: true,
+          sort: "duration",
         },
       },
       {

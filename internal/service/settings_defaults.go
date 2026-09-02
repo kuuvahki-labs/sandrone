@@ -45,6 +45,9 @@ func (s *Service) probeRequestWithDefaults(req domain.ProbeRequest) domain.Probe
 	if strings.TrimSpace(out.NTPServer) == "" {
 		out.NTPServer = defaults.NTPServer
 	}
+	if out.Method == domain.ProbeURLTest && strings.TrimSpace(out.ExpectedStatus) == "" {
+		out.ExpectedStatus = defaults.ExpectedStatus
+	}
 	if out.TimeoutMS <= 0 {
 		out.TimeoutMS = defaults.TimeoutMS
 	}

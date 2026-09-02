@@ -457,11 +457,13 @@ func TestServiceTransientProbeUsesRuntimeDefaultsBeforeExecution(t *testing.T) {
 	)
 	putProjectSettings(t, svc, context.Background(), func(update *domain.SettingsUpdate) {
 		update.ProbeDefaults = domain.ProbeDefaults{
-			Method:      "tcp_connect",
-			Core:        "mihomo",
-			TimeoutMS:   777,
-			Attempts:    3,
-			Concurrency: 4,
+			Method:         "url_test",
+			Core:           "mihomo",
+			URL:            "https://probe.example/generate_204",
+			ExpectedStatus: "204",
+			TimeoutMS:      777,
+			Attempts:       3,
+			Concurrency:    4,
 		}
 		update.CacheDefaults.ProbeTTLSeconds = 60
 	})
@@ -486,8 +488,10 @@ func TestServiceTransientProbeUsesRuntimeDefaultsBeforeExecution(t *testing.T) {
 	require.False(t, second.Results[0].CacheHit)
 
 	require.Len(t, seen, 2)
-	require.Equal(t, domain.ProbeTCPConnect, seen[0].Method)
-	require.Empty(t, seen[0].Core)
+	require.Equal(t, domain.ProbeURLTest, seen[0].Method)
+	require.Equal(t, "mihomo", seen[0].Core)
+	require.Equal(t, "https://probe.example/generate_204", seen[0].URL)
+	require.Equal(t, "204", seen[0].ExpectedStatus)
 	require.Equal(t, 777, seen[0].TimeoutMS)
 	require.Equal(t, 3, seen[0].Attempts)
 	require.Equal(t, 4, seen[0].Concurrency)

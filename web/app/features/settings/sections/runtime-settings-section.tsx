@@ -131,12 +131,20 @@ export function RuntimeSettingsSection({
               </Select>
             </FormControl>
             {value.probe_defaults.method === "url_test" ? (
-              <ProbeURLField
-                className="md:col-span-2"
-                label={t("settings.runtime.probeUrl")}
-                value={value.probe_defaults.url}
-                onChange={(url) => updateProbeDefaults({ url })}
-              />
+              <>
+                <ProbeURLField
+                  className="md:col-span-2"
+                  label={t("settings.runtime.probeUrl")}
+                  value={value.probe_defaults.url}
+                  onChange={(url) => updateProbeDefaults({ url })}
+                />
+                <TextField
+                  fullWidth
+                  label={t("settings.runtime.probeExpectedStatus")}
+                  value={value.probe_defaults.expected_status}
+                  onChange={(event) => updateProbeDefaults({ expected_status: event.target.value })}
+                />
+              </>
             ) : null}
             {value.probe_defaults.method === "udp_ntp" ? (
               <TextField

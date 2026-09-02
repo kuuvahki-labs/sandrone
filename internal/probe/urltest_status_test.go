@@ -62,3 +62,15 @@ func TestParseExpectedStatusRejectsInvalidExpressions(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeExpectedStatus(t *testing.T) {
+	t.Parallel()
+
+	empty, err := NormalizeExpectedStatus("  ")
+	require.NoError(t, err)
+	require.Empty(t, empty)
+
+	got, err := NormalizeExpectedStatus(" 200, 204, 301-303 ")
+	require.NoError(t, err)
+	require.Equal(t, "200/204/301-303", got)
+}

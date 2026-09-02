@@ -29,6 +29,7 @@ export const defaultProjectSettings: SettingsView = {
     core: "sing-box",
     url: DEFAULT_PROBE_URL,
     ntp_server: "time.apple.com",
+    expected_status: "200-299",
     timeout_ms: 5000,
     attempts: 1,
     concurrency: 10,

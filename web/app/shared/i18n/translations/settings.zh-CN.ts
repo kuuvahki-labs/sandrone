@@ -52,6 +52,7 @@ export const settingsZhCN = {
   "settings.runtime.probeAttempts": "尝试次数",
   "settings.runtime.probeResultCacheTTLSeconds": "结果缓存（秒）",
   "settings.runtime.probeConcurrency": "并发数",
+  "settings.runtime.probeExpectedStatus": "期望状态",
   "settings.runtime.probeMethod": "测活方式",
   "settings.runtime.probeMethodNtp": "UDP NTP",
   "settings.runtime.probeMethodTcp": "TCP 连接",

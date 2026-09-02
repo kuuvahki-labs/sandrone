@@ -13,6 +13,7 @@ describe("project settings model", () => {
     expect(defaultProjectSettings.remote_defaults.user_agent).toBe("");
     expect(defaultProjectSettings.appearance.locale).toBe("auto");
     expect(defaultProjectSettings.probe_defaults.url).toBe("https://cp.cloudflare.com");
+    expect(defaultProjectSettings.probe_defaults.expected_status).toBe("200-299");
     expect(defaultProjectSettings.script_defaults.timeout_ms).toBe(2000);
     expect(defaultProjectSettings.scheduled_refresh).toEqual({
       enabled: false,

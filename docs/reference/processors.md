@@ -135,12 +135,12 @@ processors:
 
 `method`、`core`、`url`、`ntp_server`、`expected_status`、
 `timeout_ms`、`attempts`、`concurrency`、`cache_ttl_seconds`。
-`expected_status` 对 sing-box 和 Mihomo 使用相同语义：空值或 `*` 接受任意状态；
+`expected_status` 对 sing-box 和 Mihomo 使用相同语义：`*` 接受任意状态；
 `204` 表示精确值；`200-299` 表示闭区间；`/` 或 `,` 可连接多个候选，例如
 `200/204/301-303`。首尾空白和空候选会被忽略；每个值必须是 `0..65535` 的
 无符号整数，最多 28 个候选。非法配置产生 `probe_invalid_target`，响应状态不匹配
 则该节点探测失败。
-除 `expected_status` 外，省略值由 probe service 使用当前项目运行默认值处理；
+省略值由 probe service 使用当前项目运行默认值处理；
 `timeout_ms`、`attempts`、`concurrency` 和 `cache_ttl_seconds` 的 `0` 与省略等价，
 其中缓存默认值来自 `cache_defaults.probe_ttl_seconds`。
 该 TTL 只在 processor 属于已保存 Subscription 的执行作用域时形成持久缓存；临时

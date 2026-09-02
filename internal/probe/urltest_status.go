@@ -18,6 +18,20 @@ type expectedStatusMatcher struct {
 	ranges     []expectedStatusRange
 }
 
+// NormalizeExpectedStatus validates an expected HTTP status expression and
+// returns its canonical slash-separated representation while preserving an
+// omitted expression as empty.
+func NormalizeExpectedStatus(raw string) (string, error) {
+	if strings.TrimSpace(raw) == "" {
+		return "", nil
+	}
+	matcher, err := parseExpectedStatus(raw)
+	if err != nil {
+		return "", err
+	}
+	return matcher.String(), nil
+}
+
 func parseExpectedStatus(raw string) (expectedStatusMatcher, error) {
 	expression := strings.TrimSpace(raw)
 	if expression == "" || expression == "*" {
