@@ -54,4 +54,5 @@ export const shareZhCN = {
   "shares.messages.copyUnavailable": "无法自动复制，请手动复制链接",
   "shares.manualCopy.retry": "重试复制",
   "shares.manualCopy.title": "请手动复制链接",
+  "shares.search": "搜索分享",
 } as const;

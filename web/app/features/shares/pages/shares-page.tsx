@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import LinkIcon from "@mui/icons-material/Link";
+import SearchIcon from "@mui/icons-material/Search";
 import TransformOutlinedIcon from "@mui/icons-material/TransformOutlined";
 import Chip from "@mui/material/Chip";
+import InputAdornment from "@mui/material/InputAdornment";
 import List from "@mui/material/List";
+import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 
 import { ManualCopyDialog } from "~/features/shares/components/manual-copy-dialog";
@@ -33,12 +36,29 @@ export interface SharesPageProps {
 export function SharesPage({ items, loaded = true, onCopy, onCopyUrl, onDelete, onGenerateConvertLink }: SharesPageProps) {
   const { t } = useI18n();
   const [manualCopyUrl, setManualCopyUrl] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [queryFocused, setQueryFocused] = useState(false);
   const [selectedShare, setSelectedShare] = useState<ShareItem | null>(null);
   const [statusFilter, setStatusFilter] = useState<ShareStatusFilter>("all");
   const validCount = items.filter((item) => item.status === "valid").length;
   const upcomingCount = items.filter((item) => item.status === "upcoming").length;
   const expiredCount = items.filter((item) => item.status === "expired").length;
-  const filteredItems = statusFilter === "all" ? items : items.filter((item) => item.status === statusFilter);
+  const filteredItems = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    return items.filter((item) => {
+      if (statusFilter !== "all" && item.status !== statusFilter) return false;
+      if (!normalized) return true;
+      return [
+        item.title,
+        item.id,
+        item.targetName,
+        item.targetFormat,
+        item.publicUrl,
+        shareStatusLabel(item.status, t),
+        item.targetKind ? t(`shares.details.targetKind.${item.targetKind}`) : "",
+      ].some((value) => String(value ?? "").toLowerCase().includes(normalized));
+    });
+  }, [items, query, statusFilter, t]);
   return (
     <section className="grid gap-6">
       <PageHeader
@@ -78,6 +98,35 @@ export function SharesPage({ items, loaded = true, onCopy, onCopyUrl, onDelete, 
           </MetricGroup>
         )}
       />
+      <div className="grid gap-3">
+        <TextField
+          fullWidth
+          label={t("actions.search")}
+          type="search"
+          value={query}
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon aria-hidden fontSize="small" />
+                </InputAdornment>
+              ),
+            },
+            htmlInput: { "aria-label": t("shares.search") },
+            inputLabel: {
+              shrink: queryFocused || Boolean(query),
+              sx: {
+                "&:not(.MuiInputLabel-shrink)": {
+                  transform: "translate(48px, 16px) scale(1)",
+                },
+              },
+            },
+          }}
+          onBlur={() => setQueryFocused(false)}
+          onChange={(event) => setQuery(event.target.value)}
+          onFocus={() => setQueryFocused(true)}
+        />
+      </div>
       {filteredItems.length ? (
         <List aria-label={t("shares.list")} className="grid gap-3 p-0">
           {filteredItems.map((item) => (
@@ -168,12 +217,20 @@ function shareActions(
 }
 
 function shareStatusChip(item: ShareItem, t: Translator) {
-  switch (item.status) {
+  return <Chip color={shareStatusColor(item.status)} label={shareStatusLabel(item.status, t)} size="small" />;
+}
+
+function shareStatusLabel(status: ShareItem["status"], t: Translator): string {
+  return t(`shares.status.${status}`);
+}
+
+function shareStatusColor(status: ShareItem["status"]): "info" | "success" | "warning" {
+  switch (status) {
     case "valid":
-      return <Chip color="success" label={t("shares.status.valid")} size="small" />;
+      return "success";
     case "upcoming":
-      return <Chip color="info" label={t("shares.status.upcoming")} size="small" />;
+      return "info";
     case "expired":
-      return <Chip color="warning" label={t("shares.status.expired")} size="small" />;
+      return "warning";
   }
 }

@@ -45,6 +45,43 @@ describe("shares page", () => {
     expect(screen.getByText("old")).toBeInTheDocument();
   });
 
+  it("searches share fields and status copy together with the status filter", () => {
+    const items: ShareItem[] = [
+      shares[0],
+      {
+        ...shares[0],
+        id: "sh_upcoming",
+        publicUrl: "https://example.com/s/sh_upcoming?format=mihomo-proxies",
+        status: "upcoming",
+        targetFormat: "mihomo-proxies",
+        targetKind: "subscription",
+        targetName: "provider-main",
+        title: "future",
+      },
+      {
+        ...shares[0],
+        id: "sh_expired",
+        publicUrl: "https://example.com/s/sh_expired",
+        status: "expired",
+        targetName: "legacy.yaml",
+        title: "old",
+      },
+    ];
+    render(<SharesPage items={items} onCopy={vi.fn()} onCopyUrl={vi.fn()} onDelete={vi.fn()} onGenerateConvertLink={vi.fn()} />);
+
+    const searchbox = screen.getByRole("searchbox", { name: "搜索分享" });
+    fireEvent.change(searchbox, { target: { value: "PROVIDER-MAIN" } });
+    expect(screen.getByRole("button", { name: "查看详情：future" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "查看详情：mobile" })).not.toBeInTheDocument();
+
+    fireEvent.change(searchbox, { target: { value: "已过期" } });
+    expect(screen.getByRole("button", { name: "查看详情：old" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "查看详情：future" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "按有效筛选" }));
+    expect(screen.getByText("没有符合当前筛选的项目")).toBeInTheDocument();
+  });
+
   it("opens share details from the card and leaves only delete in a file share menu", async () => {
     const user = userEvent.setup();
     const onCopy = vi.fn().mockResolvedValue({ copied: true });

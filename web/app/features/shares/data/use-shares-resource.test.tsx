@@ -10,10 +10,10 @@ const t: Translator = (key) => key;
 const ignoreNotice = () => undefined;
 
 describe("share resource data", () => {
-  it("uses publicBaseUrl while preserving API order", async () => {
+  it("uses publicBaseUrl and the default resource order", async () => {
     const listShares = vi.fn().mockResolvedValue({ shares: [
-      { id: "z", target_kind: "file", target_name: "z.yaml" },
-      { id: "a", target_kind: "subscription", target_name: "a", target_format: "uri-list" },
+      { created_at: "2026-01-01T00:00:00Z", id: "z", target_kind: "file", target_name: "z.yaml" },
+      { created_at: "2026-02-01T00:00:00Z", id: "a", target_kind: "subscription", target_name: "a", target_format: "uri-list" },
     ] });
     const client = { listShares } as unknown as ApiClient;
     const { result } = renderHook(() => useSharesResource({
@@ -24,10 +24,10 @@ describe("share resource data", () => {
     }));
 
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.items.map((item) => item.id)).toEqual(["z", "a"]);
+    expect(result.current.items.map((item) => item.id)).toEqual(["a", "z"]);
     expect(result.current.items.map((item) => item.publicUrl)).toEqual([
-      "https://public.example/s/z",
       "https://public.example/s/a?format=uri-list",
+      "https://public.example/s/z",
     ]);
   });
 
