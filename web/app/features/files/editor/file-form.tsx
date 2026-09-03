@@ -59,8 +59,12 @@ export function FileFormFields({ configDefault, defaultName, description = "", d
   ));
   const [sourceValid, setSourceValid] = useState(true);
   const [processorsValid, setProcessorsValid] = useState(true);
+  const [baseResetRevision, setBaseResetRevision] = useState(0);
   const isConfig = driver.configuration.mode !== "none";
   const defaultBase = driver.source.defaultBase(stableNamingLocale);
+  const baseSourceDefault = baseResetRevision > 0
+    ? { type: "inline" as const, content: emptyBaseContent(driver.source.syntax) }
+    : mode === "create" ? { type: "inline" as const, content: defaultBase } : sourceDefault;
   const processors = mode === "create"
     ? driver.processors.defaults(t)
     : processorsDefault;
@@ -89,9 +93,9 @@ export function FileFormFields({ configDefault, defaultName, description = "", d
             baseEditor={(
               <FileSourceEditor
                 contentLabel={t("files.form.content")}
-        defaultValue={mode === "create" ? { type: "inline", content: defaultBase } : sourceDefault}
-        inlineFallback={defaultBase}
-                key={`${sourceEditorKey ?? "file"}-${driver.kind}-base`}
+                defaultValue={baseSourceDefault}
+                inlineFallback={defaultBase}
+                key={`${sourceEditorKey ?? "file"}-${driver.kind}-base-${baseResetRevision}`}
                 language={driver.source.syntax}
                 onDirty={onDirty}
                 onValidityChange={setSourceValid}
@@ -108,6 +112,7 @@ export function FileFormFields({ configDefault, defaultName, description = "", d
             loadSubscriptionPreview={loadSubscriptionPreview}
             loadRuleSetCatalog={loadRuleSetCatalog}
             mode={mode}
+            onClearBase={() => setBaseResetRevision((current) => current + 1)}
             driver={driver}
             subscriptions={subscriptions}
             onDirty={onDirty}
@@ -133,6 +138,7 @@ export function FileKindConfigWorkbench({
   loadRuleSetCatalog,
   loadSubscriptionPreview,
   mode,
+  onClearBase,
   onDirty,
   onValidityChange,
   driver,
@@ -144,6 +150,7 @@ export function FileKindConfigWorkbench({
   loadSubscriptionPreview?: LoadSubscriptionPreview;
   loadRuleSetCatalog?: LoadRuleSetCatalog;
   mode: "create" | "edit";
+  onClearBase: () => void;
   onDirty?: () => void;
   onValidityChange?: (valid: boolean) => void;
   driver: Readonly<FileDriverDefinition>;
@@ -170,10 +177,15 @@ export function FileKindConfigWorkbench({
       loadSubscriptionPreview={loadSubscriptionPreview}
       loadRuleSetCatalog={loadRuleSetCatalog}
       mode={mode}
+      onClearBase={onClearBase}
       subscriptions={allowSubscriptions ? subscriptions : []}
       ui={requireFileDriverUI(driver.kind)}
       onDirty={onDirty}
       onValidityChange={onValidityChange}
     />
   );
+}
+
+function emptyBaseContent(syntax: Readonly<FileDriverDefinition>["source"]["syntax"]): string {
+  return syntax === "json" ? "{}" : "";
 }

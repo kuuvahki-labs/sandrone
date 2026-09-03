@@ -26,6 +26,7 @@ import { WorkbenchGroupSection } from "./editor-shared";
 
 export interface ConfigAdaptiveGroupControlsProps {
   candidates: readonly AdaptiveGroupCandidate[];
+  defaultExpanded?: boolean;
   disabledReason?: string;
   generatedCount: number;
   onOptionsChange: (options: AdaptiveGroupOptions) => void;
@@ -37,6 +38,7 @@ export interface ConfigAdaptiveGroupControlsProps {
 
 export function ConfigAdaptiveGroupControls({
   candidates,
+  defaultExpanded = true,
   disabledReason,
   generatedCount,
   onOptionsChange,
@@ -84,7 +86,7 @@ export function ConfigAdaptiveGroupControls({
 
   return (
     <WorkbenchGroupSection
-      collapsible={false}
+      defaultExpanded={defaultExpanded}
       headerActions={generateButton}
       id="config-adaptive-groups"
       label={t("files.config.adaptiveGroups")}

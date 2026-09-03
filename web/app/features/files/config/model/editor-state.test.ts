@@ -7,6 +7,7 @@ import {
   applyConfigEditorAdaptiveGeneration,
   applyConfigEditorCatalogRuleSet,
   applyConfigEditorTemplate,
+  clearConfigEditor,
   deriveConfigEditorOutput,
   deriveConfigEditorValidity,
   initializeConfigEditorState,
@@ -248,6 +249,40 @@ describe("config editor structure transitions", () => {
     expect(restored.structureRevision).toBe(2);
     expect(deriveConfigEditorOutput(adapter, restored).nativeConfig.groups)
       .toEqual(startingConfig.groups);
+  });
+
+  it("clears structured settings and adaptive state while preserving the selected subscription", () => {
+    const adapter = structuredAdapter("mihomo");
+    const initial = initializeConfigEditorState(adapter, {
+      defaultValue: {
+        ...adapter.templates.create("minimal", "en-US"),
+        adaptive_groups: { regions: ["hk"] },
+        subscriptions: ["provider"],
+      },
+      formMode: "edit",
+    });
+    const withUndo = applyConfigEditorTemplate(adapter, initial, "standard");
+
+    const cleared = clearConfigEditor(adapter, {
+      ...withUndo,
+      adaptiveWarnings: [{ code: "anchor_missing" }],
+    });
+
+    expect(cleared.selectedSubscription).toBe("provider");
+    expect(cleared.adaptiveEnabled).toBe(false);
+    expect(cleared.adaptiveOptionsChanged).toBe(false);
+    expect(cleared.adaptiveWarnings).toEqual([]);
+    expect(cleared.originalAdaptiveGroups).toBeUndefined();
+    expect(cleared.templateUndo).toBeNull();
+    expect(cleared.structureRevision).toBe(withUndo.structureRevision + 1);
+    expect(deriveConfigEditorOutput(adapter, cleared).encoded).toEqual({
+      subscriptions: ["provider"],
+      settings: {
+        groups: [],
+        rule_sets: [],
+        rules: [],
+      },
+    });
   });
 
   it("leaves state unchanged when template undo is unavailable", () => {

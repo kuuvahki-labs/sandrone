@@ -194,6 +194,29 @@ export function applyConfigEditorTemplate(
   };
 }
 
+export function clearConfigEditor(
+  adapter: StructuredFileConfigurationAdapter,
+  state: ConfigEditorState,
+): ConfigEditorState {
+  const empty = adapter.initialize({
+    settingsMode: "structured",
+    groups: [],
+    rule_sets: [],
+    rules: [],
+  }, state.namingLocale);
+
+  return {
+    ...state,
+    adaptiveEnabled: false,
+    adaptiveOptionsChanged: false,
+    adaptiveWarnings: [],
+    originalAdaptiveGroups: undefined,
+    structure: structureFromDraft(empty),
+    structureRevision: state.structureRevision + 1,
+    templateUndo: null,
+  };
+}
+
 export function undoConfigEditorTemplate(
   state: ConfigEditorState,
 ): ConfigEditorState {

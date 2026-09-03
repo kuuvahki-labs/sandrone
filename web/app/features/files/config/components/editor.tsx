@@ -1,6 +1,11 @@
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useId, useMemo, useState } from "react";
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
+import Dialog from "@mui/material/Dialog";
+import DialogActions from "@mui/material/DialogActions";
+import DialogContent from "@mui/material/DialogContent";
+import DialogContentText from "@mui/material/DialogContentText";
+import DialogTitle from "@mui/material/DialogTitle";
 import Typography from "@mui/material/Typography";
 
 import { adaptiveGenerationDisabledReasonKey } from "~/features/files/config/model/adaptive-availability";
@@ -14,6 +19,7 @@ import {
   applyConfigEditorAdaptiveGeneration,
   applyConfigEditorCatalogRuleSet,
   applyConfigEditorTemplate,
+  clearConfigEditor,
   type ConfigEditorAction,
   deriveConfigEditorOutput,
   deriveConfigEditorValidity,
@@ -52,12 +58,13 @@ export interface FileConfigEditorProps {
   loadSubscriptionPreview?: LoadSubscriptionPreview;
   loadRuleSetCatalog?: LoadRuleSetCatalog;
   onDirty?: () => void;
+  onClearBase: () => void;
   onValidityChange?: (valid: boolean) => void;
   subscriptions: ResourceOption[];
   ui: Readonly<StructuredConfigurationFieldSlots>;
 }
 
-export function FileConfigEditor({ adapter, allowSubscriptions = true, baseEditor, createNamingLocale = "en-US", defaultValue, loadRuleSetCatalog, loadSubscriptionPreview = emptySubscriptionPreview, mode: formMode, onDirty, onValidityChange, subscriptions, ui }: FileConfigEditorProps) {
+export function FileConfigEditor({ adapter, allowSubscriptions = true, baseEditor, createNamingLocale = "en-US", defaultValue, loadRuleSetCatalog, loadSubscriptionPreview = emptySubscriptionPreview, mode: formMode, onClearBase, onDirty, onValidityChange, subscriptions, ui }: FileConfigEditorProps) {
   const { t } = useI18n();
   const [editorState, setEditorState] = useState(() => (
     initializeConfigEditorState(adapter, {
@@ -72,7 +79,9 @@ export function FileConfigEditor({ adapter, allowSubscriptions = true, baseEdito
     preview: null,
   });
   const [catalogOpen, setCatalogOpen] = useState(false);
+  const [clearConfirmationOpen, setClearConfirmationOpen] = useState(false);
   const {
+    adaptiveEnabled,
     adaptiveOptions,
     adaptiveWarnings,
     namingLocale,
@@ -191,6 +200,20 @@ export function FileConfigEditor({ adapter, allowSubscriptions = true, baseEdito
     setEditorState(undoConfigEditorTemplate(editorState));
   }
 
+  function clearConfiguration() {
+    onDirty?.();
+    onClearBase();
+    setEditorState((current) => clearConfigEditor(adapter, current));
+  }
+
+  function requestClearConfiguration() {
+    if (formMode === "edit") {
+      setClearConfirmationOpen(true);
+      return;
+    }
+    clearConfiguration();
+  }
+
   function generateAdaptive(options: AdaptiveGroupOptions) {
     const transition = applyConfigEditorAdaptiveGeneration(
       adapter,
@@ -225,6 +248,10 @@ export function FileConfigEditor({ adapter, allowSubscriptions = true, baseEdito
   const groupIssues = relationModel.issues.filter((issue) => issue.section === "groups");
   const ruleSetIssues = relationModel.issues.filter((issue) => issue.section === "rule_sets");
   const ruleIssues = relationModel.issues.filter((issue) => issue.section === "rules");
+  const configurationEmpty = !adaptiveEnabled
+    && groups.length === 0
+    && ruleSets.length === 0
+    && rules.length === 0;
 
   return (
     <div className="grid min-w-0 gap-3">
@@ -233,19 +260,6 @@ export function FileConfigEditor({ adapter, allowSubscriptions = true, baseEdito
         {t("files.config.content")}
       </Typography>
 			{multipleSubscriptions ? <Alert severity="error">{t("files.config.multipleSubscriptions", { names: originalSubscriptions.join(", ") })}</Alert> : null}
-      {!rawMode ? (
-        <WorkbenchGroupSection collapsible={false} id="config-templates" label={copy.templateSection} summary={templateSummary}>
-          <ConfigTemplatePicker
-            choices={templates}
-            confirmBeforeApply={formMode === "edit" || recognition.adaptive}
-            copy={templatePickerCopy}
-            currentTemplateId={recognizedTemplate ?? undefined}
-            labelledBy="config-templates-header"
-            onRequestApply={applyTemplate}
-          />
-          {templateUndo ? <ConfigTemplateAppliedNotice message={copy.applied} undoLabel={copy.undo} onUndo={undoTemplate} /> : null}
-        </WorkbenchGroupSection>
-      ) : null}
       {allowSubscriptions ? <ConfigNodeSourceSection
         disabled={multipleSubscriptions}
         loadPreview={loadSubscriptionPreview}
@@ -258,6 +272,25 @@ export function FileConfigEditor({ adapter, allowSubscriptions = true, baseEdito
         onStateChange={setNodeSourceState}
       /> : null}
 			{previewValidation.issueKey ? <Alert severity="error">{t(previewValidation.issueKey)}</Alert> : null}
+      {!rawMode ? (
+        <WorkbenchGroupSection
+          collapsible={false}
+          headerActions={<Button aria-label={t("files.config.clearAction")} color="error" size="small" type="button" onClick={requestClearConfiguration}>{t("actions.clear")}</Button>}
+          id="config-templates"
+          label={copy.templateSection}
+          summary={templateSummary}
+        >
+          <ConfigTemplatePicker
+            choices={templates}
+            confirmBeforeApply={formMode === "edit" || recognition.adaptive}
+            copy={templatePickerCopy}
+            currentTemplateId={recognizedTemplate ?? undefined}
+            labelledBy="config-templates-header"
+            onRequestApply={applyTemplate}
+          />
+          {templateUndo ? <ConfigTemplateAppliedNotice message={copy.applied} undoLabel={copy.undo} onUndo={undoTemplate} /> : null}
+        </WorkbenchGroupSection>
+      ) : null}
 			{rawMode ? (
 				<>
 					<Alert severity="warning">{t("files.config.rawSettingsPreserved")}</Alert>
@@ -283,8 +316,10 @@ export function FileConfigEditor({ adapter, allowSubscriptions = true, baseEdito
 				<>
       <ConfigAdaptiveGroupControls
         candidates={adaptiveCandidates}
+        defaultExpanded={!configurationEmpty}
         disabledReason={adaptiveDisabledReason}
 		generatedCount={adapter.adaptive.canonicalNames(effectiveAdaptiveConfig.groups ?? []).length}
+		key={`adaptive-${structureRevision}`}
 		options={adaptiveOptions}
 		typeOptions={adapter.adaptive.typeOptions}
         warnings={adaptiveWarnings}
@@ -301,9 +336,9 @@ export function FileConfigEditor({ adapter, allowSubscriptions = true, baseEdito
       {editorMode === "advanced" ? <Alert severity="warning"><Typography className="font-semibold" component="p" variant="body2">{t("files.config.rawConfig")}</Typography>{t("files.config.advancedUnsupported")}</Alert> : null}
       {editorMode === "wizard" ? (
         <>
-          <ProxyGroupEditor adapter={adapter} defaultExpanded groups={groups} inboundReferences={relationModel.groupInboundReferences} issues={groupIssues} key={`groups-${structureRevision}`} namingLocale={namingLocale} nodes={nodeOptions ?? []} ui={ui} onChange={(value) => updateEditorState({ type: "change-groups", groups: value })} />
-          <RuleSetListEditor adapter={adapter} defaultExpanded={ruleSets.length <= 20} inboundReferences={relationModel.ruleSetInboundReferences} issues={ruleSetIssues} key={`rule-sets-${structureRevision}`} ruleSets={ruleSets} ui={ui} onChange={(value) => updateEditorState({ type: "change-rule-sets", ruleSets: value })} onOpenCatalog={loadRuleSetCatalog ? () => setCatalogOpen(true) : undefined} />
-          <RuleListEditor adapter={adapter} defaultExpanded groups={groups} issues={ruleIssues} key={`rules-${structureRevision}`} namingLocale={namingLocale} nodes={nodeOptions ?? []} rules={rules} ruleSets={ruleSets} ui={ui} onChange={(value) => updateEditorState({ type: "change-rules", rules: value })} />
+          <ProxyGroupEditor adapter={adapter} defaultExpanded={!configurationEmpty} groups={groups} inboundReferences={relationModel.groupInboundReferences} issues={groupIssues} key={`groups-${structureRevision}`} namingLocale={namingLocale} nodes={nodeOptions ?? []} ui={ui} onChange={(value) => updateEditorState({ type: "change-groups", groups: value })} />
+          <RuleSetListEditor adapter={adapter} defaultExpanded={!configurationEmpty && ruleSets.length <= 20} inboundReferences={relationModel.ruleSetInboundReferences} issues={ruleSetIssues} key={`rule-sets-${structureRevision}`} ruleSets={ruleSets} ui={ui} onChange={(value) => updateEditorState({ type: "change-rule-sets", ruleSets: value })} onOpenCatalog={loadRuleSetCatalog ? () => setCatalogOpen(true) : undefined} />
+          <RuleListEditor adapter={adapter} defaultExpanded={!configurationEmpty} groups={groups} issues={ruleIssues} key={`rules-${structureRevision}`} namingLocale={namingLocale} nodes={nodeOptions ?? []} rules={rules} ruleSets={ruleSets} ui={ui} onChange={(value) => updateEditorState({ type: "change-rules", rules: value })} />
         </>
       ) : (
         <>
@@ -323,7 +358,34 @@ export function FileConfigEditor({ adapter, allowSubscriptions = true, baseEdito
       ) : null}
 				</>
 			)}
+      {clearConfirmationOpen ? (
+        <ClearConfigurationDialog
+          onCancel={() => setClearConfirmationOpen(false)}
+          onConfirm={() => {
+            setClearConfirmationOpen(false);
+            clearConfiguration();
+          }}
+        />
+      ) : null}
     </div>
+  );
+}
+
+function ClearConfigurationDialog({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: () => void }) {
+  const { t } = useI18n();
+  const titleId = useId();
+  const descriptionId = useId();
+  return (
+    <Dialog open aria-describedby={descriptionId} aria-labelledby={titleId} onClose={onCancel}>
+      <DialogTitle id={titleId}>{t("files.config.clearTitle")}</DialogTitle>
+      <DialogContent>
+        <DialogContentText id={descriptionId}>{t("files.config.clearBody")}</DialogContentText>
+      </DialogContent>
+      <DialogActions>
+        <Button type="button" onClick={onCancel}>{t("actions.cancel")}</Button>
+        <Button aria-label={t("files.config.clearAction")} color="error" type="button" variant="contained" onClick={onConfirm}>{t("actions.clear")}</Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 

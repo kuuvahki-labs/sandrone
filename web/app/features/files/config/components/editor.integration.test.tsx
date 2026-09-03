@@ -82,7 +82,7 @@ describe("config file workbench integration", { timeout: 20_000 }, () => {
     const nodeSource = screen.getByRole("group", { name: "Node source" });
     expect(screen.getByRole("heading", { name: "Configuration content" }))
       .toBeInTheDocument();
-    expect(template.compareDocumentPosition(nodeSource))
+    expect(nodeSource.compareDocumentPosition(template))
       .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(await screen.findByText("Loaded 1 nodes")).toBeInTheDocument();
 
@@ -333,6 +333,7 @@ function renderEditor(
       baseEditor={<textarea aria-label="base config" defaultValue="" />}
       defaultValue={minimalConfig}
       mode="edit"
+      onClearBase={() => undefined}
       subscriptions={subscriptions}
       {...overrides}
       adapter={adapter}

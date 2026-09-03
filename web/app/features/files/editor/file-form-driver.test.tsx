@@ -24,6 +24,7 @@ describe("file form drivers", () => {
         configDefault={{ settingsPresent: true, settings: {} }}
         createNamingLocale="en-US"
         mode="edit"
+        onClearBase={() => undefined}
         driver={requireFileDriver("shadowrocket")}
         subscriptions={[{ name: "provider", title: "Provider" }]}
       />,
@@ -61,6 +62,7 @@ describe("file form drivers", () => {
       baseEditor={<div />}
       defaultValue={{ subscriptions: ["provider"], settingsMode: "raw", rawSettings: { future_nested: { keep: true } } }}
       mode="edit"
+      onClearBase={() => undefined}
       subscriptions={[]}
       ui={requireFileDriverUI("mihomo")}
     />);
@@ -122,6 +124,93 @@ describe("file form drivers", () => {
     };
     expect(base.dns.servers[2]?.detour).toBe("🚀 节点选择");
     expect(base.route.final).toBe("🚀 节点选择");
+  });
+
+  it("clears the base and template settings while preserving the subscription and processors", async () => {
+    localStorage.setItem("sandrone.locale", "en-US");
+    const user = userEvent.setup();
+    const onDirty = vi.fn();
+    render(<FileFormFields
+      configDefault={{
+        subscriptions: ["provider"],
+        settingsPresent: true,
+        settings: {
+          adaptive_groups: { regions: ["hk"] },
+          groups: [{ name: "Proxy", type: "select", proxies: ["$nodes", "DIRECT"] }],
+          rule_sets: [{ name: "private", type: "inline", behavior: "classical", payload: ["DOMAIN-SUFFIX,local"] }],
+          rules: ["RULE-SET,private,DIRECT", "MATCH,Proxy"],
+        },
+      }}
+      defaultName="client.yaml"
+      driver={requireFileDriver("mihomo")}
+      mode="edit"
+      onDirty={onDirty}
+      processorsDefault={[{
+        name: "Remote converter",
+        type: "script",
+        stage: "file",
+        params: {
+          source: {
+            type: "remote",
+            remote: { url: "https://example.com/convert.js" },
+          },
+        },
+      }]}
+      sourceDefault={{ type: "remote", remote: { url: "https://example.com/base.yaml" } }}
+      subscriptions={[{ name: "provider", title: "Provider" }]}
+    />);
+    const processorsBefore = currentProcessors();
+
+    onDirty.mockClear();
+    await user.click(screen.getByRole("button", { name: "Clear configuration" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Clear configuration?" });
+    expect(currentSource()).toEqual({
+      type: "remote",
+      remote: { url: "https://example.com/base.yaml" },
+    });
+    expect(currentConfig()).toMatchObject({ subscriptions: ["provider"] });
+    expect(onDirty).not.toHaveBeenCalled();
+
+    await user.click(within(dialog).getByRole("button", { name: "Clear configuration" }));
+
+    await waitFor(() => {
+      expect(currentSource()).toEqual({ type: "inline", content: "" });
+      expect(currentConfig()).toEqual({
+        subscriptions: ["provider"],
+        settings: { groups: [], rule_sets: [], rules: [] },
+      });
+    });
+    for (const section of ["Adaptive groups", "Proxy groups", "Rule sets", "Rules"]) {
+      expect(screen.getByRole("button", { name: section })).toHaveAttribute("aria-expanded", "false");
+    }
+    expect(currentProcessors()).toEqual(processorsBefore);
+    expect(onDirty).toHaveBeenCalled();
+  });
+
+  it("lets a new config keep only its selected subscription before a file processor generates it", async () => {
+    localStorage.setItem("sandrone.locale", "en-US");
+    const user = userEvent.setup();
+    render(<FileFormFields
+      defaultName="client.yaml"
+      driver={requireFileDriver("mihomo")}
+      mode="create"
+      subscriptions={[{ name: "provider", title: "Provider" }]}
+    />);
+
+    await user.click(screen.getByRole("combobox", { name: "Subscription" }));
+    await user.click(await screen.findByRole("option", { name: "Provider (provider)" }));
+    await user.click(screen.getByRole("button", { name: "Clear configuration" }));
+
+    expect(screen.queryByRole("dialog", { name: "Clear configuration?" }))
+      .not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(currentSource()).toEqual({ type: "inline", content: "" });
+      expect(currentConfig()).toEqual({
+        subscriptions: ["provider"],
+        settings: { groups: [], rule_sets: [], rules: [] },
+      });
+    });
   });
 
 });
@@ -241,6 +330,7 @@ describe("raw-only file kind workbench", () => {
         configDefault={{ subscriptions: ["provider"], settingsPresent: true, settings: { future: true } }}
         createNamingLocale="en-US"
         mode="edit"
+        onClearBase={() => undefined}
         driver={rawOnlyDriver}
         subscriptions={[{ name: "provider", title: "provider" }]}
         onValidityChange={onValidityChange}
@@ -265,6 +355,7 @@ describe("raw-only file kind workbench", () => {
         configDefault={{ subscriptions: ["provider"], settingsPresent: false }}
         createNamingLocale="en-US"
         mode="edit"
+        onClearBase={() => undefined}
         driver={rawOnlyDriver}
         subscriptions={[{ name: "provider", title: "provider" }]}
       />,
@@ -309,6 +400,12 @@ function currentSource(): Record<string, unknown> {
   const input = document.querySelector<HTMLInputElement>('input[name="source"]');
   if (!input) throw new Error("expected serialized source input");
   return JSON.parse(input.value) as Record<string, unknown>;
+}
+
+function currentProcessors(): unknown[] {
+  const input = document.querySelector<HTMLInputElement>('input[name="processors"]');
+  if (!input) throw new Error("expected serialized processors input");
+  return JSON.parse(input.value) as unknown[];
 }
 
 function structuredAdapter(kind: string) {
