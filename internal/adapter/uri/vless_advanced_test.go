@@ -30,6 +30,10 @@ func TestVLESSXHTTPExtraRoundTrip(t *testing.T) {
 				TLS: &domain.TLSOptions{
 					Enabled: true, ServerName: "download.example.com", ALPN: []string{"h2"},
 					ClientFingerprint: "chrome", InsecureSkipVerify: true,
+					Reality: &domain.RealityOptions{
+						Enabled: true, PublicKey: "public-key", ShortID: "08",
+						MLDSA65Verify: "verify-key", SpiderX: "/fallback",
+					},
 				},
 				ReuseSettings: &domain.XHTTPReuseSettings{MaxConnections: "4"},
 			},

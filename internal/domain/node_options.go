@@ -81,9 +81,11 @@ type ECHOptions struct {
 }
 
 type RealityOptions struct {
-	Enabled   bool   `json:"enabled,omitempty" yaml:"enabled,omitempty"`
-	PublicKey string `json:"public_key,omitempty" yaml:"public_key,omitempty"`
-	ShortID   string `json:"short_id,omitempty" yaml:"short_id,omitempty"`
+	Enabled       bool   `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+	PublicKey     string `json:"public_key,omitempty" yaml:"public_key,omitempty"`
+	ShortID       string `json:"short_id,omitempty" yaml:"short_id,omitempty"`
+	MLDSA65Verify string `json:"mldsa65_verify,omitempty" yaml:"mldsa65_verify,omitempty"`
+	SpiderX       string `json:"spider_x,omitempty" yaml:"spider_x,omitempty"`
 }
 
 type UDPOverTCPOptions struct {

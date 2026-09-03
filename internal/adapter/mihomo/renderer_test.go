@@ -1202,6 +1202,43 @@ func TestRenderMihomoSkipsCustomECHDNSTransports(t *testing.T) {
 	require.Equal(t, "valid", doc.Proxies[0]["name"])
 }
 
+func TestRenderMihomoRealityExtendedFieldsReportLoss(t *testing.T) {
+	nodes := []domain.NodeIR{
+		{Name: "valid", Type: domain.NodeTypeHTTP, Server: "valid.example", Port: 8080},
+		{
+			Name: "verify", Type: domain.NodeTypeVLESS, Server: "verify.example", Port: 443,
+			UUID: "11111111-1111-1111-1111-111111111111", Encryption: "none",
+			TLS: &domain.TLSOptions{Enabled: true, Reality: &domain.RealityOptions{
+				PublicKey: "public", MLDSA65Verify: "verify-key",
+			}},
+		},
+		{
+			Name: "spider", Type: domain.NodeTypeVLESS, Server: "spider.example", Port: 443,
+			UUID: "22222222-2222-2222-2222-222222222222", Encryption: "none",
+			TLS: &domain.TLSOptions{Enabled: true, Reality: &domain.RealityOptions{
+				PublicKey: "public", SpiderX: "/fallback",
+			}},
+		},
+	}
+
+	out, report, err := mihomo.NewRenderer().RenderWithReport(context.Background(), nodes, domain.RenderOptions{Format: "mihomo-proxies"})
+
+	require.NoError(t, err)
+	require.Equal(t, 3, report.SuccessCount)
+	require.Len(t, report.Warnings, 2)
+	require.Equal(t, "render_lossy_field", report.Warnings[0].Code)
+	require.Equal(t, "tls.reality.mldsa65_verify", report.Warnings[0].Field)
+	require.Equal(t, "render_lossy_field", report.Warnings[1].Code)
+	require.Equal(t, "tls.reality.spider_x", report.Warnings[1].Field)
+	var doc struct {
+		Proxies []map[string]any `yaml:"proxies"`
+	}
+	require.NoError(t, yaml.Unmarshal(out, &doc))
+	require.Len(t, doc.Proxies, 3)
+	require.Equal(t, "verify", doc.Proxies[1]["name"])
+	require.Equal(t, "spider", doc.Proxies[2]["name"])
+}
+
 func TestRenderMihomoHTTPUpgradeHeadersAsStringLists(t *testing.T) {
 	r := mihomo.NewRenderer()
 	nodes := []domain.NodeIR{{

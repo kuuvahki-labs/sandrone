@@ -536,6 +536,29 @@ func TestRenderSingBoxTLSFingerprintSplit(t *testing.T) {
 	}
 }
 
+func TestRenderSingBoxQUICOmitsUTLSClientFingerprint(t *testing.T) {
+	node := domain.NodeIR{
+		Name: "hy2", Type: domain.NodeTypeHysteria2, Server: "example.com", Port: 443,
+		Password: "secret",
+		TLS:      &domain.TLSOptions{Enabled: true, ServerName: "example.com", ClientFingerprint: "chrome"},
+	}
+
+	out, report, err := singbox.NewRenderer().RenderWithReport(context.Background(), []domain.NodeIR{node}, domain.RenderOptions{Format: "sing-box-outbounds"})
+
+	require.NoError(t, err)
+	require.Equal(t, 1, report.SuccessCount)
+	require.Len(t, report.Warnings, 1)
+	require.Equal(t, "render_lossy_field", report.Warnings[0].Code)
+	require.Equal(t, "tls.client_fingerprint", report.Warnings[0].Field)
+	var document struct {
+		Outbounds []map[string]any `json:"outbounds"`
+	}
+	require.NoError(t, json.Unmarshal(out, &document))
+	require.Len(t, document.Outbounds, 1)
+	tls := document.Outbounds[0]["tls"].(map[string]any)
+	require.NotContains(t, tls, "utls")
+}
+
 func TestRenderSingBoxHysteriaQUIC(t *testing.T) {
 	r := singbox.NewRenderer()
 	nodes := []domain.NodeIR{{
@@ -888,6 +911,43 @@ func TestRenderSingBoxSkipsCustomECHDNSTransport(t *testing.T) {
 	require.NoError(t, json.Unmarshal(out, &doc))
 	require.Len(t, doc.Outbounds, 1)
 	require.Equal(t, "valid", doc.Outbounds[0]["tag"])
+}
+
+func TestRenderSingBoxRealityExtendedFieldsReportLoss(t *testing.T) {
+	nodes := []domain.NodeIR{
+		{Name: "valid", Type: domain.NodeTypeHTTP, Server: "valid.example", Port: 8080},
+		{
+			Name: "verify", Type: domain.NodeTypeVLESS, Server: "verify.example", Port: 443,
+			UUID: "11111111-1111-1111-1111-111111111111", Encryption: "none",
+			TLS: &domain.TLSOptions{Enabled: true, Reality: &domain.RealityOptions{
+				PublicKey: "public", MLDSA65Verify: "verify-key",
+			}},
+		},
+		{
+			Name: "spider", Type: domain.NodeTypeVLESS, Server: "spider.example", Port: 443,
+			UUID: "22222222-2222-2222-2222-222222222222", Encryption: "none",
+			TLS: &domain.TLSOptions{Enabled: true, Reality: &domain.RealityOptions{
+				PublicKey: "public", SpiderX: "/fallback",
+			}},
+		},
+	}
+
+	out, report, err := singbox.NewRenderer().RenderWithReport(context.Background(), nodes, domain.RenderOptions{Format: "sing-box-outbounds"})
+
+	require.NoError(t, err)
+	require.Equal(t, 3, report.SuccessCount)
+	require.Len(t, report.Warnings, 2)
+	require.Equal(t, "render_lossy_field", report.Warnings[0].Code)
+	require.Equal(t, "tls.reality.mldsa65_verify", report.Warnings[0].Field)
+	require.Equal(t, "render_lossy_field", report.Warnings[1].Code)
+	require.Equal(t, "tls.reality.spider_x", report.Warnings[1].Field)
+	var doc struct {
+		Outbounds []map[string]any `json:"outbounds"`
+	}
+	require.NoError(t, json.Unmarshal(out, &doc))
+	require.Len(t, doc.Outbounds, 3)
+	require.Equal(t, "verify", doc.Outbounds[1]["tag"])
+	require.Equal(t, "spider", doc.Outbounds[2]["tag"])
 }
 
 func TestRenderSingBoxTransportVariantsAndPluginOptions(t *testing.T) {

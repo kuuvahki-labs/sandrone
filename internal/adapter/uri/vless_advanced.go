@@ -51,8 +51,10 @@ type xhttpTLSWire struct {
 }
 
 type xhttpRealityWire struct {
-	PublicKey string `json:"publicKey,omitempty"`
-	ShortID   string `json:"shortId,omitempty"`
+	PublicKey     string `json:"publicKey,omitempty"`
+	ShortID       string `json:"shortId,omitempty"`
+	MLDSA65Verify string `json:"mldsa65Verify,omitempty"`
+	SpiderX       string `json:"spiderX,omitempty"`
 }
 
 func applyXHTTPExtra(transport *domain.TransportOptions, values url.Values) bool {
@@ -395,6 +397,14 @@ func realityFromJSON(raw json.RawMessage) *domain.RealityOptions {
 		reality.ShortID = value
 		promoted = true
 	}
+	if value, ok := decodeJSONField[string](fields, "mldsa65Verify"); ok {
+		reality.MLDSA65Verify = value
+		promoted = true
+	}
+	if value, ok := decodeJSONField[string](fields, "spiderX"); ok {
+		reality.SpiderX = value
+		promoted = true
+	}
 	if !promoted {
 		return nil
 	}
@@ -442,6 +452,8 @@ func downloadFromWire(wire *xhttpDownloadWire) *domain.XHTTPDownloadSettings {
 		if reality := wire.RealitySettings; reality != nil {
 			download.TLS.Reality.PublicKey = reality.PublicKey
 			download.TLS.Reality.ShortID = reality.ShortID
+			download.TLS.Reality.MLDSA65Verify = reality.MLDSA65Verify
+			download.TLS.Reality.SpiderX = reality.SpiderX
 		}
 	}
 	return download
@@ -495,7 +507,10 @@ func downloadToWire(download *domain.XHTTPDownloadSettings) *xhttpDownloadWire {
 		}
 		if tls.Reality != nil {
 			wire.Security = "reality"
-			wire.RealitySettings = &xhttpRealityWire{PublicKey: tls.Reality.PublicKey, ShortID: tls.Reality.ShortID}
+			wire.RealitySettings = &xhttpRealityWire{
+				PublicKey: tls.Reality.PublicKey, ShortID: tls.Reality.ShortID,
+				MLDSA65Verify: tls.Reality.MLDSA65Verify, SpiderX: tls.Reality.SpiderX,
+			}
 		}
 	}
 	return wire

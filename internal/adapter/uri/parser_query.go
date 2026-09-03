@@ -68,6 +68,10 @@ func applyTLSQuery(node *domain.NodeIR, values url.Values) {
 			PublicKey: shared.QueryFirst(values, "pbk", "public-key"),
 			ShortID:   shared.QueryFirst(values, "sid", "short-id"),
 		}
+		if node.Type == domain.NodeTypeVLESS {
+			node.TLS.Reality.MLDSA65Verify = values.Get("pqv")
+			node.TLS.Reality.SpiderX = values.Get("spx")
+		}
 	}
 	if ech := parseECHQuery(values.Get("ech"), values.Get("echForceQuery")); ech != nil {
 		if node.TLS == nil {

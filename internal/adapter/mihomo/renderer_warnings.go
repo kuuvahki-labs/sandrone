@@ -26,6 +26,25 @@ func mihomoStructuredLossWarnings(node domain.NodeIR, target string) []domain.Wa
 			add("tls.ech.force_query", "mihomo ECH options do not expose a force-query mode")
 		}
 	}
+	if node.TLS != nil && node.TLS.Reality != nil {
+		if node.TLS.Reality.MLDSA65Verify != "" {
+			add("tls.reality.mldsa65_verify", "mihomo Reality options do not expose ML-DSA-65 certificate verification")
+		}
+		if node.TLS.Reality.SpiderX != "" {
+			add("tls.reality.spider_x", "mihomo Reality options do not expose the SpiderX fallback path")
+		}
+	}
+	if node.Transport != nil && node.Transport.XHTTP != nil && node.Transport.XHTTP.DownloadSettings != nil {
+		tls := node.Transport.XHTTP.DownloadSettings.TLS
+		if tls != nil && tls.Reality != nil {
+			if tls.Reality.MLDSA65Verify != "" {
+				add("transport.xhttp.download_settings.tls.reality.mldsa65_verify", "mihomo Reality options do not expose ML-DSA-65 certificate verification")
+			}
+			if tls.Reality.SpiderX != "" {
+				add("transport.xhttp.download_settings.tls.reality.spider_x", "mihomo Reality options do not expose the SpiderX fallback path")
+			}
+		}
+	}
 	switch node.Type {
 	case domain.NodeTypeVMess, domain.NodeTypeVLESS, domain.NodeTypeTrojan:
 		if node.Multiplex != nil {

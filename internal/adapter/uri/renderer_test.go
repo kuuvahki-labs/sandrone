@@ -357,7 +357,7 @@ func TestRenderParsedVMessAEADStillUsesLegacyBase64JSON(t *testing.T) {
 func TestRenderURIVLESSXHTTPRealityRoundtrip(t *testing.T) {
 	p := uri.NewParser()
 	r := uri.NewRenderer()
-	raw := "vless://11111111-1111-1111-1111-111111111111@example.com:443?encryption=none&security=reality&pbk=public-key&sid=08&type=xhttp&path=%2Fxhttp&host=cdn.example.com&mode=packet-up&packet-encoding=xudp&udp=true&sni=sni.example.com&fp=chrome&alpn=h2,http/1.1#vless-xhttp"
+	raw := "vless://11111111-1111-1111-1111-111111111111@example.com:443?encryption=none&security=reality&pbk=public-key&sid=08&pqv=verify-key&spx=%2Ffallback&type=xhttp&path=%2Fxhttp&host=cdn.example.com&mode=packet-up&packet-encoding=xudp&udp=true&sni=sni.example.com&fp=chrome&alpn=h2,http/1.1#vless-xhttp"
 
 	parsed, _, err := p.Parse(context.Background(), []byte(raw))
 	require.NoError(t, err)
@@ -380,6 +380,8 @@ func TestRenderURIVLESSXHTTPRealityRoundtrip(t *testing.T) {
 	require.NotNil(t, got.TLS.Reality)
 	require.Equal(t, "public-key", got.TLS.Reality.PublicKey)
 	require.Equal(t, "08", got.TLS.Reality.ShortID)
+	require.Equal(t, "verify-key", got.TLS.Reality.MLDSA65Verify)
+	require.Equal(t, "/fallback", got.TLS.Reality.SpiderX)
 	require.NotNil(t, got.Transport)
 	require.Equal(t, "xhttp", got.Transport.Type)
 	require.Equal(t, "/xhttp", got.Transport.Path)
@@ -483,13 +485,17 @@ func TestRenderURIVLESSWithReality(t *testing.T) {
 		UUID:       "11111111-1111-1111-1111-111111111111",
 		Encryption: "none",
 		TLS: &domain.TLSOptions{
-			Reality: &domain.RealityOptions{PublicKey: "pk", ShortID: "ab"},
+			Reality: &domain.RealityOptions{
+				PublicKey: "pk", ShortID: "ab", MLDSA65Verify: "verify-key", SpiderX: "/fallback",
+			},
 		},
 		Transport: &domain.TransportOptions{Type: "http", Path: "/h2", Host: "cdn.example.com"},
 	}}, domain.RenderOptions{})
 	require.NoError(t, err)
 	require.Equal(t, 1, report.SuccessCount)
 	require.Contains(t, string(out), "security=reality")
+	require.Contains(t, string(out), "pqv=verify-key")
+	require.Contains(t, string(out), "spx=%2Ffallback")
 	require.Contains(t, string(out), "type=h2")
 }
 

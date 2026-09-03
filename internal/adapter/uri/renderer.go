@@ -424,6 +424,12 @@ func applyURIQueryTLS(q url.Values, node domain.NodeIR) {
 		if node.TLS.Reality.ShortID != "" {
 			q.Set("sid", node.TLS.Reality.ShortID)
 		}
+		if node.Type == domain.NodeTypeVLESS && node.TLS.Reality.MLDSA65Verify != "" {
+			q.Set("pqv", node.TLS.Reality.MLDSA65Verify)
+		}
+		if node.Type == domain.NodeTypeVLESS && node.TLS.Reality.SpiderX != "" {
+			q.Set("spx", node.TLS.Reality.SpiderX)
+		}
 	} else if node.TLS.Enabled {
 		q.Set("security", "tls")
 	}

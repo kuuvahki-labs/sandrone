@@ -65,8 +65,10 @@ func parseVLESS(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 	if node.Transport != nil && node.Transport.Type == "tcp" && queryValuesEqualFold(values, "quicSecurity", "none") {
 		known["quicSecurity"] = true
 	}
-	if queryValuesAreEmpty(values, "pqv") {
-		known["pqv"] = true
+	for _, key := range []string{"pqv", "spx"} {
+		if node.TLS != nil && node.TLS.Reality != nil || queryValuesAreEmpty(values, key) {
+			known[key] = true
+		}
 	}
 	preserveURIQuery(&node, values, known)
 	return node, source, nil

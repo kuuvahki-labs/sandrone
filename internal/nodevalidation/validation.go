@@ -17,6 +17,8 @@ import (
 type Stage string
 
 const (
+	realityMLDSA65VerifyKeySize = 1952
+
 	StageNormalized Stage = "normalized"
 	StageProcessed  Stage = "processed"
 	StageRender     Stage = "render"
@@ -195,6 +197,15 @@ func validateTLS(options *domain.TLSOptions, prefix string, add func(string, str
 			add("node_validation_required", field, "Reality public key is required")
 		} else if publicKey, err := base64.RawURLEncoding.DecodeString(reality.PublicKey); err != nil || len(publicKey) != 32 {
 			add("node_validation_invalid", field, "Reality public key must be a 32-byte URL-safe base64 value without padding")
+		}
+		if reality.MLDSA65Verify != "" {
+			field = prefix + ".reality.mldsa65_verify"
+			if verifyKey, err := base64.RawURLEncoding.DecodeString(reality.MLDSA65Verify); err != nil || len(verifyKey) != realityMLDSA65VerifyKeySize {
+				add("node_validation_invalid", field, "Reality ML-DSA-65 verify key must be a 1952-byte URL-safe base64 value without padding")
+			}
+		}
+		if reality.SpiderX != "" && !strings.HasPrefix(reality.SpiderX, "/") {
+			add("node_validation_invalid", prefix+".reality.spider_x", "Reality SpiderX path must start with /")
 		}
 	}
 	if options.ECH != nil {

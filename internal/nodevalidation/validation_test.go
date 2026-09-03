@@ -1,6 +1,7 @@
 package nodevalidation_test
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"testing"
 
@@ -197,6 +198,45 @@ func TestValidateRealityPublicKey(t *testing.T) {
 			require.Len(t, result.Issues, 1)
 			require.Equal(t, tt.code, result.Issues[0].Code)
 			require.Equal(t, "tls.reality.public_key", result.Issues[0].Field)
+		})
+	}
+}
+
+func TestValidateRealityMLDSA65VerifyAndSpiderX(t *testing.T) {
+	t.Parallel()
+
+	validVerifyKey := base64.RawURLEncoding.EncodeToString(make([]byte, 1952))
+	base := domain.NodeIR{
+		Name: "vless", Type: domain.NodeTypeVLESS, Server: "example.com", Port: 443,
+		UUID: "11111111-1111-1111-1111-111111111111", Encryption: "none",
+	}
+	tests := []struct {
+		name      string
+		verifyKey string
+		spiderX   string
+		wantField string
+	}{
+		{name: "valid", verifyKey: validVerifyKey, spiderX: "/fallback"},
+		{name: "invalid verify encoding", verifyKey: "not+a-key", spiderX: "/fallback", wantField: "tls.reality.mldsa65_verify"},
+		{name: "invalid verify length", verifyKey: "c2hvcnQ", spiderX: "/fallback", wantField: "tls.reality.mldsa65_verify"},
+		{name: "invalid spider path", verifyKey: validVerifyKey, spiderX: "fallback", wantField: "tls.reality.spider_x"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			node := base
+			node.TLS = &domain.TLSOptions{Enabled: true, Reality: &domain.RealityOptions{
+				Enabled: true, PublicKey: validRealityPublicKey,
+				MLDSA65Verify: tt.verifyKey, SpiderX: tt.spiderX,
+			}}
+			result := nodevalidation.Validate([]domain.NodeIR{node}, nodevalidation.StageNormalized, "")
+			if tt.wantField == "" {
+				require.Equal(t, 1, result.Counts.Valid)
+				return
+			}
+			require.Equal(t, 1, result.Counts.Invalid)
+			require.Equal(t, []string{tt.wantField}, issueFields(result.Issues))
 		})
 	}
 }

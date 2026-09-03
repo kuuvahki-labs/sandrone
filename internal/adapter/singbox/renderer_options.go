@@ -61,7 +61,7 @@ func applyTLS(out map[string]any, node domain.NodeIR) {
 	if len(node.TLS.ALPN) > 0 {
 		tls["alpn"] = node.TLS.ALPN
 	}
-	if node.TLS.ClientFingerprint != "" {
+	if node.TLS.ClientFingerprint != "" && singBoxSupportsUTLS(node.Type) {
 		tls["utls"] = map[string]any{
 			"enabled":     true,
 			"fingerprint": node.TLS.ClientFingerprint,
@@ -88,6 +88,15 @@ func applyTLS(out map[string]any, node domain.NodeIR) {
 		}
 	}
 	out["tls"] = tls
+}
+
+func singBoxSupportsUTLS(nodeType domain.NodeType) bool {
+	switch nodeType {
+	case domain.NodeTypeHysteria, domain.NodeTypeHysteria2, domain.NodeTypeTUIC:
+		return false
+	default:
+		return true
+	}
 }
 
 func applyTransport(out map[string]any, node domain.NodeIR) error {

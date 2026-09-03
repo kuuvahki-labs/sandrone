@@ -120,6 +120,20 @@ func TestClientCapabilitiesDoNotDeclareConnectionCriticalECHDNSLossy(t *testing.
 	}
 }
 
+func TestRealityExtendedFieldCapabilitiesMatchTargetSemantics(t *testing.T) {
+	t.Parallel()
+
+	uriCapability := shared.CapabilityFor("uri-list", shared.DirectionRender, []domain.NodeType{domain.NodeTypeVLESS}, false)
+	require.Contains(t, irFields(uriCapability.Fields), "tls.reality.mldsa65_verify")
+	require.Contains(t, irFields(uriCapability.Fields), "tls.reality.spider_x")
+
+	for _, format := range []string{"mihomo-proxies", "sing-box-outbounds"} {
+		capability := shared.CapabilityFor(format, shared.DirectionRender, []domain.NodeType{domain.NodeTypeVLESS}, false)
+		require.Contains(t, irFields(capability.Lossy), "tls.reality.mldsa65_verify")
+		require.Contains(t, irFields(capability.Lossy), "tls.reality.spider_x")
+	}
+}
+
 func TestFieldRefsCoverTargetSpecificFieldsAndRawOnlyCatalog(t *testing.T) {
 	fields := shared.FieldRefs("mihomo-proxies", []domain.NodeType{
 		domain.NodeTypeShadowsocks,

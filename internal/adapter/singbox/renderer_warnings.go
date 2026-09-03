@@ -13,9 +13,31 @@ func singBoxStructuredLossWarnings(node domain.NodeIR) []domain.Warning {
 	if node.TLS != nil && node.TLS.Fingerprint != "" {
 		warnings = append(warnings, lossyWarning(node, "tls.fingerprint", "TLS certificate fingerprint is not rendered to sing-box utls.fingerprint"))
 	}
+	if node.TLS != nil && node.TLS.ClientFingerprint != "" && !singBoxSupportsUTLS(node.Type) {
+		warnings = append(warnings, lossyWarning(node, "tls.client_fingerprint", "sing-box does not support uTLS for QUIC-based outbounds"))
+	}
 	if node.TLS != nil && node.TLS.ECH != nil {
 		if node.TLS.ECH.ForceQuery != "" {
 			warnings = append(warnings, lossyWarning(node, "tls.ech.force_query", "sing-box ECH options do not expose the URI force-query mode"))
+		}
+	}
+	if node.TLS != nil && node.TLS.Reality != nil {
+		if node.TLS.Reality.MLDSA65Verify != "" {
+			warnings = append(warnings, lossyWarning(node, "tls.reality.mldsa65_verify", "sing-box Reality options do not expose ML-DSA-65 certificate verification"))
+		}
+		if node.TLS.Reality.SpiderX != "" {
+			warnings = append(warnings, lossyWarning(node, "tls.reality.spider_x", "sing-box Reality options do not expose the SpiderX fallback path"))
+		}
+	}
+	if node.Transport != nil && node.Transport.XHTTP != nil && node.Transport.XHTTP.DownloadSettings != nil {
+		tls := node.Transport.XHTTP.DownloadSettings.TLS
+		if tls != nil && tls.Reality != nil {
+			if tls.Reality.MLDSA65Verify != "" {
+				warnings = append(warnings, lossyWarning(node, "transport.xhttp.download_settings.tls.reality.mldsa65_verify", "sing-box Reality options do not expose ML-DSA-65 certificate verification"))
+			}
+			if tls.Reality.SpiderX != "" {
+				warnings = append(warnings, lossyWarning(node, "transport.xhttp.download_settings.tls.reality.spider_x", "sing-box Reality options do not expose the SpiderX fallback path"))
+			}
 		}
 	}
 	if node.Type == domain.NodeTypeSOCKS && node.TLS != nil {

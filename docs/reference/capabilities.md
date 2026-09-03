@@ -121,10 +121,22 @@ renderer 或 probe core。当前值域为 `chrome`、`firefox`、`edge`、`safar
 映射。规范化后的值写入 `NodeIR`，因此 URI、Mihomo、sing-box 和 JSON Nodes 输出
 使用同一有效语义，而不是由单个目标 renderer 私自选择默认值。
 
+sing-box 的 Hysteria、Hysteria2 和 TUIC outbound 基于 QUIC，不支持 uTLS；这些协议
+携带的 `tls.client_fingerprint` 不会写入 sing-box 配置，并产生
+`render_lossy_field`，避免因无效 `utls` 配置让整个 probe core 拒绝启动。
+
 Reality client 的 `public_key` 是连接必需字段，必须是无 padding 的 URL-safe
 Base64，且解码后恰好 32 字节。字段缺失或非法时，节点在 shared validation 阶段以
 `tls.reality.public_key` 隔离，不会让单个无效 Reality 节点阻断整批 renderer 或
 probe core，也不会由目标客户端退化成普通 TLS。
+
+VLESS URI 的 `pqv` 与 `spx` 分别映射到 canonical
+`tls.reality.mldsa65_verify` 和 `tls.reality.spider_x`，URI parser/renderer 会双向
+保留。`mldsa65_verify` 必须是无 padding 的 URL-safe Base64，解码后恰好 1952
+字节；`spider_x` 非空时必须以 `/` 开头。Mihomo 与当前 sing-box outbound schema
+都无法表达这两个字段；renderer/probe 仍会使用传统 Reality 验证路径输出和测活，
+同时为未执行的 ML-DSA-65 额外证书验证和未表达的 SpiderX 产生
+`render_lossy_field`，避免把基础连通性结果误报为完整扩展语义验证成功。
 
 ## 输出格式
 
@@ -201,7 +213,8 @@ raw 字段会产生 `render_lossy_field`。`json-nodes` 会原样承载 `raw`，
   `eh`，分别映射到 `transport.max_early_data` 和
   `transport.early_data_header_name`；缺少 `eh` 时使用
   `Sec-WebSocket-Protocol`，非法或冲突值仍保留到 `raw` 并告警；
-- VLESS/TCP 仅接受 `quicSecurity=none`；其它值以及 TCP 上的 `mode`、`spx`
+- VLESS/TCP 仅接受 `quicSecurity=none`；其它值以及 TCP 上的 `mode` 仍保留到
+  `raw` 并告警。`spx` 仅在 Reality 上映射为 canonical `spider_x`，其它安全模式下
   仍保留到 `raw` 并告警；
 - URI 中空的 `headerType=` 与 `headerType=none` 都按无语义默认值消费；其它值仍按
   对应 transport 语义处理或保留到 `raw`；

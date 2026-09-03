@@ -2539,17 +2539,21 @@ func TestParseVLESSEmptyPQVQueryIsSilent(t *testing.T) {
 	require.Empty(t, source.Warnings)
 }
 
-func TestParseVLESSNonEmptyPQVQueryStaysRaw(t *testing.T) {
+func TestParseVLESSRealityVerificationAndSpiderQueryAreCanonical(t *testing.T) {
 	p := uri.NewParser()
-	raw := "vless://11111111-1111-1111-1111-111111111111@example.com:443?encryption=none&security=reality&pbk=pk&sid=sid&pqv=mlkem#vless"
+	raw := "vless://11111111-1111-1111-1111-111111111111@example.com:443?encryption=none&security=reality&pbk=pk&sid=sid&pqv=verify-key&spx=%2Ffallback#vless"
 
 	nodes, source, err := p.Parse(context.Background(), []byte(raw))
 
 	require.NoError(t, err)
 	require.Len(t, nodes, 1)
-	require.JSONEq(t, `"mlkem"`, string(nodes[0].Raw["uri.query.pqv"]))
-	require.Len(t, source.Warnings, 1)
-	require.Equal(t, "uri.query.pqv", source.Warnings[0].Field)
+	require.NotNil(t, nodes[0].TLS)
+	require.NotNil(t, nodes[0].TLS.Reality)
+	require.Equal(t, "verify-key", nodes[0].TLS.Reality.MLDSA65Verify)
+	require.Equal(t, "/fallback", nodes[0].TLS.Reality.SpiderX)
+	require.NotContains(t, nodes[0].Raw, "uri.query.pqv")
+	require.NotContains(t, nodes[0].Raw, "uri.query.spx")
+	require.Empty(t, source.Warnings)
 }
 
 func TestParseVLESSXHTTPRealityURI(t *testing.T) {

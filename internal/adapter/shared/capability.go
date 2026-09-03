@@ -283,7 +283,7 @@ func uriSupportedFieldNames(nodeType domain.NodeType) []string {
 	case domain.NodeTypeVMess:
 		return fields(commonNodeFields(), "uuid", "cipher", "alter_id", "tls", "transport")
 	case domain.NodeTypeVLESS:
-		return fields(commonNodeFields(), "uuid", "flow", "encryption", "tls", "reality", "transport", "packet_encoding")
+		return fields(commonNodeFields(), "uuid", "flow", "encryption", "tls", "reality", "tls.reality.mldsa65_verify", "tls.reality.spider_x", "transport", "packet_encoding")
 	case domain.NodeTypeTrojan:
 		return fields(commonNodeFields(), "password", "tls", "transport")
 	case domain.NodeTypeHysteria:
@@ -311,8 +311,10 @@ func mihomoLossyFieldNames(nodeType domain.NodeType) []string {
 	switch nodeType {
 	case domain.NodeTypeShadowsocks:
 		return fields(common, "transport.type")
-	case domain.NodeTypeVMess, domain.NodeTypeVLESS:
+	case domain.NodeTypeVMess:
 		return fieldGroups(common, tlsECHAdvanced, []string{"multiplex"})
+	case domain.NodeTypeVLESS:
+		return fieldGroups(common, tlsECHAdvanced, []string{"multiplex", "tls.reality.mldsa65_verify", "tls.reality.spider_x"})
 	case domain.NodeTypeTrojan:
 		return fieldGroups(common, tlsECHAdvanced, []string{"multiplex"})
 	case domain.NodeTypeHysteria:
@@ -339,15 +341,15 @@ func singBoxLossyFieldNames(nodeType domain.NodeType) []string {
 	tlsFingerprint := fields(common, "tls.fingerprint")
 	switch nodeType {
 	case domain.NodeTypeVLESS:
-		return tlsFingerprint
+		return fields(tlsFingerprint, "tls.reality.mldsa65_verify", "tls.reality.spider_x")
 	case domain.NodeTypeVMess, domain.NodeTypeTrojan:
 		return tlsFingerprint
 	case domain.NodeTypeHysteria:
-		return fields(tlsFingerprint, "hysteria.protocol", "hysteria.quic")
+		return fields(tlsFingerprint, "tls.client_fingerprint", "hysteria.protocol", "hysteria.quic")
 	case domain.NodeTypeHysteria2:
-		return fields(tlsFingerprint, "hysteria.up", "hysteria.down", "hysteria.bbr_profile", "hysteria.realm", "hysteria.cwnd", "hysteria.udp_mtu", "hysteria.quic")
+		return fields(tlsFingerprint, "tls.client_fingerprint", "hysteria.up", "hysteria.down", "hysteria.bbr_profile", "hysteria.realm", "hysteria.cwnd", "hysteria.udp_mtu", "hysteria.quic")
 	case domain.NodeTypeTUIC:
-		return fields(tlsFingerprint, "token", "tuic.reduce_rtt", "tuic.udp_over_stream_version")
+		return fields(tlsFingerprint, "tls.client_fingerprint", "token", "tuic.reduce_rtt", "tuic.udp_over_stream_version")
 	case domain.NodeTypeSOCKS:
 		return fields(common, "tls")
 	case domain.NodeTypeHTTP:
