@@ -343,6 +343,15 @@ for (const route of routes) {
     if (route.path === "/files") {
       await expect(page.getByText("main config")).toBeHidden();
     }
+    if (route.path === "/shares" && testInfo.project.name === "mobile") {
+      const shareMetrics = await page.getByLabel("分享链接摘要").getByRole("button").evaluateAll((buttons) => ({
+        tops: buttons.map((button) => Math.round(button.getBoundingClientRect().top)),
+        widths: buttons.map((button) => button.getBoundingClientRect().width),
+      }));
+      expect(shareMetrics.tops).toHaveLength(4);
+      expect(new Set(shareMetrics.tops).size, "share metrics should stay on one mobile row").toBe(1);
+      expect(Math.max(...shareMetrics.widths) - Math.min(...shareMetrics.widths), "share metrics should have equal widths").toBeLessThanOrEqual(1);
+    }
     if (route.path === "/subscriptions/new?type=local") {
       const addProcessor = page.getByRole("button", { name: "添加处理器" });
       await addProcessor.click();
@@ -467,7 +476,7 @@ test("the convert link dialog stays usable and does not execute the generated UR
     });
   });
   await page.goto("/shares");
-  await page.getByRole("button", { name: "生成转换链接" }).click();
+  await page.getByRole("button", { name: "转换链接" }).click();
 
   const dialog = page.getByRole("dialog", { name: "生成转换链接" });
   await expect(dialog).toBeVisible();

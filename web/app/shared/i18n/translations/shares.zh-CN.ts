@@ -9,7 +9,7 @@ export const shareZhCN = {
   "shares.actions.copyShadowrocket": "复制为 Shadowrocket",
   "shares.actions.copyUriList": "复制为 URI list",
   "shares.actions.viewDetails": "查看详情",
-  "shares.convert.action": "生成转换链接",
+  "shares.convert.action": "转换链接",
   "shares.convert.content": "节点内容",
   "shares.convert.contentHelper": "内联内容最大 {bytes} 字节；长链接可能被浏览器或代理拒绝。",
   "shares.convert.copy": "复制完整链接",

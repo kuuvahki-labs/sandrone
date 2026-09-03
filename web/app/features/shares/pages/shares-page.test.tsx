@@ -23,26 +23,46 @@ const shares: ShareItem[] = [
 ];
 
 describe("shares page", () => {
-  it("filters shares by status and clears the selected filter on a second click", async () => {
+  it("combines availability and target filters and clears each independently", async () => {
     const user = userEvent.setup();
     const items: ShareItem[] = [
       shares[0],
-      { ...shares[0], id: "sh_upcoming", publicUrl: "https://example.com/s/sh_upcoming", status: "upcoming", title: "future" },
+      { ...shares[0], id: "sh_active_subscription", publicUrl: "https://example.com/s/sh_active_subscription", targetKind: "subscription", status: "valid", title: "active subscription" },
+      { ...shares[0], id: "sh_upcoming", publicUrl: "https://example.com/s/sh_upcoming", targetKind: "subscription", status: "upcoming", title: "future" },
       { ...shares[0], id: "sh_expired", publicUrl: "https://example.com/s/sh_expired", status: "expired", title: "old" },
     ];
     render(<SharesPage items={items} onCopy={vi.fn()} onCopyUrl={vi.fn()} onDelete={vi.fn()} onGenerateConvertLink={vi.fn()} />);
 
-    const upcomingFilter = screen.getByRole("button", { name: "按未生效筛选" });
-    await user.click(upcomingFilter);
-    expect(upcomingFilter).toHaveAttribute("aria-pressed", "true");
+    expect(within(screen.getByLabelText("分享链接摘要")).getAllByRole("button"))
+      .toHaveLength(4);
+    const unavailableFilter = screen.getByRole("button", { name: "按不可用筛选" });
+    const subscriptionFilter = screen.getByRole("button", { name: "按订阅筛选" });
+    await user.click(unavailableFilter);
+    expect(unavailableFilter).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("future")).toBeInTheDocument();
+    expect(screen.getByText("old")).toBeInTheDocument();
     expect(screen.queryByText("mobile")).not.toBeInTheDocument();
+    expect(screen.queryByText("active subscription")).not.toBeInTheDocument();
+
+    await user.click(subscriptionFilter);
+    expect(subscriptionFilter).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("future")).toBeInTheDocument();
     expect(screen.queryByText("old")).not.toBeInTheDocument();
 
-    await user.click(upcomingFilter);
-    expect(upcomingFilter).toHaveAttribute("aria-pressed", "false");
+    await user.click(unavailableFilter);
+    expect(unavailableFilter).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText("active subscription")).toBeInTheDocument();
+    expect(screen.getByText("future")).toBeInTheDocument();
+    expect(screen.queryByText("mobile")).not.toBeInTheDocument();
+
+    await user.click(subscriptionFilter);
+    expect(subscriptionFilter).toHaveAttribute("aria-pressed", "false");
+    const fileFilter = screen.getByRole("button", { name: "按文件筛选" });
+    await user.click(fileFilter);
     expect(screen.getByText("mobile")).toBeInTheDocument();
     expect(screen.getByText("old")).toBeInTheDocument();
+    expect(screen.queryByText("active subscription")).not.toBeInTheDocument();
+    expect(screen.queryByText("future")).not.toBeInTheDocument();
   });
 
   it("searches share fields and status copy together with the status filter", () => {
@@ -231,7 +251,7 @@ describe("shares page", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "生成转换链接" }));
+    await user.click(screen.getByRole("button", { name: "转换链接" }));
 
     expect(onGenerateConvertLink).toHaveBeenCalledOnce();
     expect(screen.getByText("还没有分享链接")).toBeInTheDocument();

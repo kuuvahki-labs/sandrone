@@ -74,7 +74,7 @@ describe("React Router app share and delete workflows", () => {
     renderApp("/shares");
 
     await screen.findByRole("heading", { level: 2, name: "分享" });
-    await user.click(screen.getByRole("button", { name: "生成转换链接" }));
+    await user.click(screen.getByRole("button", { name: "转换链接" }));
     const dialog = screen.getByRole("dialog", { name: "生成转换链接" });
     const sourceURL = "https://subscription.example/nodes?token=a+b&name=HK#primary";
     await user.type(within(dialog).getByRole("textbox", { name: "远程订阅 URL" }), sourceURL);
@@ -89,7 +89,7 @@ describe("React Router app share and delete workflows", () => {
     expect(requests.some((url) => url.startsWith("/convert?"))).toBe(false);
 
     await user.click(within(dialog).getByRole("button", { name: "取消" }));
-    await user.click(screen.getByRole("button", { name: "生成转换链接" }));
+    await user.click(screen.getByRole("button", { name: "转换链接" }));
     expect(screen.getByRole("textbox", { name: "远程订阅 URL" })).toHaveValue("");
   });
 

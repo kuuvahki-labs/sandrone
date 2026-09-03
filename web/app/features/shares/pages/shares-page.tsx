@@ -40,13 +40,16 @@ export function SharesPage({ items, loaded = true, onCopy, onCopyUrl, onDelete, 
   const [queryFocused, setQueryFocused] = useState(false);
   const [selectedShare, setSelectedShare] = useState<ShareItem | null>(null);
   const [statusFilter, setStatusFilter] = useState<ShareStatusFilter>("all");
+  const [targetFilter, setTargetFilter] = useState<ShareTargetFilter>("all");
   const validCount = items.filter((item) => item.status === "valid").length;
-  const upcomingCount = items.filter((item) => item.status === "upcoming").length;
-  const expiredCount = items.filter((item) => item.status === "expired").length;
+  const unavailableCount = items.length - validCount;
+  const subscriptionCount = items.filter((item) => item.targetKind === "subscription").length;
+  const fileCount = items.filter((item) => item.targetKind === "file").length;
   const filteredItems = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     return items.filter((item) => {
-      if (statusFilter !== "all" && item.status !== statusFilter) return false;
+      if (!shareMatchesStatusFilter(item, statusFilter)) return false;
+      if (targetFilter !== "all" && item.targetKind !== targetFilter) return false;
       if (!normalized) return true;
       return [
         item.title,
@@ -58,7 +61,7 @@ export function SharesPage({ items, loaded = true, onCopy, onCopyUrl, onDelete, 
         item.targetKind ? t(`shares.details.targetKind.${item.targetKind}`) : "",
       ].some((value) => String(value ?? "").toLowerCase().includes(normalized));
     });
-  }, [items, query, statusFilter, t]);
+  }, [items, query, statusFilter, t, targetFilter]);
   return (
     <section className="grid gap-6">
       <PageHeader
@@ -82,18 +85,25 @@ export function SharesPage({ items, loaded = true, onCopy, onCopyUrl, onDelete, 
               onSelect={() => setStatusFilter((current) => current === "valid" ? "all" : "valid")}
             />
             <Metric
-              actionLabel={t("actions.filterBy", { label: t("shares.metric.upcoming") })}
-              label={t("shares.metric.upcoming")}
-              selected={statusFilter === "upcoming"}
-              value={loaded ? upcomingCount : undefined}
-              onSelect={() => setStatusFilter((current) => current === "upcoming" ? "all" : "upcoming")}
+              actionLabel={t("actions.filterBy", { label: t("shares.metric.unavailable") })}
+              label={t("shares.metric.unavailable")}
+              selected={statusFilter === "unavailable"}
+              value={loaded ? unavailableCount : undefined}
+              onSelect={() => setStatusFilter((current) => current === "unavailable" ? "all" : "unavailable")}
             />
             <Metric
-              actionLabel={t("actions.filterBy", { label: t("shares.metric.expired") })}
-              label={t("shares.metric.expired")}
-              selected={statusFilter === "expired"}
-              value={loaded ? expiredCount : undefined}
-              onSelect={() => setStatusFilter((current) => current === "expired" ? "all" : "expired")}
+              actionLabel={t("actions.filterBy", { label: t("nav.subscriptions") })}
+              label={t("nav.subscriptions")}
+              selected={targetFilter === "subscription"}
+              value={loaded ? subscriptionCount : undefined}
+              onSelect={() => setTargetFilter((current) => current === "subscription" ? "all" : "subscription")}
+            />
+            <Metric
+              actionLabel={t("actions.filterBy", { label: t("nav.files") })}
+              label={t("nav.files")}
+              selected={targetFilter === "file"}
+              value={loaded ? fileCount : undefined}
+              onSelect={() => setTargetFilter((current) => current === "file" ? "all" : "file")}
             />
           </MetricGroup>
         )}
@@ -188,7 +198,14 @@ export function SharesPage({ items, loaded = true, onCopy, onCopyUrl, onDelete, 
   );
 }
 
-type ShareStatusFilter = "all" | ShareItem["status"];
+type ShareStatusFilter = "all" | "unavailable" | "valid";
+type ShareTargetFilter = "all" | NonNullable<ShareItem["targetKind"]>;
+
+function shareMatchesStatusFilter(item: ShareItem, filter: ShareStatusFilter): boolean {
+  if (filter === "all") return true;
+  if (filter === "valid") return item.status === "valid";
+  return item.status === "upcoming" || item.status === "expired";
+}
 
 function shareActions(
   item: ShareItem,

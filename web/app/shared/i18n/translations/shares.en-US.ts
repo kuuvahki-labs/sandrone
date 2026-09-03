@@ -9,7 +9,7 @@ export const shareEnUS = {
   "shares.actions.copyShadowrocket": "Copy as Shadowrocket",
   "shares.actions.copyUriList": "Copy as URI list",
   "shares.actions.viewDetails": "View details",
-  "shares.convert.action": "Generate convert link",
+  "shares.convert.action": "Convert link",
   "shares.convert.content": "Node content",
   "shares.convert.contentHelper": "Inline content is limited to {bytes} bytes; browsers or proxies may reject long URLs.",
   "shares.convert.copy": "Copy full link",
