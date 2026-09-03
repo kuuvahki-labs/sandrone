@@ -178,7 +178,7 @@ describe("config templates", () => {
       interval: 300,
       timeout: 5,
     });
-    expect(groups.get("Ad Block")?.proxies).toEqual(["REJECT", "REJECT-DROP", "DIRECT", "Proxy"]);
+    expect(groups.get("Ad Block")?.proxies).toEqual(["REJECT", "DIRECT", "Proxy"]);
     expect(groups.get("Static/CDN Resources")?.proxies).toEqual(["Proxy", "DIRECT", "REJECT"]);
     expect(groups.has("GLOBAL")).toBe(false);
   });
@@ -548,12 +548,12 @@ describe("config templates", () => {
    }
  });
 
-  it.each(TEMPLATE_IDS)("uses native REJECT-DROP ad blocking in the %s Shadowrocket template", (templateID) => {
+  it.each(TEMPLATE_IDS)("uses group-compatible ad blocking in the %s Shadowrocket template", (templateID) => {
     const config = createConfigFromTemplate("shadowrocket", templateID);
 
     expect(config.groups?.map((group) => group.name)).toContain("Ad Block");
     expect(config.groups?.find((group) => group.name === "Ad Block")?.proxies)
-      .toEqual(["REJECT", "REJECT-DROP", "DIRECT", "Proxy"]);
+      .toEqual(["REJECT", "DIRECT", "Proxy"]);
     expect(config.rule_sets?.map((ruleSet) => ruleSet.name)).toContain("category-ads-all");
     expect(config.rules?.filter((rule): rule is string => typeof rule === "string")
       .some((rule) => rule === "DOMAIN-SET,category-ads-all,Ad Block")).toBe(true);
@@ -791,7 +791,7 @@ function referenceProblems(kind: ConfigKind, config: FileConfigDraft): string[] 
   const literals = new Set(kind === "sing-box"
     ? ["direct", "block", "$nodes"]
     : kind === "shadowrocket"
-      ? ["PROXY", "DIRECT", "REJECT", "REJECT-DROP"]
+      ? ["PROXY", "DIRECT", "REJECT"]
       : ["DIRECT", "REJECT", "REJECT-DROP", "$nodes"]);
   const groupNames = new Set(groups.map((group) => String(group[groupNameKey])));
   const ruleSetNames = new Set(ruleSets.map((ruleSet) => String(ruleSet[ruleSetNameKey])));

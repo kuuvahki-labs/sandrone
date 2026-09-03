@@ -54,8 +54,10 @@ DOMAIN-SET/RULE-SET 文本，并位于私有网络之后、普通服务规则之
 
 Mihomo 和 Shadowrocket 还输出原生 `Fallback`，并让主代理组可以选择它；sing-box
 没有有序 fallback outbound，因此不生成一个实际只是普通 selector 的同名替代品。
-Mihomo 与 Shadowrocket 的广告组同时提供 `REJECT`、`REJECT-DROP` 和 `DIRECT`；
-sing-box 使用其原生 `block` outbound，不伪造丢包拒绝策略。
+Mihomo 的广告组同时提供 `REJECT`、`REJECT-DROP` 和 `DIRECT`；
+Shadowrocket 的广告组使用可作为组成员的 `REJECT` 和 `DIRECT`，
+`REJECT-DROP` 仅保留为规则策略；sing-box 使用其原生 `block` outbound，
+不伪造丢包拒绝策略。
 
 Mihomo 和 sing-box 分别使用 MetaCubeX 的 `cn-ip` MRS/SRS 规则集；
 Shadowrocket 使用 `GEOIP,CN`。三者都是域名规则之后的**解析型兜底**：它们能

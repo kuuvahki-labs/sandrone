@@ -228,7 +228,7 @@ describe("config relation model", () => {
   it("keeps Shadowrocket group policies separate from rule-only actions", () => {
     const model = buildConfigRelationModel(
       "shadowrocket",
-      [{ name: "Proxy", type: "select", proxies: ["PROXY", "DIRECT", "REJECT", "TAILSCALE"] }],
+      [{ name: "Proxy", type: "select", proxies: ["PROXY", "DIRECT", "REJECT", "TAILSCALE", "REJECT-DROP"] }],
       [],
       [],
       [],
@@ -238,6 +238,11 @@ describe("config relation model", () => {
       severity: "error",
       code: "unknown_group_target",
       reference: "TAILSCALE",
+    }));
+    expect(model.issues).toContainEqual(expect.objectContaining({
+      severity: "error",
+      code: "unknown_group_target",
+      reference: "REJECT-DROP",
     }));
     expect(model.issues).not.toContainEqual(expect.objectContaining({ reference: "PROXY" }));
   });

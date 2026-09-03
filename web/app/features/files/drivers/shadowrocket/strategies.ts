@@ -355,7 +355,6 @@ function materializeShadowrocketTemplate(
       ...templateGroupTargets(item, selectName, autoName, "DIRECT", "REJECT"),
     ].filter((target) => target !== name && target !== "$nodes"))];
     if (item.id === "select" && fallbackName) targets.splice(1, 0, fallbackName);
-    if (item.id === "ad") targets.splice(1, 0, "REJECT-DROP");
     return item.groupMode === "url-test"
       ? { name, type: "url-test", proxies: targets, interval: 300, timeout: 5, tolerance: 50 }
       : { name, type: "select", proxies: targets };

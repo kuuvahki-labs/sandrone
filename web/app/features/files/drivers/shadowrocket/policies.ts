@@ -1,4 +1,4 @@
-export const shadowrocketGroupBuiltinPolicies = ["PROXY", "DIRECT", "REJECT", "REJECT-DROP"] as const;
+export const shadowrocketGroupBuiltinPolicies = ["PROXY", "DIRECT", "REJECT"] as const;
 
 export const shadowrocketRuleBuiltinPolicies = [
   "PROXY", "DIRECT", "TAILSCALE", "REJECT", "REJECT-DICT", "REJECT-ARRAY",
