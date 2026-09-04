@@ -4,7 +4,6 @@ export const fileZhCN = {
   "files.config.outputNames.group.select": "🚀 节点选择",
   "files.config.outputNames.group.auto": "⚡ 自动选择",
   "files.config.outputNames.group.fallback": "故障转移",
-  "files.config.outputNames.group.cdn-resources": "🌐 静态/CDN 资源",
   "files.config.outputNames.group.other": "其他",
   "files.config.outputNames.group.ad": "🛑 广告拦截",
   "files.config.outputNames.group.private": "🏠 私有网络",

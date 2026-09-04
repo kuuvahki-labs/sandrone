@@ -6,7 +6,7 @@ export type ConfigNamingLocale = Locale;
 // IDs and approved locale-catalog names are adapted from SubBoost's proxy-group modules (AGPL-3.0), pinned at:
 // https://github.com/SubBoost/subboost/blob/ebc40a202adeaca25c88ca3bbbf085412f6e08f5/packages/core/src/generator/proxy-group-modules.ts
 export const CONFIG_GROUP_IDS = [
-  "select", "auto", "fallback", "cdn-resources", "other", "ad", "private", "cn", "global", "final", "ai", "youtube", "google",
+  "select", "auto", "fallback", "other", "ad", "private", "cn", "global", "final", "ai", "youtube", "google",
   "microsoft", "apple", "telegram", "twitter", "meta", "discord", "social-other", "netflix",
   "disney", "streaming-west", "streaming-asia", "bilibili", "steam", "gaming-pc", "gaming-console", "github",
   "cloud", "dev-tools", "storage", "payment", "education", "news", "shopping",

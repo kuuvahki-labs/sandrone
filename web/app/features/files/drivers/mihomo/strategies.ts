@@ -44,18 +44,6 @@ const ADAPTIVE_TYPE_OPTIONS = [
   { value: "load-balance", label: "load-balance" },
 ] as const;
 const RULE_BASE = "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo";
-const CUSTOM_RULE_SOURCES: Readonly<Record<string, MihomoTemplateRuleSource>> = {
-  "cdn-domainset": {
-    behavior: "domain",
-    format: "text",
-    url: "https://ruleset.skk.moe/Clash/domainset/cdn.txt",
-  },
-  "cdn-classical": {
-    behavior: "classical",
-    format: "text",
-    url: "https://ruleset.skk.moe/Clash/non_ip/cdn.txt",
-  },
-};
 
 const relations = mihomoRelations();
 const adaptive = mihomoAdaptive(mihomoAdaptiveDialect(relations));
@@ -335,14 +323,12 @@ function materializeMihomoTemplate(
 }
 
 interface MihomoTemplateRuleSource {
-  behavior: "classical" | "domain" | "ipcidr";
-  format: "mrs" | "text";
+  behavior: "domain" | "ipcidr";
+  format: "mrs";
   url: string;
 }
 
 function ruleSource(ruleID: string): MihomoTemplateRuleSource {
-  const custom = CUSTOM_RULE_SOURCES[ruleID];
-  if (custom) return custom;
   if (ruleID.endsWith("-ip")) {
     return {
       behavior: "ipcidr",

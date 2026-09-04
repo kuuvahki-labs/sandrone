@@ -43,16 +43,6 @@ const ADAPTIVE_TYPE_OPTIONS = [
   { value: "urltest", label: "urltest" },
 ] as const;
 const RULE_BASE = "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo";
-const CUSTOM_RULE_SOURCES: Readonly<Record<string, SingBoxTemplateRuleSource>> = {
-  "cdn-domainset": {
-    format: "source",
-    url: "https://ruleset.skk.moe/sing-box/domainset/cdn.json",
-  },
-  "cdn-classical": {
-    format: "source",
-    url: "https://ruleset.skk.moe/sing-box/non_ip/cdn.json",
-  },
-};
 
 const relations = singBoxRelations();
 const adaptive = singBoxAdaptive(singBoxAdaptiveDialect(relations));
@@ -403,13 +393,11 @@ function isFinalRule(rule: Record<string, unknown>): boolean {
 }
 
 interface SingBoxTemplateRuleSource {
-  format: "binary" | "source";
+  format: "binary";
   url: string;
 }
 
 function ruleSource(ruleID: string): SingBoxTemplateRuleSource {
-  const custom = CUSTOM_RULE_SOURCES[ruleID];
-  if (custom) return custom;
   const directory = ruleID.endsWith("-ip") ? "geoip" : "geosite";
   const file = ruleID.endsWith("-ip") ? ruleID.slice(0, -3) : ruleID;
   return { format: "binary", url: `${RULE_BASE}/${directory}/${file}.srs` };

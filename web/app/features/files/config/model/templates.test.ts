@@ -11,36 +11,20 @@ const CONFIG_KINDS = ["mihomo", "sing-box", "shadowrocket"] as const;
 type ConfigKind = typeof CONFIG_KINDS[number];
 const TEMPLATE_IDS = ["minimal", "standard", "full"] as const satisfies readonly ConfigTemplateID[];
 const SHADOWROCKET_RULE_BASE = "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket";
-const SHADOWROCKET_METACUBEX_RULE_BASE = "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite";
-const SHADOWROCKET_METACUBEX_RULE_IDS = new Set([
-  "aws",
-  "azure",
-  "category-ads-all",
-  "category-ai-!cn",
-  "category-doh",
-  "category-media",
-  "coursera",
-  "edx",
-  "khanacademy",
-  "meta",
-  "netlify",
-  "udemy",
-  "wise",
-]);
 const SHADOWROCKET_TEMPLATE_ARTIFACTS = new Set([
-  "Abema", "Amazon", "AmazonPrimeVideo", "Apple", "AppleTV", "Atlassian",
+  "Abema", "Advertising", "Amazon", "AmazonCloud", "AmazonPrimeVideo", "Apple", "AppleTV", "Atlassian", "Claude", "Copilot",
   "Bahamut", "BiliBili", "BiliBiliIntl", "Blizzard", "China", "Cloudflare", "DAZN",
-  "DigitalOcean", "Discord", "Disney", "Docker", "Dropbox", "EA", "Epic", "GitHub",
-  "GitLab", "Global", "Gog", "Google", "HBO", "Hulu", "Jetbrains", "KKTV", "Lan", "Line",
+  "DNS", "DigitalOcean", "Discord", "Disney", "Docker", "Dropbox", "EA", "Epic", "Facebook", "GitHub",
+  "Gemini", "GitLab", "Global", "GlobalMedia", "Gog", "Google", "HBO", "Hulu", "Instagram", "Jetbrains", "KKTV", "Lan", "Line",
   "LinkedIn", "Microsoft", "Netflix", "Niconico", "Nintendo", "Notion", "Npmjs",
-  "PayPal", "Pinterest", "PlayStation", "Reddit", "Riot", "Scholar", "Snap", "Spotify",
+  "OpenAI", "PayPal", "Pinterest", "PlayStation", "Reddit", "Riot", "Scholar", "Snap", "Spotify",
   "Stackexchange", "Steam", "Stripe", "Telegram", "TikTok", "Tumblr", "Twitch", "Twitter", "Ubisoft", "Vercel",
-  "ViuTV", "Wikimedia", "Xbox", "YouTube", "eBay",
+  "ViuTV", "Whatsapp", "Wikimedia", "Xbox", "YouTube", "eBay",
 ]);
 
 const MINIMAL_MODULES = ["select", "auto", "ad", "private", "cn", "global", "final"];
 const MIHOMO_STANDARD_MODULES = [
-  "select", "auto", "fallback", "cdn-resources", "ad", "private", "cn", "global",
+  "select", "auto", "fallback", "ad", "private", "cn", "global",
   "ai", "youtube", "google", "microsoft", "apple", "netflix", "telegram", "final",
 ];
 const SING_BOX_STANDARD_MODULES = MIHOMO_STANDARD_MODULES.filter((moduleID) => moduleID !== "fallback");
@@ -87,10 +71,10 @@ describe("config templates", () => {
     expect(templates[2].modules).not.toContain("global-all");
     expect(templates[2].modules.includes("auto")).toBe(kind !== "shadowrocket");
     expect(templates.map((template) => template.groupCount)).toEqual(kind === "mihomo"
-      ? [7, 16, 35]
+      ? [7, 15, 34]
       : kind === "sing-box"
-        ? [7, 15, 34]
-        : [6, 15, 34]);
+        ? [7, 14, 33]
+        : [6, 14, 33]);
 
     for (const template of templates) {
       const config = createConfigFromTemplate(kind, template.id);
@@ -130,7 +114,7 @@ describe("config templates", () => {
     expect(autoGroup?.url).toBe("https://cp.cloudflare.com");
   });
 
-  it.each(["standard", "full"] satisfies ConfigTemplateID[])("adds Mihomo fallback and static/CDN routing to the %s template", (templateID) => {
+  it.each(["standard", "full"] satisfies ConfigTemplateID[])("adds Mihomo fallback routing to the %s template", (templateID) => {
     const config = createConfigFromTemplate("mihomo", templateID);
     const groups = new Map((config.groups ?? []).map((group) => [String(group.name), group]));
 
@@ -143,30 +127,24 @@ describe("config templates", () => {
       interval: 300,
     });
     expect(groups.get("Ad Block")?.proxies).toEqual(["REJECT", "REJECT-DROP", "DIRECT", "Proxy"]);
-    expect(groups.get("Static/CDN Resources")).toEqual({
-      name: "Static/CDN Resources",
-      type: "select",
-      proxies: ["Proxy", "Auto", "DIRECT", "REJECT"],
-    });
     expect(groups.has("GLOBAL")).toBe(false);
   });
 
   it("keeps the minimal Mihomo template free of the standard routing extensions", () => {
     const names = createConfigFromTemplate("mihomo", "minimal").groups?.map((group) => group.name);
 
-    expect(names).not.toEqual(expect.arrayContaining(["Fallback", "Static/CDN Resources"]));
+    expect(names).not.toContain("Fallback");
   });
 
-  it.each(["standard", "full"] satisfies ConfigTemplateID[])("adds native sing-box static/CDN routing to the %s template", (templateID) => {
+  it.each(["standard", "full"] satisfies ConfigTemplateID[])("keeps unsupported fallback groups out of the %s sing-box template", (templateID) => {
     const config = createConfigFromTemplate("sing-box", templateID);
     const groups = new Map((config.groups ?? []).map((group) => [String(group.tag), group]));
 
     expect(groups.has("Fallback")).toBe(false);
-    expect(groups.get("Static/CDN Resources")?.outbounds).toEqual(["Proxy", "Auto", "direct", "block"]);
     expect(groups.has("GLOBAL")).toBe(false);
   });
 
-  it.each(["standard", "full"] satisfies ConfigTemplateID[])("adds native Shadowrocket fallback, ad, and static/CDN routing to the %s template", (templateID) => {
+  it.each(["standard", "full"] satisfies ConfigTemplateID[])("adds native Shadowrocket fallback and ad routing to the %s template", (templateID) => {
     const config = createConfigFromTemplate("shadowrocket", templateID);
     const groups = new Map((config.groups ?? []).map((group) => [String(group.name), group]));
 
@@ -179,7 +157,6 @@ describe("config templates", () => {
       timeout: 5,
     });
     expect(groups.get("Ad Block")?.proxies).toEqual(["REJECT", "DIRECT", "Proxy"]);
-    expect(groups.get("Static/CDN Resources")?.proxies).toEqual(["Proxy", "DIRECT", "REJECT"]);
     expect(groups.has("GLOBAL")).toBe(false);
   });
 
@@ -220,11 +197,9 @@ describe("config templates", () => {
 
   it("uses MetaCubeX MRS rule providers for Mihomo", () => {
     const config = createConfigFromTemplate("mihomo", "full");
-    const customRuleSetNames = new Set(["cdn-domainset", "cdn-classical"]);
 
     expect(config.rule_sets).not.toHaveLength(0);
     for (const ruleSet of config.rule_sets ?? []) {
-      if (customRuleSetNames.has(String(ruleSet.name))) continue;
       expect(ruleSet).toMatchObject({
         name: expect.any(String),
         type: "http",
@@ -237,33 +212,6 @@ describe("config templates", () => {
      });
    }
  });
-
-  it.each(["standard", "full"] satisfies ConfigTemplateID[])("uses the upstream static/CDN providers in the %s Mihomo template", (templateID) => {
-    const config = createConfigFromTemplate("mihomo", templateID);
-
-    expect(config.rule_sets).toEqual(expect.arrayContaining([
-      {
-        name: "cdn-domainset",
-        type: "http",
-        behavior: "domain",
-        format: "text",
-        interval: 86400,
-        url: "https://ruleset.skk.moe/Clash/domainset/cdn.txt",
-      },
-      {
-        name: "cdn-classical",
-        type: "http",
-        behavior: "classical",
-        format: "text",
-        interval: 86400,
-        url: "https://ruleset.skk.moe/Clash/non_ip/cdn.txt",
-      },
-    ]));
-    expect(config.rules).toEqual(expect.arrayContaining([
-      "RULE-SET,cdn-domainset,Static/CDN Resources",
-      "RULE-SET,cdn-classical,Static/CDN Resources",
-    ]));
-  });
 
   it.each(CONFIG_KINDS)("consolidates equivalent %s providers without adding broad cross-policy categories", (kind) => {
     const standard = createConfigFromTemplate(kind, "standard");
@@ -287,11 +235,9 @@ describe("config templates", () => {
 
   it("uses equivalent MetaCubeX binary SRS rule sets for sing-box", () => {
     const config = createConfigFromTemplate("sing-box", "full");
-    const customRuleSetNames = new Set(["cdn-domainset", "cdn-classical"]);
 
     expect(config.rule_sets).not.toHaveLength(0);
     for (const ruleSet of config.rule_sets ?? []) {
-      if (customRuleSetNames.has(String(ruleSet.tag))) continue;
       expect(ruleSet).toEqual({
         type: "remote",
         tag: expect.any(String),
@@ -303,27 +249,6 @@ describe("config templates", () => {
      });
    }
  });
-
-  it.each(["standard", "full"] satisfies ConfigTemplateID[])("uses native static/CDN rule-set formats in the %s sing-box template", (templateID) => {
-    const config = createConfigFromTemplate("sing-box", templateID);
-
-    expect(config.rule_sets).toEqual(expect.arrayContaining([
-      {
-        type: "remote",
-        tag: "cdn-domainset",
-        format: "source",
-        update_interval: "1d",
-        url: "https://ruleset.skk.moe/sing-box/domainset/cdn.json",
-      },
-      {
-        type: "remote",
-        tag: "cdn-classical",
-        format: "source",
-        update_interval: "1d",
-        url: "https://ruleset.skk.moe/sing-box/non_ip/cdn.json",
-      },
-    ]));
-  });
 
   it.each(TEMPLATE_IDS)("uses the complete China domain set in every %s template", (templateID) => {
     const mihomo = createConfigFromTemplate("mihomo", templateID);
@@ -351,15 +276,46 @@ describe("config templates", () => {
     const shadowrocket = createConfigFromTemplate("shadowrocket", templateID);
     expect(shadowrocket.rule_sets).toEqual(expect.arrayContaining([
       {
+        name: "cn",
+        type: "rule-set",
+        url: `${SHADOWROCKET_RULE_BASE}/China/China.list`,
+      },
+      {
         name: "cn-domain",
         type: "domain-set",
         url: `${SHADOWROCKET_RULE_BASE}/China/China_Domain.list`,
       },
     ]));
-    expect(shadowrocket.rule_sets?.some((ruleSet) => ruleSet.name === "cn")).toBe(false);
     expect(shadowrocket.rules).toEqual(expect.arrayContaining([
+      "RULE-SET,cn,China",
       "DOMAIN-SET,cn-domain,China",
       "GEOIP,CN,China",
+    ]));
+  });
+
+  it.each(TEMPLATE_IDS)("pairs the split Blackmatrix global domain list in every %s Shadowrocket template", (templateID) => {
+    const config = createConfigFromTemplate("shadowrocket", templateID);
+
+    expect(config.rule_sets).toEqual(expect.arrayContaining([
+      { name: "geolocation-!cn", type: "rule-set", url: `${SHADOWROCKET_RULE_BASE}/Global/Global.list` },
+      { name: "geolocation-!cn-domain", type: "domain-set", url: `${SHADOWROCKET_RULE_BASE}/Global/Global_Domain.list` },
+    ]));
+    expect(config.rules).toEqual(expect.arrayContaining([
+      "RULE-SET,geolocation-!cn,Global",
+      "DOMAIN-SET,geolocation-!cn-domain,Global",
+    ]));
+  });
+
+  it.each(["standard", "full"] satisfies ConfigTemplateID[])("pairs the split Blackmatrix Apple domain list in the %s Shadowrocket template", (templateID) => {
+    const config = createConfigFromTemplate("shadowrocket", templateID);
+
+    expect(config.rule_sets).toEqual(expect.arrayContaining([
+      { name: "apple", type: "rule-set", url: `${SHADOWROCKET_RULE_BASE}/Apple/Apple.list` },
+      { name: "apple-domain", type: "domain-set", url: `${SHADOWROCKET_RULE_BASE}/Apple/Apple_Domain.list` },
+    ]));
+    expect(config.rules).toEqual(expect.arrayContaining([
+      "RULE-SET,apple,Apple",
+      "DOMAIN-SET,apple-domain,Apple",
     ]));
   });
 
@@ -484,30 +440,26 @@ describe("config templates", () => {
     }));
     const expectedPolicies = new Map([
       ["category-ads-all", "Ad Block"],
+      ["category-ads-all-domain", "Ad Block"],
       ["category-ai-!cn", "AI"],
+      ["category-ai-claude", "AI"],
+      ["category-ai-copilot", "AI"],
+      ["category-ai-gemini", "AI"],
       ["category-media", "News"],
+      ["category-media-domain", "News"],
       ["meta", "Meta"],
+      ["meta-instagram", "Meta"],
+      ["meta-whatsapp", "Meta"],
       ["aws", "Cloud Services"],
-      ["azure", "Cloud Services"],
-      ["netlify", "Cloud Services"],
-      ["wise", "Payments"],
-      ["coursera", "Education"],
-      ["udemy", "Education"],
-      ["edx", "Education"],
-      ["khanacademy", "Education"],
     ]);
 
     for (const [id, policy] of expectedPolicies) {
       expect(policies.get(id)).toBe(policy);
-      expect(config.rule_sets).toContainEqual({
-        name: id,
-        type: "domain-set",
-        url: `${SHADOWROCKET_METACUBEX_RULE_BASE}/${id}.list`,
-      });
     }
+    expect(config.rule_sets?.some((ruleSet) => String(ruleSet.url).includes("MetaCubeX/meta-rules-dat"))).toBe(false);
   });
 
-  it.each(TEMPLATE_IDS)("uses live Blackmatrix and canonical MetaCubeX lists for the %s Shadowrocket template", (templateID) => {
+  it.each(TEMPLATE_IDS)("uses Shadowrocket-compatible text lists for the %s Shadowrocket template", (templateID) => {
     const config = createConfigFromTemplate("shadowrocket", templateID);
     const ruleTypesByName = new Map((config.rule_sets ?? []).map((ruleSet) => [ruleSet.name, ruleSet.type]));
     const groupsByName = new Map((config.groups ?? []).map((group) => [group.name, group]));
@@ -526,19 +478,11 @@ describe("config templates", () => {
    }
     expect(config.rules?.at(-1)).toBe("FINAL,Final");
     for (const ruleSet of config.rule_sets ?? []) {
-      if (ruleSet.name === "cdn-domainset" || ruleSet.name === "cdn-classical") continue;
       expect(ruleSet).toEqual({
         name: expect.any(String),
         type: expect.stringMatching(/^(rule-set|domain-set)$/),
-        url: expect.stringMatching(/^https:\/\/raw\.githubusercontent\.com\/(?:blackmatrix7\/ios_rule_script\/master\/rule\/Shadowrocket|MetaCubeX\/meta-rules-dat\/meta\/geo\/geosite)\//),
+        url: expect.stringMatching(/^https:\/\/raw\.githubusercontent\.com\/blackmatrix7\/ios_rule_script\/master\/rule\/Shadowrocket\//),
       });
-      if (SHADOWROCKET_METACUBEX_RULE_IDS.has(String(ruleSet.name))) {
-        expect(ruleSet).toEqual({
-          name: ruleSet.name,
-          type: "domain-set",
-          url: `${SHADOWROCKET_METACUBEX_RULE_BASE}/${String(ruleSet.name)}.list`,
-        });
-      }
    }
     for (const rule of config.rules ?? []) {
       if (typeof rule !== "string") continue;
@@ -555,28 +499,9 @@ describe("config templates", () => {
     expect(config.groups?.find((group) => group.name === "Ad Block")?.proxies)
       .toEqual(["REJECT", "DIRECT", "Proxy"]);
     expect(config.rule_sets?.map((ruleSet) => ruleSet.name)).toContain("category-ads-all");
-    expect(config.rules?.filter((rule): rule is string => typeof rule === "string")
-      .some((rule) => rule === "DOMAIN-SET,category-ads-all,Ad Block")).toBe(true);
-  });
-
-  it.each(["standard", "full"] satisfies ConfigTemplateID[])("uses Shadowrocket-compatible static/CDN rule sets in the %s template", (templateID) => {
-    const config = createConfigFromTemplate("shadowrocket", templateID);
-
-    expect(config.rule_sets).toEqual(expect.arrayContaining([
-      {
-        name: "cdn-domainset",
-        type: "domain-set",
-        url: "https://ruleset.skk.moe/List/domainset/cdn.conf",
-      },
-      {
-        name: "cdn-classical",
-        type: "rule-set",
-        url: "https://ruleset.skk.moe/List/non_ip/cdn.conf",
-      },
-    ]));
     expect(config.rules).toEqual(expect.arrayContaining([
-      "DOMAIN-SET,cdn-domainset,Static/CDN Resources",
-      "RULE-SET,cdn-classical,Static/CDN Resources",
+      "RULE-SET,category-ads-all,Ad Block",
+      "DOMAIN-SET,category-ads-all-domain,Ad Block",
     ]));
   });
 
@@ -589,7 +514,7 @@ describe("config templates", () => {
 
     expect(new Set(urls).size).toBe(urls.length);
     for (const url of urls) {
-      const match = url.match(new RegExp(`^${SHADOWROCKET_RULE_BASE}/([^/]+)/\\1(?:_Domain)?\\.list$`));
+      const match = url.match(new RegExp(`^${SHADOWROCKET_RULE_BASE}/(?:Cloud/)?([^/]+)/\\1(?:_Domain)?\\.list$`));
       expect(match?.[1]).toEqual(expect.any(String));
       expect(SHADOWROCKET_TEMPLATE_ARTIFACTS.has(match?.[1] ?? "")).toBe(true);
       if (match?.[1]) artifacts.push(match[1]);

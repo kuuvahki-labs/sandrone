@@ -76,7 +76,7 @@ export interface ConfigTemplateStrategy {
 
 const MODULES: readonly ConfigTemplateModule[] = [
   module("select"), module("auto", "url-test"), module("fallback"),
-  module("cdn-resources", "select", ["cdn-domainset", "cdn-classical"]), module("ad", "reject-first", ["category-ads-all"]),
+  module("ad", "reject-first", ["category-ads-all"]),
   module("private", "direct-first", ["private", "private-ip"]), module("cn", "direct-first", ["cn", "cn-ip"]),
   module("global", "select", ["geolocation-!cn"]), module("final"), module("ai", "select", ["category-ai-!cn"]),
   module("youtube", "select", ["youtube"]), module("google", "select", ["google", "google-ip"]), module("microsoft", "direct-first", ["microsoft"]),
@@ -96,7 +96,7 @@ const MODULES: readonly ConfigTemplateModule[] = [
 const MODULE_BY_ID = new Map(MODULES.map((item) => [item.id, item]));
 const MINIMAL_MODULES = ["select", "auto", "ad", "private", "cn", "global", "final"];
 const STANDARD_MODULES = [
-  "select", "auto", "fallback", "cdn-resources", "ad", "private", "cn", "global", "ai", "youtube", "google", "microsoft", "apple", "netflix", "telegram", "final",
+  "select", "auto", "fallback", "ad", "private", "cn", "global", "ai", "youtube", "google", "microsoft", "apple", "netflix", "telegram", "final",
 ];
 const TEMPLATE_IDS = ["minimal", "standard", "full"] as const satisfies readonly ConfigTemplateID[];
 const TEMPLATE_MODULES: Record<ConfigTemplateID, readonly string[]> = {
@@ -111,12 +111,12 @@ const TEMPLATE_METADATA: Record<ConfigTemplateID, { name: string; description: s
 };
 
 const GROUP_ORDER: readonly ConfigGroupID[] = [
-  "select", "auto", "fallback", "ad", "cdn-resources", "ai", "youtube", "google", "microsoft", "apple", "telegram", "twitter", "meta", "discord", "social-other",
+  "select", "auto", "fallback", "ad", "ai", "youtube", "google", "microsoft", "apple", "telegram", "twitter", "meta", "discord", "social-other",
   "netflix", "disney", "streaming-west", "streaming-asia", "bilibili", "steam", "gaming-pc", "gaming-console", "github", "cloud", "dev-tools", "storage",
   "payment", "education", "news", "shopping", "private", "cn", "global", "final",
 ];
 const RULE_ORDER: readonly ConfigGroupID[] = [
-  "ad", "private", "cdn-resources", "ai", "youtube", "education", "cloud", "dev-tools", "google", "telegram", "github", "gaming-console", "microsoft", "streaming-west", "apple", "twitter", "meta",
+  "ad", "private", "ai", "youtube", "education", "cloud", "dev-tools", "google", "telegram", "github", "gaming-console", "microsoft", "streaming-west", "apple", "twitter", "meta",
   "discord", "social-other", "netflix", "disney", "streaming-asia", "bilibili", "steam", "gaming-pc",
   "storage", "payment", "news", "shopping", "cn", "global",
 ];

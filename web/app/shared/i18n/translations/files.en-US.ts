@@ -4,7 +4,6 @@ export const fileEnUS = {
   "files.config.outputNames.group.select": "Proxy",
   "files.config.outputNames.group.auto": "Auto",
   "files.config.outputNames.group.fallback": "Fallback",
-  "files.config.outputNames.group.cdn-resources": "Static/CDN Resources",
   "files.config.outputNames.group.other": "Other",
   "files.config.outputNames.group.ad": "Ad Block",
   "files.config.outputNames.group.private": "Private",

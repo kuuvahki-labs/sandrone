@@ -48,9 +48,9 @@ Apple 分别直接使用其父集合，Meta 使用 `meta`，新闻使用 `catego
 宽泛父列表，例如 Xbox 先于 Microsoft、Apple TV+ 先于 Apple、Hulu 先于 Disney、
 npm 先于 GitHub；这样各子服务策略组不会被父列表提前截流。
 
-三个客户端的标准和完整模板都提供 `Static/CDN Resources`；静态/CDN 域名使用
-Sukka 的 Mihomo text、sing-box source JSON，以及 Shadowrocket 可解析的
-DOMAIN-SET/RULE-SET 文本，并位于私有网络之后、普通服务规则之前。
+Shadowrocket 模板规则使用 Blackmatrix 的
+DOMAIN-SET/RULE-SET 文本，不直接引用 MetaCubeX geosite `.list`，因为其中的 `+.`
+条目不是本项目已验证的 Shadowrocket DOMAIN-SET 语法。
 
 Mihomo 和 Shadowrocket 还输出原生 `Fallback`，并让主代理组可以选择它；sing-box
 没有有序 fallback outbound，因此不生成一个实际只是普通 selector 的同名替代品。

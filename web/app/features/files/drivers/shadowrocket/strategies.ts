@@ -48,22 +48,6 @@ const ADAPTIVE_TYPE_OPTIONS = [
   { value: "load-balance", label: "load-balance" },
 ] as const;
 const RULE_BASE = "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket";
-const METACUBEX_RULE_BASE = "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite";
-const METACUBEX_RULE_IDS = new Set([
-  "aws",
-  "azure",
-  "category-ai-!cn",
-  "category-ads-all",
-  "category-doh",
-  "category-media",
-  "coursera",
-  "edx",
-  "khanacademy",
-  "meta",
-  "netlify",
-  "udemy",
-  "wise",
-]);
 
 const relations = shadowrocketRelations();
 const adaptive = shadowrocketAdaptive(shadowrocketAdaptiveDialect(relations));
@@ -419,30 +403,60 @@ interface ShadowrocketRuleArtifact {
 }
 
 const CUSTOM_RULE_ARTIFACTS: Readonly<Record<string, readonly ShadowrocketRuleArtifact[]>> = {
-  "cdn-domainset": [{
-    id: "cdn-domainset",
-    type: "domain-set",
-    url: "https://ruleset.skk.moe/List/domainset/cdn.conf",
-  }],
-  "cdn-classical": [{
-    id: "cdn-classical",
-    type: "rule-set",
-    url: "https://ruleset.skk.moe/List/non_ip/cdn.conf",
-  }],
+  "category-ads-all": [
+    nativeRuleArtifact("category-ads-all-domain", "Advertising/Advertising_Domain", "domain-set"),
+    nativeRuleArtifact("category-ads-all", "Advertising/Advertising"),
+  ],
+  "category-ai-!cn": [
+    nativeRuleArtifact("category-ai-!cn", "OpenAI/OpenAI"),
+    nativeRuleArtifact("category-ai-gemini", "Gemini/Gemini"),
+    nativeRuleArtifact("category-ai-claude", "Claude/Claude"),
+    nativeRuleArtifact("category-ai-copilot", "Copilot/Copilot"),
+  ],
+  "category-doh": [nativeRuleArtifact("category-doh", "DNS/DNS")],
+  "category-media": [
+    nativeRuleArtifact("category-media-domain", "GlobalMedia/GlobalMedia_Domain", "domain-set"),
+    nativeRuleArtifact("category-media", "GlobalMedia/GlobalMedia"),
+  ],
+  meta: [
+    nativeRuleArtifact("meta", "Facebook/Facebook"),
+    nativeRuleArtifact("meta-instagram", "Instagram/Instagram"),
+    nativeRuleArtifact("meta-whatsapp", "Whatsapp/Whatsapp"),
+  ],
+  aws: [nativeRuleArtifact("aws", "Cloud/AmazonCloud/AmazonCloud")],
 };
+
+const UNSUPPORTED_SHADOWROCKET_RULE_IDS = new Set([
+  "azure", "coursera", "edx", "khanacademy", "netlify", "udemy", "wise",
+]);
+const NATIVE_DOMAIN_SET_COMPANION_IDS = new Set(["apple", "geolocation-!cn"]);
 
 function ruleArtifacts(ruleID: string): ShadowrocketRuleArtifact[] {
   const custom = CUSTOM_RULE_ARTIFACTS[ruleID];
   if (custom) return [...custom];
-  if (METACUBEX_RULE_IDS.has(ruleID)) {
-    return [{ id: ruleID, type: "domain-set", url: `${METACUBEX_RULE_BASE}/${ruleID}.list` }];
-  }
+  if (UNSUPPORTED_SHADOWROCKET_RULE_IDS.has(ruleID)) return [];
   const name = ARTIFACT_NAMES[canonicalRuleID(ruleID)];
   if (!name) throw new Error(`Unknown Shadowrocket template rule: ${ruleID}`);
   if (ruleID === "cn") {
-    return [{ id: "cn-domain", type: "domain-set", url: `${RULE_BASE}/${name}/${name}_Domain.list` }];
+    return [
+      nativeRuleArtifact("cn-domain", `${name}/${name}_Domain`, "domain-set"),
+      nativeRuleArtifact("cn", `${name}/${name}`),
+    ];
   }
-  return [{ id: ruleID, type: "rule-set", url: `${RULE_BASE}/${name}/${name}.list` }];
+  const artifacts: ShadowrocketRuleArtifact[] = [];
+  if (NATIVE_DOMAIN_SET_COMPANION_IDS.has(ruleID)) {
+    artifacts.push(nativeRuleArtifact(`${ruleID}-domain`, `${name}/${name}_Domain`, "domain-set"));
+  }
+  artifacts.push(nativeRuleArtifact(ruleID, `${name}/${name}`));
+  return artifacts;
+}
+
+function nativeRuleArtifact(
+  id: string,
+  path: string,
+  type: ShadowrocketRuleArtifact["type"] = "rule-set",
+): ShadowrocketRuleArtifact {
+  return { id, type, url: `${RULE_BASE}/${path}.list` };
 }
 
 function policyFilter(item: { filter: string; excludeFilter?: string }): string {
