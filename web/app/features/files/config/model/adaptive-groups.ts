@@ -81,6 +81,7 @@ export interface ConfigAdaptiveDialect {
   groupMembers: (group: ConfigMap) => string[] | undefined;
   groupName: (group: ConfigMap) => string;
   inboundReferences: (config: Readonly<FileConfigDraft>) => Readonly<Record<string, number>>;
+  referenceTargets?: readonly string[];
   referenceInsertionIndex?: (members: readonly string[]) => number;
   materialize: (
     definition: CanonicalGroupDefinition,
@@ -471,7 +472,7 @@ function isAnchorGroup(
 }
 
 function adaptiveReferenceGroups(
-  dialect: Pick<ConfigAdaptiveDialect, "canonicalName" | "groupMembers" | "groupName">,
+  dialect: Pick<ConfigAdaptiveDialect, "canonicalName" | "groupMembers" | "groupName" | "referenceTargets">,
   groups: readonly ConfigMap[],
 ): AdaptiveReferenceGroup[] {
   return groups.flatMap((group, index) => {
@@ -479,19 +480,21 @@ function adaptiveReferenceGroups(
     const members = dialect.groupMembers(group);
     if (!members) return [];
     const anchor = isAnchorGroup(dialect, group);
-    if (!anchor && !members.some(isAnchorReference)) return [];
+    if (!anchor && !members.some((member) => isAdaptiveReference(dialect, member))) return [];
     return [{ anchor, index, members }];
   });
 }
 
 function rewriteAdaptiveReferences(
-  dialect: Pick<ConfigAdaptiveDialect, "referenceInsertionIndex">,
+  dialect: Pick<ConfigAdaptiveDialect, "referenceInsertionIndex" | "referenceTargets">,
   group: Readonly<AdaptiveReferenceGroup>,
   managedNames: ReadonlySet<string>,
   generatedNames: readonly string[],
 ): string[] {
   const members = group.members.filter((target) => !managedNames.has(target));
-  const anchorIndex = group.anchor ? -1 : members.findIndex(isAnchorReference);
+  const anchorIndex = group.anchor
+    ? -1
+    : members.findIndex((member) => isAdaptiveReference(dialect, member));
   const nodesIndex = members.findIndex((target) => target === "$nodes");
   const dialectIndex = dialect.referenceInsertionIndex?.(members) ?? -1;
   const insertionIndex = anchorIndex >= 0
@@ -503,6 +506,13 @@ function rewriteAdaptiveReferences(
 
 function isAnchorReference(value: string): boolean {
   return value === configAnchorName("en-US") || value === configAnchorName("zh-CN");
+}
+
+function isAdaptiveReference(
+  dialect: Pick<ConfigAdaptiveDialect, "referenceTargets">,
+  value: string,
+): boolean {
+  return isAnchorReference(value) || dialect.referenceTargets?.includes(value) === true;
 }
 
 function hasExternalReferences(

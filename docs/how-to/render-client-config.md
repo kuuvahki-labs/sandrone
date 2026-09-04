@@ -122,13 +122,9 @@ curl -sS -X POST "$SANDRONE_API/v1/files" \
     },
     "config": {
       "settings": {
-        "groups": [{
-          "name": "Proxy",
-          "type": "select",
-          "proxies": ["PROXY", "DIRECT"]
-        }],
+        "groups": [],
         "rule_sets": [],
-        "rules": ["FINAL,Proxy"]
+        "rules": ["FINAL,PROXY"]
       }
     },
     "processors": []

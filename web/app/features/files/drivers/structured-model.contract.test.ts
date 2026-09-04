@@ -49,9 +49,7 @@ describe("structured file driver editor models", () => {
 
       expect(missing).toMatchObject({ subscriptions: ["one", "two"], settingsMode: "structured" });
       expect(empty).toMatchObject({ settingsMode: "structured" });
-      expect(missing?.groups.length).toBeGreaterThan(0);
       expect(missing?.rules.length).toBeGreaterThan(0);
-      expect(empty?.groups.length).toBeGreaterThan(0);
       expect(empty?.rules.length).toBeGreaterThan(0);
       expect(explicit).toMatchObject({
         settingsMode: "structured",

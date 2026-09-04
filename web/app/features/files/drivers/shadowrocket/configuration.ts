@@ -2,7 +2,6 @@ import { ADAPTIVE_REGION_GROUPS } from "~/features/files/config/model/adaptive-r
 import type { ConfigMap, GroupDraft, RuleDraft, RuleSetDraft } from "~/features/files/config/model/editor-model";
 import { stringField } from "~/features/files/config/model/editor-model";
 import {
-  configAnchorName,
   configAutoName,
   configCustomGroupName,
   configGroupName,
@@ -269,11 +268,11 @@ function shadowrocketRules(): StructuredFileConfigurationAdapter["rules"] {
     return nativeValuesEqual(values, serializeShadowrocketRules(drafts)) ? drafts : null;
   };
   return {
-    create: (index, locale = "en-US") => ({
+    create: (index, _locale = "en-US") => ({
       id: draftID("rule", Date.now() + index),
       type: "rule-set",
       value: "custom",
-      policy: configAnchorName(locale),
+      policy: "PROXY",
     }),
     project,
     referencesRuleSet: (type) => type === "rule-set" || type === "domain-set",
@@ -308,25 +307,18 @@ function serializeShadowrocketRules(drafts: RuleDraft[]): string[] {
 }
 
 function defaultGroups(preset: string, locale: ConfigNamingLocale): ConfigMap[] {
-  const anchor = configAnchorName(locale);
   const auto = configAutoName(locale);
-  const fallback = configGroupName("fallback", locale);
   const other = configGroupName("other", locale);
-  if (preset === "minimal") return [{ name: anchor, type: "select", proxies: ["PROXY", "DIRECT"] }];
+  if (preset === "minimal") return [];
   if (preset === "region") {
     const regions = (["hk", "tw", "jp", "sg", "us"] as const);
     return [
-      { name: anchor, type: "select", proxies: [auto, ...regions.map((id) => configRegionName(id, locale)), other, "PROXY", "DIRECT"] },
       ...regions.map((id) => ({ name: configRegionName(id, locale), type: "select", "policy-regex-filter": regionFilter(id) })),
       { name: other, type: "select", "policy-regex-filter": "(?i)" },
       { name: auto, type: "url-test", "policy-regex-filter": "(?i)", interval: 300, timeout: 5, tolerance: 50 },
     ];
   }
-  return [
-    { name: anchor, type: "select", proxies: [auto, fallback, "PROXY", "DIRECT"] },
-    { name: auto, type: "url-test", "policy-regex-filter": "(?i)", interval: 300, timeout: 5, tolerance: 50 },
-    { name: fallback, type: "fallback", "policy-regex-filter": "(?i)", interval: 300, timeout: 5 },
-  ];
+  return [];
 }
 
 function fixedRuntimeMembers(members: string[] | undefined): string[] {
@@ -337,13 +329,13 @@ function regionFilter(id: string): string {
   return ADAPTIVE_REGION_GROUPS.find((region) => region.id === id)?.filter ?? "(?i)";
 }
 
-function defaultRules(locale: ConfigNamingLocale): string[] {
+function defaultRules(_locale: ConfigNamingLocale): string[] {
   return [
     "IP-CIDR,10.0.0.0/8,DIRECT,no-resolve",
     "IP-CIDR,172.16.0.0/12,DIRECT,no-resolve",
     "IP-CIDR,192.168.0.0/16,DIRECT,no-resolve",
     "GEOIP,CN,DIRECT,no-resolve",
-    `FINAL,${configAnchorName(locale)}`,
+    "FINAL,PROXY",
   ];
 }
 

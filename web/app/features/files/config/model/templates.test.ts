@@ -11,13 +11,14 @@ const CONFIG_KINDS = ["mihomo", "sing-box", "shadowrocket"] as const;
 type ConfigKind = typeof CONFIG_KINDS[number];
 const TEMPLATE_IDS = ["minimal", "standard", "full"] as const satisfies readonly ConfigTemplateID[];
 const SHADOWROCKET_RULE_BASE = "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket";
+const SHADOWROCKET_AI_RULE_URL = "https://raw.githubusercontent.com/iab0x00/ProxyRules/main/Rule/AI.txt";
 const SHADOWROCKET_TEMPLATE_ARTIFACTS = new Set([
-  "Abema", "Advertising", "Amazon", "AmazonCloud", "AmazonPrimeVideo", "Apple", "AppleTV", "Atlassian", "Claude", "Copilot",
+  "Abema", "Advertising", "Amazon", "AmazonCloud", "AmazonPrimeVideo", "Apple", "AppleTV", "Atlassian",
   "Bahamut", "BiliBili", "BiliBiliIntl", "Blizzard", "China", "Cloudflare", "DAZN",
   "DNS", "DigitalOcean", "Discord", "Disney", "Docker", "Dropbox", "EA", "Epic", "Facebook", "GitHub",
-  "Gemini", "GitLab", "Global", "GlobalMedia", "Gog", "Google", "HBO", "Hulu", "Instagram", "Jetbrains", "KKTV", "Lan", "Line",
+  "GitLab", "Global", "GlobalMedia", "Gog", "Google", "HBO", "Hulu", "Instagram", "Jetbrains", "KKTV", "Lan", "Line",
   "LinkedIn", "Microsoft", "Netflix", "Niconico", "Nintendo", "Notion", "Npmjs",
-  "OpenAI", "PayPal", "Pinterest", "PlayStation", "Reddit", "Riot", "Scholar", "Snap", "Spotify",
+  "PayPal", "Pinterest", "PlayStation", "Reddit", "Riot", "Scholar", "Snap", "Spotify",
   "Stackexchange", "Steam", "Stripe", "Telegram", "TikTok", "Tumblr", "Twitch", "Twitter", "Ubisoft", "Vercel",
   "ViuTV", "Whatsapp", "Wikimedia", "Xbox", "YouTube", "eBay",
 ]);
@@ -28,7 +29,9 @@ const MIHOMO_STANDARD_MODULES = [
   "ai", "youtube", "google", "microsoft", "apple", "netflix", "telegram", "final",
 ];
 const SING_BOX_STANDARD_MODULES = MIHOMO_STANDARD_MODULES.filter((moduleID) => moduleID !== "fallback");
-const SHADOWROCKET_STANDARD_MODULES = MIHOMO_STANDARD_MODULES.filter((moduleID) => moduleID !== "auto");
+const SHADOWROCKET_STANDARD_MODULES = MIHOMO_STANDARD_MODULES.filter((moduleID) => (
+  moduleID !== "select" && moduleID !== "auto" && moduleID !== "fallback"
+));
 const FULL_ONLY_MODULES = [
   "bilibili",
   "twitter",
@@ -55,7 +58,7 @@ describe("config templates", () => {
   it.each(CONFIG_KINDS)("exposes the module tiers with computed %s counts", (kind) => {
     const templates = getConfigTemplates(kind);
     const expectedMinimal = kind === "shadowrocket"
-      ? MINIMAL_MODULES.filter((moduleID) => moduleID !== "auto")
+      ? MINIMAL_MODULES.filter((moduleID) => moduleID !== "select" && moduleID !== "auto")
       : MINIMAL_MODULES;
     const expectedStandard = kind === "mihomo"
       ? MIHOMO_STANDARD_MODULES
@@ -74,7 +77,7 @@ describe("config templates", () => {
       ? [7, 15, 34]
       : kind === "sing-box"
         ? [7, 14, 33]
-        : [6, 14, 33]);
+        : [5, 12, 31]);
 
     for (const template of templates) {
       const config = createConfigFromTemplate(kind, template.id);
@@ -144,19 +147,12 @@ describe("config templates", () => {
     expect(groups.has("GLOBAL")).toBe(false);
   });
 
-  it.each(["standard", "full"] satisfies ConfigTemplateID[])("adds native Shadowrocket fallback and ad routing to the %s template", (templateID) => {
+  it.each(["standard", "full"] satisfies ConfigTemplateID[])("uses native Shadowrocket policies in the %s template", (templateID) => {
     const config = createConfigFromTemplate("shadowrocket", templateID);
     const groups = new Map((config.groups ?? []).map((group) => [String(group.name), group]));
 
-    expect(groups.get("Proxy")?.proxies).toEqual(["PROXY", "Fallback", "DIRECT", "REJECT"]);
-    expect(groups.get("Fallback")).toEqual({
-      name: "Fallback",
-      type: "fallback",
-      "policy-regex-filter": "(?i)",
-      interval: 300,
-      timeout: 5,
-    });
-    expect(groups.get("Ad Block")?.proxies).toEqual(["REJECT", "DIRECT", "Proxy"]);
+    expect(groups.get("Ad Block")?.proxies).toEqual(["REJECT", "DIRECT", "PROXY"]);
+    expect(groups.get("AI")?.proxies).toEqual(["PROXY", "DIRECT", "REJECT"]);
     expect(groups.has("GLOBAL")).toBe(false);
   });
 
@@ -422,7 +418,7 @@ describe("config templates", () => {
     const encryptedDNSPort = kind === "sing-box"
       ? rules.find((rule) => isRecord(rule) && rule.port === 853)
       : rules.find((rule) => typeof rule === "string" && rule.startsWith("DST-PORT,853,"));
-    const policy = "Proxy";
+    const policy = kind === "shadowrocket" ? "PROXY" : "Proxy";
 
     expect(encryptedDNSRule).toEqual(kind === "sing-box"
       ? { rule_set: ["category-doh"], outbound: policy }
@@ -442,9 +438,6 @@ describe("config templates", () => {
       ["category-ads-all", "Ad Block"],
       ["category-ads-all-domain", "Ad Block"],
       ["category-ai-!cn", "AI"],
-      ["category-ai-claude", "AI"],
-      ["category-ai-copilot", "AI"],
-      ["category-ai-gemini", "AI"],
       ["category-media", "News"],
       ["category-media-domain", "News"],
       ["meta", "Meta"],
@@ -462,22 +455,14 @@ describe("config templates", () => {
   it.each(TEMPLATE_IDS)("uses Shadowrocket-compatible text lists for the %s Shadowrocket template", (templateID) => {
     const config = createConfigFromTemplate("shadowrocket", templateID);
     const ruleTypesByName = new Map((config.rule_sets ?? []).map((ruleSet) => [ruleSet.name, ruleSet.type]));
-    const groupsByName = new Map((config.groups ?? []).map((group) => [group.name, group]));
 
     expect(config.groups).not.toHaveLength(0);
-    expect(groupsByName.get("Proxy")).toEqual({
-      name: "Proxy",
-      type: "select",
-      proxies: templateID === "minimal"
-        ? ["PROXY", "DIRECT", "REJECT"]
-        : ["PROXY", "Fallback", "DIRECT", "REJECT"],
-   });
-    expect(groupsByName.has("Auto")).toBe(false);
-    for (const group of config.groups ?? []) {
-      if (Array.isArray(group.proxies)) expect(group.proxies).not.toContain("Auto");
-   }
     expect(config.rules?.at(-1)).toBe("FINAL,Final");
     for (const ruleSet of config.rule_sets ?? []) {
+      if (ruleSet.name === "category-ai-!cn") {
+        expect(ruleSet).toEqual({ name: "category-ai-!cn", type: "rule-set", url: SHADOWROCKET_AI_RULE_URL });
+        continue;
+      }
       expect(ruleSet).toEqual({
         name: expect.any(String),
         type: expect.stringMatching(/^(rule-set|domain-set)$/),
@@ -497,7 +482,7 @@ describe("config templates", () => {
 
     expect(config.groups?.map((group) => group.name)).toContain("Ad Block");
     expect(config.groups?.find((group) => group.name === "Ad Block")?.proxies)
-      .toEqual(["REJECT", "DIRECT", "Proxy"]);
+      .toEqual(["REJECT", "DIRECT", "PROXY"]);
     expect(config.rule_sets?.map((ruleSet) => ruleSet.name)).toContain("category-ads-all");
     expect(config.rules).toEqual(expect.arrayContaining([
       "RULE-SET,category-ads-all,Ad Block",
@@ -557,8 +542,7 @@ describe("config templates", () => {
     const names = config.groups?.map((group) => group[groupKey]);
 
     expect(names).toEqual(expect.arrayContaining([
-      "🚀 节点选择",
-      ...(kind === "shadowrocket" ? [] : ["⚡ 自动选择"]),
+      ...(kind === "shadowrocket" ? [] : ["🚀 节点选择", "⚡ 自动选择"]),
       "🛑 广告拦截",
       "🐦 推特/X",
       "🐟 漏网之鱼",
@@ -623,7 +607,7 @@ describe("config templates", () => {
       config,
       generateAdaptiveGroups(
         ["HK-01"],
-        { type: "url-test" },
+        { type: "url-test", enabledRegionIds: ["hk"] },
         "shadowrocket",
       ),
       "shadowrocket",
@@ -634,7 +618,7 @@ describe("config templates", () => {
       match: templateID,
       namingLocale: "en-US",
    });
- });
+  });
 
   it("keeps a custom adaptive-like group classified as custom", () => {
     const config = createConfigFromTemplate("mihomo", "minimal");

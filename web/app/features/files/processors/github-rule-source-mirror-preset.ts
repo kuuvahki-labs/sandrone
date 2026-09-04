@@ -18,6 +18,10 @@ export const GITHUB_RULE_SOURCE_MIRROR_REPLACEMENTS: readonly (readonly [string,
     "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/",
     "https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/",
   ],
+  [
+    "https://raw.githubusercontent.com/iab0x00/ProxyRules/main/",
+    "https://cdn.jsdelivr.net/gh/iab0x00/ProxyRules@main/",
+  ],
 ];
 
 const LEGACY_PRESET_MARKER = "// sandrone:file-preset=github-rule-source-rewrite";

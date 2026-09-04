@@ -45,17 +45,14 @@ describe("file config model", () => {
   it("uses frontend defaults for omitted Shadowrocket sections", () => {
     const config = initialConfig("shadowrocket", {}, "zh-CN");
 
-    expect(config.groups).toEqual(expect.arrayContaining([
-      expect.objectContaining({ name: "🚀 节点选择", type: "select" }),
-      expect.objectContaining({ name: "⚡ 自动选择", type: "url-test" }),
-    ]));
+    expect(config.groups).toEqual([]);
     expect(config.ruleSets).toEqual([]);
     expect(serializeRules("shadowrocket", config.rules)).toEqual([
       "IP-CIDR,10.0.0.0/8,DIRECT,no-resolve",
       "IP-CIDR,172.16.0.0/12,DIRECT,no-resolve",
       "IP-CIDR,192.168.0.0/16,DIRECT,no-resolve",
       "GEOIP,CN,DIRECT,no-resolve",
-      "FINAL,🚀 节点选择",
+      "FINAL,PROXY",
     ]);
   });
 

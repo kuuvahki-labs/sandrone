@@ -93,7 +93,7 @@ function stripCanonicalAdaptiveGroups(
 }
 
 describe("localized adaptive group naming", () => {
-  it.each(["mihomo", "sing-box", "shadowrocket"] as const)("uses localized region names and anchors for %s", (target) => {
+  it.each(["mihomo", "sing-box", "shadowrocket"] as const)("uses localized region names and routing references for %s", (target) => {
     const base = createConfigFromTemplate(target, "minimal", "zh-CN");
     const generation = generateAdaptiveGroups(
       ["HK-01"],
@@ -104,23 +104,25 @@ describe("localized adaptive group naming", () => {
     const result = mergeAdaptiveGroups(base, generation, target);
     const nameKey = target === "sing-box" ? "tag" : "name";
     const memberKey = target === "sing-box" ? "outbounds" : "proxies";
-    const anchor = result.config.groups?.find((group) => group[nameKey] === "🚀 节点选择");
+    const referenceGroup = result.config.groups?.find((group) => group[nameKey] === (
+      target === "shadowrocket" ? "🐟 漏网之鱼" : "🚀 节点选择"
+    ));
 
     expect(generation.candidates.find((candidate) => candidate.id === "hk")?.name).toBe("🇭🇰 香港");
     expect(result.generatedGroupNames).toEqual(["🇭🇰 香港"]);
-    expect(anchor?.[memberKey]).toEqual(expect.arrayContaining(["🇭🇰 香港"]));
+    expect(referenceGroup?.[memberKey]).toEqual(expect.arrayContaining(["🇭🇰 香港"]));
     expect(adaptiveGroupAnchorProblem(base, target)).toBeNull();
  });
 
   it.each(["mihomo", "sing-box", "shadowrocket"] as const)(
-    "adds generated regions to every %s template selector that routes through the anchor",
+    "adds generated regions to every %s template selector that routes through its proxy reference",
     (target) => {
       const base = createConfigFromTemplate(target, "standard");
       const nameKey = target === "sing-box" ? "tag" : "name";
       const memberKey = target === "sing-box" ? "outbounds" : "proxies";
       const dependentNames = (base.groups ?? []).flatMap((group) => {
         const members = group[memberKey];
-        return Array.isArray(members) && members.includes("Proxy")
+        return Array.isArray(members) && members.includes(target === "shadowrocket" ? "PROXY" : "Proxy")
           ? [group[nameKey]]
           : [];
       });
@@ -136,7 +138,7 @@ describe("localized adaptive group naming", () => {
       const merged = mergeAdaptiveGroups(base, generation, target);
 
       expect(dependentNames.length).toBeGreaterThan(0);
-      for (const name of ["Proxy", ...dependentNames]) {
+      for (const name of [...(target === "shadowrocket" ? [] : ["Proxy"]), ...dependentNames]) {
         const group = merged.config.groups?.find((item) => item[nameKey] === name);
         expect(group?.[memberKey]).toEqual(expect.arrayContaining(["Hong Kong", "Japan"]));
       }
@@ -579,7 +581,7 @@ describe("adaptive Shadowrocket group generation", () => {
 
     expect(canonicalAdaptiveGroupNames(first.config.groups ?? [], "shadowrocket")).toEqual(["Hong Kong"]);
     expect(first.generatedGroupNames).toEqual(["Hong Kong"]);
-    expect(first.config.groups?.find((group) => group.name === "Proxy")?.proxies)
+    expect(first.config.groups?.find((group) => group.name === "Final")?.proxies)
       .toEqual(["PROXY", "Hong Kong", "DIRECT", "REJECT"]);
     expect(second.changed).toBe(false);
  });

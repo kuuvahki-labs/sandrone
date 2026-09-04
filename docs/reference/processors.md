@@ -299,6 +299,7 @@ Web 文件处理器编辑器为 Mihomo、sing-box 和 Shadowrocket 提供
 | `https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/` | `https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/` |
 | `https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/` | `https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@sing/` |
 | `https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/` | `https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/` |
+| `https://raw.githubusercontent.com/iab0x00/ProxyRules/main/` | `https://cdn.jsdelivr.net/gh/iab0x00/ProxyRules@main/` |
 
 这些只是可编辑的默认替换值。用户可以在普通脚本参数编辑器中修改
 `replacements`，换成其他镜像或追加映射；通用脚本源码不绑定 GitHub 或

@@ -57,6 +57,7 @@ describe("GitHub rule source mirror preset", () => {
       "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geoip/cn.mrs?download=1",
       "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/cn.srs",
       "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket/Apple/Apple.list",
+      "https://raw.githubusercontent.com/iab0x00/ProxyRules/main/Rule/AI.txt",
       unrelated,
     ].join("\n");
 
@@ -65,6 +66,7 @@ describe("GitHub rule source mirror preset", () => {
       "https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geoip/cn.mrs?download=1",
       "https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@sing/geo/geosite/cn.srs",
       "https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Shadowrocket/Apple/Apple.list",
+      "https://cdn.jsdelivr.net/gh/iab0x00/ProxyRules@main/Rule/AI.txt",
       unrelated,
     ].join("\n"));
 

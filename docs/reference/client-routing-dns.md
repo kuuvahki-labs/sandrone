@@ -41,6 +41,11 @@ DNS 路径与 IP 兜底语义的现行契约。它描述默认生成结果，不
 的国内直连例外；需要直连时由对应服务策略组选择 `DIRECT`。Microsoft 和 Apple
 策略组默认以 `DIRECT` 为首选项，因此默认路径仍然直连，但用户切换策略后会作用于
 完整服务。
+除这类明确的直连优先组外，Shadowrocket 服务组直接以客户端内建 `PROXY`
+为第一项；模板不生成自定义主 `Proxy`/“节点选择”组和依赖它的
+`Fallback` 组。DoH、853 端口及默认新规则也直接使用内建 `PROXY`。
+启用自适应地区组时，Web 把生成的地区组插在各策略组的内建 `PROXY` 之后，
+不要求额外的主代理组。
 
 同一策略下优先使用上游维护的聚合集合：AI 使用 `category-ai-!cn`，Microsoft 和
 Apple 分别直接使用其父集合，Meta 使用 `meta`，新闻使用 `category-media`。这能
@@ -48,12 +53,14 @@ Apple 分别直接使用其父集合，Meta 使用 `meta`，新闻使用 `catego
 宽泛父列表，例如 Xbox 先于 Microsoft、Apple TV+ 先于 Apple、Hulu 先于 Disney、
 npm 先于 GitHub；这样各子服务策略组不会被父列表提前截流。
 
-Shadowrocket 模板规则使用 Blackmatrix 的
-DOMAIN-SET/RULE-SET 文本，不直接引用 MetaCubeX geosite `.list`，因为其中的 `+.`
-条目不是本项目已验证的 Shadowrocket DOMAIN-SET 语法。
+Shadowrocket 的 AI 聚合规则使用 iab0x00 `AI.txt`，其余模板规则使用
+Blackmatrix 的 DOMAIN-SET/RULE-SET 文本。模板不直接引用 MetaCubeX geosite
+`.list`，因为其中的 `+.` 条目不是本项目已验证的 Shadowrocket
+DOMAIN-SET 语法。
 
-Mihomo 和 Shadowrocket 还输出原生 `Fallback`，并让主代理组可以选择它；sing-box
-没有有序 fallback outbound，因此不生成一个实际只是普通 selector 的同名替代品。
+Mihomo 输出原生 `Fallback`，并让主代理组可以选择它；sing-box 没有有序
+fallback outbound，Shadowrocket 模板直接使用内建 `PROXY`，因此两者都不生成
+`Fallback` 替代组。
 Mihomo 的广告组同时提供 `REJECT`、`REJECT-DROP` 和 `DIRECT`；
 Shadowrocket 的广告组使用可作为组成员的 `REJECT` 和 `DIRECT`，
 `REJECT-DROP` 仅保留为规则策略；sing-box 使用其原生 `block` outbound，

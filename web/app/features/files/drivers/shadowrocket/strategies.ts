@@ -1,6 +1,5 @@
 import {
   ADAPTIVE_REGION_IDS,
-  type AdaptiveGroupAnchorProblem,
   adaptiveGroupHelpers,
   adaptiveGroupOptionsFromValues,
   type ConfigAdaptiveDialect,
@@ -8,7 +7,7 @@ import {
 } from "~/features/files/config/model/adaptive-groups";
 import { CANONICAL_ADAPTIVE_GROUP_DEFINITIONS } from "~/features/files/config/model/adaptive-regions";
 import type { ConfigMap } from "~/features/files/config/model/editor-model";
-import { configAnchorName, configGroupName } from "~/features/files/config/model/naming";
+import { configGroupName } from "~/features/files/config/model/naming";
 import type { ConfigPreviewStrategy } from "~/features/files/config/model/preview";
 import type { ConfigReferenceStrategy } from "~/features/files/config/model/references";
 import {
@@ -48,6 +47,7 @@ const ADAPTIVE_TYPE_OPTIONS = [
   { value: "load-balance", label: "load-balance" },
 ] as const;
 const RULE_BASE = "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket";
+const AI_RULE_URL = "https://raw.githubusercontent.com/iab0x00/ProxyRules/main/Rule/AI.txt";
 
 const relations = shadowrocketRelations();
 const adaptive = shadowrocketAdaptive(shadowrocketAdaptiveDialect(relations));
@@ -252,7 +252,7 @@ function shadowrocketAdaptiveDialect(
     return group;
   };
   return {
-    anchorProblem: (config) => anchorProblem(config.groups ?? []),
+    anchorProblem: () => null,
     canonicalName: (group) => {
       for (const definition of CANONICAL_ADAPTIVE_GROUP_DEFINITIONS) {
         for (const name of [definition.name, ...(definition.legacyNames ?? [])]) {
@@ -274,6 +274,7 @@ function shadowrocketAdaptiveDialect(
       [],
       config.rules ?? [],
     )).groupInboundReferences,
+    referenceTargets: ["PROXY"],
     referenceInsertionIndex: (members) => {
       const index = members.findIndex((member) => member === "DIRECT" || member === "REJECT");
       return index < 0 ? members.length : index;
@@ -313,7 +314,9 @@ function shadowrocketTemplates(
   return createConfigTemplateStrategy({
     groupNames: (groups) => groups.map((group) => trimmedString(group.name)).filter(Boolean),
     materialize: materializeShadowrocketTemplate,
-    moduleIDs: (_id, moduleIDs) => moduleIDs.filter((moduleID) => moduleID !== "auto"),
+    moduleIDs: (_id, moduleIDs) => moduleIDs.filter((moduleID) => (
+      moduleID !== "select" && moduleID !== "auto" && moduleID !== "fallback"
+    )),
     normalizeRecognition: (config) => {
       const adaptiveLayer = adaptiveStrategy.recognizesCanonicalLayer(config);
       const stripped = adaptiveLayer ? adaptiveStrategy.strip(config) : { changed: false, config, strippedGroupNames: [] };
@@ -326,36 +329,42 @@ function shadowrocketTemplates(
 function materializeShadowrocketTemplate(
   blueprint: Readonly<ConfigTemplateBlueprint>,
 ): FileConfigDraft {
-  const fallbackName = blueprint.enabled.has("fallback") ? configGroupName("fallback", blueprint.namingLocale) : undefined;
   const groups = blueprint.groups.map((item) => {
     const name = configGroupName(item.id, blueprint.namingLocale);
-    const selectName = blueprint.enabled.has("select") ? configGroupName("select", blueprint.namingLocale) : undefined;
-    const autoName = blueprint.enabled.has("auto") ? configGroupName("auto", blueprint.namingLocale) : undefined;
-    if (item.id === "fallback") {
-      return { name, type: "fallback", "policy-regex-filter": "(?i)", interval: 300, timeout: 5 };
-    }
-    const targets = [...new Set([
-      ...(item.id === "select" ? ["PROXY"] : []),
-      ...templateGroupTargets(item, selectName, autoName, "DIRECT", "REJECT"),
-    ].filter((target) => target !== name && target !== "$nodes"))];
-    if (item.id === "select" && fallbackName) targets.splice(1, 0, fallbackName);
+    const targets = templateGroupTargets(item, "PROXY", undefined, "DIRECT", "REJECT")
+      .filter((target) => target !== name && target !== "$nodes");
     return item.groupMode === "url-test"
       ? { name, type: "url-test", proxies: targets, interval: 300, timeout: 5, tolerance: 50 }
       : { name, type: "select", proxies: targets };
   });
-  const ruleEntries = blueprint.ruleEntries
+  const serviceRuleEntries = blueprint.ruleEntries
     .filter(({ ruleID }) => canonicalRuleID(ruleID) === ruleID)
-    .flatMap(({ module, ruleID }) => ruleArtifacts(ruleID).map((artifact) => ({ artifact, module })));
+    .flatMap(({ module, ruleID }) => ruleArtifacts(ruleID).map((artifact) => ({
+      artifact,
+      moduleID: module.id,
+      policy: configGroupName(module.id, blueprint.namingLocale),
+    })));
+  const privateRuleEnd = serviceRuleEntries.map(({ moduleID }) => moduleID).lastIndexOf("private") + 1;
+  const dohRuleEntries = ruleArtifacts("category-doh").map((artifact) => ({
+    artifact,
+    moduleID: "select" as const,
+    policy: "PROXY",
+  }));
+  const ruleEntries = [
+    ...serviceRuleEntries.slice(0, privateRuleEnd),
+    ...dohRuleEntries,
+    ...serviceRuleEntries.slice(privateRuleEnd),
+  ];
   const ruleSets = ruleEntries.map(({ artifact }) => ({
     name: artifact.id,
     type: artifact.type,
     url: artifact.url,
   }));
   const rules = [
-    `DST-PORT,853,${configGroupName("select", blueprint.namingLocale)}`,
-    ...ruleEntries.map(({ artifact, module }) => {
+    "DST-PORT,853,PROXY",
+    ...ruleEntries.map(({ artifact, policy }) => {
       const type = artifact.type === "domain-set" ? "DOMAIN-SET" : "RULE-SET";
-      return `${type},${artifact.id},${configGroupName(module.id, blueprint.namingLocale)}`;
+      return `${type},${artifact.id},${policy}`;
     }),
     `GEOIP,CN,${configGroupName("cn", blueprint.namingLocale)}`,
   ];
@@ -407,12 +416,7 @@ const CUSTOM_RULE_ARTIFACTS: Readonly<Record<string, readonly ShadowrocketRuleAr
     nativeRuleArtifact("category-ads-all-domain", "Advertising/Advertising_Domain", "domain-set"),
     nativeRuleArtifact("category-ads-all", "Advertising/Advertising"),
   ],
-  "category-ai-!cn": [
-    nativeRuleArtifact("category-ai-!cn", "OpenAI/OpenAI"),
-    nativeRuleArtifact("category-ai-gemini", "Gemini/Gemini"),
-    nativeRuleArtifact("category-ai-claude", "Claude/Claude"),
-    nativeRuleArtifact("category-ai-copilot", "Copilot/Copilot"),
-  ],
+  "category-ai-!cn": [{ id: "category-ai-!cn", type: "rule-set", url: AI_RULE_URL }],
   "category-doh": [nativeRuleArtifact("category-doh", "DNS/DNS")],
   "category-media": [
     nativeRuleArtifact("category-media-domain", "GlobalMedia/GlobalMedia_Domain", "domain-set"),
@@ -464,21 +468,6 @@ function policyFilter(item: { filter: string; excludeFilter?: string }): string 
   const include = item.filter.replace(/^\(\?i\)/, "");
   const exclude = item.excludeFilter.replace(/^\(\?i\)/, "");
   return `(?i)^(?!.*(?:${exclude}))(?=.*(?:${include})).*$`;
-}
-
-function anchorProblem(groups: readonly ConfigMap[]): AdaptiveGroupAnchorProblem | null {
-  const anchors = groups.filter((group) => {
-    const name = trimmedString(group.name);
-    return name === configAnchorName("en-US") || name === configAnchorName("zh-CN");
-  });
-  if (anchors.length === 0) return { code: "anchor_missing" };
-  if (anchors.length > 1) return { code: "anchor_duplicate", count: anchors.length };
-  if (anchors[0].type !== "select") return { code: "anchor_type_invalid" };
-  if (!Array.isArray(anchors[0].proxies)
-    || anchors[0].proxies.some((member) => typeof member !== "string")) {
-    return { code: "anchor_members_invalid" };
-  }
-  return null;
 }
 
 function addIntegerIssue(

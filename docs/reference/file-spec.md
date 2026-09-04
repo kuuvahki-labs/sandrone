@@ -173,12 +173,9 @@ kind: shadowrocket
 source: {}
 config:
   settings:
-    groups:
-      - name: Proxy
-        type: select
-        proxies: [PROXY, DIRECT]
+    groups: []
     rule_sets: []
-    rules: [FINAL,Proxy]
+    rules: [FINAL,PROXY]
 ```
 
 这三个示例都使用内建 base。Shadowrocket 的节点订阅须另行添加

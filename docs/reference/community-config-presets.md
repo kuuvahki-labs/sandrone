@@ -105,8 +105,9 @@ fallback。
 
 Mihomo、sing-box 和 Shadowrocket 还共享“GitHub 加速”快捷项，并在三个客户端的
 新建文件中默认启用。它
-把项目已知的 MetaCubeX `meta`/`sing` 与 blackmatrix7 GitHub Raw 前缀改写为
-jsDelivr，未匹配内容保持原样且不产生 warning。它生成普通 inline script，并把
+把项目已知的 MetaCubeX `meta`/`sing`、blackmatrix7 与 Shadowrocket AI 使用的
+iab0x00 GitHub Raw 前缀改写为 jsDelivr，未匹配内容保持原样且不产生 warning。
+它生成普通 inline script，并把
 有序替换表放在可编辑参数中，不是新的 processor type；删除或编辑副本即可改变
 行为。精确参数与前缀表见
 [Processors](processors.md#web-内置字符串替换预设)，来源为

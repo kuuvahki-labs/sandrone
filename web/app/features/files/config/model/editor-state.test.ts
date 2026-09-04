@@ -358,9 +358,10 @@ describe("config editor structure transitions", () => {
 });
 
 describe("config editor adaptive and catalog transitions", () => {
-  it.each(["mihomo", "shadowrocket"])(
-    "applies five default adaptive groups for %s and persists the selected options",
-    (kind) => {
+  it(
+    "applies five default adaptive groups for Mihomo and persists the selected options",
+    () => {
+      const kind = "mihomo";
       const adapter = structuredAdapter(kind);
       const initial = initializeConfigEditorState(adapter, {
         defaultValue: adapter.templates.create("minimal"),
@@ -405,37 +406,25 @@ describe("config editor adaptive and catalog transitions", () => {
     },
   );
 
-  it("materializes Shadowrocket frontend defaults as the adaptive anchor", () => {
+  it("generates Shadowrocket adaptive groups through the built-in PROXY references", () => {
     const adapter = structuredAdapter("shadowrocket");
     const initial = initializeConfigEditorState(adapter, {
-      defaultValue: {
-        settingsMode: "structured",
-      },
-      formMode: "edit",
+      defaultValue: adapter.templates.create("minimal"),
+      formMode: "create",
     });
-
-    expect(deriveConfigEditorOutput(adapter, initial).encoded).toMatchObject({
-      settings: {
-        groups: expect.any(Array),
-        rule_sets: expect.any(Array),
-        rules: expect.any(Array),
-      },
-    });
-
+    const options = { ...adapter.adaptive.defaultOptions(), enabledRegionIds: ["hk"] };
     const transition = applyConfigEditorAdaptiveGeneration(adapter, initial, {
-      nodeNames: ["HK-01", "香港-02"],
-      options: adapter.adaptive.defaultOptions(),
+      nodeNames: ["HK-01"],
+      options,
     });
     const output = deriveConfigEditorOutput(adapter, transition.state);
 
+    expect(initial.adaptiveEnabled).toBe(true);
     expect(transition.applied).toBe(true);
-    expect(output.nativeConfig.groups).toEqual(expect.arrayContaining([
-      expect.objectContaining({ name: "Proxy", type: "select" }),
-      expect.objectContaining({
-        name: "Hong Kong",
-        "policy-regex-filter": expect.any(String),
-      }),
-    ]));
+    expect(output.nativeConfig.groups?.find((group) => group.name === "Final")?.proxies)
+      .toEqual(["PROXY", "Hong Kong", "DIRECT", "REJECT"]);
+    expect(adapter.adaptive.canonicalNames(output.nativeConfig.groups ?? []))
+      .toEqual(["Hong Kong"]);
   });
 
   it("does not change state when generated groups cannot be projected", () => {
