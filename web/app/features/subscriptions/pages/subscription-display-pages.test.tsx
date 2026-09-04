@@ -52,11 +52,12 @@ describe("SubscriptionPreviewPage", () => {
     expect(nodeDetails).toHaveAttribute("aria-expanded", "true");
     await user.click(screen.getByRole("button", { name: "查看节点信息：source-keep" }));
 
-    const dialog = screen.getByRole("dialog", { name: "节点信息" });
-    expect(within(dialog).getByText("source-keep")).toBeInTheDocument();
-    expect(await within(dialog).findByText("ss://fixture-node", undefined, { timeout: 5_000 })).toBeInTheDocument();
+    expect(within(screen.getByRole("dialog", { name: "节点信息" })).getByText("source-keep")).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(within(screen.getByRole("dialog", { name: "节点信息" })).getByText("ss://fixture-node")).toBeInTheDocument();
+    }, { timeout: 5_000 });
     expect(onRenderNodeURI).toHaveBeenCalledWith(subscriptionPreview.nodes[0].after);
-    await user.click(within(dialog).getByRole("button", { name: "关闭" }));
+    await user.click(within(screen.getByRole("dialog", { name: "节点信息" })).getByRole("button", { name: "关闭" }));
 
     await user.click(screen.getByRole("button", { name: "筛选已移除，共 1 个" }));
     await user.click(screen.getByRole("button", { name: "drop 节点详情" }));
