@@ -273,6 +273,11 @@ export function FileConfigEditor({ adapter, allowSubscriptions = true, baseEdito
       /> : null}
 			{previewValidation.issueKey ? <Alert severity="error">{t(previewValidation.issueKey)}</Alert> : null}
       {!rawMode ? (
+        <WorkbenchGroupSection collapsible={false} id="file-config-base" label={t("files.config.baseContent")}>
+          {baseEditor}
+        </WorkbenchGroupSection>
+      ) : null}
+      {!rawMode ? (
         <WorkbenchGroupSection
           collapsible={false}
           headerActions={<Button aria-label={t("files.config.clearAction")} color="error" size="small" type="button" onClick={requestClearConfiguration}>{t("actions.clear")}</Button>}
@@ -330,14 +335,11 @@ export function FileConfigEditor({ adapter, allowSubscriptions = true, baseEdito
         onGenerate={generateAdaptive}
       />
       {adaptiveStale ? <Alert severity="error">{t("files.config.adaptiveStale")}</Alert> : null}
-      <WorkbenchGroupSection collapsible={false} id="file-config-base" label={t("files.config.baseContent")}>
-        {baseEditor}
-      </WorkbenchGroupSection>
       {editorMode === "advanced" ? <Alert severity="warning"><Typography className="font-semibold" component="p" variant="body2">{t("files.config.rawConfig")}</Typography>{t("files.config.advancedUnsupported")}</Alert> : null}
       {editorMode === "wizard" ? (
         <>
           <ProxyGroupEditor adapter={adapter} defaultExpanded={!configurationEmpty} groups={groups} inboundReferences={relationModel.groupInboundReferences} issues={groupIssues} key={`groups-${structureRevision}`} namingLocale={namingLocale} nodes={nodeOptions ?? []} ui={ui} onChange={(value) => updateEditorState({ type: "change-groups", groups: value })} />
-          <RuleSetListEditor adapter={adapter} defaultExpanded={!configurationEmpty && ruleSets.length <= 20} inboundReferences={relationModel.ruleSetInboundReferences} issues={ruleSetIssues} key={`rule-sets-${structureRevision}`} ruleSets={ruleSets} ui={ui} onChange={(value) => updateEditorState({ type: "change-rule-sets", ruleSets: value })} onOpenCatalog={loadRuleSetCatalog ? () => setCatalogOpen(true) : undefined} />
+          <RuleSetListEditor adapter={adapter} defaultExpanded={!configurationEmpty} inboundReferences={relationModel.ruleSetInboundReferences} issues={ruleSetIssues} key={`rule-sets-${structureRevision}`} ruleSets={ruleSets} ui={ui} onChange={(value) => updateEditorState({ type: "change-rule-sets", ruleSets: value })} onOpenCatalog={loadRuleSetCatalog ? () => setCatalogOpen(true) : undefined} />
           <RuleListEditor adapter={adapter} defaultExpanded={!configurationEmpty} groups={groups} issues={ruleIssues} key={`rules-${structureRevision}`} namingLocale={namingLocale} nodes={nodeOptions ?? []} rules={rules} ruleSets={ruleSets} ui={ui} onChange={(value) => updateEditorState({ type: "change-rules", rules: value })} />
         </>
       ) : (

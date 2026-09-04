@@ -79,10 +79,13 @@ describe("config file workbench integration", { timeout: 20_000 }, () => {
     const template = screen.getByRole("group", {
       name: "Configuration template",
     });
+    const baseContent = screen.getByRole("group", { name: "Base configuration content" });
     const nodeSource = screen.getByRole("group", { name: "Node source" });
     expect(screen.getByRole("heading", { name: "Configuration content" }))
       .toBeInTheDocument();
     expect(nodeSource.compareDocumentPosition(template))
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(baseContent.compareDocumentPosition(template))
       .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(await screen.findByText("Loaded 1 nodes")).toBeInTheDocument();
 
@@ -126,6 +129,19 @@ describe("config file workbench integration", { timeout: 20_000 }, () => {
     await user.click(within(rule).getByRole("combobox", { name: "Policy" }));
     const policyOption = await screen.findByRole("option", { name: /Hong Kong.*Proxy group/ });
     expect(policyOption).not.toHaveTextContent(/ss|node-1\.example:8388/);
+  });
+
+  it("keeps a large rule-set collection expanded by default", () => {
+    localStorage.setItem("sandrone.locale", "en-US");
+    const adapter = structuredAdapter("shadowrocket");
+
+    renderEditor({
+      adapter,
+      defaultValue: adapter.templates.create("full"),
+    });
+
+    expect(screen.getByRole("button", { name: "Rule sets" }))
+      .toHaveAttribute("aria-expanded", "true");
   });
 
   it("restores catalog state after a template round trip and reports adaptive changes", async () => {
