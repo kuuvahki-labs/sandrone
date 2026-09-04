@@ -29,12 +29,14 @@ export function CodeBlock({
   fillHeight = false,
   label,
   language = "text",
+  showLanguage = true,
   toolbar,
   value,
 }: {
   fillHeight?: boolean;
   label: string;
   language?: string;
+  showLanguage?: boolean;
   toolbar?: ReactNode;
   value: string;
 }) {
@@ -64,9 +66,11 @@ export function CodeBlock({
           <Typography className="break-words" component="h3" variant="subtitle2">
             {label}
           </Typography>
-          <Typography color="text.secondary" variant="caption">
-            {language}
-          </Typography>
+          {showLanguage ? (
+            <Typography color="text.secondary" variant="caption">
+              {language}
+            </Typography>
+          ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {toolbar}

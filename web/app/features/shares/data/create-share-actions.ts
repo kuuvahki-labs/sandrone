@@ -3,6 +3,7 @@ import { type ShareCopyFormat, shareUrlWithFormat } from "~/features/shares/mode
 import type { ShareItem } from "~/features/shares/model/types";
 import type { ApiClient, ShareCreateRequest } from "~/shared/api/client";
 import { defaultTranslator, type Translator } from "~/shared/i18n/context";
+import { copyText } from "~/shared/ui/text-transfer";
 
 export type CopyShareResult =
   | { copied: true }
@@ -49,13 +50,7 @@ export function createShareActions({
   }
 
   async function copyShareUrl(publicUrl: string): Promise<CopyShareResult> {
-    if (!navigator.clipboard) {
-      showNotice(t("shares.messages.copyUnavailable"), "warning");
-      return { copied: false, url: publicUrl };
-    }
-    try {
-      await navigator.clipboard.writeText(publicUrl);
-    } catch {
+    if (!(await copyText(publicUrl))) {
       showNotice(t("shares.messages.copyUnavailable"), "warning");
       return { copied: false, url: publicUrl };
     }

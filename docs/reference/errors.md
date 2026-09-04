@@ -75,6 +75,12 @@ processor 已返回 `AppError` 时，处理链保留原 code，并补上缺失�
 | --- | --- |
 | `cache_operation_failed` | 手动清空缓存期间 Store 操作失败；HTTP 不暴露底层 cause |
 
+### 节点 IP 归属
+
+| code | 含义 |
+| --- | --- |
+| `ip_lookup_failed` | DNS 解析或 `ipwho.is` 请求、响应失败 |
+
 ### Probe 批次错误
 
 | code | 含义 |
@@ -117,6 +123,7 @@ HTTP status 与 `AppError.code` 是两个维度，不能互相推导。通用 se
 | `413` | `backup_too_large` |
 | `422` | `backup_incompatible` |
 | `500` | `backup_restore_failed`、`cache_operation_failed` 及没有专门映射的其它 service error |
+| `502` | `ip_lookup_failed` |
 
 因此，远程响应失败产生的 `file_input_not_found` 通常是 `400`，而包装了本地
 `os.ErrNotExist` 的同码错误是 `404`。`parse_failed`、`render_failed`、

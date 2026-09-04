@@ -24,8 +24,7 @@ import {
 import type { ApiClient, FormatCapabilityDirection, FormatCapabilitySummary } from "~/shared/api/client";
 import { type TranslationKey, useI18n } from "~/shared/i18n/context";
 import { AppDialog } from "~/shared/ui/dialogs";
-
-import { hasSelectionWithin, selectContents } from "./share-url-selection";
+import { hasSelectionWithin, selectContents } from "~/shared/ui/text-transfer";
 
 interface ConvertLinkDialogProps {
   client: ApiClient;

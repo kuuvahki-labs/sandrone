@@ -156,6 +156,38 @@ test.beforeEach(async ({ page }) => {
   await page.route("**/v1/capabilities/ui", async (route) => {
     await route.fulfill({ json: uiCapabilities });
   });
+  await page.route("**/v1/nodes/inspect", async (route) => {
+    const request = route.request().postDataJSON() as { include?: string[] };
+    if (request.include?.includes("ip")) {
+      await route.fulfill({
+        json: {
+          ip: {
+            server: "example.com",
+            ip: "203.0.113.10",
+            ip_version: 4,
+            public: true,
+            country_code: "US",
+            country: "United States",
+            continent_code: "NA",
+            continent: "North America",
+            asn: "AS64500",
+            as_name: "Example Network",
+            as_domain: "example.net",
+            source: { name: "ipwho.is", url: "https://ipwho.is" },
+          },
+        },
+      });
+      return;
+    }
+    await route.fulfill({
+      json: {
+        uri: {
+          value: "ss://fixture-node-uri",
+          warnings: [],
+        },
+      },
+    });
+  });
   await page.route("**/v1/rule-set-catalog?target=*", async (route) => {
     await route.fulfill({ json: { items: [] } });
   });
@@ -280,6 +312,59 @@ test("ignored subscription warnings persist and can be restored", async ({ page 
 
   await page.goto("/subscriptions/remote/provider/preview");
   await expect(page.getByRole("button", { name: "展开预览警告" })).toBeVisible();
+  expect(consoleIssues).toEqual([]);
+});
+
+test("node preview expands from the row and loads node information automatically", async ({ page }) => {
+  const consoleIssues: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error" || message.type() === "warning") {
+      consoleIssues.push(`${message.type()}: ${message.text()}`);
+    }
+  });
+  await page.goto("/subscriptions/remote/provider/preview");
+
+  const details = page.getByRole("button", { name: new RegExp(`^${longPreviewNode} 节点详情`) });
+  await expect(details).toHaveAttribute("aria-expanded", "false");
+  await details.click();
+  await expect(details).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("region", { name: "节点详情" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "节点详情" })).not.toContainText("json-diff");
+
+  const uriRequest = page.waitForRequest((request) => (
+    request.method() === "POST" && new URL(request.url()).pathname === "/v1/nodes/inspect"
+      && (request.postDataJSON() as { include?: string[] }).include?.includes("uri") === true
+  ));
+  const ipRequest = page.waitForRequest((request) => (
+    request.method() === "POST" && new URL(request.url()).pathname === "/v1/nodes/inspect"
+      && (request.postDataJSON() as { include?: string[] }).include?.includes("ip") === true
+  ));
+  await page.getByRole("button", { name: `查看节点信息：${longPreviewNode}` }).click();
+  expect((await uriRequest).postDataJSON()).toMatchObject({
+    include: ["uri"],
+    node: { name: longPreviewNode, server: "example.com", type: "ss" },
+  });
+
+  const dialog = page.getByRole("dialog", { name: "节点信息" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText(longPreviewNode)).toBeVisible();
+  await expect(dialog.getByRole("img", { name: `${longPreviewNode} 的节点 URI 二维码` })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "复制节点 URI" })).toBeVisible();
+  await expect(dialog).not.toContainText("节点工具");
+
+  expect((await ipRequest).postDataJSON()).toMatchObject({
+    include: ["ip"],
+    node: { name: longPreviewNode, server: "example.com", type: "ss" },
+  });
+  await expect(dialog.getByText("203.0.113.10")).toBeVisible();
+
+  const dialogMetrics = await dialog.evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }));
+  expect(dialogMetrics.scrollWidth).toBeLessThanOrEqual(dialogMetrics.clientWidth + 1);
+  await dialog.getByRole("button", { name: "关闭" }).click();
+  await expect(dialog).toBeHidden();
   expect(consoleIssues).toEqual([]);
 });
 

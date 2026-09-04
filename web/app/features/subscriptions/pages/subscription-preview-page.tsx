@@ -1,4 +1,5 @@
 import { useDeferredValue, useId, useMemo, useState } from "react";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -9,6 +10,7 @@ import Card from "@mui/material/Card";
 import CardActionArea from "@mui/material/CardActionArea";
 import CardContent from "@mui/material/CardContent";
 import Collapse from "@mui/material/Collapse";
+import IconButton from "@mui/material/IconButton";
 import InputAdornment from "@mui/material/InputAdornment";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
@@ -18,7 +20,8 @@ import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 
-import type { SubscriptionItem, SubscriptionPreview, SubscriptionPreviewNode, SubscriptionPreviewNodeDiff, SubscriptionPreviewProbe, SubscriptionPreviewStatus } from "~/features/subscriptions/model/types";
+import { NodeInfoDialog } from "~/features/subscriptions/components/node-tools-dialog";
+import type { NodeIPInfo, NodeURIResult, SubscriptionItem, SubscriptionPreview, SubscriptionPreviewNode, SubscriptionPreviewNodeDiff, SubscriptionPreviewProbe, SubscriptionPreviewStatus } from "~/features/subscriptions/model/types";
 import { type Translator, useI18n } from "~/shared/i18n/context";
 import { PreviewPendingStatus } from "~/shared/preview/preview-pending-status";
 import { groupPreviewWarnings } from "~/shared/resources/warning-groups";
@@ -42,14 +45,18 @@ export interface SubscriptionPreviewPageProps {
   pending?: boolean;
   preview?: SubscriptionPreview;
   onBack: () => void;
+  onCopyURI: (uri: string) => Promise<boolean>;
+  onLookupNodeIP: (node: SubscriptionPreviewNode) => Promise<NodeIPInfo>;
   onRefresh: () => void;
+  onRenderNodeURI: (node: SubscriptionPreviewNode) => Promise<NodeURIResult>;
   onShare: () => void;
 }
 
-export function SubscriptionPreviewPage({ backLabel, elapsedSeconds = 0, failed = false, pending = false, preview, onBack, onRefresh, onShare }: SubscriptionPreviewPageProps) {
+export function SubscriptionPreviewPage({ backLabel, elapsedSeconds = 0, failed = false, pending = false, preview, onBack, onCopyURI, onLookupNodeIP, onRefresh, onRenderNodeURI, onShare }: SubscriptionPreviewPageProps) {
   const { t } = useI18n();
   const [filter, setFilter] = useState<PreviewFilter>("final");
   const [query, setQuery] = useState("");
+  const [nodeInfo, setNodeInfo] = useState<SubscriptionPreviewNode | null>(null);
   const deferredQuery = useDeferredValue(query);
   const previewNodes = preview?.nodes;
   const visibleWarnings = useVisiblePreviewWarnings(preview?.warnings);
@@ -141,7 +148,11 @@ export function SubscriptionPreviewPage({ backLabel, elapsedSeconds = 0, failed 
 
           <List aria-label={t("subscriptions.preview.nodeList")} className="grid gap-3 p-0">
             {visibleNodes.length ? visibleNodes.map((diff) => (
-              <PreviewNodeCard diff={diff} key={diff.runtimeId} />
+              <PreviewNodeCard
+                diff={diff}
+                key={diff.runtimeId}
+                onOpenNodeInfo={setNodeInfo}
+              />
             )) : (
               <ListItem className="block" disablePadding>
                 <Card component="article" variant="outlined">
@@ -155,6 +166,15 @@ export function SubscriptionPreviewPage({ backLabel, elapsedSeconds = 0, failed 
             )}
           </List>
         </>
+      ) : null}
+      {nodeInfo ? (
+        <NodeInfoDialog
+          node={nodeInfo}
+          onClose={() => setNodeInfo(null)}
+          onCopyURI={onCopyURI}
+          onLookupIP={onLookupNodeIP}
+          onRenderURI={onRenderNodeURI}
+        />
       ) : null}
     </section>
   );
@@ -172,7 +192,13 @@ function previewNodeSearchText(diff: SubscriptionPreviewNodeDiff, finalOnly = fa
   return values.filter((value) => value !== undefined && value !== null).join(" ").toLowerCase();
 }
 
-function PreviewNodeCard({ diff }: { diff: SubscriptionPreviewNodeDiff }) {
+function PreviewNodeCard({
+  diff,
+  onOpenNodeInfo,
+}: {
+  diff: SubscriptionPreviewNodeDiff;
+  onOpenNodeInfo: (node: SubscriptionPreviewNode) => void;
+}) {
   const { locale, t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const [detailMode, setDetailMode] = useState<PreviewDetailMode>("diff");
@@ -202,6 +228,18 @@ function PreviewNodeCard({ diff }: { diff: SubscriptionPreviewNodeDiff }) {
       {hasMetadata ? <ToggleButton aria-label={t("subscriptions.preview.meta")} value="meta">{t("subscriptions.preview.meta")}</ToggleButton> : null}
     </ToggleButtonGroup>
   );
+  const detailToolbar = (
+    <>
+      {detailModeControl}
+      {diff.after ? (
+        <Tooltip title={t("subscriptions.nodeTools.open")}>
+          <IconButton aria-label={t("subscriptions.nodeTools.openNamed", { name: nodeName })} size="small" onClick={() => onOpenNodeInfo(diff.after!)}>
+            <InfoOutlinedIcon aria-hidden fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      ) : null}
+    </>
+  );
 
   return (
     <ListItem className="block min-w-0" disablePadding>
@@ -215,17 +253,19 @@ function PreviewNodeCard({ diff }: { diff: SubscriptionPreviewNodeDiff }) {
         >
           <CardContent className="min-w-0 [&:last-child]:pb-4">
             <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto] items-start gap-3">
-              <PreviewNodeSummary diff={diff} />
+              <div className="min-w-0">
+                <PreviewNodeSummary diff={diff} />
+              </div>
               {probeSummary ? <PreviewProbeSummary summary={probeSummary} /> : null}
-              <span className="pt-1 text-text-secondary">
-                {expanded ? <KeyboardArrowUpIcon aria-hidden fontSize="small" /> : <KeyboardArrowDownIcon aria-hidden fontSize="small" />}
+              <span aria-hidden className="flex size-8 items-center justify-center">
+                {expanded ? <KeyboardArrowUpIcon fontSize="small" /> : <KeyboardArrowDownIcon fontSize="small" />}
               </span>
             </div>
           </CardContent>
         </CardActionArea>
         <Collapse id={detailsId} in={expanded} timeout="auto" unmountOnExit>
           <CardContent className="min-w-0 border-t border-divider pt-3">
-            <CodeBlock label={t("subscriptions.preview.detailLabel")} language="json-diff" toolbar={detailModeControl} value={detailValue} />
+            <CodeBlock label={t("subscriptions.preview.detailLabel")} language="json-diff" showLanguage={false} toolbar={detailToolbar} value={detailValue} />
           </CardContent>
         </Collapse>
       </Card>

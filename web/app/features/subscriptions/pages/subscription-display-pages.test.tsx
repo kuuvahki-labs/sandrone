@@ -22,11 +22,47 @@ import { SubscriptionsPage } from "./subscriptions-page";
 const previewPageActions = {
   backLabel: "返回编辑",
   onBack: noop,
+  onCopyURI: async () => true,
+  onLookupNodeIP: async () => ({ ip: "198.18.0.1", ipVersion: 4 as const, public: false, server: "proxy.example.com" }),
   onRefresh: noop,
+  onRenderNodeURI: async () => ({ uri: "ss://fixture", warnings: [] }),
   onShare: noop,
 };
 
 describe("SubscriptionPreviewPage", () => {
+  it("offers node information only for final nodes", async () => {
+    const user = userEvent.setup();
+    const result = {
+      uri: "ss://fixture-node",
+      warnings: [{ code: "render_lossy_field", field: "udp", message: "field omitted", node: "source-keep" }],
+    };
+    const onRenderNodeURI = vi.fn().mockResolvedValue(result);
+    render(
+      <SubscriptionPreviewPage
+        {...previewPageActions}
+        item={subscriptions[0]}
+        preview={subscriptionPreview}
+        onRenderNodeURI={onRenderNodeURI}
+      />,
+    );
+
+    const nodeDetails = screen.getByRole("button", { name: "source-keep 节点详情" });
+    expect(nodeDetails).toHaveAttribute("aria-expanded", "false");
+    await user.click(nodeDetails);
+    expect(nodeDetails).toHaveAttribute("aria-expanded", "true");
+    await user.click(screen.getByRole("button", { name: "查看节点信息：source-keep" }));
+
+    const dialog = screen.getByRole("dialog", { name: "节点信息" });
+    expect(within(dialog).getByText("source-keep")).toBeInTheDocument();
+    expect(await within(dialog).findByText("ss://fixture-node", undefined, { timeout: 5_000 })).toBeInTheDocument();
+    expect(onRenderNodeURI).toHaveBeenCalledWith(subscriptionPreview.nodes[0].after);
+    await user.click(within(dialog).getByRole("button", { name: "关闭" }));
+
+    await user.click(screen.getByRole("button", { name: "筛选已移除，共 1 个" }));
+    await user.click(screen.getByRole("button", { name: "drop 节点详情" }));
+    expect(screen.queryByRole("button", { name: "查看节点信息：drop" })).not.toBeInTheDocument();
+  });
+
   it("searches preview nodes and composes with the status filter", async () => {
     const user = userEvent.setup();
     render(<SubscriptionPreviewPage {...previewPageActions} item={subscriptions[0]} preview={subscriptionPreview} />);
@@ -167,12 +203,12 @@ describe("SubscriptionPreviewPage", () => {
     expect(screen.queryByText("source-keep")).not.toBeInTheDocument();
     expect(screen.queryByText("移除节点")).not.toBeInTheDocument();
     expect(screen.getByText("drop")).toBeInTheDocument();
-    const removedSummary = screen.getByRole("button", { name: /drop/ });
-    await user.click(removedSummary);
+    const removedDetailsButton = screen.getByRole("button", { name: "drop 节点详情" });
+    await user.click(removedDetailsButton);
 
-    expect(removedSummary).toHaveAttribute("aria-expanded", "true");
+    expect(removedDetailsButton).toHaveAttribute("aria-expanded", "true");
     const detailBlock = screen.getByRole("region", { name: "节点详情" });
-    expect(detailBlock).toHaveTextContent("json-diff");
+    expect(detailBlock).not.toHaveTextContent("json-diff");
     expect(detailBlock).toHaveTextContent('- "name": "drop"');
     expect(detailBlock.querySelector('[data-diff-line="removed"]')).toBeInTheDocument();
     const diffModeButton = within(detailBlock).getByRole("button", { name: "差异" });
@@ -180,11 +216,10 @@ describe("SubscriptionPreviewPage", () => {
     expect(diffModeButton).toHaveAttribute("aria-pressed", "true");
     expect(Boolean(diffModeButton.compareDocumentPosition(diffCopyButton) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
     expect(detailBlock).toHaveTextContent('"name": "drop"');
-    await user.click(removedSummary);
-    expect(removedSummary).toHaveAttribute("aria-expanded", "false");
+    await user.click(removedDetailsButton);
+    expect(removedDetailsButton).toHaveAttribute("aria-expanded", "false");
     await user.click(screen.getByRole("button", { name: "筛选已修改，共 1 个" }));
-    const modifiedSummary = screen.getByRole("button", { name: /source-keep/ });
-    await user.click(modifiedSummary);
+    await user.click(screen.getByRole("button", { name: "source-keep 节点详情" }));
 
     const modifiedDetailBlock = screen.getByRole("region", { name: "节点详情" });
     expect(within(modifiedDetailBlock).getByRole("button", { name: "差异" })).toHaveAttribute("aria-pressed", "true");
@@ -230,11 +265,11 @@ describe("SubscriptionPreviewPage", () => {
 
     render(<SubscriptionPreviewPage {...previewPageActions} item={subscriptions[0]} preview={previewWithMetadata} />);
 
-    await user.click(screen.getByRole("button", { name: /node-a/ }));
+    await user.click(screen.getByRole("button", { name: "node-a 节点详情" }));
 
     const detailBlock = screen.getByRole("region", { name: "节点详情" });
     expect(within(detailBlock).getByRole("button", { name: "差异" })).toHaveAttribute("aria-pressed", "true");
-    expect(detailBlock).toHaveTextContent("json-diff");
+    expect(detailBlock).not.toHaveTextContent("json-diff");
     expect(detailBlock).toHaveTextContent('- "server": "before.example.com"');
     expect(detailBlock).toHaveTextContent('+ "server": "example.com"');
     expect(detailBlock).toHaveTextContent('"type": "ss"');
@@ -248,7 +283,7 @@ describe("SubscriptionPreviewPage", () => {
     await user.click(metadataButton);
 
     expect(metadataButton).toHaveAttribute("aria-pressed", "true");
-    expect(detailBlock).toHaveTextContent("json-diff");
+    expect(detailBlock).not.toHaveTextContent("json-diff");
     expect(detailBlock).toHaveTextContent('+ "probe.duration_ms": "11"');
     expect(detailBlock).toHaveTextContent('- "source": "fixture"');
     expect(detailBlock).not.toHaveTextContent('"after"');
@@ -348,7 +383,7 @@ describe("SubscriptionPreviewPage", () => {
     const user = userEvent.setup();
     render(<SubscriptionPreviewPage {...previewPageActions} item={subscriptions[0]} preview={allStatusSubscriptionPreview} />);
 
-    await user.click(screen.getByRole("button", { name: /after-node/ }));
+    await user.click(screen.getByRole("button", { name: "after-node 节点详情" }));
 
     const detailBlock = screen.getByRole("region", { name: "节点详情" });
     const text = (detailBlock.textContent ?? "").replace(/\s+/g, " ");

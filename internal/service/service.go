@@ -10,6 +10,7 @@ package service
 import (
 	"context"
 	"log/slog"
+	"net"
 	"sort"
 	"sync"
 	"time"
@@ -24,6 +25,7 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/fetcher"
 	"github.com/kuuvahki-labs/sandrone/internal/filedriver"
+	"github.com/kuuvahki-labs/sandrone/internal/iplookup"
 	"github.com/kuuvahki-labs/sandrone/internal/probe"
 	"github.com/kuuvahki-labs/sandrone/internal/processor"
 	fileproc "github.com/kuuvahki-labs/sandrone/internal/processor/file"
@@ -86,6 +88,8 @@ type Service struct {
 	metaStore               *store.MetaStore
 	settingsStore           *store.SettingsStore
 	fetcher                 *fetcher.Fetcher
+	ipLookup                iplookup.Provider
+	ipResolver              IPResolver
 	logger                  *slog.Logger
 	now                     func() time.Time
 	catalog                 func() (*ruleSetCatalogSnapshot, error)
@@ -103,6 +107,10 @@ type Service struct {
 
 // Option lets callers customise Service construction.
 type Option func(*Service)
+
+type IPResolver interface {
+	LookupIPAddr(context.Context, string) ([]net.IPAddr, error)
+}
 
 // WithProcessor adds an extra ProcessorSpec hook to the registry.
 // (Currently a thin wrapper around the registry; kept here so callers do not
@@ -185,6 +193,22 @@ func WithFetcher(remoteFetcher *fetcher.Fetcher) Option {
 	}
 }
 
+func WithIPLookupProvider(provider iplookup.Provider) Option {
+	return func(s *Service) {
+		if provider != nil {
+			s.ipLookup = provider
+		}
+	}
+}
+
+func WithIPResolver(resolver IPResolver) Option {
+	return func(s *Service) {
+		if resolver != nil {
+			s.ipResolver = resolver
+		}
+	}
+}
+
 // WithFS wraps an afero filesystem in the default store implementation.
 func WithFS(fs afero.Fs) Option {
 	return WithStore(store.NewFSStore(fs))
@@ -228,6 +252,8 @@ func New(opts ...Option) *Service {
 		typedFiles:              typedFiles,
 		prober:                  probe.New(),
 		fetcher:                 fetcher.New(),
+		ipLookup:                iplookup.NewIPWhois(),
+		ipResolver:              net.DefaultResolver,
 		now:                     time.Now,
 		scheduledRefreshUpdates: make(chan struct{}, 1),
 		scheduledRefreshRuns:    make(chan scheduledRefreshRunRequest),

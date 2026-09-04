@@ -76,6 +76,27 @@ describe("ApiClient", () => {
     expect(calls[0]?.headers).toEqual({ Authorization: "Bearer secret" });
   });
 
+  it("posts a node and requested information to the protected inspection endpoint", async () => {
+    saveAdminToken("secret");
+    const calls: Array<{ input: FetchInput; init?: FetchOptions }> = [];
+    const client = new ApiClient({
+      fetcher: async (input, init) => {
+        calls.push({ input, init });
+        return new Response(JSON.stringify({ server: "proxy.example.com", ip: "198.18.0.1", ip_version: 4, public: false }), {
+          headers: { "content-type": "application/json" },
+        });
+      },
+    });
+
+    const node = { name: "fixture", server: "proxy.example.com", type: "trojan" };
+    await client.inspectNode({ node, include: ["ip"] });
+
+    expect(String(calls[0]?.input)).toBe("/v1/nodes/inspect");
+    expect(calls[0]?.init?.method).toBe("POST");
+    expect(calls[0]?.init?.headers).toEqual({ Authorization: "Bearer secret", "Content-Type": "application/json" });
+    expect(calls[0]?.init?.body).toBe(JSON.stringify({ node, include: ["ip"] }));
+  });
+
   it("omits auth for health checks", async () => {
     saveAdminToken("secret");
     const calls: FetchOptions[] = [];

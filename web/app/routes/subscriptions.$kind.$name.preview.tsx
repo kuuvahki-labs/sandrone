@@ -1,9 +1,10 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 
 import { LoadingScreen } from "~/core/components/loading-screen";
 import { useSandrone } from "~/core/provider/context";
 import { useShareDialog } from "~/features/shares/components/share-dialog-context";
+import { createNodeToolsActions } from "~/features/subscriptions/data/create-node-tools-actions";
 import { useSubscriptionDetailsResource, useSubscriptionResources } from "~/features/subscriptions/data/use-subscription-resources";
 import type { SubscriptionPreview } from "~/features/subscriptions/model/types";
 import { SubscriptionPreviewPage } from "~/features/subscriptions/pages/subscription-preview-page";
@@ -29,6 +30,11 @@ export default function SubscriptionPreviewRoute() {
   const loadPreview = useCallback((): Promise<SubscriptionPreview | null> => item ? loadSubscriptionPreview(item.name) : Promise.resolve(null), [item, loadSubscriptionPreview]);
   const refreshPreviewLoader = useCallback((): Promise<SubscriptionPreview | null> => item ? loadSubscriptionPreview(item.name, { refresh: true }) : Promise.resolve(null), [item, loadSubscriptionPreview]);
   const { elapsedSeconds, failed, pending, preview, refreshPreview } = useResourcePreview<SubscriptionPreview>(item ? `${item.kind}:${item.name}` : undefined, loadPreview, refreshPreviewLoader);
+  const nodeTools = useMemo(() => createNodeToolsActions({
+    client: app.client,
+    showNotice: app.showNotice,
+    t,
+  }), [app.client, app.showNotice, t]);
 
   if (subscriptions.loading) return <LoadingScreen />;
 
@@ -44,7 +50,10 @@ export default function SubscriptionPreviewRoute() {
       item={item}
       key={`${item.kind}:${item.name}`}
       onBack={() => navigate(backToList ? "/subscriptions" : subscriptionEditPath(item.kind, item.name))}
+      onCopyURI={nodeTools.copyURI}
+      onLookupNodeIP={nodeTools.lookupNodeIPInfo}
       onRefresh={refreshPreview}
+      onRenderNodeURI={nodeTools.renderNodeURI}
       onShare={() => shareDialog.open({ kind: "subscription", name: item.name })}
       pending={pending}
       preview={preview}

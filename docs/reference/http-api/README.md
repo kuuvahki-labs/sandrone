@@ -7,6 +7,7 @@
 - [转换与能力检查](conversion.md)
 - [运行时 schema catalog](schemas.md)
 - [订阅资源](subscriptions.md)
+- [节点信息](node-tools.md)
 - [文件资源](files.md)
 - [项目设置、缓存、规则集目录与备份](settings.md)
 - [分享资源与公开输出](shares.md)

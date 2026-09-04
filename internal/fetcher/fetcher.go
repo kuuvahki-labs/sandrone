@@ -246,7 +246,7 @@ func (f *Fetcher) publicDialContext(ctx context.Context, network, address string
 func (f *Fetcher) resolvePublicAddresses(ctx context.Context, host string) ([]netip.Addr, error) {
 	if parsed, err := netip.ParseAddr(strings.Trim(host, "[]")); err == nil {
 		parsed = parsed.Unmap()
-		if !isPublicAddress(parsed) {
+		if !IsPublicAddress(parsed) {
 			return nil, domain.NewError(domain.CodeInvalidArgument, "remote address must be public")
 		}
 		return []netip.Addr{parsed}, nil
@@ -265,7 +265,7 @@ func (f *Fetcher) resolvePublicAddresses(ctx context.Context, host string) ([]ne
 			return nil, domain.NewError(domain.CodeInvalidArgument, "remote host resolved to an invalid address")
 		}
 		ip = ip.Unmap()
-		if !isPublicAddress(ip) {
+		if !IsPublicAddress(ip) {
 			return nil, domain.NewError(domain.CodeInvalidArgument, "remote address must be public")
 		}
 		addresses = append(addresses, ip)
@@ -302,7 +302,10 @@ var nonPublicPrefixes = []netip.Prefix{
 	netip.MustParsePrefix("ff00::/8"),
 }
 
-func isPublicAddress(ip netip.Addr) bool {
+// IsPublicAddress reports whether ip may be sent to an external network
+// service. It rejects private, reserved, documentation, transition, and
+// Mihomo fake-IP ranges in addition to non-global-unicast addresses.
+func IsPublicAddress(ip netip.Addr) bool {
 	if !ip.IsValid() || !ip.IsGlobalUnicast() {
 		return false
 	}

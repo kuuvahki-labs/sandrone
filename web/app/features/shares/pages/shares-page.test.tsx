@@ -118,6 +118,7 @@ describe("shares page", () => {
     expect(within(dialog).getByText("sh_123")).toBeInTheDocument();
     expect(within(dialog).getByText("default.yaml")).toBeInTheDocument();
     expect(within(dialog).getByText("age X25519")).toBeInTheDocument();
+    expect(await within(dialog).findByRole("img", { name: "mobile 的分享链接二维码" })).toBeInTheDocument();
     expect(dialog.querySelector('time[datetime="2026-06-30T01:02:03Z"]')).toBeInTheDocument();
     expect(dialog.querySelector('time[datetime="2026-07-02T04:05:06Z"]')).toBeInTheDocument();
     expect(onCopy).not.toHaveBeenCalled();

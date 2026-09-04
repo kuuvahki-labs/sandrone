@@ -58,6 +58,17 @@ export interface SubscriptionPreviewRequest {
   refresh?: boolean;
 }
 
+export interface ConvertRequest {
+  from_format: string;
+  to_format: string;
+  content: string;
+}
+
+export interface NodeInspectRequest {
+  node: Record<string, unknown>;
+  include: Array<"uri" | "ip">;
+}
+
 export interface FileSpecInput {
   name: string;
   display_name?: string;
@@ -241,6 +252,14 @@ export class ApiClient {
 
   inspect(): Promise<unknown> {
     return this.dedupedRequest("GET", "/v1/inspect");
+  }
+
+  convert(request: ConvertRequest): Promise<unknown> {
+    return this.request("/v1/convert", { method: "POST", body: request });
+  }
+
+  inspectNode(request: NodeInspectRequest): Promise<unknown> {
+    return this.request("/v1/nodes/inspect", { method: "POST", body: request });
   }
 
   listFormatCapabilities(): Promise<FormatCapabilityList> {

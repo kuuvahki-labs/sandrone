@@ -12,7 +12,6 @@ import Typography from "@mui/material/Typography";
 
 import { ManualCopyDialog } from "~/features/shares/components/manual-copy-dialog";
 import { ShareDetailsDialog } from "~/features/shares/components/share-details-dialog";
-import { hasSelectionWithin, selectContents } from "~/features/shares/components/share-url-selection";
 import type { CopyShareResult } from "~/features/shares/data/create-share-actions";
 import { type ShareCopyFormat, shareCopyFormats } from "~/features/shares/model/share-formats";
 import type { ShareItem } from "~/features/shares/model/types";
@@ -23,6 +22,7 @@ import {
   type DestinationListAction,
   DestinationListItem,
 } from "~/shared/ui/resource-list";
+import { hasSelectionWithin, selectContents } from "~/shared/ui/text-transfer";
 
 export interface SharesPageProps {
   items: ShareItem[];

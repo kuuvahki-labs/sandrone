@@ -7,8 +7,8 @@ import type { CopyShareResult } from "~/features/shares/data/create-share-action
 import type { ShareItem } from "~/features/shares/model/types";
 import { type TranslationKey, useI18n } from "~/shared/i18n/context";
 import { AppDialog } from "~/shared/ui/dialogs";
-
-import { hasSelectionWithin, selectContents } from "./share-url-selection";
+import { QrCodePanel } from "~/shared/ui/qr-code";
+import { hasSelectionWithin, selectContents } from "~/shared/ui/text-transfer";
 
 export function ShareDetailsDialog({
   item,
@@ -68,6 +68,9 @@ export function ShareDetailsDialog({
           </Typography>
         </dd>
       </dl>
+      <div className="mt-5 grid gap-3">
+        <QrCodePanel label={t("shares.qrcode.label", { name: item.title })} value={item.publicUrl} />
+      </div>
       <DialogActions className="px-0 pb-0">
         <Button type="button" onClick={onClose}>{t("actions.close")}</Button>
         <Button type="button" variant="contained" onClick={() => { void copyLink(); }}>

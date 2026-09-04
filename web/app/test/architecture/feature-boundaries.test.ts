@@ -101,7 +101,6 @@ const featureOwnedModules = [
   "features/shares/components/share-dialog-context.tsx",
   "features/shares/components/share-dialog.tsx",
   "features/shares/components/manual-copy-dialog.tsx",
-  "features/shares/components/share-url-selection.ts",
   "features/shares/data/create-share-actions.ts",
   "features/shares/data/use-shares-resource.ts",
   "features/shares/model/codec.ts",

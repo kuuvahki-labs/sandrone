@@ -97,6 +97,7 @@ describe("share dialog context", () => {
 
     const result = await screen.findByRole("dialog", { name: "分享链接已创建" });
     expect(within(result).getByText(createdPublicUrl)).toBeInTheDocument();
+    expect(await within(result).findByRole("img", { name: "mobile 的分享链接二维码" })).toBeInTheDocument();
     expect(within(result).queryByRole("textbox", { name: "名称" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Open another share dialog", hidden: true }));

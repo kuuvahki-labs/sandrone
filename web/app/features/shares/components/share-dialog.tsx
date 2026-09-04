@@ -15,8 +15,8 @@ import { shareCopyFormats } from "~/features/shares/model/share-formats";
 import type { ShareItem, ShareTarget } from "~/features/shares/model/types";
 import { useI18n } from "~/shared/i18n/context";
 import { AppDialog } from "~/shared/ui/dialogs";
-
-import { hasSelectionWithin, selectContents } from "./share-url-selection";
+import { QrCodePanel } from "~/shared/ui/qr-code";
+import { hasSelectionWithin, selectContents } from "~/shared/ui/text-transfer";
 
 interface ShareDialogProps {
   target: ShareTarget;
@@ -67,6 +67,9 @@ export function ShareDialog({ target, onClose, onCopy, onSubmit }: ShareDialogPr
         >
           {result.publicUrl}
         </Typography>
+        <div className="mt-5 grid gap-3">
+          <QrCodePanel label={t("shares.qrcode.label", { name: result.title })} value={result.publicUrl} />
+        </div>
         <DialogActions className="px-0 pb-0">
           <Button type="button" onClick={onClose}>{t("share.result.done")}</Button>
           <Button type="button" variant="contained" onClick={() => { void copyResult(); }}>

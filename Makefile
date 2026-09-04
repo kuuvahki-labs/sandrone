@@ -1,6 +1,7 @@
 .DEFAULT_GOAL := check
 
 GO ?= go
+GOFMT ?= $(shell $(GO) env GOROOT)/bin/gofmt
 GOFLAGS ?= -mod=readonly -tags probe_singbox,with_quic,with_wireguard,with_utls
 PKGS ?= ./...
 CMD_PKG ?= ./cmd/sandrone
@@ -118,7 +119,8 @@ fmt:
 	$(GO) fmt $(PKGS)
 
 fmt-check:
-	@test -z "$$(find . -type f -name '*.go' -not -path './.git/*' -not -path './.claude/*' -exec gofmt -l {} +)"
+	@unformatted="$$(find . -type f -name '*.go' -not -path './.git/*' -not -path './.claude/*' -exec "$(GOFMT)" -l {} +)" || exit $$?; \
+	test -z "$$unformatted"
 
 vet:
 	$(GO) vet $(GOFLAGS) $(PKGS)

@@ -30,6 +30,7 @@ const (
 	CodeBackupTooLarge         ErrorCode = "backup_too_large"
 	CodeBackupRestoreFailed    ErrorCode = "backup_restore_failed"
 	CodeCacheOperationFailed   ErrorCode = "cache_operation_failed"
+	CodeIPLookupFailed         ErrorCode = "ip_lookup_failed"
 )
 
 type AppError struct {

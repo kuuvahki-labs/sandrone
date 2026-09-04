@@ -54,5 +54,6 @@ export const shareEnUS = {
   "shares.messages.copyUnavailable": "Automatic copy is unavailable. Copy the link manually.",
   "shares.manualCopy.retry": "Retry copy",
   "shares.manualCopy.title": "Copy link manually",
+  "shares.qrcode.label": "QR code for the {name} share link",
   "shares.search": "Search shares",
 } as const;

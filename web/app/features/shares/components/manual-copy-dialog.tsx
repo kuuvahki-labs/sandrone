@@ -6,8 +6,7 @@ import Typography from "@mui/material/Typography";
 import type { CopyShareResult } from "~/features/shares/data/create-share-actions";
 import { useI18n } from "~/shared/i18n/context";
 import { AppDialog } from "~/shared/ui/dialogs";
-
-import { hasSelectionWithin, selectContents } from "./share-url-selection";
+import { hasSelectionWithin, selectContents } from "~/shared/ui/text-transfer";
 
 export function ManualCopyDialog({
   onClose,

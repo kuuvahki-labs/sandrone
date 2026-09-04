@@ -56,6 +56,26 @@ export interface SubscriptionPreviewNode {
   raw?: Record<string, unknown>;
 }
 
+export interface NodeURIResult {
+  uri: string;
+  warnings: PreviewWarning[];
+}
+
+export interface NodeIPInfo {
+  server: string;
+  ip: string;
+  ipVersion: 4 | 6;
+  public: boolean;
+  countryCode?: string;
+  country?: string;
+  continentCode?: string;
+  continent?: string;
+  asn?: string;
+  asName?: string;
+  asDomain?: string;
+  source?: { name: string; url: string };
+}
+
 export type SubscriptionPreviewWarning = PreviewWarning;
 
 export interface SubscriptionPreviewNodeDiff {

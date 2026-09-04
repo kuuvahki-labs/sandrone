@@ -1,7 +1,9 @@
 import { arrayField, asRecord, numberField, optionalNumberField, stringField } from "~/shared/resources/model-fields";
 import type { ProcessorDetail, RemoteInputDetail } from "~/shared/resources/types";
+import { warningsFromAPI } from "~/shared/resources/warning-codec";
 
 import type {
+  NodeIPInfo,
   SubscriptionDefinition,
   SubscriptionItem,
   SubscriptionKind,
@@ -16,6 +18,28 @@ import type {
 } from "./types";
 
 const positiveIntegerPattern = /^[1-9]\d*$/;
+
+export function nodeIPInfoFromAPI(value: unknown): NodeIPInfo {
+  const item = asRecord(value);
+  const version = numberField(item.ip_version);
+  const source = asRecord(item.source);
+  return {
+    server: stringField(item.server),
+    ip: stringField(item.ip),
+    ipVersion: version === 6 ? 6 : 4,
+    public: item.public === true,
+    countryCode: stringField(item.country_code) || undefined,
+    country: stringField(item.country) || undefined,
+    continentCode: stringField(item.continent_code) || undefined,
+    continent: stringField(item.continent) || undefined,
+    asn: stringField(item.asn) || undefined,
+    asName: stringField(item.as_name) || undefined,
+    asDomain: stringField(item.as_domain) || undefined,
+    source: stringField(source.name) && stringField(source.url)
+      ? { name: stringField(source.name), url: stringField(source.url) }
+      : undefined,
+  };
+}
 
 export function subscriptionsFromResourceList(list: unknown): SubscriptionItem[] {
   return arrayField(asRecord(list).items).map(subscriptionFromAPI).filter(hasName);
@@ -215,20 +239,7 @@ function subscriptionTrafficItemFromAPI(value: unknown): SubscriptionTrafficItem
 }
 
 function previewWarningsFromAPI(item: Record<string, unknown>): SubscriptionPreviewWarning[] {
-  return arrayField(item.warnings).map(previewWarningFromAPI).filter((warning) => warning.code || warning.message);
-}
-
-function previewWarningFromAPI(value: unknown): SubscriptionPreviewWarning {
-  const item = asRecord(value);
-  return {
-    ...item,
-    code: stringField(item.code),
-    message: stringField(item.message),
-    node: stringField(item.node) || undefined,
-    field: stringField(item.field) || undefined,
-    source: stringField(item.source) || undefined,
-    target: stringField(item.target) || undefined,
-  };
+  return warningsFromAPI(item.warnings);
 }
 
 function stringMapField(value: unknown): Record<string, string> {

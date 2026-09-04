@@ -122,6 +122,8 @@ func writeServiceError(w http.ResponseWriter, err error) {
 		status = http.StatusUnprocessableEntity
 	case domain.IsCode(err, domain.CodeBackupRestoreFailed):
 		status = http.StatusInternalServerError
+	case domain.IsCode(err, domain.CodeIPLookupFailed):
+		status = http.StatusBadGateway
 	default:
 		if domain.IsCode(err, domain.CodeInvalidArgument) ||
 			domain.IsCode(err, domain.CodeNodeValidationFailed) ||
