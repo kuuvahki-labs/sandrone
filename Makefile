@@ -69,7 +69,7 @@ BUILD_LDFLAGS_ARG := -ldflags "$(BUILD_LDFLAGS)"
 endif
 BUILD_VCS_ARG := $(if $(BUILD_REVISION),,-buildvcs=false)
 
-VALIDATED_TARGETS := help check ci fmt fmt-check vet test test-webui test-webui-e2e build build-bin build-check build-webui image lint ruleset-catalog release-artifacts snapshot-artifacts
+VALIDATED_TARGETS := help check fmt fmt-check vet test test-webui test-webui-e2e build build-bin build-check build-webui image lint ruleset-catalog release-artifacts snapshot-artifacts
 
 .PHONY: validate-build-identity $(VALIDATED_TARGETS)
 
@@ -94,8 +94,7 @@ validate-build-identity:
 
 help: ## Show available targets.
 	@printf '%s\n' 'Common targets:'
-	@printf '  %-28s %s\n' 'check' 'Run fmt-check, vet, test, and build.'
-	@printf '  %-28s %s\n' 'ci' 'Run check and lint.'
+	@printf '  %-28s %s\n' 'check' 'Run fmt-check, vet, test, build, and lint.'
 	@printf '  %-28s %s\n' 'fmt' 'Format Go files with go fmt.'
 	@printf '  %-28s %s\n' 'fmt-check' 'Check Go formatting without changing files.'
 	@printf '  %-28s %s\n' 'vet' 'Run go vet.'
@@ -111,9 +110,7 @@ help: ## Show available targets.
 	@printf '  %-28s %s\n' 'image' 'Build a locally tagged container image.'
 	@printf '  %-28s %s\n' 'lint' 'Run golangci-lint with .golangci.yml.'
 
-check: fmt-check vet test build-check
-
-ci: check lint
+check: fmt-check vet test build-check lint
 
 fmt:
 	$(GO) fmt $(PKGS)

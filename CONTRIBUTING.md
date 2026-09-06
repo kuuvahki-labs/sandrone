@@ -11,7 +11,7 @@
 - Go `1.27.0`，版本以 `go.mod` 为准。
 - Node.js `24.17.0` 和 pnpm `11.24.0`，仅 Web 开发需要。
 - Docker 与 Docker Compose，用于验证容器运行路径。
-- 支持当前 Go 版本的 `golangci-lint`，仅 `make ci` 或 `make lint` 需要。
+- 支持当前 Go 版本的 `golangci-lint`，运行 `make check` 或 `make lint` 时需要。
 
 首次进行 Web 开发时安装依赖：
 
@@ -71,16 +71,16 @@ pnpm --dir web install --frozen-lockfile
 | 改动 | 本地交付验证 |
 | --- | --- |
 | 纯文档、规则说明、Skill 指令 | 检查相关链接/锚点、命令与规则一致性、示例脱敏；Skill 另做结构校验。不要求 Go/Web 全量检查。 |
-| Go 实现 | 相关包或行为窄测后运行 `make check`；提交 Go 变更前补 `make lint`，可用 `make ci` 合并执行。 |
+| Go 实现 | 相关包或行为窄测后运行 `make check`，包含 Go lint。 |
 | Web 局部逻辑或组件 | 相关 Vitest（行为变化时）、`pnpm --dir web typecheck` 与 `pnpm --dir web lint`；纯文案/样式无需新增单元测试。 |
 | Web 共享模型、状态、驱动或依赖 | 在上项基础上运行 `pnpm --dir web test:run`；涉及构建或依赖时加 `pnpm --dir web build`。 |
 | Web 路由、浏览器集成或响应式布局 | 在相关静态检查基础上运行对应 Playwright 用例：`pnpm --dir web test:e2e` 可带用例路径。合并 Web 变更或发版前运行完整 smoke。 |
 | Shell、构建、CI 或部署配置 | 语法/配置校验及受影响命令或构建路径的验证；不因文件后缀是文档就省略可执行示例的必要检查。 |
 
-`make check` 是 Go 基线：格式检查、`go vet`、默认 Go 测试和 CLI 构建；
-`make ci` 是 `make check` 加 Go lint，两者均不包含 Web 检查。远端
+`make check` 是完整 Go 门禁：格式检查、`go vet`、默认 Go 测试、CLI 构建和 Go lint，
+不包含 Web 检查。远端
 [CI](.github/workflows/ci.yml) 另有模块校验与独立 Web job，保留其完整检查。
-已完成 `make check` 后只需补 `make lint`，无需为了目标名称重复运行。
+迭代时可单独运行 `make test`、`make vet` 或 `make lint`；完整门禁通过后无需重复运行单项。
 
 Playwright 默认启动 built SPA，已包含 `pnpm build`；成功的默认 E2E 可计入同一版本的
 构建验证。使用外部 server 时需确认其产物来自当前修改，否则不能据此声称构建已验证。

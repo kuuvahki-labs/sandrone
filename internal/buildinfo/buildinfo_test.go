@@ -430,7 +430,7 @@ func TestArtifactTargetsUseCanonicalScript(t *testing.T) {
 		t.Fatal(err)
 	}
 	content := string(makefile)
-	validatedLine := "VALIDATED_TARGETS := help check ci fmt fmt-check vet test test-webui test-webui-e2e build build-bin build-check build-webui image lint ruleset-catalog release-artifacts snapshot-artifacts"
+	validatedLine := "VALIDATED_TARGETS := help check fmt fmt-check vet test test-webui test-webui-e2e build build-bin build-check build-webui image lint ruleset-catalog release-artifacts snapshot-artifacts"
 	if !strings.Contains(content, validatedLine) {
 		t.Errorf("Makefile does not validate artifact targets")
 	}

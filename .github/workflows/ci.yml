@@ -28,17 +28,14 @@ jobs:
       - name: Verify Go modules
         run: go mod verify
 
-      - name: Run Go checks
-        run: make check
-
       - name: Install golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.13.2
           install-only: true
 
-      - name: Run Go lint
-        run: make lint
+      - name: Run Go checks
+        run: make check
 
   web:
     name: Web UI checks
