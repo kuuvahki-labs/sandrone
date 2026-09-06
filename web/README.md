@@ -87,18 +87,6 @@ go run -mod=readonly -tags probe_singbox ./cmd/sandrone serve
 
 ## 验证
 
-迭代时先运行最窄的相关 Vitest 文件；交付前运行：
-
-```sh
-pnpm test:run
-pnpm typecheck
-pnpm lint
-pnpm build
-```
-
-涉及路由流程、响应式布局或准备合并、发版时，运行精简的桌面与移动端
-Playwright smoke：
-
-```sh
-pnpm test:e2e
-```
+验证范围统一按[贡献指南](../CONTRIBUTING.md#选择验证范围)选择：局部行为先运行
+相关 Vitest；共享逻辑变化扩大测试范围，路由、浏览器集成和响应式变化使用 Playwright。
+默认 Playwright 流程已构建 SPA，无需在同一版本上重复执行 build。

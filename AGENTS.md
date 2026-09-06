@@ -1,11 +1,12 @@
 # AGENTS.md
 
-适用于仓库根及未另设 `AGENTS.md` 的目录；更深层规则优先。人类贡献流程见
-[CONTRIBUTING.md](CONTRIBUTING.md)，系统契约从 [docs/README.md](docs/README.md)
-进入。
+适用于仓库根及未另设 `AGENTS.md` 的目录；更深层规则优先。开发、验证和
+[任务完成标准](CONTRIBUTING.md#任务完成标准)见贡献指南，系统契约从
+[文档索引](docs/README.md)按任务查阅。
 
-- 先检查工作树与邻近代码/测试；保留现有改动，不扩大任务范围。
-- 沿用现有分层和模式，做最小完整改动；在最接近契约的位置验证。
+- 先检查工作树与邻近代码/测试；保留现有改动，沿用已有分层和模式。
+- 资料按需读取：涉及契约再查对应 reference，涉及架构再查对应架构页；
+  不要求每次通读文档，同一任务中已读且未变化的内容无需重读。
 - 业务编排只放 `internal/service`；entrypoint 只做协议适配。
 - adapter 不读写 store；processor 不依赖 adapter，也不绕过受控 I/O；service
   和 domain 不依赖 entrypoint framework。
@@ -13,20 +14,20 @@
   `subscriptions` 和 `settings`，由对应 driver 严格解码。
 - file-stage processor 按声明顺序执行。
 - Web 改动遵守 [web/AGENTS.md](web/AGENTS.md)。
-- 修改任一 adapter 的解析或渲染时，不能只验证当前格式；必须以 canonical
-  `NodeIR` 语义为边界，按[贡献指南](CONTRIBUTING.md#选择验证范围)全局检查其它输入、
-  输出、校验、能力声明和跨格式测试。
+- adapter 改动以 `NodeIR` 语义为边界判断影响；共享语义、协议值域或客户端共享
+  路径变化按[影响矩阵](CONTRIBUTING.md#跨协议与客户端影响矩阵)检查，局部改动
+  验证受影响路径及转换边界，不因文件位置无差别扩大范围。
 - warning 不等于兼容需求。新增 `NodeIR` 字段、扩大值域或为来源私有值增加映射前，
-  必须按[字段接纳流程](docs/architecture/node-pipeline.md#字段接纳与-warning-处置)
+  按[字段接纳流程](docs/architecture/node-pipeline.md#字段接纳与-warning-处置)
   区分协议语义与实现配置；未知连接关键值应隔离节点，不在 probe 或 renderer 中猜测、
   截断或按前缀兼容。
-- 协议 canonical 语义变化要检查该协议的全部输入和客户端输出；客户端共享 adapter
-  变化要检查该客户端支持的全部协议；domain、service normalization/validation 或
-  shared helper 变化要按[影响矩阵](CONTRIBUTING.md#跨协议与客户端影响矩阵)检查全部
-  调用者。每项都要有已修改、测试证明无需修改或不适用的结论。
-- 先跑相关窄测；交付前运行与范围匹配的门禁，默认全仓门禁为 `make check`。
+- 按[验证范围](CONTRIBUTING.md#选择验证范围)先做相关窄测，再完成风险对应的门禁；
+  已通过的检查没有新改动、失败或未解决风险时不重复运行。
 - 一个事实只在 canonical 文档完整说明；其他位置只链接。
-- 删除功能时同步删除专属实现、测试、fixture、示例和文档，并用 `rg` 确认旧标识
-  只剩明确兼容点。不要保留功能墓碑或已完成的 plan/spec。
+- 删除或重命名时清理本任务涉及的旧实现、专属测试、fixture、示例与文档，并用
+  `rg` 检查旧标识；保留仍有效的兼容契约和回归测试。临时材料按
+  [文档政策](CONTRIBUTING.md#文档政策)整理。
+- 已授权的工作持续执行到相应完成标准；普通实现选择不重复确认，诊断阶段结束
+  不应中断已授权的修复。仅在缺少必要信息或授权时询问，并继续不依赖该答复的工作。
 - 不提交真实订阅、节点 URI、凭据、私有 fixture、本机路径、运行时数据或
   agent/IDE 状态；安全问题按 [SECURITY.md](SECURITY.md) 私下报告。

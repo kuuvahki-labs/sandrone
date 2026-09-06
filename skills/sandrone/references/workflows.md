@@ -28,7 +28,8 @@ client may add a namespace prefix.
 
 ## Schema Mapping
 
-Read schemas at task time; do not copy their fields into this reference.
+Use live schemas for the payload being authored or validated; reuse still-valid
+results within the task. Do not copy their fields into this reference.
 
 | Schema | HTTP | MCP resource |
 | --- | --- | --- |
@@ -43,10 +44,13 @@ Read schemas at task time; do not copy their fields into this reference.
 
 ## Discover
 
-For HTTP, call `/healthz`, `/version`, `GET /v1/inspect`, then only the format
-capability, schema, and resource endpoints needed by the request. For MCP, call
-`sandrone_inspect`, read the narrowest capability/schema resources, list with
-the narrowest useful `kind`, then read the relevant definitions.
+On first connection or when server identity/capabilities are uncertain, use
+`/healthz`, `/version`, and `GET /v1/inspect` for HTTP, or `sandrone_inspect` for MCP.
+Then read only the capability/schema and resource endpoints needed by the request.
+List resources only when discovery is needed; read exact named definitions directly.
+Reuse still-valid discovery within the task, refreshing after server changes or
+schema mismatches. Always reread the current definition before overwrite/delete.
+Explaining a supplied report alone needs no discovery or live requests.
 
 Follow an opaque `next_cursor` without interpreting or modifying it. Keep the
 same list filter across pages.

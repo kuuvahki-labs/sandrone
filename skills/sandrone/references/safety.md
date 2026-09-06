@@ -2,11 +2,9 @@
 
 ## Authorization and Transport
 
-Shell execution grants HTTP transport access, not mutation authorization. MCP
-tool availability likewise does not authorize mutation. An explicit user
-request to create, update, replace, or delete the exact named resource
-authorizes that action; inspection, drafting, validation, preview, rendering,
-or diagnosis does not.
+Apply the [Mutation Rule](../SKILL.md#mutation-rule). Transport availability
+alone does not authorize resource writes; explicit authorization persists
+throughout the task and does not require another confirmation.
 
 `put` immediately saves and overwrites the same name. Read an existing
 definition before replacement. `delete` is immediate and has no recycle bin:

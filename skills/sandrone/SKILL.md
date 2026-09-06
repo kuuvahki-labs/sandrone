@@ -10,7 +10,8 @@ description: Use when an Agent must operate Sandrone to convert proxy or subscri
 Use the bundled HTTP script as the preferred execution plane and a connected
 Sandrone MCP server as the fallback. Use this Skill for workflow and safety
 decisions; obtain capabilities, schemas, defaults, examples, and current
-resource definitions from the selected live plane.
+resource definitions from the selected live plane when the task needs them.
+Explaining an already supplied report does not require a server connection.
 
 ## Select One Execution Plane
 
@@ -26,24 +27,21 @@ Sandrone does not support the legacy initialize/initialized session lifecycle
 or older protocol negotiation. If the client cannot establish that connection,
 report the incompatibility and the HTTP setup alternative.
 
-For HTTP, call `/healthz`, `/version`, `/v1/inspect`, then the exact
-`/v1/capabilities/formats/*` and `/v1/schemas/*` endpoints needed by the task.
-For MCP, call `sandrone_inspect`, read the exact capability/schema resources,
-list relevant stored resources, and read named definitions.
+For first connection or uncertain capabilities, use the relevant discovery section
+in [references/workflows.md](references/workflows.md#discover). Read only the
+recipe and endpoint mappings needed for the task. Reuse still-valid discovery
+and schema results within the task; refresh after a server change or schema mismatch.
 
-Keep the selected plane fixed throughout a mutation. After any ambiguous
-failure, reread the exact resource through that plane before deciding whether
-to retry.
-
-Read [references/workflows.md](references/workflows.md) for HTTP-first operation
-mappings and task recipes. Read [references/safety.md](references/safety.md)
-before any put, overwrite, delete, remote fetch, or processor-script
-task.
+Before a mutation, read the authorization and retry sections of
+[references/safety.md](references/safety.md). Read its external-effects or script
+sections when those operations are involved; already-read unchanged guidance
+need not be reread.
 
 ## Treat the Server as Canonical
 
 - Fetch the applicable processor, file-kind, Subscription, FileSpec, or script
-  schema through the selected plane. Never reconstruct or copy a dynamic schema
+  schema through the selected plane when constructing or validating that payload.
+  Reuse a still-valid live schema from this task. Never reconstruct a dynamic schema
   from this Skill.
 - Send only fields published by the current schema.
 - Use canonical format, processor stage/type, and FileSpec kind values.
@@ -62,13 +60,20 @@ named resource as authorization for that action. Do not infer authorization
 from a request to inspect, draft, validate, preview, diagnose, or render.
 
 Before overwriting or deleting, read the exact existing definition. For
-ambiguous names or scopes, stop and ask. Do not add a redundant confirmation
+ambiguous names or scopes, first use available read-only context to resolve them;
+ask only if the mutation target remains uncertain. Do not add a redundant confirmation
 when the user's instruction is already explicit and the target is exact.
 
 ## Return Useful Results
 
-Lead with the completed outcome. Include the resource name, whether state was
-persisted, the preview/render result, and material warnings. Never
+Complete the requested draft, read, conversion, or authorized mutation and its
+applicable verification before reporting the outcome. Do not stop at a draft
+when persistence was authorized. If verification fails after a successful write,
+report the saved state and the verification gap separately; do not repeat the
+write merely to retry verification.
+
+Lead with the completed outcome. Include the relevant resource name, whether state
+was persisted, any preview/render result, and material warnings. Never
 echo bearer tokens, credentials, subscription URLs, or full node secrets unless
 the user explicitly requests the sensitive value.
 

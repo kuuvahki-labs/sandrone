@@ -84,9 +84,11 @@ warning 是需要分类的诊断，不是新增兼容逻辑或 `NodeIR` 字段�
 | 目标缺失会改变认证、TLS identity、transport、协议变体或其它连接关键语义 | 跳过该节点，不做降级输出 | `render_node_skipped` |
 
 “可清空后保留节点”必须能证明清空只移除无操作默认值或非语义 metadata。无法证明
-时按连接关键字段处理并隔离节点。warning 的调查流程固定为：先在未运行 processor
-的原始 parse 路径复现，再确认字段属于协议还是来源实现，随后选择上表动作，最后
-检查所有 parser、renderer、validation、capability、warning、跨格式测试和文档。
+时按连接关键字段处理并隔离节点。warning 调查先定位首次异常 stage：解析或字段
+语义问题在未运行 processor 的原始 parse 路径复现，确认协议与来源实现边界后选择
+上表动作；运行时、processor 或目标表达问题从对应阶段取证。只有涉及 canonical
+或共享语义变化时才展开[影响矩阵](../../CONTRIBUTING.md#跨协议与客户端影响矩阵)，
+局部问题验证受影响路径；证据足以回答当前任务后无需追加无关调查。
 probe 只消费已经规范化且验证通过的 `NodeIR`，不承担字段修复。
 
 VMess、VLESS 和 Trojan URI 的 TCP `headerType=http` 规范化为
@@ -141,7 +143,7 @@ nodes-stage processor 接收节点切片、目标、来源上下文和请求 met
 - 每一步读取上一步结果，后一步不会看到原始输入的旁路副本。
 - processor 失败会终止当前调用，service 不把中间节点作为成功结果交付；运行时
   完全没有 probe backend 时，内建 probe processor 按
-  [probe 降级契约](../reference/processors.md#nodes-probe)返回 warning，不视为失败。
+  [probe 降级契约](../reference/processors.md#probe)返回 warning，不视为失败。
 
 内建处理器覆盖过滤、去重、重命名、排序、常用属性策略和显式探测。JavaScript processor 用于内建策略无法表达的开放式改写，但仍受同步 envelope、超时和注入 API 限制。
 

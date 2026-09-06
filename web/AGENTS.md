@@ -1,7 +1,7 @@
 # Web UI 模块约定
 
-本文件只定义 `web/` 的长期模块与测试边界。安装、开发、构建和验证命令见
-[Web UI 快速说明](README.md)；仓库级规则以根目录
+本文件只定义 `web/` 的长期模块与测试边界。安装、开发、构建命令见
+[Web UI 快速说明](README.md)，验证范围见[贡献指南](../CONTRIBUTING.md#选择验证范围)；仓库级规则以根目录
 [AGENTS.md](../AGENTS.md) 和 [CONTRIBUTING.md](../CONTRIBUTING.md) 为准。
 
 ## Runtime
@@ -82,7 +82,7 @@ module。registry 组合值，不充当 re-export surface。
   的页面。
 - 长期文档只正向描述当前契约；命令清单留在 README，route/driver 等枚举留在
   代码与测试，不在多个页面复制。
-- 实施中的 spec/plan 可以临时存在，但交付前删除；不保留完成记录、旧入口、
-  compatibility 墓碑或 agent 执行清单。
+- 临时材料和旧内容按[文档政策](../CONTRIBUTING.md#文档政策)整理；保留仍有效的
+  契约、设计决策与回归测试，不因交付顺手清理无关文件。
 - 示例必须脱敏；不提交真实订阅、节点 URI、token、cookie、私钥、私有 fixture、
   本机路径、agent/IDE 状态或生成产物。
