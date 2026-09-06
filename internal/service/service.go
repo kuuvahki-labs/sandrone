@@ -26,6 +26,7 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/fetcher"
 	"github.com/kuuvahki-labs/sandrone/internal/filedriver"
 	"github.com/kuuvahki-labs/sandrone/internal/iplookup"
+	"github.com/kuuvahki-labs/sandrone/internal/logbuffer"
 	"github.com/kuuvahki-labs/sandrone/internal/probe"
 	"github.com/kuuvahki-labs/sandrone/internal/processor"
 	fileproc "github.com/kuuvahki-labs/sandrone/internal/processor/file"
@@ -91,6 +92,7 @@ type Service struct {
 	ipLookup                iplookup.Provider
 	ipResolver              IPResolver
 	logger                  *slog.Logger
+	logBuffer               *logbuffer.Buffer
 	now                     func() time.Time
 	catalog                 func() (*ruleSetCatalogSnapshot, error)
 	settingsMu              sync.RWMutex

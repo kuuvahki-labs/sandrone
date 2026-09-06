@@ -27,6 +27,7 @@ export interface SettingsPageProps {
   themeMode: ThemeMode;
   version?: string;
   onOpenData: () => void;
+  onOpenLogs: () => void;
   onOpenService: () => void;
   onSaveBaseUrl: (value: string) => void;
   onSignOut: () => void;
@@ -49,6 +50,7 @@ export function SettingsPage({
   themeMode,
   version,
   onOpenData,
+  onOpenLogs,
   onOpenService,
   onSaveBaseUrl,
   onSignOut,
@@ -80,6 +82,14 @@ export function SettingsPage({
           <CardActionArea component="div" aria-label={t("settings.service.open")} onClick={onOpenService}>
             <CardContent className="flex items-center justify-between gap-4">
               <Typography component="h3" variant="h6">{t("settings.service.title")}</Typography>
+              <ChevronRightIcon aria-hidden color="action" />
+            </CardContent>
+          </CardActionArea>
+        </Card>
+        <Card component="article" variant="outlined">
+          <CardActionArea aria-label={t("settings.logs.open")} onClick={onOpenLogs}>
+            <CardContent className="flex items-center justify-between gap-4">
+              <Typography component="h3" variant="h6">{t("settings.logs.title")}</Typography>
               <ChevronRightIcon aria-hidden color="action" />
             </CardContent>
           </CardActionArea>

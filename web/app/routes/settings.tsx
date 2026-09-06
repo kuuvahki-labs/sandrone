@@ -18,6 +18,7 @@ export default function SettingsRoute() {
       localeMode={app.effectiveSettings.appearance.locale}
       themeMode={app.effectiveSettings.appearance.theme_mode}
       version={version.version}
+      onOpenLogs={() => navigate("/settings/logs")}
       onOpenData={() => navigate("/settings/data")}
       onOpenService={() => navigate("/settings/service")}
       onSaveBaseUrl={app.saveBaseUrl}

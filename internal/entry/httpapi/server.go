@@ -12,6 +12,7 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/app"
 	"github.com/kuuvahki-labs/sandrone/internal/buildinfo"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
+	"github.com/kuuvahki-labs/sandrone/internal/logbuffer"
 )
 
 type Option func(*Server)
@@ -94,7 +95,11 @@ func (s *Server) logRequests(next http.Handler) http.Handler {
 		if requestID := r.Header.Get("X-Request-Id"); requestID != "" {
 			attrs = append(attrs, "request_id", requestID)
 		}
-		s.rt.Logger.Log(r.Context(), level, "http request completed", attrs...)
+		ctx := r.Context()
+		if r.Method == http.MethodGet && r.URL.Path == "/v1/logs" && status < 400 {
+			ctx = logbuffer.WithoutCapture(ctx)
+		}
+		s.rt.Logger.Log(ctx, level, "http request completed", attrs...)
 	})
 }
 
@@ -192,6 +197,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /v1/files", s.putFile)
 	s.mux.HandleFunc("GET /v1/files/", s.getFile)
 	s.mux.HandleFunc("DELETE /v1/files/", s.deleteFile)
+	s.mux.HandleFunc("GET /v1/logs", s.getLogs)
 	s.mux.HandleFunc("GET /v1/settings", s.getSettings)
 	s.mux.HandleFunc("PUT /v1/settings", s.putSettings)
 	s.mux.HandleFunc("GET /v1/settings/scheduled-refresh-status", s.getScheduledRefreshStatus)

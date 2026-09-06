@@ -785,3 +785,14 @@ describe("ApiClient", () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 });
+
+it("loads runtime logs with the admin token and supports cancellation", async () => {
+  saveAdminToken("example-token");
+  const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ entries: [] }), { headers: { "Content-Type": "application/json" } }));
+  const client = new ApiClient({ fetcher });
+  const controller = new AbortController();
+  await expect(client.getLogs(controller.signal)).resolves.toEqual({ entries: [] });
+  expect(fetcher).toHaveBeenCalledWith("/v1/logs", expect.objectContaining({
+    headers: { Authorization: "Bearer example-token" }, signal: controller.signal,
+  }));
+});

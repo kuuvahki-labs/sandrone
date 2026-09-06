@@ -14,4 +14,5 @@ export default [
   route("settings", "routes/settings.tsx", { id: "settings" }),
   route("settings/service", "routes/settings.service.tsx", { id: "settings-service" }),
   route("settings/data", "routes/settings.data.tsx", { id: "settings-data" }),
+  route("settings/logs", "routes/settings.logs.tsx", { id: "settings-logs" }),
 ] satisfies RouteConfig;

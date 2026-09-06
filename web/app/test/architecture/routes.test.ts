@@ -26,6 +26,7 @@ const expectedRoutes = [
   { id: "settings", index: false, path: "settings", file: "routes/settings.tsx" },
   { id: "settings-service", index: false, path: "settings/service", file: "routes/settings.service.tsx" },
   { id: "settings-data", index: false, path: "settings/data", file: "routes/settings.data.tsx" },
+  { id: "settings-logs", index: false, path: "settings/logs", file: "routes/settings.logs.tsx" },
 ] as const;
 
 interface RouteConfigRecord {
@@ -78,7 +79,7 @@ function hasRealDefaultComponent(source: string, fileName: string): boolean {
 }
 
 describe("public React Router modules", () => {
-  it("keeps the exact ordered 13-route production contract", async () => {
+  it("keeps the exact ordered 14-route production contract", async () => {
     const configuredRoutes = await Promise.resolve(routes) as readonly RouteConfigRecord[];
 
     expect(configuredRoutes.map(normalizeRoute)).toEqual(expectedRoutes);

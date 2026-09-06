@@ -32,6 +32,7 @@ describe("SettingsRoute", () => {
   });
 
   it.each([
+    ["打开程序日志", "/settings/logs", "logs destination"],
     ["打开服务设置", "/settings/service", "service destination"],
     ["打开数据管理", "/settings/data", "data destination"],
   ])("navigates with %s", async (buttonName, destination, destinationText) => {

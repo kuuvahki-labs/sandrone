@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
+	"github.com/kuuvahki-labs/sandrone/internal/logbuffer"
 	"github.com/kuuvahki-labs/sandrone/internal/service"
 	projectsettings "github.com/kuuvahki-labs/sandrone/internal/settings"
 	"github.com/kuuvahki-labs/sandrone/internal/store"
@@ -113,7 +114,18 @@ func NewRuntimeContext(ctx context.Context, cfg Config, logger *slog.Logger, opt
 			return nil, err
 		}
 	}
+	// Capture exactly the levels accepted by the injected output handler.
+	level := cfg.Log.Level
+	for _, candidate := range []slog.Level{slog.LevelDebug, slog.LevelInfo, slog.LevelWarn, slog.LevelError} {
+		if logger.Enabled(ctx, candidate) {
+			level = strings.ToLower(candidate.String())
+			break
+		}
+	}
+	logs := logbuffer.New(level)
+	logger = slog.New(logs.Handler(logger.Handler()))
 	serviceOptions := []service.Option{
+		service.WithLogBuffer(logs),
 		service.WithStore(coordinator),
 		service.WithProjectSettings(settingsStore, cfg.StoredSettings, cfg.EffectiveSettings, cfg.OverrideSources),
 		service.WithLogger(logger),

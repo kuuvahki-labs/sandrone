@@ -12,6 +12,7 @@ describe("settings page", () => {
   it("shows RFC3339 build time for development and release builds", () => {
     const { rerender } = render(
       <SettingsPage
+        onOpenLogs={noop}
         buildTime="2026-08-30T03:15:42Z"
         localeMode="auto"
         publicBaseUrl="https://example.com"
@@ -29,6 +30,7 @@ describe("settings page", () => {
 
     rerender(
       <SettingsPage
+        onOpenLogs={noop}
         buildTime="2026-08-30T03:15:42Z"
         localeMode="auto"
         publicBaseUrl="https://example.com"
@@ -52,6 +54,7 @@ describe("settings page", () => {
     const onThemeMode = vi.fn();
     render(
       <SettingsPage
+        onOpenLogs={noop}
         localeMode="auto"
         publicBaseUrl="https://example.com"
         themeMode="system"
@@ -82,6 +85,7 @@ describe("settings page", () => {
     render(
       <I18nProvider>
         <SettingsPage
+        onOpenLogs={noop}
           localeMode="auto"
           publicBaseUrl="https://example.com"
           themeMode="system"
@@ -105,6 +109,7 @@ describe("settings page", () => {
     const onOpenService = vi.fn();
     render(
       <SettingsPage
+        onOpenLogs={noop}
         localeMode="auto"
         publicBaseUrl="https://example.com"
         themeMode="system"
@@ -132,6 +137,7 @@ describe("settings page", () => {
     const onSignOut = vi.fn();
     render(
       <SettingsPage
+        onOpenLogs={noop}
         localeMode="auto"
         publicBaseUrl="https://example.com"
         themeMode="system"

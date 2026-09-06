@@ -83,6 +83,8 @@ go run -mod=readonly -tags probe_singbox ./cmd/sandrone serve
 
 发布二进制只使用构建时嵌入的 Web 资源，不读取运行时外部静态目录。
 
+程序日志的页面使用与保留范围见[程序日志](../docs/reference/http-api/logs.md)。
+
 ## 验证
 
 迭代时先运行最窄的相关 Vitest 文件；交付前运行：

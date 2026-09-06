@@ -12,6 +12,7 @@ import FilePreviewRoute from "~/routes/files.$name.preview";
 import FilesNewRoute from "~/routes/files.new";
 import SettingsRoute from "~/routes/settings";
 import SettingsDataRoute from "~/routes/settings.data";
+import SettingsLogsRoute from "~/routes/settings.logs";
 import SettingsServiceRoute from "~/routes/settings.service";
 import SharesRoute from "~/routes/shares";
 import SubscriptionsRoute from "~/routes/subscriptions";
@@ -44,6 +45,7 @@ export const integrationRouteEntries = [
   { id: "settings", path: "settings", file: "routes/settings.tsx", Component: SettingsRoute },
   { id: "settings-service", path: "settings/service", file: "routes/settings.service.tsx", Component: SettingsServiceRoute },
   { id: "settings-data", path: "settings/data", file: "routes/settings.data.tsx", Component: SettingsDataRoute },
+  { id: "settings-logs", path: "settings/logs", file: "routes/settings.logs.tsx", Component: SettingsLogsRoute },
 ] satisfies readonly IntegrationRouteEntry[];
 
 export interface ResourceFixture {
@@ -171,6 +173,12 @@ export function installDefaultFetchMock() {
     const url = String(input);
     const resourceResponse = resourceListResponse(url, resources, init);
     if (resourceResponse) return resourceResponse;
+    if (url === "/v1/logs") {
+      return jsonResponse({
+        instance_id: "test-runtime", snapshot_time: "2026-09-06T01:02:03.456Z", level: "info",
+        max_entries: 1000, max_bytes: 2097152, max_entry_bytes: 8192, dropped: 0, entries: [],
+      });
+    }
     if (url === "/v1/settings") {
       return jsonResponse(defaultSettingsEnvelope(defaultProjectSettings));
     }

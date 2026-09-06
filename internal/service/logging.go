@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
+	"github.com/kuuvahki-labs/sandrone/internal/logbuffer"
 )
 
 func (s *Service) log(ctx context.Context, level slog.Level, msg string, attrs ...any) {
@@ -53,4 +54,15 @@ func probeCounts(result *domain.ProbeResult) (int, int, int, int) {
 		}
 	}
 	return success, unsupported, failure, cacheHits
+}
+
+func WithLogBuffer(buffer *logbuffer.Buffer) Option {
+	return func(s *Service) { s.logBuffer = buffer }
+}
+
+func (s *Service) Logs() (logbuffer.Snapshot, error) {
+	if s.logBuffer == nil {
+		return logbuffer.Snapshot{}, domain.NewError(domain.CodeNotImplemented, "runtime log capture is unavailable")
+	}
+	return s.logBuffer.Snapshot(), nil
 }

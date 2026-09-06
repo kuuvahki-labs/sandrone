@@ -1,6 +1,26 @@
 import type { IgnoredWarning } from "~/shared/resources/types";
 import { getAdminToken } from "~/shared/storage/preferences";
 
+export interface LogEntry {
+  id: number;
+  time: string;
+  level: string;
+  message: string;
+  attrs: Record<string, unknown>;
+  truncated: boolean;
+}
+
+export interface LogSnapshot {
+  instance_id: string;
+  snapshot_time: string;
+  level: string;
+  max_entries: number;
+  max_bytes: number;
+  max_entry_bytes: number;
+  dropped: number;
+  entries: LogEntry[];
+}
+
 export type Fetcher = typeof fetch;
 
 type RuleSetCatalogTransportTarget = "mihomo" | "sing-box" | "shadowrocket";
@@ -374,9 +394,13 @@ export class ApiClient {
     return this.request(`/v1/${kind}/${encodeURIComponent(name)}`, { method: "DELETE" });
   }
 
+  getLogs(signal?: AbortSignal): Promise<LogSnapshot> {
+    return this.request<LogSnapshot>("/v1/logs", { signal });
+  }
+
   private async request<T = unknown>(
     path: string,
-    options: { method?: string; body?: unknown; auth?: boolean } = {},
+    options: { method?: string; body?: unknown; auth?: boolean; signal?: AbortSignal } = {},
   ): Promise<T> {
     const headers: Record<string, string> = {};
     const token = getAdminToken();
@@ -391,6 +415,7 @@ export class ApiClient {
       method: options.method ?? "GET",
       headers,
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      ...(options.signal ? { signal: options.signal } : {}),
     });
     const contentType = response.headers.get("content-type") ?? "";
     const data = contentType.includes("application/json") ? await response.json() : await response.text();

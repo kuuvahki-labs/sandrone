@@ -191,6 +191,13 @@ test.beforeEach(async ({ page }) => {
   await page.route("**/v1/rule-set-catalog?target=*", async (route) => {
     await route.fulfill({ json: { items: [] } });
   });
+  await page.route("**/v1/logs", async (route) => {
+    await route.fulfill({ json: {
+      instance_id: "runtime-example", snapshot_time: "2026-09-06T01:02:03.456Z", level: "info",
+      max_entries: 1000, max_bytes: 2097152, max_entry_bytes: 8192, dropped: 0,
+      entries: [{ id: 1, time: "2026-09-06T01:02:01.123Z", level: "info", message: "service render completed", attrs: { operation: "render", duration_ms: 12 }, truncated: false }],
+    } });
+  });
   await page.route("**/v1/settings", async (route) => {
     if (route.request().method() === "PUT") {
       const update = route.request().postDataJSON() as {
@@ -247,6 +254,7 @@ const routes = [
   { path: "/shares", heading: "分享", content: "还没有分享链接", focus: false },
   { path: "/settings/service", heading: "服务设置", content: "远程请求", focus: false },
   { path: "/settings/data", heading: "数据管理", content: "缓存", focus: false },
+  { path: "/settings/logs", heading: "程序日志", content: "全部级别", focus: false },
 ];
 
 test("settings overview opens service settings", async ({ page }) => {
@@ -579,4 +587,30 @@ test("the convert link dialog stays usable and does not execute the generated UR
     scrollWidth: document.documentElement.scrollWidth,
   }));
   expect(pageMetrics.scrollWidth).toBeLessThanOrEqual(pageMetrics.clientWidth + 1);
+});
+
+test("settings logs refresh manually and keep filters", async ({ page }) => {
+  const consoleIssues: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error" || message.type() === "warning") consoleIssues.push(message.text());
+  });
+  let reads = 0;
+  page.on("request", (request) => { if (new URL(request.url()).pathname === "/v1/logs") reads++; });
+  await page.goto("/settings");
+  await page.getByRole("button", { name: "打开程序日志" }).click();
+  await expect(page).toHaveURL(/\/settings\/logs$/);
+  await expect(page.getByText("1 条")).toBeVisible();
+  await page.getByLabel("日志详情 1", { exact: true }).click();
+  await expect(page.locator("details[open] pre").last()).toContainText('"duration_ms": 12');
+  await page.getByRole("textbox", { name: "搜索日志…" }).fill("render");
+  expect(reads).toBe(1);
+  await page.getByRole("button", { name: "刷新", exact: true }).click();
+  await expect(page.getByText("1 / 1 条")).toBeVisible();
+  await expect(page.getByRole("textbox")).toHaveValue("render");
+  expect(reads).toBe(2);
+  await page.getByRole("textbox").fill("absent");
+  await expect(page.getByText("没有匹配的日志")).toBeVisible();
+  await page.getByRole("button", { name: "返回", exact: true }).click();
+  await expect(page).toHaveURL(/\/settings$/);
+  expect(consoleIssues).toEqual([]);
 });
