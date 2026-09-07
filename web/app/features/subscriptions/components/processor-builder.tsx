@@ -47,8 +47,6 @@ import { ProbeURLField } from "~/shared/ui/probe-url-field";
 
 const fields = ["name", "type", "server"];
 const fieldOptions = fields.map((field) => ({ value: field, label: field }));
-const informationNodePattern =
-  "(?i)(网址|官网|流量|剩余|时间|应急|套餐|订阅|公告|重置|过期|到期|bandwidth|traffic|quota|reset|expire|expiry|expiration)";
 
 export function ProcessorBuilder({ defaultValue = [], onDirty, probeCacheTTLSeconds, probeDefaults, remoteDefaults = emptyRemoteDefaults, scriptFiles = [], scriptTimeoutMS }: { defaultValue?: ProcessorDetail[]; onDirty?: () => void; probeCacheTTLSeconds: number; probeDefaults: ProbeDefaultsInput; remoteDefaults?: RemoteInputDefaults; scriptFiles?: ResourceOption[]; scriptTimeoutMS?: number }) {
   const { t } = useI18n();
@@ -61,10 +59,9 @@ export function ProcessorBuilder({ defaultValue = [], onDirty, probeCacheTTLSeco
 
   return (
     <ProcessorEditorList
-      addProcessorDrafts={(type, current) => addSubscriptionProcessorDrafts(type, current, t)}
       createDraftId={createProcessorID}
       defaultParams={defaultParams}
-      defaultType="filter"
+      defaultType="script"
       defaultValue={defaultValue}
       draftProcessors={draftProcessors}
       paramsEditor={ParamsEditor}
@@ -89,7 +86,7 @@ function ProcessorParamsEditor({ draft, onChange, probeCacheTTLSeconds, probeDef
           {match === "in" ? (
             <TextField fullWidth label={t("processors.filter.value")} placeholder="ss, vmess" value={listToText(params.values)} onChange={(event) => onChange({ values: textToList(event.target.value) })} />
           ) : (
-            <TextField fullWidth label={t("processors.filter.pattern")} value={stringValue(params.pattern)} onChange={(event) => onChange({ pattern: event.target.value })} />
+            <TextField fullWidth label={t("processors.filter.pattern")} placeholder={t("processors.filter.patternPlaceholder")} value={stringValue(params.pattern)} onChange={(event) => onChange({ pattern: event.target.value })} />
           )}
         </>
       );
@@ -233,7 +230,6 @@ function serializeDraft(draft: ProcessorDraft, t: Translator): ProcessorDetail {
 function processorOptions(t: Translator, probeEnabled = true) {
   return [
     { value: "filter", label: t("processors.filter") },
-    { value: "information_filter_preset", label: t("processors.filter.infoPresetOption") },
     { value: "dedup", label: t("processors.dedup") },
     { value: "rename", label: t("processors.nameOperation") },
     { value: "sort", label: t("processors.sort") },
@@ -241,31 +237,6 @@ function processorOptions(t: Translator, probeEnabled = true) {
     ...(probeEnabled ? [{ value: "probe", label: t("processors.probe") }] : []),
     { value: "script", label: t("model.processor.script") },
   ];
-}
-
-function addSubscriptionProcessorDrafts(type: string, current: ProcessorDraft[], t: Translator): ProcessorDraft[] {
-  if (type !== "information_filter_preset") {
-    return [...current, {
-      enabled: true,
-      id: createProcessorID(),
-      name: "",
-      type,
-      params: defaultParams(type),
-    }];
-  }
-  const preset: ProcessorDraft = {
-    enabled: true,
-    id: createProcessorID(),
-    name: t("processors.filter.infoPresetName"),
-    type: "filter",
-    params: {
-      action: "drop",
-      field: "name",
-      match: "regex",
-      pattern: informationNodePattern,
-    },
-  };
-  return [...current, preset];
 }
 
 function filterActionOptions(t: Translator) {
@@ -323,7 +294,7 @@ function defaultStage(): string {
 function defaultParams(type: string): Record<string, unknown> {
   switch (type) {
     case "filter":
-      return { action: "keep", field: "name", match: "regex", pattern: "" };
+      return { action: "drop", field: "name", match: "regex", pattern: "" };
     case "dedup":
       return { strategy: "name" };
     case "rename":

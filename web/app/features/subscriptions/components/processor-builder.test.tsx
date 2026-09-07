@@ -242,7 +242,7 @@ describe("ProcessorBuilder", () => {
     ]);
   });
 
-  it("appends the information-node filter preset after an existing probe", async () => {
+  it("adds a probe with inherited connection settings and behavior defaults", async () => {
     const user = userEvent.setup();
     const { serializedProcessors } = renderProcessorBuilder();
 
@@ -283,32 +283,6 @@ describe("ProcessorBuilder", () => {
         },
       },
     ]);
-
-    await selectMuiOption(user, screen.getByRole("combobox", { name: "类型" }), "过滤信息节点");
-    await user.click(screen.getByRole("button", { name: "添加处理器" }));
-
-    expect(serializedProcessors()).toEqual([
-      {
-        type: "probe",
-        stage: "nodes",
-        params: {
-          fail_mode: "drop",
-          annotate: true,
-          sort: "duration",
-        },
-      },
-      {
-        name: "过滤信息节点",
-        type: "filter",
-        stage: "nodes",
-        params: {
-          action: "drop",
-          field: "name",
-          match: "regex",
-          pattern: "(?i)(网址|官网|流量|剩余|时间|应急|套餐|订阅|公告|重置|过期|到期|bandwidth|traffic|quota|reset|expire|expiry|expiration)",
-        },
-      },
-    ]);
   });
 
   it("starts without quick settings and appends visual processors in order", async () => {
@@ -317,7 +291,7 @@ describe("ProcessorBuilder", () => {
     const { serializedProcessors } = renderProcessorBuilder({ onDirty });
 
     const newType = screen.getByRole("combobox", { name: "类型" });
-    expect(newType).toHaveTextContent("过滤");
+    expect(newType).toHaveTextContent("脚本");
     const addProcessor = screen.getByRole("button", { name: "添加处理器" });
     expect(addProcessor).toHaveTextContent("添加");
     await user.click(newType);
@@ -343,7 +317,11 @@ describe("ProcessorBuilder", () => {
     const filterName = within(filterGroup).getByRole("textbox", { name: "名称" });
     expect(filterName).toHaveValue("");
     fireEvent.change(filterName, { target: { value: "按 server 过滤" } });
-    expect(within(filterGroup).getByRole("combobox", { name: "过滤动作" })).toHaveTextContent("保留");
+    expect(within(filterGroup).getByRole("combobox", { name: "过滤动作" })).toHaveTextContent("排除");
+    const patternInput = within(filterGroup).getByRole("textbox", { name: "正则表达式" });
+    expect(patternInput).toHaveAttribute("placeholder", "流量|到期");
+    expect(patternInput).toHaveValue("");
+    expect(serializedProcessors()[0]?.params).not.toHaveProperty("pattern");
     await user.click(within(filterGroup).getByRole("combobox", { name: "匹配字段" }));
     const fieldListbox = await screen.findByRole("listbox");
     expect(within(fieldListbox).getByRole("option", { name: "name" })).toBeInTheDocument();
@@ -357,7 +335,7 @@ describe("ProcessorBuilder", () => {
     });
 
     expect(serializedProcessors()).toEqual([
-      { name: "按 server 过滤", type: "filter", stage: "nodes", params: { action: "keep", field: "server", match: "regex", pattern: "example\\.com" } },
+      { name: "按 server 过滤", type: "filter", stage: "nodes", params: { action: "drop", field: "server", match: "regex", pattern: "example\\.com" } },
     ]);
 
     await selectMuiOption(user, newType, "名称处理");
@@ -368,7 +346,7 @@ describe("ProcessorBuilder", () => {
     expect(within(renameGroup).queryByRole("combobox", { name: /名称操作/ })).not.toBeInTheDocument();
 
     expect(serializedProcessors()).toEqual([
-      { name: "按 server 过滤", type: "filter", stage: "nodes", params: { action: "keep", field: "server", match: "regex", pattern: "example\\.com" } },
+      { name: "按 server 过滤", type: "filter", stage: "nodes", params: { action: "drop", field: "server", match: "regex", pattern: "example\\.com" } },
       { type: "rename", stage: "nodes", params: { trim: true } },
     ]);
 
@@ -377,7 +355,7 @@ describe("ProcessorBuilder", () => {
     const quickSettingsGroup = screen.getByRole("group", { name: "处理器 快捷设置" });
     expect(within(quickSettingsGroup).getByText("处理器 3")).toBeInTheDocument();
     expect(serializedProcessors()).toEqual([
-      { name: "按 server 过滤", type: "filter", stage: "nodes", params: { action: "keep", field: "server", match: "regex", pattern: "example\\.com" } },
+      { name: "按 server 过滤", type: "filter", stage: "nodes", params: { action: "drop", field: "server", match: "regex", pattern: "example\\.com" } },
       { type: "rename", stage: "nodes", params: { trim: true } },
       { type: "quick_settings", stage: "nodes" },
     ]);

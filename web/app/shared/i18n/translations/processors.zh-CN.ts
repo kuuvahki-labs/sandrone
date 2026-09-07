@@ -21,6 +21,5 @@ export const processorZhCN = {
   "processors.quick.disabled": "禁用",
   "processors.quick.enabled": "启用",
   "processors.quick.reuse": "连接复用（仅 Snell）",
-  "processors.filter.infoPresetOption": "过滤信息节点",
-  "processors.filter.infoPresetName": "过滤信息节点",
+  "processors.filter.patternPlaceholder": "流量|到期",
 } as const;
