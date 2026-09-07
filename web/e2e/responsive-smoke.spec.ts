@@ -449,7 +449,7 @@ for (const route of routes) {
       const addProcessor = page.getByRole("button", { name: "添加处理器" });
       await addProcessor.click();
       await addProcessor.click();
-      const processorCards = page.getByRole("group", { name: "处理器 过滤" });
+      const processorCards = page.getByRole("group", { name: "处理器 脚本" });
       await expect(processorCards).toHaveCount(2);
       const secondProcessor = processorCards.nth(1);
       const enabledButton = secondProcessor.getByRole("button", { name: "启用 处理器 2" });
