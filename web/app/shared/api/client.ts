@@ -1,5 +1,8 @@
 import type { IgnoredWarning } from "~/shared/resources/types";
+import { apiSession, onApiSessionReset, resetApiSession } from "~/shared/storage/api-session";
 import { getAdminToken } from "~/shared/storage/preferences";
+
+import { invalidateListCache, listCacheEntry, resourceListFreshMs, type ResourceListKind } from "./resource-list-cache";
 
 export interface LogEntry {
   id: number;
@@ -26,6 +29,7 @@ export type Fetcher = typeof fetch;
 type RuleSetCatalogTransportTarget = "mihomo" | "sing-box" | "shadowrocket";
 
 const inFlightRequests = new Map<string, Promise<unknown>>();
+onApiSessionReset(() => inFlightRequests.clear());
 
 export interface ApiClientOptions {
   baseUrl?: string;
@@ -290,16 +294,46 @@ export class ApiClient {
     return this.dedupedRequest("GET", "/v1/capabilities/ui");
   }
 
-  listSubscriptions(): Promise<unknown> {
-    return this.dedupedRequest("GET", "/v1/subscriptions");
+  listSubscriptions(options: { fresh?: boolean } = {}): Promise<unknown> {
+    return this.listResource("subscriptions", options.fresh);
   }
 
-  listFiles(): Promise<unknown> {
-    return this.dedupedRequest("GET", "/v1/files");
+  listFiles(options: { fresh?: boolean } = {}): Promise<unknown> {
+    return this.listResource("files", options.fresh);
   }
 
-  listShares(): Promise<unknown> {
-    return this.dedupedRequest("GET", "/v1/shares");
+  listShares(options: { fresh?: boolean } = {}): Promise<unknown> {
+    return this.listResource("shares", options.fresh);
+  }
+
+  cachedResourceList(kind: ResourceListKind): { value: unknown; fresh: boolean } | undefined {
+    apiSession(getAdminToken());
+    const entry = listCacheEntry(this.baseUrl, kind);
+    if (entry.value === undefined) return undefined;
+    return { value: structuredClone(entry.value), fresh: Date.now() - entry.updatedAt < resourceListFreshMs };
+  }
+
+  private listResource(kind: ResourceListKind, fresh = false): Promise<unknown> {
+    const session = apiSession(getAdminToken());
+    const entry = listCacheEntry(this.baseUrl, kind);
+    if (entry.pending) return entry.pending.then((value) => structuredClone(value));
+    if (!fresh && entry.value !== undefined && Date.now() - entry.updatedAt < resourceListFreshMs) {
+      return Promise.resolve(structuredClone(entry.value));
+    }
+    const request = this.request(`/v1/${kind}`).then((value) => {
+      if (session !== apiSession(getAdminToken())) throw new ApiError(409, "stale_session", "Session changed");
+      // A write can finish while a list request is in flight. Read the new list
+      // instead of publishing the pre-write response to either cache or caller.
+      if (listCacheEntry(this.baseUrl, kind) !== entry) return this.listResource(kind);
+      entry.traffic.clear();
+      entry.value = structuredClone(value);
+      entry.updatedAt = Date.now();
+      return value;
+    }).finally(() => {
+      if (entry.pending === request) entry.pending = undefined;
+    });
+    entry.pending = request;
+    return request.then((value) => structuredClone(value));
   }
 
   createSubscription(subscription: SubscriptionInput): Promise<unknown> {
@@ -320,7 +354,21 @@ export class ApiClient {
 
   subscriptionTraffic(name: string, body: SubscriptionTrafficRequest = {}): Promise<unknown> {
     const path = `/v1/subscriptions/${encodeURIComponent(name)}/traffic`;
-    return this.dedupedRequest("POST", path, { method: "POST", body });
+    apiSession(getAdminToken());
+    const entry = listCacheEntry(this.baseUrl, "subscriptions");
+    if (entry.value === undefined || Date.now() - entry.updatedAt >= resourceListFreshMs) {
+      return this.dedupedRequest("POST", path, { method: "POST", body });
+    }
+    if (body.refresh) entry.traffic.delete(name);
+    let request = entry.traffic.get(name);
+    if (!request) {
+      request = this.dedupedRequest("POST", path, { method: "POST", body }).catch((error: unknown) => {
+        if (entry.traffic.get(name) === request) entry.traffic.delete(name);
+        throw error;
+      });
+      entry.traffic.set(name, request);
+    }
+    return request.then((value) => structuredClone(value));
   }
 
   createFile(file: FileSpecInput): Promise<unknown> {
@@ -358,7 +406,12 @@ export class ApiClient {
   }
 
   async restoreBackup(file: Blob): Promise<void> {
-    await this.rawRequest("/v1/backup/restore", { method: "POST", body: file });
+    try {
+      await this.rawRequest("/v1/backup/restore", { method: "POST", body: file });
+    } finally {
+      invalidateListCache(this.baseUrl);
+      inFlightRequests.clear();
+    }
   }
 
   async clearCache(): Promise<void> {
@@ -402,8 +455,11 @@ export class ApiClient {
     path: string,
     options: { method?: string; body?: unknown; auth?: boolean; signal?: AbortSignal } = {},
   ): Promise<T> {
+    const resource = /^\/v1\/(subscriptions|files|shares)\//.exec(path)?.[1] as ResourceListKind | undefined;
     const headers: Record<string, string> = {};
     const token = getAdminToken();
+    const session = apiSession(token);
+    const resourceState = resource && options.method !== "DELETE" ? listCacheEntry(this.baseUrl, resource) : undefined;
     if (options.auth !== false && token) {
       headers.Authorization = `Bearer ${token}`;
     }
@@ -425,9 +481,23 @@ export class ApiClient {
       const code = typeof errorRecord.code === "string" ? errorRecord.code : "http_error";
       const message = typeof errorRecord.message === "string" ? errorRecord.message : `HTTP ${response.status}`;
       if (response.status === 401 && options.auth !== false) {
-        this.onUnauthorized?.();
+        if (session === apiSession(getAdminToken())) {
+          resetApiSession();
+          this.onUnauthorized?.();
+        }
       }
       throw new ApiError(response.status, code, message);
+    }
+    if (options.auth !== false && session !== apiSession(getAdminToken())) {
+      throw new ApiError(409, "stale_session", "Session changed");
+    }
+    if (resource && resourceState && listCacheEntry(this.baseUrl, resource) !== resourceState) {
+      throw new ApiError(409, "stale_resource", "Resource changed during request");
+    }
+    const mutation = /^\/v1\/(subscriptions|files|shares)(?:\/[^/]+)?$/.exec(path);
+    if (mutation && options.method && options.method !== "GET") {
+      invalidateListCache(this.baseUrl, mutation[1] as ResourceListKind);
+      inFlightRequests.clear();
     }
     return data as T;
   }
@@ -438,6 +508,7 @@ export class ApiClient {
   ): Promise<Response> {
     const headers: Record<string, string> = {};
     const token = getAdminToken();
+    const session = apiSession(token);
     if (options.auth !== false && token) {
       headers.Authorization = `Bearer ${token}`;
     }
@@ -455,9 +526,15 @@ export class ApiClient {
       const code = typeof errorRecord.code === "string" ? errorRecord.code : "http_error";
       const message = typeof errorRecord.message === "string" ? errorRecord.message : `HTTP ${response.status}`;
       if (response.status === 401 && options.auth !== false) {
-        this.onUnauthorized?.();
+        if (session === apiSession(getAdminToken())) {
+          resetApiSession();
+          this.onUnauthorized?.();
+        }
       }
       throw new ApiError(response.status, code, message);
+    }
+    if (options.auth !== false && session !== apiSession(getAdminToken())) {
+      throw new ApiError(409, "stale_session", "Session changed");
     }
     return response;
   }
@@ -499,7 +576,7 @@ export class ApiClient {
   private requestKey(method: string, path: string, options: { body?: unknown; auth?: boolean }): string {
     const token = options.auth === false ? "" : getAdminToken();
     const body = options.body === undefined ? "" : JSON.stringify(options.body);
-    return [this.baseUrl, method, path, token, body].join("\n");
+    return [this.baseUrl, method, path, apiSession(token), body].join("\n");
   }
 }
 

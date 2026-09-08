@@ -36,7 +36,7 @@ export default function SubscriptionPreviewRoute() {
     t,
   }), [app.client, app.showNotice, t]);
 
-  if (subscriptions.loading) return <LoadingScreen />;
+  if (subscriptions.loading && !subscriptions.loaded) return <LoadingScreen />;
 
   if (!item) {
     return <MissingResource title={t("subscriptions.missing")} onBack={() => navigate("/subscriptions")} />;

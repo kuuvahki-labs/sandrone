@@ -31,7 +31,7 @@ export default function FilesRoute() {
     t,
   });
 
-  if (files.loading) return <LoadingScreen />;
+  if (files.loading && !files.loaded) return <LoadingScreen />;
 
   return (
     <>

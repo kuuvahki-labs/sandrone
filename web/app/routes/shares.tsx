@@ -25,7 +25,7 @@ export default function SharesRoute() {
     t,
   });
 
-  if (shares.loading) return <LoadingScreen />;
+  if (shares.loading && !shares.loaded) return <LoadingScreen />;
 
   return (
     <>

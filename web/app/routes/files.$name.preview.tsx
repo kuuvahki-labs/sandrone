@@ -29,7 +29,7 @@ export default function FilePreviewRoute() {
   const refreshPreviewLoader = useCallback((): Promise<FilePreview | null> => item ? loadFilePreview(item.name, { refresh: true }) : Promise.resolve(null), [item, loadFilePreview]);
   const { elapsedSeconds, failed, pending, preview, refreshPreview } = useResourcePreview<FilePreview>(item?.name, loadPreview, refreshPreviewLoader);
 
-  if (files.loading) return <LoadingScreen />;
+  if (files.loading && !files.loaded) return <LoadingScreen />;
 
   if (!item) {
     return <MissingResource title={t("files.missing")} onBack={() => navigate("/files")} />;

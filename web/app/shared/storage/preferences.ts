@@ -1,5 +1,7 @@
 import { detectPreferredLocale, isLocale, type Locale } from "~/shared/i18n/locales";
 
+import { resetApiSession } from "./api-session";
+
 export type ThemeMode = "system" | "light" | "dark";
 export type ThemePreset = "ocean";
 export type LocaleMode = "auto" | Locale;
@@ -21,6 +23,7 @@ export const themePreferenceChangeEvent = "sandrone:theme-preference-change";
 
 export function saveAdminToken(token: string): void {
   browserStorage()?.setItem(adminTokenKey, token.trim());
+  resetApiSession();
 }
 
 export function getAdminToken(): string {
@@ -29,6 +32,7 @@ export function getAdminToken(): string {
 
 export function clearAdminToken(): void {
   browserStorage()?.removeItem(adminTokenKey);
+  resetApiSession();
 }
 
 export function getLocalePreference(languages?: readonly string[]): Locale {

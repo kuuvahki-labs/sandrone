@@ -24,12 +24,13 @@ export function useSharesResource({
   showNotice,
   t,
 }: ShareResourcePorts): ResourceListState<ShareItem> {
-  const load = useCallback(() => client.listShares(), [client]);
+  const load = useCallback((options?: { fresh?: boolean }) => options ? client.listShares(options) : client.listShares(), [client]);
+  const cached = useCallback(() => client.cachedResourceList?.("shares"), [client]);
   const map = useCallback(
     (resourceList: unknown) => sortSharesFromResourceList(resourceList, publicBaseUrl),
     [publicBaseUrl],
   );
-  return useResourceList({ load, map, showNotice, t });
+  return useResourceList({ load, cached, map, showNotice, t });
 }
 
 function sortSharesFromResourceList(resourceList: unknown, publicBaseUrl: string): ShareItem[] {

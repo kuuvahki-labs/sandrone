@@ -22,8 +22,9 @@ export interface FileResourcePorts {
 }
 
 export function useFileResources({ client, showNotice, t }: FileResourcePorts): ResourceListState<FileItem> {
-  const load = useCallback(() => client.listFiles(), [client]);
-  return useResourceList({ load, map: sortedFilesFromResourceList, showNotice, t });
+  const load = useCallback((options?: { fresh?: boolean }) => options ? client.listFiles(options) : client.listFiles(), [client]);
+  const cached = useCallback(() => client.cachedResourceList?.("files"), [client]);
+  return useResourceList({ load, cached, map: sortedFilesFromResourceList, showNotice, t });
 }
 
 export function useFileDetailsResource({ client, showNotice, t }: FileResourcePorts) {

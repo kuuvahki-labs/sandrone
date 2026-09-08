@@ -101,7 +101,9 @@ Web UI 会隐藏定时更新、测活默认值和新增 probe processor 的入�
 快照供 Vercel 复用；Vercel 的降级结果不会写回该快照。两端需使用相同构建、
 remote/probe/script 执行设置和 Subscription，并为订阅快照配置正数 TTL；scheduler
 能力不参与缓存 identity。HTTP 与 MCP 不提供直接 probe 入口。缓存身份和写入规则
-见[存储与并发](../architecture/storage.md#缓存层)。
+见[缓存契约](../architecture/storage.md#cache)；资源列表的正文复用与复核期限见
+[MetaStore](../architecture/storage.md#metastore)，浏览器行为见
+[页面数据复用](../../web/AGENTS.md#页面数据复用)。
 
 CLI、Docker 与其他长驻 `serve` 部署不受此 profile 影响。
 

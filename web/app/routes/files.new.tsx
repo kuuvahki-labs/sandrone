@@ -39,7 +39,7 @@ export default function NewFileRoute() {
   ), [app.client]);
   const loadRuleSetCatalog = useCallback(async (target: RuleSetCatalogTarget) => ruleSetCatalogFromAPI(await app.client.listRuleSetCatalog(target)), [app.client]);
 
-  if (files.loading || subscriptions.loading) return <LoadingScreen />;
+  if ((files.loading && !files.loaded) || (subscriptions.loading && !subscriptions.loaded)) return <LoadingScreen />;
 
   return (
     <FileNewPage

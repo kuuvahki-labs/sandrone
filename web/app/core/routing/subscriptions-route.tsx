@@ -43,7 +43,7 @@ export function SubscriptionsRoute() {
     t,
   });
 
-  if (subscriptions.loading) return <LoadingScreen />;
+  if (subscriptions.loading && !subscriptions.loaded) return <LoadingScreen />;
 
   return (
     <>

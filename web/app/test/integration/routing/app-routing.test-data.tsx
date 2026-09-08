@@ -19,6 +19,7 @@ import SubscriptionsRoute from "~/routes/subscriptions";
 import SubscriptionEditRoute from "~/routes/subscriptions.$kind.$name.edit";
 import SubscriptionPreviewRoute from "~/routes/subscriptions.$kind.$name.preview";
 import NewSubscriptionRoute from "~/routes/subscriptions.new";
+import { resetApiSession } from "~/shared/storage/api-session";
 
 interface IntegrationRouteEntryBase {
   readonly Component: ComponentType;
@@ -168,6 +169,7 @@ export const formatCapabilities = {
 
 export function installDefaultFetchMock() {
   localStorage.clear();
+  resetApiSession();
   vi.restoreAllMocks();
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);

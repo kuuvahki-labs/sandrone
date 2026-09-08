@@ -31,7 +31,7 @@ export default function NewSubscriptionRoute() {
     t,
   });
 
-  if (subscriptions.loading || files.loading) return <LoadingScreen />;
+  if ((subscriptions.loading && !subscriptions.loaded) || (files.loading && !files.loaded)) return <LoadingScreen />;
 
   return (
     <SubscriptionNewPage

@@ -27,8 +27,9 @@ export function useSubscriptionResources({
   showNotice,
   t,
 }: SubscriptionResourcePorts): ResourceListState<SubscriptionItem> {
-  const load = useCallback(() => client.listSubscriptions(), [client]);
-  return useResourceList({ load, map: sortedSubscriptionsFromResourceList, showNotice, t });
+  const load = useCallback((options?: { fresh?: boolean }) => options ? client.listSubscriptions(options) : client.listSubscriptions(), [client]);
+  const cached = useCallback(() => client.cachedResourceList?.("subscriptions"), [client]);
+  return useResourceList({ load, cached, map: sortedSubscriptionsFromResourceList, showNotice, t });
 }
 
 export function useSubscriptionDetailsResource({ client, showNotice, t }: SubscriptionResourcePorts) {

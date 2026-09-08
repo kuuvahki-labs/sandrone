@@ -62,8 +62,8 @@ export default function FileEditRoute() {
   }, [detail, item, loadFileDetail]);
 
   if (
-    (files.loading && files.items.length === 0)
-    || (subscriptions.loading && subscriptions.items.length === 0)
+    (files.loading && !files.loaded)
+    || (subscriptions.loading && !subscriptions.loaded)
   ) return <LoadingScreen />;
 
   if (!item) {

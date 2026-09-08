@@ -79,8 +79,8 @@ export default function SubscriptionEditRoute() {
   }, [item, loadSubscriptionDefinition]);
 
   if (
-    (subscriptions.loading && subscriptions.items.length === 0)
-    || (files.loading && files.items.length === 0)
+    (subscriptions.loading && !subscriptions.loaded)
+    || (files.loading && !files.loaded)
   ) return <LoadingScreen />;
 
   if (!item) {

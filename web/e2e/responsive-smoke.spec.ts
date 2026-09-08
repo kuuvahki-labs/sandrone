@@ -614,3 +614,31 @@ test("settings logs refresh manually and keep filters", async ({ page }) => {
   await expect(page).toHaveURL(/\/settings$/);
   expect(consoleIssues).toEqual([]);
 });
+
+test("list navigation reuses fresh data and keeps stale rows visible during refresh", async ({ page }) => {
+  const now = new Date("2026-09-08T00:00:00Z");
+  await page.clock.setFixedTime(now);
+  let lists = 0;
+  let release!: () => void;
+  const refresh = new Promise<void>((resolve) => { release = resolve; });
+  await page.route("**/v1/subscriptions", async (route) => {
+    lists += 1;
+    if (lists > 1) await refresh;
+    await route.fulfill({ json: { items: manifest.subscriptions } });
+  });
+  await page.goto("/subscriptions");
+  const rows = page.getByRole("list", { name: "订阅列表" });
+  await expect(rows.getByText("provider", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "provider 更多操作" }).click();
+  await page.getByRole("menuitem", { name: "预览订阅" }).click();
+  await expect(page.getByRole("heading", { name: "节点预览" })).toBeVisible();
+  await page.getByRole("button", { name: "返回", exact: true }).click();
+  await expect(rows).toBeVisible();
+  expect(lists).toBe(1);
+  await page.clock.setFixedTime(new Date(now.getTime() + 5_000));
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect.poll(() => lists).toBe(2);
+  await expect(rows.getByText("provider", { exact: true })).toBeVisible();
+  release();
+  await expect(rows).toBeVisible();
+});

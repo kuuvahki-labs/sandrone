@@ -15,32 +15,36 @@ export interface ResourceListState<T> {
 export function useResourceList<T>({
   load,
   map,
+  cached,
   showNotice,
   t,
 }: {
-  load: () => Promise<unknown>;
+  load: (options?: { fresh?: boolean }) => Promise<unknown>;
+  cached?: () => { value: unknown; fresh: boolean } | undefined;
   map: (resourceList: unknown) => T[];
   showNotice: ResourceErrorNotice;
   t: Translator;
 }): ResourceListState<T> {
   const generation = useRef(0);
-  const [items, setItems] = useState<T[]>([]);
-  const [loaded, setLoaded] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [initial] = useState(() => cached?.());
+  const [items, setItems] = useState<T[]>(() => initial ? map(initial.value) : []);
+  const [loaded, setLoaded] = useState(!!initial);
+  const [loading, setLoading] = useState(!initial);
 
-  const reload = useCallback(async () => {
+  const refresh = useCallback(async (fresh: boolean) => {
+    if (!fresh && cached?.()?.fresh) return;
     const currentGeneration = generation.current + 1;
     generation.current = currentGeneration;
     setLoading(true);
     try {
-      const nextItems = map(await load());
+      const nextItems = map(await load(fresh ? { fresh: true } : undefined));
       if (generation.current === currentGeneration) {
         setItems(nextItems);
         setLoaded(true);
       }
     } catch (error) {
       if (generation.current === currentGeneration) {
-        if (!(error instanceof ApiError && error.status === 401)) {
+        if (!(error instanceof ApiError && (error.status === 401 || error.code === "stale_session"))) {
           showNotice(error instanceof Error ? error.message : t("errors.serviceUnavailable"), "error");
         }
       }
@@ -49,14 +53,25 @@ export function useResourceList<T>({
         setLoading(false);
       }
     }
-  }, [load, map, showNotice, t]);
+  }, [cached, load, map, showNotice, t]);
+
+  const reload = useCallback(() => refresh(true), [refresh]);
 
   useEffect(() => {
-    void reload();
+    const previous = cached?.();
+    if (previous) {
+      setItems(map(previous.value));
+      setLoaded(true);
+      setLoading(false);
+    }
+    void refresh(false);
+    const onFocus = () => { void refresh(false); };
+    window.addEventListener("focus", onFocus);
     return () => {
       generation.current += 1;
+      window.removeEventListener("focus", onFocus);
     };
-  }, [reload]);
+  }, [cached, map, refresh]);
 
   return { items, loaded, loading, reload };
 }
