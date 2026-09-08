@@ -4,10 +4,12 @@ package backup
 import (
 	"archive/zip"
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
 	"io"
+	"io/fs"
 	"slices"
 	"sort"
 	"strings"
@@ -44,8 +46,8 @@ type Entry struct {
 
 // Snapshot contains the private state required for one atomic replacement and rollback.
 type Snapshot struct {
-	files        map[string][]byte
-	currentPaths []string
+	files          map[string][]byte
+	currentEntries []store.Entry
 }
 
 type backupStoreOperationError struct {
@@ -347,9 +349,8 @@ func Capture(ctx context.Context, resourceStore store.Store) (Snapshot, error) {
 		return Snapshot{}, &backupStoreOperationError{operation: "list current Store files", cause: err}
 	}
 	sort.Slice(listed, func(i, j int) bool { return listed[i].Key < listed[j].Key })
-	snapshot := Snapshot{files: make(map[string][]byte)}
+	snapshot := Snapshot{files: make(map[string][]byte), currentEntries: listed}
 	for _, item := range listed {
-		snapshot.currentPaths = append(snapshot.currentPaths, item.Key)
 		if item.IsDir {
 			continue
 		}
@@ -367,21 +368,23 @@ func Capture(ctx context.Context, resourceStore store.Store) (Snapshot, error) {
 
 // Replace swaps the captured Store tree for replacement values.
 func (s Snapshot) Replace(ctx context.Context, resourceStore store.Store, replacement map[string][]byte) error {
-	return replaceStoreFiles(ctx, resourceStore, s.currentPaths, replacement)
+	return replaceStoreFiles(ctx, resourceStore, s.currentEntries, replacement)
 }
 
-func replaceStoreFiles(ctx context.Context, resourceStore store.Store, currentPaths []string, replacement map[string][]byte) error {
-	deletionKeys := slices.Clone(currentPaths)
-	sort.Slice(deletionKeys, func(i, j int) bool {
-		leftDepth := strings.Count(deletionKeys[i], "/")
-		rightDepth := strings.Count(deletionKeys[j], "/")
-		if leftDepth != rightDepth {
-			return leftDepth > rightDepth
-		}
-		return deletionKeys[i] > deletionKeys[j]
+func replaceStoreFiles(ctx context.Context, resourceStore store.Store, currentEntries []store.Entry, replacement map[string][]byte) error {
+	deletionEntries := slices.Clone(currentEntries)
+	slices.SortFunc(deletionEntries, func(left, right store.Entry) int {
+		return cmp.Or(
+			cmp.Compare(strings.Count(right.Key, "/"), strings.Count(left.Key, "/")),
+			strings.Compare(right.Key, left.Key),
+		)
 	})
-	for _, key := range deletionKeys {
-		if err := resourceStore.Delete(ctx, key); err != nil {
+	for _, entry := range deletionEntries {
+		if err := resourceStore.Delete(ctx, entry.Key); err != nil {
+			// Object stores list virtual directories that disappear with their children.
+			if entry.IsDir && errors.Is(err, fs.ErrNotExist) {
+				continue
+			}
 			return &backupStoreOperationError{operation: "delete current Store files", cause: err}
 		}
 	}
@@ -415,11 +418,7 @@ func (s Snapshot) Restore(ctx context.Context, resourceStore store.Store) error 
 	if err != nil {
 		return &backupStoreOperationError{operation: "list Store files for rollback", cause: err}
 	}
-	keys := make([]string, 0, len(listed))
-	for _, item := range listed {
-		keys = append(keys, item.Key)
-	}
-	if err := replaceStoreFiles(ctx, resourceStore, keys, s.files); err != nil {
+	if err := replaceStoreFiles(ctx, resourceStore, listed, s.files); err != nil {
 		return &backupStoreOperationError{operation: "restore previous Store files", cause: err}
 	}
 	return nil
