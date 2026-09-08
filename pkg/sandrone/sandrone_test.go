@@ -2,7 +2,7 @@ package sandrone_test
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"mime"
 	"os"
 	"sort"
@@ -40,7 +40,7 @@ func TestPublicFileKindAndConfigAliases(t *testing.T) {
 	var kind sandrone.FileKind = sandrone.FileKindMihomo
 	config := sandrone.FileConfig{
 		Subscriptions: []string{"default"},
-		Settings:      json.RawMessage(`{"groups":[]}`),
+		Settings:      jsontext.Value(`{"groups":[]}`),
 	}
 	require.Equal(t, sandrone.FileKind("mihomo"), kind)
 	require.Equal(t, sandrone.FileKind("static"), sandrone.FileKindStatic)
@@ -81,7 +81,7 @@ func TestEngineTypedFileConfigRoundTrip(t *testing.T) {
 		Kind: sandrone.FileKindSingBox,
 		Config: &sandrone.FileConfig{
 			Subscriptions: []string{"provider"},
-			Settings:      json.RawMessage(`{"groups":[],"rule_sets":[],"rules":[]}`),
+			Settings:      jsontext.Value(`{"groups":[],"rule_sets":[],"rules":[]}`),
 		},
 	}
 	require.NoError(t, engine.PutSubscription(ctx, sandrone.Subscription{
@@ -290,8 +290,8 @@ func TestEngineGetFileScriptProducesSubscriptionContent(t *testing.T) {
 		Processors: []sandrone.ProcessorSpec{{
 			Type:  "script",
 			Stage: sandrone.StageFile,
-			Params: map[string]json.RawMessage{
-				"content": json.RawMessage(strconv.Quote(`
+			Params: map[string]jsontext.Value{
+				"content": jsontext.Value(strconv.Quote(`
 function main(input) {
   const produced = api.subscription.produce("nodes", { target: "mihomo-proxies" });
   input.file.content = input.file.content + produced.content;

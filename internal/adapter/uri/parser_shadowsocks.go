@@ -1,7 +1,7 @@
 package uri
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"net/url"
 	"strconv"
 	"strings"
@@ -55,7 +55,7 @@ func parseSS(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 	node.Port = uint16(port)
 	node.Cipher = methodPassword.Method
 	node.Password = methodPassword.Password
-	node.Raw = map[string]json.RawMessage{}
+	node.Raw = map[string]jsontext.Value{}
 	if queryStr != "" {
 		values, err := url.ParseQuery(queryStr)
 		if err != nil {
@@ -81,7 +81,7 @@ func parseSS(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 				if uotKnown[key] || tfoKnown[key] {
 					continue
 				}
-				node.Raw["uri.query."+key] = json.RawMessage(strconv.Quote(values.Get(key)))
+				node.Raw["uri.query."+key] = jsontext.Value(strconv.Quote(values.Get(key)))
 			}
 		}
 	}
@@ -123,7 +123,7 @@ func parseSSR(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 		Obfs:     parts[4],
 	}
 	node.Name = shared.DecodeName("", node.Server)
-	node.Raw = map[string]json.RawMessage{}
+	node.Raw = map[string]jsontext.Value{}
 	if queryStr != "" {
 		values, err := url.ParseQuery(queryStr)
 		if err != nil {

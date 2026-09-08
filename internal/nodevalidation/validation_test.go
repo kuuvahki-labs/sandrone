@@ -2,7 +2,7 @@ package nodevalidation_test
 
 import (
 	"encoding/base64"
-	"encoding/json"
+	"encoding/json/v2"
 	"testing"
 
 	"github.com/stretchr/testify/require"

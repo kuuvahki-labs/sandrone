@@ -1,16 +1,16 @@
 package uri
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
-	"io"
 	"net/url"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/kuuvahki-labs/sandrone/internal/jsonvalue"
 
 	"gopkg.in/yaml.v3"
 
@@ -314,17 +314,8 @@ func parseYAMLNodeLine(line string) ([]domain.NodeIR, error) {
 }
 
 func decodeJSONLine[T any](line string, target *T) error {
-	decoder := json.NewDecoder(bytes.NewReader([]byte(line)))
-	decoder.UseNumber()
-	if err := decoder.Decode(target); err != nil {
+	if err := json.Unmarshal([]byte(line), target, jsonvalue.PreserveNumbers); err != nil {
 		return err
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); err != io.EOF {
-		if err != nil {
-			return err
-		}
-		return domain.NewError(domain.CodeParseFailed, "json line contains trailing values")
 	}
 	return nil
 }

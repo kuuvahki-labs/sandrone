@@ -2,7 +2,8 @@ package service_test
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"testing"
 
 	"github.com/spf13/afero"
@@ -43,7 +44,7 @@ func TestServiceStaticFileRejectsConfig(t *testing.T) {
 func TestServiceMihomoExplicitEmptySettingsStayEmpty(t *testing.T) {
 	spec := domain.FileSpec{
 		Name: "empty.yaml", Kind: domain.FileKindMihomo,
-		Config: &domain.FileConfig{Settings: json.RawMessage(`{
+		Config: &domain.FileConfig{Settings: jsontext.Value(`{
 			"groups":[], "rule_sets":[], "rules":[]
 		}`)},
 	}
@@ -61,7 +62,7 @@ func TestServiceMihomoExplicitEmptySettingsStayEmpty(t *testing.T) {
 func TestServiceSingBoxExplicitEmptySettingsStayEmpty(t *testing.T) {
 	spec := domain.FileSpec{
 		Name: "empty.json", Kind: domain.FileKindSingBox,
-		Config: &domain.FileConfig{Settings: json.RawMessage(`{
+		Config: &domain.FileConfig{Settings: jsontext.Value(`{
 			"groups":[], "rule_sets":[], "rules":[]
 		}`)},
 	}
@@ -99,7 +100,7 @@ func TestServiceTypedSettingsAreStrictPerKind(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			spec := domain.FileSpec{
 				Name: "strict", Kind: test.kind,
-				Config: &domain.FileConfig{Settings: json.RawMessage(test.settings)},
+				Config: &domain.FileConfig{Settings: jsontext.Value(test.settings)},
 			}
 			_, err := service.New().GetFile(context.Background(), domain.FileRequest{Spec: &spec})
 			require.True(t, domain.IsCode(err, domain.CodeInvalidArgument), "got %v", err)
@@ -117,13 +118,13 @@ func TestServiceTypedSettingsRequireCompleteSections(t *testing.T) {
 	} {
 		for _, test := range []struct {
 			name     string
-			settings json.RawMessage
+			settings jsontext.Value
 			path     string
 		}{
 			{name: "settings", path: "config.settings"},
-			{name: "groups", settings: json.RawMessage(`{"rule_sets":[],"rules":[]}`), path: "config.settings.groups"},
-			{name: "rule sets", settings: json.RawMessage(`{"groups":[],"rules":[]}`), path: "config.settings.rule_sets"},
-			{name: "rules", settings: json.RawMessage(`{"groups":[],"rule_sets":[]}`), path: "config.settings.rules"},
+			{name: "groups", settings: jsontext.Value(`{"rule_sets":[],"rules":[]}`), path: "config.settings.groups"},
+			{name: "rule sets", settings: jsontext.Value(`{"groups":[],"rules":[]}`), path: "config.settings.rule_sets"},
+			{name: "rules", settings: jsontext.Value(`{"groups":[],"rule_sets":[]}`), path: "config.settings.rules"},
 		} {
 			t.Run(string(kind)+"/"+test.name, func(t *testing.T) {
 				spec := domain.FileSpec{
@@ -143,7 +144,7 @@ func TestServicePutFileValidatesBeforeStorage(t *testing.T) {
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
 	bad := domain.FileSpec{
 		Name: "bad.yaml", Kind: domain.FileKindMihomo,
-		Config: &domain.FileConfig{Settings: json.RawMessage(`{"rules":null}`)},
+		Config: &domain.FileConfig{Settings: jsontext.Value(`{"rules":null}`)},
 	}
 
 	err := svc.PutFile(context.Background(), bad)
@@ -164,7 +165,7 @@ func TestServicePutFileValidatesBeforeCheckingStoreAvailability(t *testing.T) {
 func TestServiceTypedSettingsReportsNullFieldsDeterministically(t *testing.T) {
 	spec := domain.FileSpec{
 		Name: "bad.yaml", Kind: domain.FileKindMihomo,
-		Config: &domain.FileConfig{Settings: json.RawMessage(`{"rules":null,"groups":null}`)},
+		Config: &domain.FileConfig{Settings: jsontext.Value(`{"rules":null,"groups":null}`)},
 	}
 
 	_, err := service.New().GetFile(context.Background(), domain.FileRequest{Spec: &spec})

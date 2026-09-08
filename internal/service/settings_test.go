@@ -2,7 +2,8 @@ package service_test
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"testing"
 
 	"github.com/spf13/afero"
@@ -140,7 +141,7 @@ func TestServiceSettingsApplyScriptTimeoutToSubsequentProcessors(t *testing.T) {
 	spec := domain.ProcessorSpec{
 		Type:   "script",
 		Stage:  domain.StageNodes,
-		Params: map[string]json.RawMessage{"source": source},
+		Params: map[string]jsontext.Value{"source": source},
 	}
 	input := domain.NodeProcessInput{Nodes: []domain.NodeIR{{Name: "a", Type: domain.NodeTypeShadowsocks}}}
 

@@ -1,7 +1,8 @@
 package httpapi
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"io"
 	"net/http"
@@ -104,11 +105,15 @@ func readBackupBody(w http.ResponseWriter, r *http.Request) ([]byte, bool) {
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
+	body, err := json.Marshal(value, jsontext.WithIndent("  "))
+	if err != nil {
+		status = http.StatusInternalServerError
+		body = []byte(`{"error":{"code":"internal_error","message":"failed to encode JSON response"}}`)
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	encoder := json.NewEncoder(w)
-	encoder.SetIndent("", "  ")
-	_ = encoder.Encode(value)
+	// The response is committed; a client write failure cannot be repaired here.
+	_, _ = w.Write(body) //nolint:gosec // Body is encoded JSON or a fixed JSON error, served as application/json.
 }
 
 func writeServiceError(w http.ResponseWriter, err error) {

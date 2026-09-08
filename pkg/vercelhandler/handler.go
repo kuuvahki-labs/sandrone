@@ -7,7 +7,7 @@ package vercelhandler
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -132,7 +132,7 @@ func environmentInt(raw string, fallback int) (int, error) {
 func writeInitializationError(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusInternalServerError)
-	_ = json.NewEncoder(w).Encode(map[string]any{
+	_ = json.MarshalWrite(w, map[string]any{
 		"error": map[string]string{
 			"code":    "runtime_initialization_failed",
 			"message": "application runtime is unavailable",

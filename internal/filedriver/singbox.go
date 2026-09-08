@@ -2,7 +2,8 @@ package filedriver
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"strings"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
@@ -47,7 +48,7 @@ func (singBoxFileDriver) Descriptor() Descriptor {
 	}
 }
 
-func (singBoxFileDriver) ValidateSettings(raw json.RawMessage) error {
+func (singBoxFileDriver) ValidateSettings(raw jsontext.Value) error {
 	_, err := decodeSingBoxFileSettings(raw)
 	return err
 }
@@ -82,7 +83,7 @@ func (singBoxFileDriver) Compile(_ context.Context, in CompileInput) ([]byte, er
 		route["final"] = "Proxy"
 	}
 	doc["route"] = route
-	out, err := json.MarshalIndent(doc, "", "  ")
+	out, err := json.Marshal(doc, jsontext.WithIndent("  "))
 	if err != nil {
 		return nil, domain.WrapError(domain.CodeInvalidArgument, `file kind "sing-box": encode config`, err)
 	}

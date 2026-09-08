@@ -2,7 +2,8 @@ package mcpapi_test
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"testing"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -58,7 +59,7 @@ func TestPublishedSchemasMatchRealProcessorAndFileDecoders(t *testing.T) {
 		if capability.Kind == domain.FileKindStatic {
 			require.False(t, document.SettingsSupported)
 			require.Nil(t, document.SettingsSchema)
-			for _, settings := range []json.RawMessage{json.RawMessage(`{}`), json.RawMessage(`{"future":true}`)} {
+			for _, settings := range []jsontext.Value{jsontext.Value(`{}`), jsontext.Value(`{"future":true}`)} {
 				spec := domain.FileSpec{
 					Name: "static.txt", Kind: domain.FileKindStatic,
 					Source: domain.FileSource{Type: "inline", Content: "static"},
@@ -118,7 +119,7 @@ func TestPublishedFileSettingsSchemasRejectDecoderInvalidNullAndUnknownFields(t 
 
 			spec := domain.FileSpec{
 				Name: string(test.kind), Kind: test.kind,
-				Config: &domain.FileConfig{Settings: json.RawMessage(test.settings)},
+				Config: &domain.FileConfig{Settings: jsontext.Value(test.settings)},
 			}
 			require.Error(t, rt.Service.PutFile(ctx, spec))
 		})
@@ -157,7 +158,7 @@ func TestPublishedFileSettingsSchemasAcceptDecoderValidNestedValues(t *testing.T
 
 			spec := domain.FileSpec{
 				Name: string(test.kind) + "-nested", Kind: test.kind,
-				Config: &domain.FileConfig{Settings: json.RawMessage(test.settings)},
+				Config: &domain.FileConfig{Settings: jsontext.Value(test.settings)},
 			}
 			require.NoError(t, rt.Service.PutFile(ctx, spec))
 		})
@@ -364,7 +365,7 @@ func TestScriptAPIMetadataMatchesPositionalInvocationAndJSONValues(t *testing.T)
 	require.Contains(t, string(body), "shape-ok")
 }
 
-func assertSchemaAcceptsNull(t *testing.T, raw json.RawMessage) {
+func assertSchemaAcceptsNull(t *testing.T, raw jsontext.Value) {
 	t.Helper()
 	var schema jsonschema.Schema
 	require.NoError(t, json.Unmarshal(raw, &schema))
@@ -373,7 +374,7 @@ func assertSchemaAcceptsNull(t *testing.T, raw json.RawMessage) {
 	require.NoError(t, resolved.Validate(nil))
 }
 
-func assertSchemaAcceptsJSONValues(t *testing.T, raw json.RawMessage) {
+func assertSchemaAcceptsJSONValues(t *testing.T, raw jsontext.Value) {
 	t.Helper()
 	var schema jsonschema.Schema
 	require.NoError(t, json.Unmarshal(raw, &schema))
@@ -384,9 +385,9 @@ func assertSchemaAcceptsJSONValues(t *testing.T, raw json.RawMessage) {
 	}
 }
 
-func rawParams(t *testing.T, example map[string]any) map[string]json.RawMessage {
+func rawParams(t *testing.T, example map[string]any) map[string]jsontext.Value {
 	t.Helper()
-	params := make(map[string]json.RawMessage, len(example))
+	params := make(map[string]jsontext.Value, len(example))
 	for name, value := range example {
 		body, err := json.Marshal(value)
 		require.NoError(t, err)

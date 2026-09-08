@@ -31,9 +31,9 @@ type DiagnoseRequest struct {
 	Name             string            `json:"name,omitempty" yaml:"name,omitempty"`
 	Format           string            `json:"format,omitempty" yaml:"format,omitempty"`
 	Content          []byte            `json:"content,omitempty" yaml:"content,omitempty"`
-	Remote           *RemoteInput      `json:"remote,omitempty" yaml:"remote,omitempty"`
+	Remote           *RemoteInput      `json:"remote,omitzero" yaml:"remote,omitempty"`
 	SubscriptionName string            `json:"subscription_name,omitempty" yaml:"subscription_name,omitempty"`
-	File             *FileRequest      `json:"file,omitempty" yaml:"file,omitempty"`
+	File             *FileRequest      `json:"file,omitzero" yaml:"file,omitempty"`
 	Processors       []ProcessorSpec   `json:"processors,omitempty" yaml:"processors,omitempty"`
 	Target           string            `json:"target,omitempty" yaml:"target,omitempty"`
 	Meta             map[string]string `json:"meta,omitempty" yaml:"meta,omitempty"`
@@ -44,7 +44,7 @@ type DiagnoseInput struct {
 	Kind   DiagnoseInputKind `json:"kind" yaml:"kind"`
 	Name   string            `json:"name,omitempty" yaml:"name,omitempty"`
 	Format string            `json:"format,omitempty" yaml:"format,omitempty"`
-	Remote bool              `json:"remote,omitempty" yaml:"remote,omitempty"`
+	Remote bool              `json:"remote,omitzero" yaml:"remote,omitempty"`
 }
 
 type DiagnoseStage struct {
@@ -58,7 +58,7 @@ type DiagnoseStage struct {
 	OutputCount int           `json:"output_count" yaml:"output_count"`
 	Warnings    []Warning     `json:"warnings,omitempty" yaml:"warnings,omitempty"`
 	Probes      []ProbeResult `json:"probes,omitempty" yaml:"probes,omitempty"`
-	Error       *AppError     `json:"error,omitempty" yaml:"error,omitempty"`
+	Error       *AppError     `json:"error,omitzero" yaml:"error,omitempty"`
 }
 
 type DiagnoseResult struct {
@@ -66,12 +66,12 @@ type DiagnoseResult struct {
 	Input        DiagnoseInput     `json:"input" yaml:"input"`
 	Stages       []DiagnoseStage   `json:"stages" yaml:"stages"`
 	Nodes        []NodeIR          `json:"nodes,omitempty" yaml:"nodes,omitempty"`
-	File         *FileDocument     `json:"file,omitempty" yaml:"file,omitempty"`
+	File         *FileDocument     `json:"file,omitzero" yaml:"file,omitempty"`
 	Counts       ValidationCounts  `json:"counts" yaml:"counts"`
 	Issues       []ValidationIssue `json:"issues,omitempty" yaml:"issues,omitempty"`
 	Warnings     []Warning         `json:"warnings,omitempty" yaml:"warnings,omitempty"`
 	Dependencies []ResourceRef     `json:"dependencies,omitempty" yaml:"dependencies,omitempty"`
 	SourceRefs   []SourceRef       `json:"source_refs,omitempty" yaml:"source_refs,omitempty"`
 	Report       Report            `json:"report,omitempty" yaml:"report,omitempty"`
-	Error        *AppError         `json:"error,omitempty" yaml:"error,omitempty"`
+	Error        *AppError         `json:"error,omitzero" yaml:"error,omitempty"`
 }

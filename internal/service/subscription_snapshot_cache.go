@@ -2,7 +2,7 @@ package service
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"time"
 
 	cachepkg "github.com/kuuvahki-labs/sandrone/internal/cache"

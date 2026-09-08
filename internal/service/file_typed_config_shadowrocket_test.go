@@ -2,7 +2,8 @@ package service_test
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"strings"
 	"testing"
 
@@ -173,7 +174,7 @@ func TestServiceShadowrocketLeavesUnrecognizedRawRuleKindsOpaque(t *testing.T) {
 func TestServiceShadowrocketExplicitEmptySettingsStayEmpty(t *testing.T) {
 	spec := domain.FileSpec{
 		Name: "empty.conf", Kind: domain.FileKindShadowrocket,
-		Config: &domain.FileConfig{Settings: json.RawMessage(`{
+		Config: &domain.FileConfig{Settings: jsontext.Value(`{
 			"groups":[], "rule_sets":[], "rules":[]
 		}`)},
 	}
@@ -302,7 +303,7 @@ func TestServiceShadowrocketRejectsUnresolvedPoliciesAfterRenderingNodes(t *test
 func TestServiceShadowrocketRejectsNodesMacro(t *testing.T) {
 	spec := domain.FileSpec{
 		Name: "invalid.conf", Kind: domain.FileKindShadowrocket,
-		Config: &domain.FileConfig{Settings: json.RawMessage(`{"groups":[{"name":"Proxy","type":"select","proxies":["$nodes"]}],"rule_sets":[],"rules":[]}`)},
+		Config: &domain.FileConfig{Settings: jsontext.Value(`{"groups":[{"name":"Proxy","type":"select","proxies":["$nodes"]}],"rule_sets":[],"rules":[]}`)},
 	}
 
 	_, err := service.New().GetFile(context.Background(), domain.FileRequest{Spec: &spec})
@@ -337,7 +338,7 @@ func TestServiceShadowrocketINIOverrideRunsAfterTypedCompilation(t *testing.T) {
 	require.Contains(t, body, "FINAL,Proxy\nDOMAIN,example.com,DIRECT")
 }
 
-func shadowrocketSettings(t *testing.T, value map[string]any) json.RawMessage {
+func shadowrocketSettings(t *testing.T, value map[string]any) jsontext.Value {
 	t.Helper()
 	return completeTypedSettings(t, value)
 }

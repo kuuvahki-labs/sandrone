@@ -2,7 +2,7 @@ package mihomo_test
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"strings"
 	"testing"
 
@@ -247,9 +247,9 @@ func TestRenderMihomoProxies(t *testing.T) {
 				Path: "/ws",
 				Host: "cdn.example.com",
 			},
-			Raw: map[string]json.RawMessage{
-				"vmess.alter_id": json.RawMessage("0"),
-				"vmess.v":        json.RawMessage(`"2"`),
+			Raw: map[string]jsontext.Value{
+				"vmess.alter_id": jsontext.Value("0"),
+				"vmess.v":        jsontext.Value(`"2"`),
 			},
 		},
 	}

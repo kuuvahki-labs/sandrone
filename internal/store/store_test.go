@@ -2,7 +2,8 @@ package store_test
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"os"
 	"strings"
@@ -206,8 +207,8 @@ func TestMetaStoreListFilesIncludesProcessorsForUsageInference(t *testing.T) {
 		Processors: []domain.ProcessorSpec{{
 			Type:  "script",
 			Stage: domain.StageFile,
-			Params: map[string]json.RawMessage{
-				"source": json.RawMessage(`{"type":"inline","content":"function main(input) { return input; }"}`),
+			Params: map[string]jsontext.Value{
+				"source": jsontext.Value(`{"type":"inline","content":"function main(input) { return input; }"}`),
 			},
 		}},
 	}))
@@ -331,8 +332,8 @@ func TestMetaStoreWritesJSONWithoutHTMLEscaping(t *testing.T) {
 		Processors: []domain.ProcessorSpec{{
 			Type:  "script",
 			Stage: domain.StageNodes,
-			Params: map[string]json.RawMessage{
-				"source": json.RawMessage(`{"type":"inline","content":"function main(input) { return input.nodes.filter((node) => node.name > 'a' && node.name < 'z' && node.name !== '&'); }"}`),
+			Params: map[string]jsontext.Value{
+				"source": jsontext.Value(`{"type":"inline","content":"function main(input) { return input.nodes.filter((node) => node.name > 'a' && node.name < 'z' && node.name !== '&'); }"}`),
 			},
 		}},
 	}))

@@ -3,7 +3,8 @@ package mcpapi_test
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -82,12 +83,12 @@ func TestStreamableHTTPDiscover(t *testing.T) {
 	require.NoError(t, err)
 	var envelope struct {
 		Result struct {
-			ResultType        string                     `json:"resultType"`
-			Meta              map[string]json.RawMessage `json:"_meta"`
-			SupportedVersions []string                   `json:"supportedVersions"`
-			Capabilities      map[string]json.RawMessage `json:"capabilities"`
-			TTLMs             int                        `json:"ttlMs"`
-			CacheScope        string                     `json:"cacheScope"`
+			ResultType        string                    `json:"resultType"`
+			Meta              map[string]jsontext.Value `json:"_meta"`
+			SupportedVersions []string                  `json:"supportedVersions"`
+			Capabilities      map[string]jsontext.Value `json:"capabilities"`
+			TTLMs             int                       `json:"ttlMs"`
+			CacheScope        string                    `json:"cacheScope"`
 		} `json:"result"`
 		Error *rpcError `json:"error"`
 	}
@@ -130,10 +131,10 @@ func TestStreamableHTTPListMetadata(t *testing.T) {
 	require.NoError(t, err)
 	var envelope struct {
 		Result struct {
-			ResultType string                     `json:"resultType"`
-			Meta       map[string]json.RawMessage `json:"_meta"`
-			TTLMs      int                        `json:"ttlMs"`
-			CacheScope string                     `json:"cacheScope"`
+			ResultType string                    `json:"resultType"`
+			Meta       map[string]jsontext.Value `json:"_meta"`
+			TTLMs      int                       `json:"ttlMs"`
+			CacheScope string                    `json:"cacheScope"`
 		} `json:"result"`
 		Error *rpcError `json:"error"`
 	}
@@ -273,9 +274,9 @@ func TestStreamableHTTPRejectsOversizedBody(t *testing.T) {
 }
 
 type rpcError struct {
-	Code    int64           `json:"code"`
-	Message string          `json:"message"`
-	Data    json.RawMessage `json:"data"`
+	Code    int64          `json:"code"`
+	Message string         `json:"message"`
+	Data    jsontext.Value `json:"data"`
 }
 
 type rpcErrorEnvelope struct {
@@ -316,7 +317,7 @@ func decodeRPCError(t *testing.T, body io.Reader) rpcErrorEnvelope {
 	return envelope
 }
 
-func rawMessageKeys(values map[string]json.RawMessage) []string {
+func rawMessageKeys(values map[string]jsontext.Value) []string {
 	keys := make([]string, 0, len(values))
 	for key := range values {
 		keys = append(keys, key)

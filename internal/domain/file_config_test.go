@@ -1,7 +1,8 @@
 package domain
 
 import (
-	"encoding/json"
+	"encoding/json/v2"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -22,13 +23,19 @@ func TestFileConfigJSONRejectsLegacyCompilerFields(t *testing.T) {
 		t.Run(field, func(t *testing.T) {
 			var config FileConfig
 			err := json.Unmarshal([]byte(`{"`+field+`":[]}`), &config)
-			require.ErrorContains(t, err, `config.`+field)
+			require.ErrorIs(t, err, json.ErrUnknownName)
+			semantic, ok := errors.AsType[*json.SemanticError](err)
+			require.True(t, ok)
+			require.Equal(t, "/"+field, string(semantic.JSONPointer))
 		})
 	}
 }
 
-func TestFileConfigJSONReportsUnknownFieldsDeterministically(t *testing.T) {
+func TestFileConfigJSONReportsUnknownFieldPointer(t *testing.T) {
 	var config FileConfig
 	err := json.Unmarshal([]byte(`{"z_field":true,"a_field":true}`), &config)
-	require.EqualError(t, err, "config.a_field: unknown field")
+	require.ErrorIs(t, err, json.ErrUnknownName)
+	semantic, ok := errors.AsType[*json.SemanticError](err)
+	require.True(t, ok)
+	require.Equal(t, "/z_field", string(semantic.JSONPointer))
 }

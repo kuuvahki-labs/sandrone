@@ -2,7 +2,7 @@ package uri
 
 import (
 	"encoding/base64"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -37,7 +37,7 @@ func parseVLESS(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 	node.PacketEncoding = shared.QueryFirst(values, "packetEncoding", "packet-encoding")
 	applyTLSQuery(&node, values)
 	applyTransportQuery(&node, values)
-	node.Raw = map[string]json.RawMessage{}
+	node.Raw = map[string]jsontext.Value{}
 	known := map[string]bool{
 		"flow": true, "encryption": true, "packetEncoding": true, "packet-encoding": true,
 		"security": true, "tls": true, "sni": true, "servername": true, "serverName": true, "fp": true, "fingerprint": true, "pinSHA256": true, "pcs": true, "alpn": true,
@@ -108,7 +108,7 @@ func parseTrojan(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 	}
 	applyTransportQuery(&node, values)
 	legacy := applyTrojanPresenceFlags(&node, values)
-	node.Raw = map[string]json.RawMessage{}
+	node.Raw = map[string]jsontext.Value{}
 	known := map[string]bool{
 		"security": true, "tls": true, "sni": true, "servername": true, "serverName": true, "peer": true,
 		"fp": true, "fingerprint": true, "pinSHA256": true, "pcs": true, "alpn": true,
@@ -175,7 +175,7 @@ func parseHysteria(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 	} else {
 		node.TLS.Enabled = true
 	}
-	node.Raw = map[string]json.RawMessage{}
+	node.Raw = map[string]jsontext.Value{}
 	known := map[string]bool{
 		"protocol": true,
 		"auth":     true, "auth_str": true, "auth-str": true, "authString": true,
@@ -238,7 +238,7 @@ func parseHysteria2(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 	} else {
 		node.TLS.Enabled = true
 	}
-	node.Raw = map[string]json.RawMessage{}
+	node.Raw = map[string]jsontext.Value{}
 	known := map[string]bool{
 		"obfs": true, "obfs-type": true, "obfs-password": true, "obfs_password": true, "obfsParam": true, "obfs-param": true,
 		"hop_interval": true, "hop-interval": true,
@@ -298,7 +298,7 @@ func parseTUIC(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 	} else {
 		node.TLS.Enabled = true
 	}
-	node.Raw = map[string]json.RawMessage{}
+	node.Raw = map[string]jsontext.Value{}
 	known := map[string]bool{
 		"token":          true,
 		"udp_relay_mode": true, "udp-relay-mode": true, "zero_rtt_handshake": true,
@@ -405,7 +405,7 @@ func parseSOCKS(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 			node.Password = password
 		}
 	}
-	node.Raw = map[string]json.RawMessage{}
+	node.Raw = map[string]jsontext.Value{}
 	values := u.Query()
 	preserveURIQuery(&node, values, map[string]bool{})
 	return node, source, nil
@@ -505,7 +505,7 @@ func parseTelegramProxyURL(u *url.URL, kind string) (domain.NodeIR, *domain.Sour
 		Port:         port,
 		Username:     shared.QueryFirst(values, "user", "username"),
 		Password:     shared.QueryFirst(values, "pass", "password"),
-		Raw:          map[string]json.RawMessage{},
+		Raw:          map[string]jsontext.Value{},
 	}
 	preserveURIQuery(&node, values, map[string]bool{"server": true, "host": true, "port": true, "user": true, "username": true, "pass": true, "password": true})
 	return node, telegramSource(format), nil
@@ -585,7 +585,7 @@ func parseHTTP(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 	}
 	values := u.Query()
 	applyTLSQuery(&node, values)
-	node.Raw = map[string]json.RawMessage{}
+	node.Raw = map[string]jsontext.Value{}
 	preserveURIQuery(&node, values, map[string]bool{
 		"security": true, "tls": true, "sni": true, "servername": true, "serverName": true,
 		"allowInsecure": true, "allowinsecure": true, "allow_insecure": true, "allow-insecure": true, "skip-cert-verify": true, "insecure": true, "disable_sni": true,

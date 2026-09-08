@@ -3,7 +3,7 @@ package filedriver
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 
 	"gopkg.in/yaml.v3"
 
@@ -55,7 +55,7 @@ rules: []`),
 	}
 }
 
-func (mihomoFileDriver) ValidateSettings(raw json.RawMessage) error {
+func (mihomoFileDriver) ValidateSettings(raw jsontext.Value) error {
 	_, err := decodeMihomoFileSettings(raw)
 	return err
 }

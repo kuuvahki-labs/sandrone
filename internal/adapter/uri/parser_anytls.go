@@ -1,7 +1,7 @@
 package uri
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"net/url"
 	"strconv"
 
@@ -45,7 +45,7 @@ func parseAnyTLS(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 	} else {
 		node.TLS.Enabled = true
 	}
-	node.Raw = map[string]json.RawMessage{}
+	node.Raw = map[string]jsontext.Value{}
 	known := map[string]bool{
 		"idle-session-check-interval": true, "idle-session-timeout": true, "min-idle-session": true,
 		"security": true, "tls": true, "sni": true, "servername": true, "serverName": true,

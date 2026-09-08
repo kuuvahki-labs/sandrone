@@ -3,11 +3,8 @@
 package settings
 
 import (
-	"bytes"
-	"encoding/json"
-	"errors"
+	"encoding/json/v2"
 	"fmt"
-	"io"
 	"net"
 	"net/url"
 	"strings"
@@ -31,15 +28,8 @@ func Decode(body []byte) (domain.Settings, error) {
 // should be erased by rewriting the canonical representation.
 func DecodeStored(body []byte) (domain.Settings, bool, error) {
 	var stored storedSettings
-	decoder := json.NewDecoder(bytes.NewReader(body))
-	if err := decoder.Decode(&stored); err != nil {
+	if err := json.Unmarshal(body, &stored); err != nil {
 		return domain.Settings{}, false, err
-	}
-	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
-		if err != nil {
-			return domain.Settings{}, false, err
-		}
-		return domain.Settings{}, false, errors.New("settings contain trailing JSON")
 	}
 	value := domain.Settings{
 		SchemaVersion: stored.SchemaVersion,
@@ -75,7 +65,7 @@ type storedSettings struct {
 	SchemaVersion    int                             `json:"schema_version"`
 	HTTP             storedHTTPSettings              `json:"http"`
 	MCP              storedMCPSettings               `json:"mcp"`
-	LegacyWebUI      *storedWebUISettings            `json:"webui,omitempty"`
+	LegacyWebUI      *storedWebUISettings            `json:"webui,omitzero"`
 	Log              domain.LogSettings              `json:"log"`
 	RemoteDefaults   domain.RemoteDefaults           `json:"remote_defaults"`
 	ProbeDefaults    domain.ProbeDefaults            `json:"probe_defaults"`
@@ -88,13 +78,13 @@ type storedSettings struct {
 
 type storedHTTPSettings struct {
 	Listen              string  `json:"listen"`
-	LegacyToken         *string `json:"token,omitempty"`
-	LegacyTokenRequired *bool   `json:"token_required,omitempty"`
+	LegacyToken         *string `json:"token,omitzero"`
+	LegacyTokenRequired *bool   `json:"token_required,omitzero"`
 }
 
 type storedMCPSettings struct {
-	LegacyTransport            *string `json:"transport,omitempty"`
-	LegacyAllowManagementTools *bool   `json:"allow_management_tools,omitempty"`
+	LegacyTransport            *string `json:"transport,omitzero"`
+	LegacyAllowManagementTools *bool   `json:"allow_management_tools,omitzero"`
 	Path                       string  `json:"path"`
 	MaxOutputBytes             int     `json:"max_output_bytes"`
 }

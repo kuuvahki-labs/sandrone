@@ -6,7 +6,8 @@ import (
 	"bytes"
 	"cmp"
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"io"
 	"io/fs"
@@ -299,45 +300,13 @@ func validateBackupManifest(body []byte) error {
 	return nil
 }
 
-func decodeBackupManifestFields(body []byte) (map[string]json.RawMessage, error) {
-	decoder := json.NewDecoder(bytes.NewReader(body))
-	token, err := decoder.Token()
-	if err != nil {
-		return nil, err
-	}
-	if delimiter, ok := token.(json.Delim); !ok || delimiter != '{' {
+func decodeBackupManifestFields(body []byte) (map[string]jsontext.Value, error) {
+	if jsontext.Value(body).Kind() != '{' {
 		return nil, errors.New("manifest must be a JSON object")
 	}
-
-	fields := make(map[string]json.RawMessage)
-	for decoder.More() {
-		token, err := decoder.Token()
-		if err != nil {
-			return nil, err
-		}
-		name, ok := token.(string)
-		if !ok {
-			return nil, errors.New("manifest field name is invalid")
-		}
-		if _, duplicate := fields[name]; duplicate {
-			return nil, errors.New("manifest contains a duplicate field")
-		}
-		var value json.RawMessage
-		if err := decoder.Decode(&value); err != nil {
-			return nil, err
-		}
-		fields[name] = value
-	}
-	if token, err = decoder.Token(); err != nil {
+	var fields map[string]jsontext.Value
+	if err := json.Unmarshal(body, &fields); err != nil {
 		return nil, err
-	} else if delimiter, ok := token.(json.Delim); !ok || delimiter != '}' {
-		return nil, errors.New("manifest object is not closed")
-	}
-	if _, err := decoder.Token(); !errors.Is(err, io.EOF) {
-		if err != nil {
-			return nil, err
-		}
-		return nil, errors.New("manifest contains trailing JSON")
 	}
 	return fields, nil
 }

@@ -1,15 +1,16 @@
 package singbox
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 	"strings"
 
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/shared"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
+	"github.com/kuuvahki-labs/sandrone/internal/jsonvalue"
 )
 
 type Parser struct{}
@@ -24,9 +25,7 @@ func (p *Parser) Name() string {
 
 func (p *Parser) Parse(_ context.Context, in []byte) ([]domain.NodeIR, *domain.SourceInfo, error) {
 	var doc map[string]any
-	decoder := json.NewDecoder(bytes.NewReader(in))
-	decoder.UseNumber()
-	if err := decoder.Decode(&doc); err != nil {
+	if err := json.Unmarshal(in, &doc, jsonvalue.PreserveNumbers); err != nil {
 		return nil, shared.SourceInfo("sing-box", shared.SourceRefs("sing-box")), domain.WrapError(domain.CodeParseFailed, "parse sing-box json", err)
 	}
 	items := []any{}
@@ -88,7 +87,7 @@ func parseOutbound(outbound map[string]any, nodeIndex int) (domain.NodeIR, []dom
 		Type:         singBoxNodeType(typ),
 		Server:       shared.StringValue(outbound["server"]),
 		SourceFormat: "sing-box",
-		Raw:          map[string]json.RawMessage{},
+		Raw:          map[string]jsontext.Value{},
 	}
 	if node.Type == "" {
 		return node, nil, domain.NewError(domain.CodeParseFailed, "unsupported sing-box outbound type")
@@ -342,7 +341,7 @@ func singBoxHysteriaRate(node *domain.NodeIR, value, fallbackValue any, rawKey, 
 		return shared.HysteriaRate{Mbps: fallbackMbps}
 	}
 	implicit := shared.HysteriaImplicitNone
-	if _, ok := value.(json.Number); ok {
+	if _, ok := value.(jsontext.Value); ok {
 		implicit = shared.HysteriaImplicitBps
 	}
 	rate, err := shared.NormalizeHysteriaRate(shared.StringValue(value), implicit)
@@ -447,7 +446,7 @@ func singBoxKnownFields(nodeType domain.NodeType) map[string]bool {
 	return common
 }
 
-func unknownWarnings(node domain.NodeIR, raw map[string]json.RawMessage, source string, nodeIndex int, nodeContext domain.WarningNodeContext) []domain.Warning {
+func unknownWarnings(node domain.NodeIR, raw map[string]jsontext.Value, source string, nodeIndex int, nodeContext domain.WarningNodeContext) []domain.Warning {
 	index := nodeIndex
 	return shared.ParseUnknownWarningsWithContext(node, raw, source, &index, &nodeContext)
 }

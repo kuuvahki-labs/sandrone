@@ -76,6 +76,9 @@ header 必须与配置值精确匹配。缺失或不匹配时返回 `401`，erro
 }
 ```
 
+JSON 响应在发送状态码前完成编码；编码失败返回 `500` 和 `internal_error`，
+不发送部分编码结果，也不在错误正文中暴露原响应内容。
+
 标准库 router 生成的未注册路径、method mismatch，以及部分未知 action 会直接
 返回 `text/plain` 的 `404` 或 `405`；客户端应先检查 status 和
 `Content-Type`，不能无条件解码 JSON。对于 JSON error，不要根据 `message`

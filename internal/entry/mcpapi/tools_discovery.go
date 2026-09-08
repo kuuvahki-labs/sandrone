@@ -1,13 +1,11 @@
 package mcpapi
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
-	"io"
+	"encoding/json/v2"
 	"sort"
 	"strconv"
 
@@ -26,7 +24,7 @@ const (
 type listResourcesInput struct {
 	Kind   string `json:"kind,omitempty"`
 	Cursor string `json:"cursor,omitempty"`
-	Limit  int    `json:"limit,omitempty"`
+	Limit  int    `json:"limit,omitzero"`
 }
 
 type listedResource struct {
@@ -184,13 +182,8 @@ func decodeResourceCursor(encoded, expectedKind string) (string, error) {
 	if err != nil {
 		return "", domain.NewError(domain.CodeInvalidArgument, "resource cursor is invalid")
 	}
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
 	var cursor resourceCursor
-	if err := decoder.Decode(&cursor); err != nil {
-		return "", domain.NewError(domain.CodeInvalidArgument, "resource cursor is invalid")
-	}
-	if err := ensureJSONEOF(decoder); err != nil {
+	if err := json.Unmarshal(data, &cursor, json.RejectUnknownMembers(true)); err != nil {
 		return "", domain.NewError(domain.CodeInvalidArgument, "resource cursor is invalid")
 	}
 	if cursor.Version != resourceCursorVersion ||
@@ -200,18 +193,6 @@ func decodeResourceCursor(encoded, expectedKind string) (string, error) {
 		return "", domain.NewError(domain.CodeInvalidArgument, "resource cursor is invalid or does not match resource kind")
 	}
 	return cursor.Offset, nil
-}
-
-func ensureJSONEOF(decoder *json.Decoder) error {
-	var extra any
-	err := decoder.Decode(&extra)
-	if err == io.EOF {
-		return nil
-	}
-	if err == nil {
-		return io.ErrUnexpectedEOF
-	}
-	return err
 }
 
 func resourceCursorCheck(version int, kind, offset string) string {

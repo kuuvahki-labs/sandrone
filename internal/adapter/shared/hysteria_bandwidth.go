@@ -2,7 +2,8 @@ package shared
 
 import (
 	"bytes"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 	"math"
 	"net/url"
@@ -68,7 +69,7 @@ func NormalizeHysteriaMbps(value any) (int, error) {
 			return 0, fmt.Errorf("hysteria Mbps rate exceeds safe bound")
 		}
 		parsed = uint64(typed)
-	case json.Number:
+	case jsontext.Value:
 		var err error
 		parsed, err = strconv.ParseUint(string(typed), 10, 64)
 		if err != nil {
@@ -309,7 +310,7 @@ func applyLegacyHysteriaText(
 func preserveLegacyHysteriaValue(node *domain.NodeIR, direction, sourceField string, value any) []domain.Warning {
 	key := "json-nodes.hysteria." + direction
 	if node.Raw == nil {
-		node.Raw = map[string]json.RawMessage{}
+		node.Raw = map[string]jsontext.Value{}
 	}
 	serialized, err := json.Marshal(value)
 	if err != nil {

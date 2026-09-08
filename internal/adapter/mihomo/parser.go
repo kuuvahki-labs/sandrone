@@ -2,7 +2,7 @@ package mihomo
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 	"maps"
 	"strings"
@@ -78,7 +78,7 @@ func parseMihomoProxy(proxy map[string]any, nodeIndex int) (domain.NodeIR, []dom
 		Type:         mihomoNodeType(typ),
 		Server:       shared.StringValue(proxy["server"]),
 		SourceFormat: "mihomo",
-		Raw:          map[string]json.RawMessage{},
+		Raw:          map[string]jsontext.Value{},
 	}
 	if node.Type == "" {
 		return node, nil, domain.NewError(domain.CodeParseFailed, "unsupported mihomo proxy type")
@@ -573,7 +573,7 @@ func preserveNestedMihomoRaw(node *domain.NodeIR, parent string, opts map[string
 		return
 	}
 	if node.Raw == nil {
-		node.Raw = map[string]json.RawMessage{}
+		node.Raw = map[string]jsontext.Value{}
 	}
 	for _, key := range sortedMapKeys(opts) {
 		if known[key] {

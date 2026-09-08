@@ -1,9 +1,8 @@
 package mcpapi
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 	"strconv"
 	"strings"
@@ -266,11 +265,11 @@ func quotedReportPromptArgument(arguments map[string]string) (string, error) {
 	if len(report) > maxPromptReportBytes {
 		return "", domain.NewError(domain.CodeInvalidArgument, "report_json is too large")
 	}
-	if !json.Valid([]byte(report)) {
+	if !jsontext.Value([]byte(report)).IsValid() {
 		return "", domain.NewError(domain.CodeInvalidArgument, "report_json must be valid JSON")
 	}
-	var compact bytes.Buffer
-	if err := json.Compact(&compact, []byte(report)); err != nil {
+	compact := jsontext.Value(report)
+	if err := compact.Compact(); err != nil {
 		return "", domain.NewError(domain.CodeInvalidArgument, "report_json must be valid JSON")
 	}
 	return strconv.Quote(compact.String()), nil

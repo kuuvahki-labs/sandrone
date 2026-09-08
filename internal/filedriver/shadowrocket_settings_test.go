@@ -1,7 +1,8 @@
 package filedriver
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -59,7 +60,7 @@ func TestDecodeShadowrocketSettingsRejectsIncompleteKnownRules(t *testing.T) {
 }
 
 func TestDecodeShadowrocketSettingsRejectsUnbalancedLogicalRules(t *testing.T) {
-	raw := json.RawMessage(`{"groups":[],"rule_sets":[],"rules":["AND,((DOMAIN,example.com),(DST-PORT,443))),DIRECT"]}`)
+	raw := jsontext.Value(`{"groups":[],"rule_sets":[],"rules":["AND,((DOMAIN,example.com),(DST-PORT,443))),DIRECT"]}`)
 
 	_, err := decodeShadowrocketFileSettings(raw)
 
@@ -67,7 +68,7 @@ func TestDecodeShadowrocketSettingsRejectsUnbalancedLogicalRules(t *testing.T) {
 }
 
 func TestDecodeShadowrocketSettingsKeepsUnknownRulesOpen(t *testing.T) {
-	raw := json.RawMessage(`{
+	raw := jsontext.Value(`{
 			"groups":[],
 			"rule_sets":[],
 			"rules":[

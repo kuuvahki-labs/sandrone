@@ -1,12 +1,12 @@
 package jsonnodes
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/shared"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
+	"github.com/kuuvahki-labs/sandrone/internal/jsonvalue"
 )
 
 type Parser struct{}
@@ -20,19 +20,15 @@ func (p *Parser) Name() string {
 }
 
 func (p *Parser) Parse(_ context.Context, in []byte) ([]domain.NodeIR, *domain.SourceInfo, error) {
-	decoder := json.NewDecoder(bytes.NewReader(in))
-	decoder.UseNumber()
 	var nodes []domain.NodeIR
-	if err := decoder.Decode(&nodes); err == nil {
+	if err := json.Unmarshal(in, &nodes, jsonvalue.PreserveNumbers); err == nil {
 		normalizeLegacyHysteriaBandwidth(nodes)
 		return nodes, &domain.SourceInfo{Format: "json-nodes"}, nil
 	}
-	decoder = json.NewDecoder(bytes.NewReader(in))
-	decoder.UseNumber()
 	var doc struct {
 		Nodes []domain.NodeIR `json:"nodes"`
 	}
-	if err := decoder.Decode(&doc); err != nil {
+	if err := json.Unmarshal(in, &doc, jsonvalue.PreserveNumbers); err != nil {
 		return nil, &domain.SourceInfo{Format: "json-nodes"}, domain.WrapError(domain.CodeParseFailed, "parse json nodes", err)
 	}
 	normalizeLegacyHysteriaBandwidth(doc.Nodes)

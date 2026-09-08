@@ -2,7 +2,8 @@ package file
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"strconv"
@@ -17,10 +18,10 @@ import (
 // PatchOp is a single RFC 6902 patch operation. The From field is only
 // meaningful for "move" and "copy" operations.
 type PatchOp struct {
-	Op    string          `json:"op" jsonschema:"Patch operation" enum:"add,replace,remove,test,move,copy"`
-	Path  string          `json:"path" jsonschema:"JSON Pointer target path"`
-	From  string          `json:"from,omitempty" jsonschema:"JSON Pointer source path for move and copy"`
-	Value json.RawMessage `json:"value,omitempty" jsonschema:"JSON value used by add replace and test"`
+	Op    string         `json:"op" jsonschema:"Patch operation" enum:"add,replace,remove,test,move,copy"`
+	Path  string         `json:"path" jsonschema:"JSON Pointer target path"`
+	From  string         `json:"from,omitempty" jsonschema:"JSON Pointer source path for move and copy"`
+	Value jsontext.Value `json:"value,omitempty" jsonschema:"JSON value used by add replace and test"`
 }
 
 // PatchParams holds the patch operations applied by the yaml_patch /
@@ -182,7 +183,16 @@ func applyPatchOp(root any, op PatchOp) (any, error) {
 		if err != nil {
 			return root, err
 		}
-		if !valueEquals(actual, expected) {
+		equal, err := valueEquals(actual, expected)
+		if err != nil {
+			return root, &domain.AppError{
+				Code:    domain.CodeFileProcessorFailed,
+				Message: fmt.Sprintf("compare test value at %q", op.Path),
+				Path:    op.Path,
+				Cause:   err,
+			}
+		}
+		if !equal {
 			return root, &domain.AppError{
 				Code:    domain.CodeFileProcessorFailed,
 				Message: fmt.Sprintf("test failed at %q", op.Path),
@@ -216,7 +226,7 @@ func applyPatchOp(root any, op PatchOp) (any, error) {
 	}
 }
 
-func decodeValue(raw json.RawMessage) (any, error) {
+func decodeValue(raw jsontext.Value) (any, error) {
 	if len(raw) == 0 {
 		return nil, nil //nolint:nilnil // Empty patch value intentionally decodes to a nil JSON value without an error.
 	}
@@ -511,8 +521,14 @@ func deepCopy(value any) any {
 	}
 }
 
-func valueEquals(a, b any) bool {
-	ab, _ := json.Marshal(a)
-	bb, _ := json.Marshal(b)
-	return string(ab) == string(bb)
+func valueEquals(a, b any) (bool, error) {
+	ab, err := json.Marshal(a, json.Deterministic(true))
+	if err != nil {
+		return false, fmt.Errorf("encode actual value: %w", err)
+	}
+	bb, err := json.Marshal(b, json.Deterministic(true))
+	if err != nil {
+		return false, fmt.Errorf("encode expected value: %w", err)
+	}
+	return string(ab) == string(bb), nil
 }

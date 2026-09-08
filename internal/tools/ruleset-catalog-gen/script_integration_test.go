@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"compress/gzip"
-	"encoding/json"
+	"encoding/json/v2"
 	"io"
 	"os"
 	"os/exec"

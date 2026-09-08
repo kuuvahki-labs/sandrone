@@ -3,7 +3,7 @@ package filedriver
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 	"strconv"
 	"strings"
@@ -42,7 +42,7 @@ func (shadowrocketFileDriver) Descriptor() Descriptor {
 	}
 }
 
-func (shadowrocketFileDriver) ValidateSettings(raw json.RawMessage) error {
+func (shadowrocketFileDriver) ValidateSettings(raw jsontext.Value) error {
 	_, err := decodeShadowrocketFileSettings(raw)
 	return err
 }

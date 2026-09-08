@@ -3,10 +3,13 @@ package mcpapi_test
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/kuuvahki-labs/sandrone/internal/jsonvalue"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/require"
@@ -316,10 +319,9 @@ func withoutProtocolLinks(value any) any {
 
 func decodeJSONDocument(t *testing.T, body []byte) any {
 	t.Helper()
-	decoder := json.NewDecoder(bytes.NewReader(body))
-	decoder.UseNumber()
+	decoder := jsontext.NewDecoder(bytes.NewReader(body))
 	var document any
-	require.NoError(t, decoder.Decode(&document))
+	require.NoError(t, json.UnmarshalDecode(decoder, &document, jsonvalue.PreserveNumbers))
 	return document
 }
 
@@ -435,17 +437,17 @@ type scriptMethodResource struct {
 	Stages             []string `json:"stages"`
 	RuntimeRequirement string   `json:"runtime_requirement"`
 	Arguments          []struct {
-		Position int             `json:"position"`
-		Name     string          `json:"name"`
-		Schema   json.RawMessage `json:"schema"`
-		Required bool            `json:"required"`
+		Position int            `json:"position"`
+		Name     string         `json:"name"`
+		Schema   jsontext.Value `json:"schema"`
+		Required bool           `json:"required"`
 	} `json:"arguments"`
 	RecommendedArity      string `json:"recommended_arity"`
 	ExtraArgumentsIgnored bool   `json:"extra_arguments_ignored"`
 	ZeroArguments         string `json:"zero_arguments"`
 	Returns               struct {
-		Kind   string          `json:"kind"`
-		Schema json.RawMessage `json:"schema"`
+		Kind   string         `json:"kind"`
+		Schema jsontext.Value `json:"schema"`
 	} `json:"returns"`
 	ErrorCodes []string `json:"error_codes"`
 }

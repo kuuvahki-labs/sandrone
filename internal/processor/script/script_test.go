@@ -2,7 +2,8 @@ package script_test
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"os"
 	"path/filepath"
 	"testing"
@@ -15,9 +16,9 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/processor/script"
 )
 
-func params(t *testing.T, m map[string]any) map[string]json.RawMessage {
+func params(t *testing.T, m map[string]any) map[string]jsontext.Value {
 	t.Helper()
-	out := map[string]json.RawMessage{}
+	out := map[string]jsontext.Value{}
 	for k, v := range m {
 		b, err := json.Marshal(v)
 		require.NoError(t, err)
@@ -287,7 +288,7 @@ func TestScriptSourceStrictDecodeStillRejectsUnknownFields(t *testing.T) {
 
 	require.Error(t, err)
 	require.True(t, domain.IsCode(err, domain.CodeProcessorConfigInvalid), "got %v", err)
-	require.ErrorContains(t, err, "unknown field")
+	require.ErrorIs(t, err, json.ErrUnknownName)
 }
 
 func TestScriptLegacyInlineContent(t *testing.T) {

@@ -18,8 +18,8 @@ type NodeURIInfo struct {
 }
 
 type NodeInspectResult struct {
-	URI *NodeURIInfo      `json:"uri,omitempty" yaml:"uri,omitempty"`
-	IP  *NodeIPInfoResult `json:"ip,omitempty" yaml:"ip,omitempty"`
+	URI *NodeURIInfo      `json:"uri,omitzero" yaml:"uri,omitempty"`
+	IP  *NodeIPInfoResult `json:"ip,omitzero" yaml:"ip,omitempty"`
 }
 
 type NodeIPInfoSource struct {
@@ -39,5 +39,5 @@ type NodeIPInfoResult struct {
 	ASN           string            `json:"asn,omitempty" yaml:"asn,omitempty"`
 	ASName        string            `json:"as_name,omitempty" yaml:"as_name,omitempty"`
 	ASDomain      string            `json:"as_domain,omitempty" yaml:"as_domain,omitempty"`
-	Source        *NodeIPInfoSource `json:"source,omitempty" yaml:"source,omitempty"`
+	Source        *NodeIPInfoSource `json:"source,omitzero" yaml:"source,omitempty"`
 }

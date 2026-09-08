@@ -3,7 +3,8 @@
 package agentcatalog
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -32,7 +33,7 @@ type FileKindCatalogDocument struct {
 	Kind              domain.FileKind      `json:"kind"`
 	Description       string               `json:"description"`
 	SettingsSupported bool                 `json:"settings_supported"`
-	SettingsSchema    *jsonschema.Schema   `json:"settings_schema,omitempty"`
+	SettingsSchema    *jsonschema.Schema   `json:"settings_schema,omitzero"`
 	MediaType         string               `json:"media_type"`
 	Syntax            string               `json:"syntax"`
 	DefaultExtension  string               `json:"default_extension"`
@@ -73,12 +74,12 @@ type ScriptArgumentDocument struct {
 	Name     string             `json:"name"`
 	Schema   *jsonschema.Schema `json:"schema"`
 	Required bool               `json:"required"`
-	Variadic bool               `json:"variadic,omitempty"`
+	Variadic bool               `json:"variadic,omitzero"`
 }
 
 type ScriptReturnDocument struct {
 	Kind   string             `json:"kind"`
-	Schema *jsonschema.Schema `json:"schema,omitempty"`
+	Schema *jsonschema.Schema `json:"schema,omitzero"`
 }
 
 type ScriptSourceDocument struct {
@@ -102,10 +103,10 @@ type scriptProbeOptions struct {
 	URL             string            `json:"url,omitempty"`
 	NTPServer       string            `json:"ntp_server,omitempty"`
 	ExpectedStatus  string            `json:"expected_status,omitempty"`
-	TimeoutMS       int               `json:"timeout_ms,omitempty" minimum:"0"`
-	Attempts        int               `json:"attempts,omitempty" minimum:"0"`
-	Concurrency     int               `json:"concurrency,omitempty" minimum:"0"`
-	CacheTTLSeconds int               `json:"cache_ttl_seconds,omitempty" minimum:"0"`
+	TimeoutMS       int               `json:"timeout_ms,omitzero" minimum:"0"`
+	Attempts        int               `json:"attempts,omitzero" minimum:"0"`
+	Concurrency     int               `json:"concurrency,omitzero" minimum:"0"`
+	CacheTTLSeconds int               `json:"cache_ttl_seconds,omitzero" minimum:"0"`
 	Meta            map[string]string `json:"meta,omitempty"`
 }
 
@@ -404,7 +405,7 @@ func schemaForPrototype(prototype any) (*jsonschema.Schema, error) {
 	prototypeType := reflect.TypeOf(prototype)
 	schema, err := jsonschema.ForType(prototypeType, &jsonschema.ForOptions{
 		TypeSchemas: map[reflect.Type]*jsonschema.Schema{
-			reflect.TypeOf(json.RawMessage{}): {},
+			reflect.TypeOf(jsontext.Value{}): {},
 		},
 	})
 	if err != nil {
@@ -528,8 +529,8 @@ func applyConstraintTags(field reflect.StructField, schema *jsonschema.Schema) e
 		schema.Maximum = &number
 	}
 	if value := field.Tag.Get("default"); value != "" {
-		raw := json.RawMessage(value)
-		if !json.Valid(raw) {
+		raw := jsontext.Value(value)
+		if !raw.IsValid() {
 			raw, _ = json.Marshal(value)
 		}
 		schema.Default = raw

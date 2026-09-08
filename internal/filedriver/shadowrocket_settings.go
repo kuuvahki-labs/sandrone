@@ -2,7 +2,8 @@ package filedriver
 
 import (
 	"bytes"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 	"net/url"
 	"sort"
@@ -13,7 +14,7 @@ import (
 )
 
 type ShadowrocketFileSettings struct {
-	AdaptiveGroups *ShadowrocketAdaptiveGroupSettings `json:"adaptive_groups,omitempty" jsonschema:"Legacy Web and HTTP compatibility metadata"`
+	AdaptiveGroups *ShadowrocketAdaptiveGroupSettings `json:"adaptive_groups,omitzero" jsonschema:"Legacy Web and HTTP compatibility metadata"`
 	Groups         []ShadowrocketGroupSettings        `json:"groups,omitempty" jsonschema:"Explicit Shadowrocket proxy groups"`
 	RuleSets       []ShadowrocketRuleSetSettings      `json:"rule_sets,omitempty" jsonschema:"Named remote rule-set declarations"`
 	Rules          []string                           `json:"rules,omitempty" jsonschema:"Ordered Shadowrocket rules"`
@@ -28,19 +29,19 @@ type ShadowrocketFileCapabilitySettings struct {
 }
 
 type ShadowrocketAdaptiveGroupSettings struct {
-	Type    *string  `json:"type,omitempty" jsonschema:"Generated group type" enum:"select,url-test,load-balance"`
+	Type    *string  `json:"type,omitzero" jsonschema:"Generated group type" enum:"select,url-test,load-balance"`
 	Regions []string `json:"regions,omitempty" jsonschema:"Recognized lowercase region identifiers"`
 }
 
 type ShadowrocketGroupSettings struct {
 	Name              string    `json:"name" jsonschema:"Unique assignment-safe group name"`
 	Type              string    `json:"type" jsonschema:"Shadowrocket group type" enum:"select,url-test,fallback,load-balance,random"`
-	Proxies           *[]string `json:"proxies,omitempty" jsonschema:"Fixed built-in policies or declared proxy groups"`
-	PolicyRegexFilter *string   `json:"policy-regex-filter,omitempty" jsonschema:"Dynamic policy regular-expression filter"`
-	Interval          *int      `json:"interval,omitempty" jsonschema:"Health-check interval in seconds" minimum:"1" maximum:"86400"`
-	Timeout           *int      `json:"timeout,omitempty" jsonschema:"Health-check timeout in seconds" minimum:"1" maximum:"300"`
-	Tolerance         *int      `json:"tolerance,omitempty" jsonschema:"Latency tolerance in milliseconds" minimum:"0" maximum:"65535"`
-	Hidden            *bool     `json:"hidden,omitempty" jsonschema:"Whether the group is hidden in the client"`
+	Proxies           *[]string `json:"proxies,omitzero" jsonschema:"Fixed built-in policies or declared proxy groups"`
+	PolicyRegexFilter *string   `json:"policy-regex-filter,omitzero" jsonschema:"Dynamic policy regular-expression filter"`
+	Interval          *int      `json:"interval,omitzero" jsonschema:"Health-check interval in seconds" minimum:"1" maximum:"86400"`
+	Timeout           *int      `json:"timeout,omitzero" jsonschema:"Health-check timeout in seconds" minimum:"1" maximum:"300"`
+	Tolerance         *int      `json:"tolerance,omitzero" jsonschema:"Latency tolerance in milliseconds" minimum:"0" maximum:"65535"`
+	Hidden            *bool     `json:"hidden,omitzero" jsonschema:"Whether the group is hidden in the client"`
 }
 
 type ShadowrocketRuleSetSettings struct {
@@ -49,7 +50,7 @@ type ShadowrocketRuleSetSettings struct {
 	URL  string `json:"url" jsonschema:"Absolute HTTP or HTTPS URL"`
 }
 
-func decodeShadowrocketFileSettings(raw json.RawMessage) (ShadowrocketFileSettings, error) {
+func decodeShadowrocketFileSettings(raw jsontext.Value) (ShadowrocketFileSettings, error) {
 	if len(bytes.TrimSpace(raw)) == 0 {
 		return ShadowrocketFileSettings{}, shadowrocketSettingsError(fmt.Errorf("config.settings is required"))
 	}
@@ -123,11 +124,11 @@ func decodeShadowrocketFileSettings(raw json.RawMessage) (ShadowrocketFileSettin
 	return settings, nil
 }
 
-func strictJSONObject(raw json.RawMessage, path string) (map[string]json.RawMessage, error) {
+func strictJSONObject(raw jsontext.Value, path string) (map[string]jsontext.Value, error) {
 	if isJSONNull(raw) {
 		return nil, fmt.Errorf("%s must not be null", path)
 	}
-	var fields map[string]json.RawMessage
+	var fields map[string]jsontext.Value
 	if err := json.Unmarshal(raw, &fields); err != nil || fields == nil {
 		return nil, fmt.Errorf("%s must be an object", path)
 	}
@@ -139,11 +140,11 @@ func strictJSONObject(raw json.RawMessage, path string) (map[string]json.RawMess
 	return fields, nil
 }
 
-func strictJSONArray(raw json.RawMessage, path string) ([]json.RawMessage, error) {
+func strictJSONArray(raw jsontext.Value, path string) ([]jsontext.Value, error) {
 	if isJSONNull(raw) {
 		return nil, fmt.Errorf("%s must not be null", path)
 	}
-	var items []json.RawMessage
+	var items []jsontext.Value
 	if err := json.Unmarshal(raw, &items); err != nil {
 		return nil, fmt.Errorf("%s must be an array", path)
 	}
@@ -155,7 +156,7 @@ func strictJSONArray(raw json.RawMessage, path string) ([]json.RawMessage, error
 	return items, nil
 }
 
-func decodeStrictJSONObject[T any](raw json.RawMessage, path string, out *T, allowedNames ...string) error {
+func decodeStrictJSONObject[T any](raw jsontext.Value, path string, out *T, allowedNames ...string) error {
 	fields, err := strictJSONObject(raw, path)
 	if err != nil {
 		return err
@@ -167,9 +168,7 @@ func decodeStrictJSONObject[T any](raw json.RawMessage, path string, out *T, all
 	if err := rejectUnknownJSONFields(fields, allowed, path); err != nil {
 		return err
 	}
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(out); err != nil {
+	if err := json.Unmarshal(raw, out, json.RejectUnknownMembers(true)); err != nil {
 		const prefix = "json: unknown field "
 		if strings.HasPrefix(err.Error(), prefix) {
 			name := strings.Trim(err.Error()[len(prefix):], `"`)
@@ -180,7 +179,7 @@ func decodeStrictJSONObject[T any](raw json.RawMessage, path string, out *T, all
 	return nil
 }
 
-func rejectUnknownJSONFields(fields map[string]json.RawMessage, allowed map[string]bool, path string) error {
+func rejectUnknownJSONFields(fields map[string]jsontext.Value, allowed map[string]bool, path string) error {
 	for _, name := range sortedRawFieldNames(fields) {
 		if !allowed[name] {
 			return fmt.Errorf("%s.%s: unknown field", path, name)
@@ -189,7 +188,7 @@ func rejectUnknownJSONFields(fields map[string]json.RawMessage, allowed map[stri
 	return nil
 }
 
-func sortedRawFieldNames(fields map[string]json.RawMessage) []string {
+func sortedRawFieldNames(fields map[string]jsontext.Value) []string {
 	names := make([]string, 0, len(fields))
 	for name := range fields {
 		names = append(names, name)
@@ -198,7 +197,7 @@ func sortedRawFieldNames(fields map[string]json.RawMessage) []string {
 	return names
 }
 
-func isJSONNull(raw json.RawMessage) bool {
+func isJSONNull(raw jsontext.Value) bool {
 	return bytes.Equal(bytes.TrimSpace(raw), []byte("null"))
 }
 

@@ -15,6 +15,19 @@ NodeIR                    -> NodeProbeResult
 
 完整字段以 [`internal/domain`](../../internal/domain/) 和 [`pkg/sandrone`](../../pkg/sandrone/sandrone.go) 的公开别名为准。本页只解释模型之间长期有效的关系。
 
+## JSON 表达
+
+项目 Go 代码统一使用 `encoding/json/v2` 与 `encoding/json/jsontext`，采用 v2 默认语义，
+不启用 v1 兼容选项。结构体字段名按大小写精确匹配；重复对象成员、非法 UTF-8 和
+一个输入中的多个 JSON 值均被拒绝。未知字段是否拒绝由对应入口或模型决定，
+`FileConfig`、typed settings 和 processor 参数继续严格解码。
+
+原始 JSON 使用 `jsontext.Value`；可选数值、布尔值、指针和时间用 `omitzero`
+表达省略规则，集合用 `omitempty` 省略空集合，未省略的 nil slice/map 输出为 `[]`/`{}`。
+节点来源和 typed settings 中需要精确保留的泛型数字使用原始 JSON 数值，避免经过
+`float64` 丢失精度。缓存身份、连接身份、内容比较和承诺稳定的输出显式启用
+`json.Deterministic(true)`；其它输出不承诺对象成员顺序。
+
 ## `NodeIR`
 
 `NodeIR` 是与外部客户端格式无关的统一节点表达。parser 把分享 URI、订阅或客户端节点结构规范化为它，renderer 再从它生成目标节点片段。

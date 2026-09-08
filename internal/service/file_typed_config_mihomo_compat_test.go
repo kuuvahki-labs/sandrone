@@ -5,7 +5,7 @@ package service_test
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"testing"
 
 	mihomoconfig "github.com/metacubex/mihomo/config"

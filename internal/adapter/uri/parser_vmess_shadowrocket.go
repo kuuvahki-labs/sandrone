@@ -1,7 +1,7 @@
 package uri
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -57,7 +57,7 @@ func parseShadowrocketVMess(raw string) (domain.NodeIR, *domain.SourceInfo, bool
 	if err := markShadowrocketCommonKnown(&node, values, known); err != nil {
 		return node, source, true, err
 	}
-	node.Raw = map[string]json.RawMessage{}
+	node.Raw = map[string]jsontext.Value{}
 	preserveURIQuery(&node, values, known)
 	return node, source, true, nil
 }
@@ -95,7 +95,7 @@ func parseShadowrocketVLESS(raw string) (domain.NodeIR, *domain.SourceInfo, bool
 	if err := markShadowrocketCommonKnown(&node, values, known); err != nil {
 		return node, source, true, err
 	}
-	node.Raw = map[string]json.RawMessage{}
+	node.Raw = map[string]jsontext.Value{}
 	preserveURIQuery(&node, values, known)
 	return node, source, true, nil
 }

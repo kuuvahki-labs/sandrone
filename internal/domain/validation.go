@@ -1,7 +1,7 @@
 package domain
 
 type ValidateRequest struct {
-	File    *FileSpec         `json:"file,omitempty" yaml:"file,omitempty"`
+	File    *FileSpec         `json:"file,omitzero" yaml:"file,omitempty"`
 	Format  string            `json:"format,omitempty" yaml:"format,omitempty"`
 	Content []byte            `json:"content,omitempty" yaml:"content,omitempty"`
 	Target  string            `json:"target,omitempty" yaml:"target,omitempty"`
@@ -20,7 +20,7 @@ type ValidationIssue struct {
 	Stage     string   `json:"stage,omitempty" yaml:"stage,omitempty"`
 	Code      string   `json:"code" yaml:"code"`
 	Message   string   `json:"message" yaml:"message"`
-	NodeIndex *int     `json:"node_index,omitempty" yaml:"node_index,omitempty"`
+	NodeIndex *int     `json:"node_index,omitzero" yaml:"node_index,omitempty"`
 	RuntimeID string   `json:"runtime_id,omitempty" yaml:"runtime_id,omitempty"`
 	NodeName  string   `json:"node_name,omitempty" yaml:"node_name,omitempty"`
 	NodeType  NodeType `json:"node_type,omitempty" yaml:"node_type,omitempty"`
@@ -68,6 +68,6 @@ type ProbeBackendSummary struct {
 
 type InspectStore struct {
 	Configured    bool `json:"configured" yaml:"configured"`
-	Subscriptions *int `json:"subscriptions,omitempty" yaml:"subscriptions,omitempty"`
-	Files         *int `json:"files,omitempty" yaml:"files,omitempty"`
+	Subscriptions *int `json:"subscriptions,omitzero" yaml:"subscriptions,omitempty"`
+	Files         *int `json:"files,omitzero" yaml:"files,omitempty"`
 }

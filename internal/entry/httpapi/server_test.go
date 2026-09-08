@@ -1,7 +1,8 @@
 package httpapi_test
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -17,9 +18,9 @@ func testRuntime(t *testing.T, cfg app.Config) *app.Runtime {
 	return rt
 }
 
-func params(t *testing.T, m map[string]any) map[string]json.RawMessage {
+func params(t *testing.T, m map[string]any) map[string]jsontext.Value {
 	t.Helper()
-	out := map[string]json.RawMessage{}
+	out := map[string]jsontext.Value{}
 	for key, value := range m {
 		body, err := json.Marshal(value)
 		require.NoError(t, err)

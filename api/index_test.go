@@ -1,7 +1,8 @@
 package handler
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"go/parser"
 	"go/token"
 	"os"
@@ -31,7 +32,7 @@ func TestVercelConfigContract(t *testing.T) {
 	body, err := os.ReadFile(filepath.Join("..", "vercel.json"))
 	require.NoError(t, err)
 	var cfg struct {
-		Framework json.RawMessage `json:"framework"`
+		Framework jsontext.Value `json:"framework"`
 		Git       struct {
 			DeploymentEnabled bool `json:"deploymentEnabled"`
 		} `json:"git"`

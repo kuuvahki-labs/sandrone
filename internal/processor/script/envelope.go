@@ -4,7 +4,8 @@
 package script
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 	"maps"
 
@@ -27,7 +28,7 @@ type ScriptEnvelope struct {
 	Args     map[string]any      `json:"args,omitempty"`
 
 	Nodes []ScriptNode `json:"nodes,omitempty"`
-	File  *ScriptFile  `json:"file,omitempty"`
+	File  *ScriptFile  `json:"file,omitzero"`
 	Parts []ScriptPart `json:"parts,omitempty"`
 
 	Warnings []domain.Warning `json:"warnings,omitempty"`
@@ -41,13 +42,13 @@ type ScriptNode struct {
 	Name           string            `json:"name"`
 	Type           string            `json:"type"`
 	Server         string            `json:"server,omitempty"`
-	Port           uint16            `json:"port,omitempty"`
+	Port           uint16            `json:"port,omitzero"`
 	Network        string            `json:"network,omitempty"`
 	Username       string            `json:"username,omitempty"`
 	Password       string            `json:"password,omitempty"`
 	UUID           string            `json:"uuid,omitempty"`
 	Cipher         string            `json:"cipher,omitempty"`
-	AlterID        int               `json:"alter_id,omitempty"`
+	AlterID        int               `json:"alter_id,omitzero"`
 	Flow           string            `json:"flow,omitempty"`
 	Encryption     string            `json:"encryption,omitempty"`
 	Token          string            `json:"token,omitempty"`
@@ -72,7 +73,7 @@ type ScriptNode struct {
 	Meta           map[string]string `json:"meta,omitempty"`
 	Raw            map[string]any    `json:"raw,omitempty"`
 	Ext            map[string]any    `json:"ext,omitempty"`
-	Lossy          bool              `json:"lossy,omitempty"`
+	Lossy          bool              `json:"lossy,omitzero"`
 	Warnings       []domain.Warning  `json:"warnings,omitempty"`
 	SourceFormat   string            `json:"source_format,omitempty"`
 }
@@ -101,7 +102,7 @@ type ScriptPart struct {
 // Unknown top-level fields are preserved in Ext so a script that adds fields
 // can still be re-encoded back into an IR.
 func nodeToScript(n domain.NodeIR) (ScriptNode, error) {
-	body, err := json.Marshal(n) //nolint:gosec // NodeIR contains proxy credentials by design; this marshals in memory for script envelope conversion.
+	body, err := json.Marshal(n) // NodeIR contains proxy credentials by design; this marshals in memory for script envelope conversion.
 	if err != nil {
 		return ScriptNode{}, err
 	}
@@ -114,7 +115,7 @@ func nodeToScript(n domain.NodeIR) (ScriptNode, error) {
 }
 
 func scriptToNode(s ScriptNode) (domain.NodeIR, []domain.Warning, error) {
-	body, err := json.Marshal(s) //nolint:gosec // ScriptNode may contain proxy credentials by design; this marshals in memory back into NodeIR.
+	body, err := json.Marshal(s) // ScriptNode may contain proxy credentials by design; this marshals in memory back into NodeIR.
 	if err != nil {
 		return domain.NodeIR{}, nil, err
 	}
@@ -132,7 +133,7 @@ func scriptToNode(s ScriptNode) (domain.NodeIR, []domain.Warning, error) {
 	}
 	if s.Ext != nil {
 		if node.Raw == nil {
-			node.Raw = map[string]json.RawMessage{}
+			node.Raw = map[string]jsontext.Value{}
 		}
 		for k, v := range s.Ext {
 			raw, err := json.Marshal(v)

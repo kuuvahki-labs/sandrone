@@ -1,15 +1,16 @@
 package processor_test
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
-func rawParams(t *testing.T, m map[string]any) map[string]json.RawMessage {
+func rawParams(t *testing.T, m map[string]any) map[string]jsontext.Value {
 	t.Helper()
-	out := map[string]json.RawMessage{}
+	out := map[string]jsontext.Value{}
 	for k, v := range m {
 		b, err := json.Marshal(v)
 		require.NoError(t, err)

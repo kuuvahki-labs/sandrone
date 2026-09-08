@@ -1,7 +1,7 @@
 package mcpapi
 
 import (
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"net/url"
@@ -90,7 +90,6 @@ var (
 	schemaPathPattern         = regexp.MustCompile(`/properties/([^/:]+)|/items`)
 	missingPropertyPattern    = regexp.MustCompile(`missing properties:?\s+\["([^"]+)"`)
 	additionalPropertyPattern = regexp.MustCompile(`unexpected additional properties \["([^"]+)"`)
-	unknownFieldPattern       = regexp.MustCompile(`unknown field "([^"]+)"`)
 	settingsPathPattern       = regexp.MustCompile(`config\.settings(?:\.[A-Za-z0-9_-]+)*`)
 	validationValuePattern    = regexp.MustCompile(`(?:enum|type):\s+"?([^"\s]+)"?`)
 )
@@ -218,8 +217,12 @@ func processorWireField(appErr *domain.AppError, input map[string]any) string {
 	if strings.Contains(appErr.Message, "stage must be set") {
 		return base + ".stage"
 	}
-	if match := unknownFieldPattern.FindStringSubmatch(errorCauseText(appErr)); len(match) == 2 {
-		return base + ".params." + match[1]
+	if semantic, ok := errors.AsType[*json.SemanticError](appErr); ok && semantic.JSONPointer != "" {
+		path := base + ".params"
+		for token := range semantic.JSONPointer.Tokens() {
+			path += "." + token
+		}
+		return path
 	}
 	for _, field := range []string{"mode", "pattern", "value", "source", "timeout_ms"} {
 		if strings.Contains(appErr.Message, field) {
@@ -261,11 +264,4 @@ func processorWireMatches(value any, path string, processorType string) []string
 		}
 	}
 	return matches
-}
-
-func errorCauseText(appErr *domain.AppError) string {
-	if appErr == nil || appErr.Cause == nil {
-		return ""
-	}
-	return appErr.Cause.Error()
 }

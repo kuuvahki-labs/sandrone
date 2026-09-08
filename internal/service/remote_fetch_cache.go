@@ -21,7 +21,7 @@ const (
 type remoteFetchCacheRecord struct {
 	Body        []byte           `json:"body"`
 	Headers     http.Header      `json:"headers,omitempty"`
-	StatusCode  int              `json:"status_code,omitempty"`
+	StatusCode  int              `json:"status_code,omitzero"`
 	ContentHash string           `json:"content_hash,omitempty"`
 	SourceRef   domain.SourceRef `json:"source_ref,omitempty"`
 }

@@ -1,10 +1,9 @@
 package script
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
-	"encoding/json"
+	"encoding/json/v2"
 	"fmt"
 	"maps"
 	"strings"
@@ -31,10 +30,15 @@ func newScriptAPI(cfg Config, warningSink *[]domain.Warning, logSink *[]string, 
 	return &scriptAPI{cfg: cfg, warningSink: warningSink, logSink: logSink, probeRunner: probeRunner, resourceResolver: resolver}
 }
 
-func (a *scriptAPI) begin(ctx context.Context, envelope ScriptEnvelope) {
+func (a *scriptAPI) begin(ctx context.Context, envelope ScriptEnvelope) error {
+	counts, err := scriptProbeNodeCounts(envelope.Nodes)
+	if err != nil {
+		return err
+	}
 	a.ctx = ctx
 	a.stage = envelope.Stage
-	a.probeNodeCounts = scriptProbeNodeCounts(envelope.Nodes)
+	a.probeNodeCounts = counts
+	return nil
 }
 
 func (a *scriptAPI) end() {
@@ -110,10 +114,10 @@ type scriptProbeOptions struct {
 	URL             string            `json:"url,omitempty"`
 	NTPServer       string            `json:"ntp_server,omitempty"`
 	ExpectedStatus  string            `json:"expected_status,omitempty"`
-	TimeoutMS       int               `json:"timeout_ms,omitempty"`
-	Attempts        int               `json:"attempts,omitempty"`
-	Concurrency     int               `json:"concurrency,omitempty"`
-	CacheTTLSeconds int               `json:"cache_ttl_seconds,omitempty"`
+	TimeoutMS       int               `json:"timeout_ms,omitzero"`
+	Attempts        int               `json:"attempts,omitzero"`
+	Concurrency     int               `json:"concurrency,omitzero"`
+	CacheTTLSeconds int               `json:"cache_ttl_seconds,omitzero"`
 	Meta            map[string]string `json:"meta,omitempty"`
 }
 
@@ -130,7 +134,11 @@ func (a *scriptAPI) jsProbe(vm *goja.Runtime) func(call goja.FunctionCall) goja.
 		if err := exportJSValue(call.Argument(0), &scriptNodes); err != nil {
 			panic(vm.NewGoError(fmt.Errorf("decode api.probe nodes: %w", err)))
 		}
-		if !scriptProbeNodesAllowed(a.probeNodeCounts, scriptNodes) {
+		allowed, err := scriptProbeNodesAllowed(a.probeNodeCounts, scriptNodes)
+		if err != nil {
+			panic(vm.NewGoError(fmt.Errorf("validate api.probe node identities: %w", err)))
+		}
+		if !allowed {
 			panic(vm.NewGoError(&domain.AppError{Code: domain.CodeScriptRuntime, Message: "api.probe nodes must be a subset of the script input nodes"}))
 		}
 		nodes, warnings, err := scriptToNodes(scriptNodes)
@@ -279,37 +287,45 @@ func exportJSValueStrict[T any](value goja.Value, out *T) error {
 	if err != nil {
 		return err
 	}
-	decoder := json.NewDecoder(bytes.NewReader(body))
-	decoder.DisallowUnknownFields()
-	return decoder.Decode(out)
+	return json.Unmarshal(body, out, json.RejectUnknownMembers(true))
 }
 
-func scriptProbeNodeCounts(nodes []ScriptNode) map[string]int {
+func scriptProbeNodeCounts(nodes []ScriptNode) (map[string]int, error) {
 	out := make(map[string]int, len(nodes))
-	for _, node := range nodes {
-		out[scriptProbeNodeKey(node)]++
+	for index, node := range nodes {
+		key, err := scriptProbeNodeKey(node)
+		if err != nil {
+			return nil, fmt.Errorf("input node %d: %w", index, err)
+		}
+		out[key]++
 	}
-	return out
+	return out, nil
 }
 
-func scriptProbeNodesAllowed(allowed map[string]int, nodes []ScriptNode) bool {
+func scriptProbeNodesAllowed(allowed map[string]int, nodes []ScriptNode) (bool, error) {
 	remaining := make(map[string]int, len(allowed))
 	for key, count := range allowed {
 		remaining[key] = count
 	}
-	for _, node := range nodes {
-		key := scriptProbeNodeKey(node)
+	for index, node := range nodes {
+		key, err := scriptProbeNodeKey(node)
+		if err != nil {
+			return false, fmt.Errorf("probe node %d: %w", index, err)
+		}
 		if remaining[key] <= 0 {
-			return false
+			return false, nil
 		}
 		remaining[key]--
 	}
-	return true
+	return true, nil
 }
 
-func scriptProbeNodeKey(node ScriptNode) string {
-	body, _ := json.Marshal(node) //nolint:gosec // ScriptNode credentials are compared in memory to enforce api.probe subset checks.
-	return string(body)
+func scriptProbeNodeKey(node ScriptNode) (string, error) {
+	body, err := json.Marshal(node, json.Deterministic(true)) // ScriptNode credentials are compared in memory to enforce api.probe subset checks.
+	if err != nil {
+		return "", fmt.Errorf("encode node identity: %w", err)
+	}
+	return string(body), nil
 }
 
 func (a *scriptAPI) jsYAML(vm *goja.Runtime) goja.Value {

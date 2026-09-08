@@ -1,7 +1,8 @@
 package mcpapi
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -32,10 +33,10 @@ func TestFileSourceOutputPreservesFileDocument(t *testing.T) {
 				Name: "node-a", Type: domain.NodeTypeShadowsocks,
 				Server: "example.com", Port: 8388,
 				PluginOptions: map[string]any{
-					"counter": json.Number("9007199254740993"),
+					"counter": jsontext.Value("9007199254740993"),
 				},
-				Raw: map[string]json.RawMessage{
-					"plugin": json.RawMessage(`{"mode":"fast","counter":9007199254740993}`),
+				Raw: map[string]jsontext.Value{
+					"plugin": jsontext.Value(`{"mode":"fast","counter":9007199254740993}`),
 				},
 			}},
 		}},
@@ -61,8 +62,8 @@ func TestFileSourceOutputPreservesFileDocument(t *testing.T) {
 	require.Equal(t, "node-a", output.Parts[0].Nodes[0]["name"])
 	rawPlugin := output.Parts[0].Nodes[0]["raw"].(map[string]any)["plugin"].(map[string]any)
 	require.Equal(t, "fast", rawPlugin["mode"])
-	require.Equal(t, json.Number("9007199254740993"), rawPlugin["counter"])
-	require.Equal(t, json.Number("9007199254740993"),
+	require.Equal(t, jsontext.Value("9007199254740993"), rawPlugin["counter"])
+	require.Equal(t, jsontext.Value("9007199254740993"),
 		output.Parts[0].Nodes[0]["plugin_options"].(map[string]any)["counter"])
 
 	wire, err := json.Marshal(output)

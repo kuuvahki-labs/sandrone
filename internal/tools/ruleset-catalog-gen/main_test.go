@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"compress/gzip"
-	"encoding/json"
+	"encoding/json/v2"
 	"io"
 	"os"
 	"path/filepath"
@@ -265,7 +265,7 @@ func TestShadowrocketItemsRejectSymlinkedREADMEs(t *testing.T) {
 }
 
 func TestWriteGzipIsDeterministic(t *testing.T) {
-	catalog := catalogSnapshot{Mihomo: []catalogItem{{Name: "geosite-cn", URL: "https://example.test/cn.mrs", RuleKind: "domain"}}, SingBox: []catalogItem{}}
+	catalog := catalogSnapshot{Mihomo: []catalogItem{{Name: "geosite-cn", URL: "https://example.test/cn.mrs", RuleKind: "domain"}}, SingBox: []catalogItem{}, Shadowrocket: []catalogItem{}}
 	var first, second bytes.Buffer
 	require.NoError(t, writeGzip(&first, catalog))
 	require.NoError(t, writeGzip(&second, catalog))

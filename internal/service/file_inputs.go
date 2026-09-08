@@ -2,7 +2,7 @@ package service
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 	"strings"
 
@@ -81,9 +81,9 @@ func normalizeInlineNodes(nodes []domain.NodeIR) ([]domain.NodeIR, []domain.Warn
 			out[i].Hysteria = &hysteria
 		}
 		if out[i].Raw != nil {
-			raw := make(map[string]json.RawMessage, len(out[i].Raw))
+			raw := make(map[string]jsontext.Value, len(out[i].Raw))
 			for key, value := range out[i].Raw {
-				raw[key] = append(json.RawMessage(nil), value...)
+				raw[key] = append(jsontext.Value(nil), value...)
 			}
 			out[i].Raw = raw
 		}

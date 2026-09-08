@@ -3,7 +3,8 @@ package uri_test
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 	"net/url"
 	"strings"
@@ -751,32 +752,22 @@ func TestParseVMessAEADXHTTPStringContainingNullIsConsumed(t *testing.T) {
 	require.Empty(t, source.Warnings)
 }
 
-func TestParseVMessAEADXHTTPCaseInsensitiveWireFieldsRemainTyped(t *testing.T) {
+func TestParseVMessAEADXHTTPRejectsNoncanonicalFieldCase(t *testing.T) {
 	extra := `{"XMUX":{"MAXCONCURRENCY":"8-16"},"DOWNLOADSETTINGS":{"ADDRESS":"download.example.com","NETWORK":"xhttp","SECURITY":"none","XHTTPSETTINGS":{"PATH":"/download"}}}`
-
 	got, source := parseVMessAEADXHTTPDownloadExtra(t, extra)
-
-	require.NotNil(t, got.Transport.XHTTP.ReuseSettings)
-	require.Equal(t, "8-16", got.Transport.XHTTP.ReuseSettings.MaxConcurrency)
-	download := got.Transport.XHTTP.DownloadSettings
-	require.NotNil(t, download)
-	require.NotNil(t, download.Server)
-	require.Equal(t, "download.example.com", *download.Server)
-	require.NotNil(t, download.Path)
-	require.Equal(t, "/download", *download.Path)
-	require.Empty(t, got.Raw)
-	require.Empty(t, source.Warnings)
+	require.Nil(t, got.Transport.XHTTP.ReuseSettings)
+	require.Nil(t, got.Transport.XHTTP.DownloadSettings)
+	require.NotEmpty(t, got.Raw)
+	require.NotEmpty(t, source.Warnings)
 }
 
-func TestParseVMessAEADXHTTPCaseVariantsKeepWholeStructDecodeOrder(t *testing.T) {
+func TestParseVMessAEADXHTTPCaseVariantsKeepCanonicalField(t *testing.T) {
 	extra := `{"xmux":{"maxConcurrency":"first"},"XMUX":{"MAXCONCURRENCY":"last"}}`
-
 	got, source := parseVMessAEADXHTTPDownloadExtra(t, extra)
-
 	require.NotNil(t, got.Transport.XHTTP.ReuseSettings)
-	require.Equal(t, "last", got.Transport.XHTTP.ReuseSettings.MaxConcurrency)
-	require.Empty(t, got.Raw)
-	require.Empty(t, source.Warnings)
+	require.Equal(t, "first", got.Transport.XHTTP.ReuseSettings.MaxConcurrency)
+	require.NotEmpty(t, got.Raw)
+	require.NotEmpty(t, source.Warnings)
 }
 
 func TestParseVMessAEADXHTTPTypeErrorsPreserveRawAndPromoteSiblings(t *testing.T) {
@@ -2806,7 +2797,7 @@ func TestParseLegacyVMessV1CombinedHostPath(t *testing.T) {
 	}
 }
 
-func rawKeys(raw map[string]json.RawMessage) []string {
+func rawKeys(raw map[string]jsontext.Value) []string {
 	keys := make([]string, 0, len(raw))
 	for key := range raw {
 		keys = append(keys, key)

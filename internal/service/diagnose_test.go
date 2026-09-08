@@ -3,7 +3,8 @@ package service
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -414,7 +415,7 @@ func TestDiagnoseStoredFileTracesSubscriptionAndFileProcessors(t *testing.T) {
 		Name: "client.yaml", Kind: domain.FileKindMihomo,
 		Config: &domain.FileConfig{
 			Subscriptions: []string{"provider"},
-			Settings:      json.RawMessage(`{"groups":[],"rule_sets":[],"rules":[]}`),
+			Settings:      jsontext.Value(`{"groups":[],"rule_sets":[],"rules":[]}`),
 		},
 		Processors: []domain.ProcessorSpec{{
 			Type: "merge", Stage: domain.StageFile,
@@ -484,9 +485,9 @@ func TestDiagnoseTransientTraceDoesNotUsePersistentProbeCache(t *testing.T) {
 	require.False(t, second.Stages[1].Probes[0].Results[0].CacheHit)
 }
 
-func diagnoseParams(t *testing.T, values map[string]any) map[string]json.RawMessage {
+func diagnoseParams(t *testing.T, values map[string]any) map[string]jsontext.Value {
 	t.Helper()
-	out := make(map[string]json.RawMessage, len(values))
+	out := make(map[string]jsontext.Value, len(values))
 	for key, value := range values {
 		body, err := json.Marshal(value)
 		require.NoError(t, err)

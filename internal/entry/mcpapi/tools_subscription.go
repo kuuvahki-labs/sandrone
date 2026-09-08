@@ -18,21 +18,21 @@ type subscriptionRenderInput struct {
 	Name    string            `json:"name"`
 	Format  string            `json:"format"`
 	Args    map[string]string `json:"args,omitempty"`
-	Refresh bool              `json:"refresh,omitempty"`
+	Refresh bool              `json:"refresh,omitzero"`
 }
 
 type subscriptionRenderOutput struct {
 	ContentType    string        `json:"content_type,omitempty"`
 	Body           string        `json:"body,omitempty"`
-	BodyOmitted    bool          `json:"body_omitted,omitempty"`
-	BodyBytes      int           `json:"body_bytes,omitempty"`
-	MaxOutputBytes int           `json:"max_output_bytes,omitempty"`
+	BodyOmitted    bool          `json:"body_omitted,omitzero"`
+	BodyBytes      int           `json:"body_bytes,omitzero"`
+	MaxOutputBytes int           `json:"max_output_bytes,omitzero"`
 	Report         domain.Report `json:"report,omitempty"`
 }
 
 type subscriptionTrafficInput struct {
 	Name    string `json:"name"`
-	Refresh bool   `json:"refresh,omitempty"`
+	Refresh bool   `json:"refresh,omitzero"`
 }
 
 func registerSubscriptionTools(server *mcp.Server, rt *app.Runtime) {

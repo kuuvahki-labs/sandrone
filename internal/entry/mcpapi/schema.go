@@ -1,7 +1,7 @@
 package mcpapi
 
 import (
-	"encoding/json"
+	"encoding/json/v2"
 
 	"github.com/google/jsonschema-go/jsonschema"
 )

@@ -1,7 +1,7 @@
 package uri
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"net/url"
 	"sort"
 	"strconv"
@@ -245,9 +245,9 @@ func preserveURIQuery(node *domain.NodeIR, values url.Values, known map[string]b
 			continue
 		}
 		if node.Raw == nil {
-			node.Raw = map[string]json.RawMessage{}
+			node.Raw = map[string]jsontext.Value{}
 		}
-		node.Raw["uri.query."+key] = json.RawMessage(strconv.Quote(values.Get(key)))
+		node.Raw["uri.query."+key] = jsontext.Value(strconv.Quote(values.Get(key)))
 	}
 }
 

@@ -29,10 +29,10 @@ type ProbeRequest struct {
 	URL             string            `json:"url,omitempty" yaml:"url,omitempty"`
 	NTPServer       string            `json:"ntp_server,omitempty" yaml:"ntp_server,omitempty"`
 	ExpectedStatus  string            `json:"expected_status,omitempty" yaml:"expected_status,omitempty"`
-	TimeoutMS       int               `json:"timeout_ms,omitempty" yaml:"timeout_ms,omitempty"`
-	Attempts        int               `json:"attempts,omitempty" yaml:"attempts,omitempty"`
-	Concurrency     int               `json:"concurrency,omitempty" yaml:"concurrency,omitempty"`
-	CacheTTLSeconds int               `json:"cache_ttl_seconds,omitempty" yaml:"cache_ttl_seconds,omitempty"`
+	TimeoutMS       int               `json:"timeout_ms,omitzero" yaml:"timeout_ms,omitempty"`
+	Attempts        int               `json:"attempts,omitzero" yaml:"attempts,omitempty"`
+	Concurrency     int               `json:"concurrency,omitzero" yaml:"concurrency,omitempty"`
+	CacheTTLSeconds int               `json:"cache_ttl_seconds,omitzero" yaml:"cache_ttl_seconds,omitempty"`
 	Meta            map[string]string `json:"meta,omitempty" yaml:"meta,omitempty"`
 }
 
@@ -48,9 +48,9 @@ type NodeProbeResult struct {
 	Target     string    `json:"target,omitempty" yaml:"target,omitempty"`
 	Core       string    `json:"core,omitempty" yaml:"core,omitempty"`
 	Backend    string    `json:"backend,omitempty" yaml:"backend,omitempty"`
-	CacheHit   bool      `json:"cache_hit,omitempty" yaml:"cache_hit,omitempty"`
+	CacheHit   bool      `json:"cache_hit,omitzero" yaml:"cache_hit,omitempty"`
 	Alive      bool      `json:"alive" yaml:"alive"`
-	DurationMS int       `json:"duration_ms,omitempty" yaml:"duration_ms,omitempty"`
+	DurationMS int       `json:"duration_ms,omitzero" yaml:"duration_ms,omitempty"`
 	CheckedAt  time.Time `json:"checked_at" yaml:"checked_at"`
 	ErrorCode  string    `json:"error_code,omitempty" yaml:"error_code,omitempty"`
 	Error      string    `json:"error,omitempty" yaml:"error,omitempty"`
@@ -64,8 +64,8 @@ type ProbeReport struct {
 	SuccessCount     int                    `json:"success_count" yaml:"success_count"`
 	UnsupportedCount int                    `json:"unsupported_count,omitzero" yaml:"unsupported_count,omitempty"`
 	FailureCount     int                    `json:"failure_count" yaml:"failure_count"`
-	CacheHitCount    int                    `json:"cache_hit_count,omitempty" yaml:"cache_hit_count,omitempty"`
-	ErrorCounts      map[string]int         `json:"error_counts,omitempty" yaml:"error_counts,omitempty"`
+	CacheHitCount    int                    `json:"cache_hit_count,omitzero" yaml:"cache_hit_count,omitempty"`
+	ErrorCounts      map[string]int         `json:"error_counts,omitzero" yaml:"error_counts,omitempty"`
 	Dimensions       []ProbeReportDimension `json:"dimensions,omitempty" yaml:"dimensions,omitempty"`
 }
 
@@ -75,6 +75,6 @@ type ProbeReportDimension struct {
 	SuccessCount     int            `json:"success_count" yaml:"success_count"`
 	UnsupportedCount int            `json:"unsupported_count,omitzero" yaml:"unsupported_count,omitempty"`
 	FailureCount     int            `json:"failure_count" yaml:"failure_count"`
-	CacheHitCount    int            `json:"cache_hit_count,omitempty" yaml:"cache_hit_count,omitempty"`
-	ErrorCounts      map[string]int `json:"error_counts,omitempty" yaml:"error_counts,omitempty"`
+	CacheHitCount    int            `json:"cache_hit_count,omitzero" yaml:"cache_hit_count,omitempty"`
+	ErrorCounts      map[string]int `json:"error_counts,omitzero" yaml:"error_counts,omitempty"`
 }

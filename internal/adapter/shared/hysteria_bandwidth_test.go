@@ -1,7 +1,7 @@
 package shared_test
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"math"
 	"strconv"
 	"testing"
@@ -78,7 +78,7 @@ func TestNormalizeHysteriaMbpsUsesSafeStrictBound(t *testing.T) {
 	}
 	require.Equal(t, wantMax, shared.MaxHysteriaMbps())
 
-	for _, value := range []any{wantMax, int64(wantMax), uint64(wantMax), float64(wantMax), json.Number(strconv.Itoa(wantMax)), strconv.Itoa(wantMax)} {
+	for _, value := range []any{wantMax, int64(wantMax), uint64(wantMax), float64(wantMax), jsontext.Value(strconv.Itoa(wantMax)), strconv.Itoa(wantMax)} {
 		got, err := shared.NormalizeHysteriaMbps(value)
 		require.NoError(t, err)
 		require.Equal(t, wantMax, got)
@@ -87,7 +87,7 @@ func TestNormalizeHysteriaMbpsUsesSafeStrictBound(t *testing.T) {
 	zero, err := shared.NormalizeHysteriaMbps(0)
 	require.NoError(t, err)
 	require.Zero(t, zero)
-	for _, value := range []any{-1, 1.5, json.Number("1.5"), "1.5", ""} {
+	for _, value := range []any{-1, 1.5, jsontext.Value("1.5"), "1.5", ""} {
 		_, err := shared.NormalizeHysteriaMbps(value)
 		require.Error(t, err, "value %#v must not be accepted as integer Mbps", value)
 	}
@@ -203,7 +203,7 @@ func TestNormalizeLegacyHysteriaBandwidthPreservesInvalidInput(t *testing.T) {
 	node := domain.NodeIR{
 		Name: "hy", Type: domain.NodeTypeHysteria, SourceFormat: "json-nodes",
 		Hysteria: &domain.HysteriaOptions{Up: "bad", Down: "-1"},
-		Raw:      map[string]json.RawMessage{"existing": json.RawMessage(`true`)},
+		Raw:      map[string]jsontext.Value{"existing": jsontext.Value(`true`)},
 	}
 
 	warnings := shared.NormalizeLegacyHysteriaBandwidth(&node)
@@ -288,7 +288,7 @@ func TestNormalizeLegacyHysteriaBandwidthDeduplicatesIdenticalRawValue(t *testin
 	node := domain.NodeIR{
 		Name: "same", Type: domain.NodeTypeHysteria, SourceFormat: "json-nodes",
 		Hysteria: &domain.HysteriaOptions{Up: "bad"},
-		Raw:      map[string]json.RawMessage{"json-nodes.hysteria.up": json.RawMessage(`"bad"`)},
+		Raw:      map[string]jsontext.Value{"json-nodes.hysteria.up": jsontext.Value(`"bad"`)},
 	}
 
 	warnings := shared.NormalizeLegacyHysteriaBandwidth(&node)
@@ -302,7 +302,7 @@ func TestNormalizeLegacyHysteriaBandwidthPreservesConflictingRawValuesDeterminis
 	node := domain.NodeIR{
 		Name: "conflict", Type: domain.NodeTypeHysteria, SourceFormat: "mihomo",
 		Hysteria: &domain.HysteriaOptions{Up: "bad", UpMbps: -1},
-		Raw:      map[string]json.RawMessage{"json-nodes.hysteria.up": json.RawMessage(`"existing"`)},
+		Raw:      map[string]jsontext.Value{"json-nodes.hysteria.up": jsontext.Value(`"existing"`)},
 	}
 
 	warnings := shared.NormalizeLegacyHysteriaBandwidth(&node)

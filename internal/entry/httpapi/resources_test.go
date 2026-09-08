@@ -3,7 +3,8 @@ package httpapi_test
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -306,7 +307,7 @@ func TestFileEndpointExposesSourceAsBodyOrJSONWithoutChangingSpec(t *testing.T) 
 		Name:   "default.yaml",
 		Kind:   domain.FileKindMihomo,
 		Source: domain.FileSource{Type: "inline", Content: "mixed-port: 7891\nmarker: source\n"},
-		Config: &domain.FileConfig{Settings: json.RawMessage(`{
+		Config: &domain.FileConfig{Settings: jsontext.Value(`{
 			"groups": [],
 			"rule_sets": [],
 			"rules": []

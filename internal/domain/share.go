@@ -9,10 +9,10 @@ type Share struct {
 	TargetName   string            `json:"target_name" yaml:"target_name"`
 	TargetFormat string            `json:"target_format,omitempty" yaml:"target_format,omitempty"`
 	ContentType  string            `json:"content_type,omitempty" yaml:"content_type,omitempty"`
-	CreatedAt    time.Time         `json:"created_at,omitempty,omitzero" yaml:"created_at,omitempty"`
-	UpdatedAt    time.Time         `json:"updated_at,omitempty,omitzero" yaml:"updated_at,omitempty"`
-	ValidFrom    time.Time         `json:"valid_from,omitempty,omitzero" yaml:"valid_from,omitempty"`
-	ValidUntil   time.Time         `json:"valid_until,omitempty,omitzero" yaml:"valid_until,omitempty"`
+	CreatedAt    time.Time         `json:"created_at,omitzero" yaml:"created_at,omitempty"`
+	UpdatedAt    time.Time         `json:"updated_at,omitzero" yaml:"updated_at,omitempty"`
+	ValidFrom    time.Time         `json:"valid_from,omitzero" yaml:"valid_from,omitempty"`
+	ValidUntil   time.Time         `json:"valid_until,omitzero" yaml:"valid_until,omitempty"`
 	AgeRecipient string            `json:"age_recipient,omitempty" yaml:"age_recipient,omitempty"`
 	Meta         map[string]string `json:"meta,omitempty" yaml:"meta,omitempty"`
 }
@@ -24,8 +24,8 @@ type ShareCreateRequest struct {
 	TargetName   string            `json:"target_name" yaml:"target_name"`
 	TargetFormat string            `json:"target_format,omitempty" yaml:"target_format,omitempty"`
 	ContentType  string            `json:"content_type,omitempty" yaml:"content_type,omitempty"`
-	ValidFrom    time.Time         `json:"valid_from,omitempty,omitzero" yaml:"valid_from,omitempty"`
-	ValidUntil   time.Time         `json:"valid_until,omitempty,omitzero" yaml:"valid_until,omitempty"`
+	ValidFrom    time.Time         `json:"valid_from,omitzero" yaml:"valid_from,omitempty"`
+	ValidUntil   time.Time         `json:"valid_until,omitzero" yaml:"valid_until,omitempty"`
 	AgeRecipient string            `json:"age_recipient,omitempty" yaml:"age_recipient,omitempty"`
 	Meta         map[string]string `json:"meta,omitempty" yaml:"meta,omitempty"`
 }
@@ -57,5 +57,5 @@ type ShareRenderResult struct {
 	ContentType string            `json:"content_type,omitempty" yaml:"content_type,omitempty"`
 	Body        []byte            `json:"body,omitempty" yaml:"body,omitempty"`
 	Headers     map[string]string `json:"headers,omitempty" yaml:"headers,omitempty"`
-	Status      int               `json:"status,omitempty" yaml:"status,omitempty"`
+	Status      int               `json:"status,omitzero" yaml:"status,omitempty"`
 }

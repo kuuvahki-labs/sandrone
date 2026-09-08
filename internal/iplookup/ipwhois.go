@@ -4,7 +4,7 @@ package iplookup
 
 import (
 	"context"
-	json "encoding/json/v2"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"io"

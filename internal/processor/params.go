@@ -1,8 +1,8 @@
 package processor
 
 import (
-	"bytes"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
@@ -18,7 +18,7 @@ func UnmarshalParams[T any](spec domain.ProcessorSpec, target *T) error {
 	if len(spec.Params) == 0 {
 		return nil
 	}
-	full := map[string]json.RawMessage{}
+	full := map[string]jsontext.Value{}
 	for key, raw := range spec.Params {
 		full[key] = raw
 	}
@@ -31,9 +31,7 @@ func UnmarshalParams[T any](spec domain.ProcessorSpec, target *T) error {
 			Cause:     err,
 		}
 	}
-	decoder := json.NewDecoder(bytes.NewReader(body))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(target); err != nil {
+	if err := json.Unmarshal(body, target, json.RejectUnknownMembers(true)); err != nil {
 		return &domain.AppError{
 			Code:      domain.CodeProcessorConfigInvalid,
 			Message:   fmt.Sprintf("decode processor params for %q", spec.Type),

@@ -1,14 +1,15 @@
 package domain
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"time"
 )
 
 type RemoteDefaults struct {
 	UserAgent string `json:"user_agent,omitempty" yaml:"user_agent,omitempty"`
 	Proxy     string `json:"proxy,omitempty" yaml:"proxy,omitempty"`
-	TimeoutMS int    `json:"timeout_ms,omitempty" yaml:"timeout_ms,omitempty"`
+	TimeoutMS int    `json:"timeout_ms,omitzero" yaml:"timeout_ms,omitempty"`
 }
 
 type ProbeDefaults struct {
@@ -17,9 +18,9 @@ type ProbeDefaults struct {
 	URL            string `json:"url,omitempty" yaml:"url,omitempty"`
 	NTPServer      string `json:"ntp_server,omitempty" yaml:"ntp_server,omitempty"`
 	ExpectedStatus string `json:"expected_status" yaml:"expected_status"`
-	TimeoutMS      int    `json:"timeout_ms,omitempty" yaml:"timeout_ms,omitempty"`
-	Attempts       int    `json:"attempts,omitempty" yaml:"attempts,omitempty"`
-	Concurrency    int    `json:"concurrency,omitempty" yaml:"concurrency,omitempty"`
+	TimeoutMS      int    `json:"timeout_ms,omitzero" yaml:"timeout_ms,omitempty"`
+	Attempts       int    `json:"attempts,omitzero" yaml:"attempts,omitempty"`
+	Concurrency    int    `json:"concurrency,omitzero" yaml:"concurrency,omitempty"`
 }
 
 type ScriptDefaults struct {
@@ -27,9 +28,9 @@ type ScriptDefaults struct {
 }
 
 type CacheDefaults struct {
-	RemoteFetchTTLSeconds          int `json:"remote_fetch_ttl_seconds,omitempty" yaml:"remote_fetch_ttl_seconds,omitempty"`
-	ProbeTTLSeconds                int `json:"probe_ttl_seconds,omitempty" yaml:"probe_ttl_seconds,omitempty"`
-	SubscriptionSnapshotTTLSeconds int `json:"subscription_snapshot_ttl_seconds,omitempty" yaml:"subscription_snapshot_ttl_seconds,omitempty"`
+	RemoteFetchTTLSeconds          int `json:"remote_fetch_ttl_seconds,omitzero" yaml:"remote_fetch_ttl_seconds,omitempty"`
+	ProbeTTLSeconds                int `json:"probe_ttl_seconds,omitzero" yaml:"probe_ttl_seconds,omitempty"`
+	SubscriptionSnapshotTTLSeconds int `json:"subscription_snapshot_ttl_seconds,omitzero" yaml:"subscription_snapshot_ttl_seconds,omitempty"`
 }
 
 type Settings struct {
@@ -48,13 +49,13 @@ type Settings struct {
 	cacheDefaultsSet bool
 }
 
-func (s *Settings) UnmarshalJSON(data []byte) error {
+func (s *Settings) UnmarshalJSONFrom(decoder *jsontext.Decoder) error {
 	type settingsAlias Settings
 	var raw struct {
 		settingsAlias
 		CacheDefaults *CacheDefaults `json:"cache_defaults"`
 	}
-	if err := json.Unmarshal(data, &raw); err != nil {
+	if err := json.UnmarshalDecode(decoder, &raw); err != nil {
 		return err
 	}
 	*s = Settings(raw.settingsAlias)
@@ -151,13 +152,13 @@ type SettingsView struct {
 type ScheduledRefreshStatus struct {
 	Enabled          bool       `json:"enabled"`
 	Running          bool       `json:"running"`
-	NextRunAt        *time.Time `json:"next_run_at,omitempty"`
-	LastStartedAt    *time.Time `json:"last_started_at,omitempty"`
-	LastCompletedAt  *time.Time `json:"last_completed_at,omitempty"`
+	NextRunAt        *time.Time `json:"next_run_at,omitzero"`
+	LastStartedAt    *time.Time `json:"last_started_at,omitzero"`
+	LastCompletedAt  *time.Time `json:"last_completed_at,omitzero"`
 	LastSuccessCount int        `json:"last_success_count"`
 	LastFailureCount int        `json:"last_failure_count"`
 	SkippedCount     int        `json:"skipped_count"`
-	LastSkippedAt    *time.Time `json:"last_skipped_at,omitempty"`
+	LastSkippedAt    *time.Time `json:"last_skipped_at,omitzero"`
 }
 
 type SettingsSnapshot struct {

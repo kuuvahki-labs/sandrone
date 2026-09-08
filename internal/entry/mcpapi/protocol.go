@@ -3,7 +3,8 @@ package mcpapi
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"io"
 	"net/http"
 
@@ -118,7 +119,7 @@ func decodeProtocolRequest(req *http.Request) (*jsonrpc.Request, bool) {
 	return request, ok
 }
 
-func protocolVersionFromParams(params json.RawMessage) string {
+func protocolVersionFromParams(params jsontext.Value) string {
 	var values struct {
 		Meta            map[string]any `json:"_meta"`
 		ProtocolVersion string         `json:"protocolVersion"`

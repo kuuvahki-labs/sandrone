@@ -59,8 +59,8 @@ type probeCacheSelector struct {
 	URL                    string `json:"url,omitempty"`
 	NTPServer              string `json:"ntp_server,omitempty"`
 	ExpectedStatus         string `json:"expected_status,omitempty"`
-	TimeoutMS              int    `json:"timeout_ms,omitempty"`
-	Attempts               int    `json:"attempts,omitempty"`
+	TimeoutMS              int    `json:"timeout_ms,omitzero"`
+	Attempts               int    `json:"attempts,omitzero"`
 }
 
 type probeCacheGroup struct {

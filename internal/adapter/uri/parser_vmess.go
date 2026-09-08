@@ -1,7 +1,8 @@
 package uri
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"net/url"
@@ -66,7 +67,7 @@ func parseVMessAEAD(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 	node.PacketEncoding = shared.NormalizePacketEncoding(shared.QueryFirst(values, "packetEncoding", "packet-encoding"))
 	applyTLSQuery(&node, values)
 	xhttpExtraComplete := applyTransportQuery(&node, values)
-	node.Raw = map[string]json.RawMessage{}
+	node.Raw = map[string]jsontext.Value{}
 	known := vmessAEADKnownQueryFields(node, values, xhttpExtraComplete)
 	applyWebSocketEarlyDataQuery(node.Transport, values, known)
 	preserveURIQuery(&node, values, known)
@@ -306,7 +307,7 @@ func parseLegacyVMess(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 			node.Transport.Path = ""
 		}
 	}
-	node.Raw = map[string]json.RawMessage{}
+	node.Raw = map[string]jsontext.Value{}
 	preserveVMessHeaderTypeRaw(node.Raw, doc, "type", node.Transport)
 	preserveVMessHeaderTypeRaw(node.Raw, doc, "headerType", node.Transport)
 	knownFields := map[string]bool{
@@ -387,7 +388,7 @@ func legacyVMessHTTPHeaderType(doc map[string]any, network string) string {
 	return ""
 }
 
-func preserveVMessHeaderTypeRaw(raw map[string]json.RawMessage, doc map[string]any, key string, transport *domain.TransportOptions) {
+func preserveVMessHeaderTypeRaw(raw map[string]jsontext.Value, doc map[string]any, key string, transport *domain.TransportOptions) {
 	value := shared.StringValue(doc[key])
 	if value == "" || value == "auto" || value == "none" {
 		return

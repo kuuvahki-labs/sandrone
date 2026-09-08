@@ -20,12 +20,12 @@ type ProbeParams struct {
 	URL             string `json:"url,omitempty" jsonschema:"URL used for URL tests"`
 	NTPServer       string `json:"ntp_server,omitempty" jsonschema:"NTP server used for UDP NTP probes"`
 	ExpectedStatus  string `json:"expected_status,omitempty" jsonschema:"Expected HTTP status expression"`
-	TimeoutMS       int    `json:"timeout_ms,omitempty" jsonschema:"Per-attempt timeout in milliseconds" minimum:"0"`
-	Attempts        int    `json:"attempts,omitempty" jsonschema:"Number of probe attempts" minimum:"0"`
-	Concurrency     int    `json:"concurrency,omitempty" jsonschema:"Maximum concurrent probes" minimum:"0"`
-	CacheTTLSeconds int    `json:"cache_ttl_seconds,omitempty" jsonschema:"Successful result cache lifetime in seconds" minimum:"0"`
+	TimeoutMS       int    `json:"timeout_ms,omitzero" jsonschema:"Per-attempt timeout in milliseconds" minimum:"0"`
+	Attempts        int    `json:"attempts,omitzero" jsonschema:"Number of probe attempts" minimum:"0"`
+	Concurrency     int    `json:"concurrency,omitzero" jsonschema:"Maximum concurrent probes" minimum:"0"`
+	CacheTTLSeconds int    `json:"cache_ttl_seconds,omitzero" jsonschema:"Successful result cache lifetime in seconds" minimum:"0"`
 	FailMode        string `json:"fail_mode,omitempty" jsonschema:"Treatment of nodes that fail probing" enum:"keep,drop,error" default:"keep"`
-	Annotate        bool   `json:"annotate,omitempty" jsonschema:"Write probe result fields into node metadata"`
+	Annotate        bool   `json:"annotate,omitzero" jsonschema:"Write probe result fields into node metadata"`
 	Sort            string `json:"sort,omitempty" jsonschema:"Optional result ordering" enum:"duration"`
 }
 

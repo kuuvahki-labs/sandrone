@@ -3,7 +3,7 @@ package uri
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
+	"encoding/json/v2"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -176,7 +176,7 @@ func renderVMessURI(node domain.NodeIR) (string, []domain.Warning, error) {
 			doc["pcs"] = node.TLS.Fingerprint
 		}
 	}
-	body, err := json.Marshal(doc)
+	body, err := json.Marshal(doc, json.Deterministic(true))
 	if err != nil {
 		return "", nil, err
 	}

@@ -5,8 +5,8 @@ import "github.com/kuuvahki-labs/sandrone/internal/domain"
 type convertRequest struct {
 	FromFormat       string                 `json:"from_format"`
 	ToFormat         string                 `json:"to_format"`
-	Content          *string                `json:"content,omitempty"`
-	Remote           *domain.RemoteInput    `json:"remote,omitempty"`
+	Content          *string                `json:"content,omitzero"`
+	Remote           *domain.RemoteInput    `json:"remote,omitzero"`
 	ParseProcessors  []domain.ProcessorSpec `json:"parse_processors,omitempty"`
 	RenderProcessors []domain.ProcessorSpec `json:"render_processors,omitempty"`
 	Options          domain.RenderOptions   `json:"options,omitempty"`
@@ -16,7 +16,7 @@ type convertRequest struct {
 type subscriptionRenderRequest struct {
 	Format  string            `json:"format"`
 	Args    map[string]string `json:"args,omitempty"`
-	Refresh bool              `json:"refresh,omitempty"`
+	Refresh bool              `json:"refresh,omitzero"`
 }
 
 type agentRenderResponse struct {
@@ -26,12 +26,12 @@ type agentRenderResponse struct {
 }
 
 type subscriptionTrafficRequest struct {
-	Refresh bool `json:"refresh,omitempty"`
+	Refresh bool `json:"refresh,omitzero"`
 }
 
 type subscriptionPreviewRequest struct {
 	Args    map[string]string `json:"args,omitempty"`
-	Refresh bool              `json:"refresh,omitempty"`
+	Refresh bool              `json:"refresh,omitzero"`
 }
 
 type renderResponse struct {

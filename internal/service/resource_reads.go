@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	jsonv1 "encoding/json"
 	"encoding/json/v2"
 	"sync"
 
@@ -57,16 +56,16 @@ func (s *Service) readResource[T any](ctx context.Context, kind, name string, lo
 	key := kind + "\x00" + name
 	if item, ok := scope.items[key]; ok {
 		var value T
-		err := json.Unmarshal(item.body, &value, jsonv1.DefaultOptionsV1())
+		err := json.Unmarshal(item.body, &value)
 		return value, item.revision, err
 	}
 	value, err := load(ctx, name)
 	if err != nil {
 		return zero, "", err
 	}
-	// Keep the persisted model and legacy identity semantics. Encoding the memo
-	// also prevents consumers from sharing mutable maps, slices or pointers.
-	body, err := json.Marshal(value, jsonv1.DefaultOptionsV1())
+	// Encoding the memo prevents consumers from sharing mutable maps, slices
+	// or pointers. Revisions use the same semantic identity as cache dependencies.
+	body, err := json.Marshal(value)
 	if err != nil {
 		return zero, "", err
 	}

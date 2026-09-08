@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
-	"encoding/json"
+	"encoding/json/v2"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/kuuvahki-labs/sandrone/internal/jsonvalue"
 
 	"gopkg.in/yaml.v3"
 
@@ -290,10 +292,8 @@ func decodeTopLevelDocument(content []byte) (map[string]any, bool) {
 		return nil, false
 	}
 	if trimmed[0] == '{' {
-		decoder := json.NewDecoder(bytes.NewReader(trimmed))
-		decoder.UseNumber()
 		var doc map[string]any
-		if err := decoder.Decode(&doc); err == nil {
+		if err := json.Unmarshal(trimmed, &doc, jsonvalue.PreserveNumbers); err == nil {
 			return doc, true
 		}
 	}

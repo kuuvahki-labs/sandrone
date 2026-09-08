@@ -8,5 +8,5 @@ type RequestInfo struct {
 
 type ResponseInfo struct {
 	Headers map[string]string `json:"headers,omitempty" yaml:"headers,omitempty"`
-	Status  int               `json:"status,omitempty" yaml:"status,omitempty"`
+	Status  int               `json:"status,omitzero" yaml:"status,omitempty"`
 }

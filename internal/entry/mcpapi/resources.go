@@ -2,7 +2,8 @@ package mcpapi
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"net/url"
 	"strings"
 
@@ -177,7 +178,7 @@ func addResourceTemplate(server *mcp.Server, tmpl, name, desc string, load func(
 }
 
 func jsonResource(uri string, value any) (*mcp.ReadResourceResult, error) {
-	body, err := json.MarshalIndent(value, "", "  ")
+	body, err := json.Marshal(value, jsontext.WithIndent("  "))
 	if err != nil {
 		return nil, err
 	}

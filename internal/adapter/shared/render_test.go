@@ -1,7 +1,7 @@
 package shared_test
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -13,10 +13,10 @@ import (
 func TestRawWarningsSortsSkipsAndUsesTargetMessage(t *testing.T) {
 	node := domain.NodeIR{
 		Name: "node-a",
-		Raw: map[string]json.RawMessage{
-			"z":    json.RawMessage(`1`),
-			"skip": json.RawMessage(`2`),
-			"a":    json.RawMessage(`3`),
+		Raw: map[string]jsontext.Value{
+			"z":    jsontext.Value(`1`),
+			"skip": jsontext.Value(`2`),
+			"a":    jsontext.Value(`3`),
 		},
 	}
 

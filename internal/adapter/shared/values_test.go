@@ -1,7 +1,7 @@
 package shared_test
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 	"math"
@@ -37,7 +37,7 @@ func TestIntAndUint16Value(t *testing.T) {
 		{name: "int64", in: int64(2), want: 2},
 		{name: "uint64", in: uint64(3), want: 3},
 		{name: "float64", in: float64(4.8), want: 4},
-		{name: "json number", in: json.Number("5"), want: 5},
+		{name: "json number", in: jsontext.Value("5"), want: 5},
 		{name: "string", in: "6", want: 6},
 		{name: "empty string", in: "", want: 0},
 	}
@@ -50,7 +50,7 @@ func TestIntAndUint16Value(t *testing.T) {
 		})
 	}
 
-	_, err := shared.IntValue(json.Number("bad"))
+	_, err := shared.IntValue(jsontext.Value("bad"))
 	require.Error(t, err)
 	_, err = shared.IntValue(struct{}{})
 	require.ErrorContains(t, err, "unsupported number type")
@@ -115,7 +115,7 @@ func TestRawHelpers(t *testing.T) {
 	require.JSONEq(t, `123`, string(shared.RawNumberOrString("123")))
 	require.JSONEq(t, `"abc"`, string(shared.RawNumberOrString("abc")))
 
-	raw := map[string]json.RawMessage{}
+	raw := map[string]jsontext.Value{}
 	shared.AddRaw(raw, "ok", map[string]any{"a": 1})
 	shared.AddRaw(raw, "nan", math.NaN())
 	require.JSONEq(t, `{"a":1}`, string(raw["ok"]))
@@ -203,7 +203,7 @@ func TestURLAndWarningHelpers(t *testing.T) {
 	node := domain.NodeIR{}
 	shared.EnsureRaw(&node)
 	require.NotNil(t, node.Raw)
-	node.Raw["a"] = json.RawMessage(`1`)
+	node.Raw["a"] = jsontext.Value(`1`)
 	shared.EnsureRaw(&node)
 	require.JSONEq(t, `1`, string(node.Raw["a"]))
 

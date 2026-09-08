@@ -2,7 +2,7 @@ package domain
 
 import (
 	"crypto/sha256"
-	"encoding/json"
+	"encoding/json/v2"
 	"fmt"
 	"uuid"
 )
@@ -58,7 +58,7 @@ func NodeConnectionKey(node NodeIR) (string, error) {
 	node.Lossy = false
 	node.Warnings = nil
 	node.SourceFormat = ""
-	body, err := json.Marshal(node) //nolint:gosec // Credentials are hashed immediately and never returned.
+	body, err := json.Marshal(node, json.Deterministic(true)) // Credentials are hashed immediately and never returned.
 	if err != nil {
 		return "", fmt.Errorf("encode node connection semantics: %w", err)
 	}

@@ -1,10 +1,9 @@
 package domain
 
 import (
-	"bytes"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
-	"sort"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -15,10 +14,10 @@ type FileSpec struct {
 	DisplayName string            `json:"display_name,omitempty" yaml:"display_name,omitempty"`
 	Kind        FileKind          `json:"kind" yaml:"kind"`
 	Source      FileSource        `json:"source" yaml:"source"`
-	Config      *FileConfig       `json:"config,omitempty" yaml:"config,omitempty"`
+	Config      *FileConfig       `json:"config,omitzero" yaml:"config,omitempty"`
 	Processors  []ProcessorSpec   `json:"processors,omitempty" yaml:"processors,omitempty"`
-	CreatedAt   time.Time         `json:"created_at,omitempty" yaml:"created_at,omitempty"`
-	UpdatedAt   time.Time         `json:"updated_at,omitempty" yaml:"updated_at,omitempty"`
+	CreatedAt   time.Time         `json:"created_at,omitzero" yaml:"created_at,omitempty"`
+	UpdatedAt   time.Time         `json:"updated_at,omitzero" yaml:"updated_at,omitempty"`
 	Meta        map[string]string `json:"meta,omitempty" yaml:"meta,omitempty"`
 }
 
@@ -32,45 +31,13 @@ const (
 )
 
 type FileConfig struct {
-	Subscriptions []string        `json:"subscriptions,omitempty" yaml:"subscriptions,omitempty"`
-	Settings      json.RawMessage `json:"settings,omitempty" yaml:"settings,omitempty"`
+	Subscriptions []string       `json:"subscriptions,omitempty" yaml:"subscriptions,omitempty"`
+	Settings      jsontext.Value `json:"settings,omitempty" yaml:"settings,omitempty"`
 }
 
-func (c *FileConfig) UnmarshalJSON(body []byte) error {
-	decoder := json.NewDecoder(bytes.NewReader(body))
-	decoder.UseNumber()
-	var fields map[string]json.RawMessage
-	if err := decoder.Decode(&fields); err != nil {
-		return fmt.Errorf("config: %w", err)
-	}
-	*c = FileConfig{}
-	names := make([]string, 0, len(fields))
-	for name := range fields {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	for _, name := range names {
-		raw := fields[name]
-		switch name {
-		case "subscriptions":
-			if err := json.Unmarshal(raw, &c.Subscriptions); err != nil {
-				return fmt.Errorf("config.subscriptions: %w", err)
-			}
-		case "settings":
-			c.Settings = append(json.RawMessage(nil), raw...)
-		default:
-			return fmt.Errorf("config.%s: unknown field", name)
-		}
-	}
-	return nil
-}
-
-func (c FileConfig) MarshalJSON() ([]byte, error) {
-	type wire struct {
-		Subscriptions []string        `json:"subscriptions,omitempty"`
-		Settings      json.RawMessage `json:"settings,omitempty"`
-	}
-	return json.Marshal(wire(c))
+func (c *FileConfig) UnmarshalJSONFrom(decoder *jsontext.Decoder) error {
+	type wire FileConfig
+	return json.UnmarshalDecode(decoder, (*wire)(c), json.RejectUnknownMembers(true))
 }
 
 func (c *FileConfig) UnmarshalYAML(node *yaml.Node) error {
@@ -82,7 +49,7 @@ func (c *FileConfig) UnmarshalYAML(node *yaml.Node) error {
 	if err != nil {
 		return fmt.Errorf("config: %w", err)
 	}
-	return c.UnmarshalJSON(body)
+	return json.Unmarshal(body, c)
 }
 
 func (c FileConfig) MarshalYAML() (any, error) {
@@ -110,7 +77,7 @@ type FileAdaptiveGroupConfig struct {
 type FileSource struct {
 	Type    string       `json:"type" yaml:"type"`
 	Content string       `json:"content,omitempty" yaml:"content,omitempty"`
-	Remote  *RemoteInput `json:"remote,omitempty" yaml:"remote,omitempty"`
+	Remote  *RemoteInput `json:"remote,omitzero" yaml:"remote,omitempty"`
 }
 
 type NodeInput struct {
@@ -125,9 +92,9 @@ type NodeInput struct {
 	URL             string            `json:"url,omitempty" yaml:"url,omitempty"`
 	UserAgent       string            `json:"user_agent,omitempty" yaml:"user_agent,omitempty"`
 	Proxy           string            `json:"proxy,omitempty" yaml:"proxy,omitempty"`
-	TimeoutMS       int               `json:"timeout_ms,omitempty" yaml:"timeout_ms,omitempty"`
-	CacheTTLSeconds int               `json:"cache_ttl_seconds,omitempty" yaml:"cache_ttl_seconds,omitempty"`
-	Required        bool              `json:"required,omitempty" yaml:"required,omitempty"`
+	TimeoutMS       int               `json:"timeout_ms,omitzero" yaml:"timeout_ms,omitempty"`
+	CacheTTLSeconds int               `json:"cache_ttl_seconds,omitzero" yaml:"cache_ttl_seconds,omitempty"`
+	Required        bool              `json:"required,omitzero" yaml:"required,omitempty"`
 	Meta            map[string]string `json:"meta,omitempty" yaml:"meta,omitempty"`
 }
 
@@ -135,7 +102,7 @@ type FileMergePolicy struct {
 	Mode               string   `json:"mode,omitempty" yaml:"mode,omitempty"`
 	Include            []string `json:"include,omitempty" yaml:"include,omitempty"`
 	Separator          string   `json:"separator,omitempty" yaml:"separator,omitempty"`
-	IgnoreFailedRemote bool     `json:"ignore_failed_remote,omitempty" yaml:"ignore_failed_remote,omitempty"`
+	IgnoreFailedRemote bool     `json:"ignore_failed_remote,omitzero" yaml:"ignore_failed_remote,omitempty"`
 }
 
 type FileDocument struct {
@@ -167,11 +134,11 @@ const (
 )
 
 type ProcessorSpec struct {
-	Name    string                     `json:"name,omitempty" yaml:"name,omitempty"`
-	Type    string                     `json:"type" yaml:"type"`
-	Stage   Stage                      `json:"stage,omitempty" yaml:"stage,omitempty"`
-	Enabled *bool                      `json:"enabled,omitempty" yaml:"enabled,omitempty"`
-	Params  map[string]json.RawMessage `json:"params,omitempty" yaml:"params,omitempty"`
+	Name    string                    `json:"name,omitempty" yaml:"name,omitempty"`
+	Type    string                    `json:"type" yaml:"type"`
+	Stage   Stage                     `json:"stage,omitempty" yaml:"stage,omitempty"`
+	Enabled *bool                     `json:"enabled,omitzero" yaml:"enabled,omitempty"`
+	Params  map[string]jsontext.Value `json:"params,omitempty" yaml:"params,omitempty"`
 }
 
 func (spec ProcessorSpec) IsEnabled() bool {

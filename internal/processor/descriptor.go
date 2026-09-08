@@ -4,9 +4,9 @@ import "github.com/kuuvahki-labs/sandrone/internal/domain"
 
 // Effects identifies externally observable work a processor can perform.
 type Effects struct {
-	Probes      bool `json:"probes,omitempty"`
-	RemoteReads bool `json:"remote_reads,omitempty"`
-	RunsScript  bool `json:"runs_script,omitempty"`
+	Probes      bool `json:"probes,omitzero"`
+	RemoteReads bool `json:"remote_reads,omitzero"`
+	RunsScript  bool `json:"runs_script,omitzero"`
 }
 
 // Descriptor is owner-maintained metadata for a registered processor.

@@ -1,10 +1,11 @@
 package file
 
-import "encoding/json"
+import (
+	"encoding/json/jsontext"
+	"encoding/json/v2"
+)
 
-// marshalStableJSON returns a 2-space indented JSON representation. JSON's
-// own object key order is preserved by encoding/json's sorting of map keys,
-// which is good enough for our deterministic output requirements.
+// marshalStableJSON returns deterministic, 2-space indented JSON.
 func marshalStableJSON(v any) ([]byte, error) {
-	return json.MarshalIndent(v, "", "  ")
+	return json.Marshal(v, json.Deterministic(true), jsontext.WithIndent("  "))
 }

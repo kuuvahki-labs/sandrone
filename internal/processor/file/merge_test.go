@@ -2,7 +2,8 @@ package file_test
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"testing"
 
@@ -204,7 +205,7 @@ func TestMergePartsJSONOverrideSupportsOrderedOperations(t *testing.T) {
 	out, err := fileproc.MergeParts(parts, "sing-box", fileproc.MergeParams{Mode: "json_override"})
 
 	require.NoError(t, err)
-	require.True(t, json.Valid(out), "json_override output must be valid JSON: %s", out)
+	require.True(t, jsontext.Value(out).IsValid(), "json_override output must be valid JSON: %s", out)
 	require.Equal(t, []any{"reset", "after"}, jsonPath(t, out, "dns", "fake-ip-filter"))
 	require.Equal(t, []any{"before", "base"}, jsonPath(t, out, "dns", "fallback"))
 	require.Equal(t, []any{"https://dns.example/dns-query"}, jsonPath(t, out, "dns", "nameserver"))

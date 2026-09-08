@@ -1,9 +1,9 @@
 package store
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 	"sort"
 	"strings"
@@ -138,14 +138,7 @@ func (s *MetaStore) writeJSON(ctx context.Context, prefix string, name string, v
 }
 
 func marshalStoreJSON(value any) ([]byte, error) {
-	var body bytes.Buffer
-	encoder := json.NewEncoder(&body)
-	encoder.SetEscapeHTML(false)
-	encoder.SetIndent("", "  ")
-	if err := encoder.Encode(value); err != nil {
-		return nil, err
-	}
-	return body.Bytes(), nil
+	return json.Marshal(value, json.Deterministic(true), jsontext.WithIndent("  "))
 }
 
 func (s *MetaStore) readJSON[T any](ctx context.Context, prefix string, name string) (T, error) {

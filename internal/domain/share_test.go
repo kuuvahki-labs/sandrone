@@ -1,7 +1,8 @@
 package domain_test
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"testing"
 	"time"
 
@@ -36,7 +37,7 @@ func TestShareJSONOmitsUnsetOptionalTimes(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			body, err := json.Marshal(test.value)
 			require.NoError(t, err)
-			var fields map[string]json.RawMessage
+			var fields map[string]jsontext.Value
 			require.NoError(t, json.Unmarshal(body, &fields))
 			for _, key := range test.keys {
 				require.NotContains(t, fields, key)
@@ -52,7 +53,7 @@ func TestShareJSONKeepsSetOptionalTimes(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	var fields map[string]json.RawMessage
+	var fields map[string]jsontext.Value
 	require.NoError(t, json.Unmarshal(body, &fields))
 	require.JSONEq(t, `"2026-07-19T12:30:00Z"`, string(fields["valid_until"]))
 }

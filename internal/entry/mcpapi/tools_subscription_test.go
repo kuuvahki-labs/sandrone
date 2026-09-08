@@ -3,7 +3,8 @@ package mcpapi_test
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -246,9 +247,9 @@ func localProcessedSubscription(t *testing.T, name string) domain.Subscription {
 	}
 }
 
-func subscriptionProcessorParams(t *testing.T, values map[string]any) map[string]json.RawMessage {
+func subscriptionProcessorParams(t *testing.T, values map[string]any) map[string]jsontext.Value {
 	t.Helper()
-	out := make(map[string]json.RawMessage, len(values))
+	out := make(map[string]jsontext.Value, len(values))
 	for key, value := range values {
 		body, err := json.Marshal(value)
 		require.NoError(t, err)

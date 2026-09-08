@@ -2,7 +2,7 @@ package main
 
 import (
 	"compress/gzip"
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"flag"
 	"fmt"

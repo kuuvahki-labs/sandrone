@@ -1,13 +1,14 @@
 package shared
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"sort"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
 
-func ParseUnknownWarningsWithContext(node domain.NodeIR, raw map[string]json.RawMessage, source string, nodeIndex *int, nodeContext *domain.WarningNodeContext) []domain.Warning {
+func ParseUnknownWarningsWithContext(node domain.NodeIR, raw map[string]jsontext.Value, source string, nodeIndex *int, nodeContext *domain.WarningNodeContext) []domain.Warning {
 	if len(raw) == 0 {
 		return nil
 	}
@@ -107,9 +108,9 @@ func NoRenderableNodesError(report domain.RenderReport) error {
 
 func MarshalStableJSON(v any, indent bool) ([]byte, error) {
 	if indent {
-		return json.MarshalIndent(v, "", "  ")
+		return json.Marshal(v, json.Deterministic(true), jsontext.WithIndent("  "))
 	}
-	return json.Marshal(v)
+	return json.Marshal(v, json.Deterministic(true))
 }
 
 func MergeWarnings(report *domain.RenderReport, warnings []domain.Warning) {

@@ -1,7 +1,8 @@
 package mcpapi
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
@@ -11,7 +12,7 @@ type processorSpec struct {
 	Type    string         `json:"type"`
 	Stage   domain.Stage   `json:"stage,omitempty"`
 	Name    string         `json:"name,omitempty"`
-	Enabled *bool          `json:"enabled,omitempty"`
+	Enabled *bool          `json:"enabled,omitzero"`
 	Params  map[string]any `json:"params,omitempty"`
 }
 
@@ -41,8 +42,8 @@ func processorSpecsDomain(specs []processorSpec) ([]domain.ProcessorSpec, error)
 	return out, nil
 }
 
-func rawObject(values map[string]any) (map[string]json.RawMessage, error) {
-	out := make(map[string]json.RawMessage, len(values))
+func rawObject(values map[string]any) (map[string]jsontext.Value, error) {
+	out := make(map[string]jsontext.Value, len(values))
 	for key, value := range values {
 		body, err := json.Marshal(value)
 		if err != nil {
@@ -59,7 +60,7 @@ type fileConfig struct {
 }
 
 func (config fileConfig) domain() (*domain.FileConfig, error) {
-	var settings json.RawMessage
+	var settings jsontext.Value
 	if config.Settings != nil {
 		body, err := json.Marshal(config.Settings)
 		if err != nil {
@@ -78,7 +79,7 @@ type fileSpec struct {
 	DisplayName string            `json:"display_name,omitempty"`
 	Kind        domain.FileKind   `json:"kind"`
 	Source      domain.FileSource `json:"source"`
-	Config      *fileConfig       `json:"config,omitempty"`
+	Config      *fileConfig       `json:"config,omitzero"`
 	Processors  []processorSpec   `json:"processors,omitempty"`
 	Meta        map[string]string `json:"meta,omitempty"`
 }
@@ -112,11 +113,11 @@ type subscription struct {
 	Type               domain.SubscriptionType `json:"type"`
 	Format             string                  `json:"format,omitempty"`
 	Content            string                  `json:"content,omitempty"`
-	Remote             *domain.RemoteInput     `json:"remote,omitempty"`
+	Remote             *domain.RemoteInput     `json:"remote,omitzero"`
 	Inputs             []domain.NodeInput      `json:"inputs,omitempty"`
 	Processors         []processorSpec         `json:"processors,omitempty"`
 	Nodes              []domain.NodeIR         `json:"nodes,omitempty"`
-	SnapshotTTLSeconds *int                    `json:"snapshot_ttl_seconds,omitempty"`
+	SnapshotTTLSeconds *int                    `json:"snapshot_ttl_seconds,omitzero"`
 	Meta               map[string]string       `json:"meta,omitempty"`
 }
 
@@ -144,7 +145,7 @@ type convertInput struct {
 	FromFormat       string               `json:"from_format"`
 	ToFormat         string               `json:"to_format"`
 	Content          string               `json:"content,omitempty"`
-	Remote           *domain.RemoteInput  `json:"remote,omitempty"`
+	Remote           *domain.RemoteInput  `json:"remote,omitzero"`
 	ParseProcessors  []processorSpec      `json:"parse_processors,omitempty"`
 	RenderProcessors []processorSpec      `json:"render_processors,omitempty"`
 	Options          domain.RenderOptions `json:"options,omitempty"`
@@ -156,7 +157,7 @@ type getFileInput struct {
 	Mode    string            `json:"mode,omitempty"`
 	Target  string            `json:"target,omitempty"`
 	Args    map[string]string `json:"args,omitempty"`
-	Refresh bool              `json:"refresh,omitempty"`
+	Refresh bool              `json:"refresh,omitzero"`
 }
 
 type putSubscriptionInput struct {

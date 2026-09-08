@@ -1,12 +1,13 @@
 package mcpapi
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/kuuvahki-labs/sandrone/internal/jsonvalue"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -19,10 +20,10 @@ type fileSpecOutput struct {
 	DisplayName string                `json:"display_name,omitempty"`
 	Kind        domain.FileKind       `json:"kind"`
 	Source      domain.FileSource     `json:"source"`
-	Config      *fileConfigOutput     `json:"config,omitempty"`
+	Config      *fileConfigOutput     `json:"config,omitzero"`
 	Processors  []processorSpecOutput `json:"processors,omitempty"`
-	CreatedAt   time.Time             `json:"created_at,omitempty"`
-	UpdatedAt   time.Time             `json:"updated_at,omitempty"`
+	CreatedAt   time.Time             `json:"created_at,omitzero"`
+	UpdatedAt   time.Time             `json:"updated_at,omitzero"`
 	Meta        map[string]string     `json:"meta,omitempty"`
 }
 
@@ -35,7 +36,7 @@ type processorSpecOutput struct {
 	Type    string         `json:"type"`
 	Stage   domain.Stage   `json:"stage,omitempty"`
 	Name    string         `json:"name,omitempty"`
-	Enabled *bool          `json:"enabled,omitempty"`
+	Enabled *bool          `json:"enabled,omitzero"`
 	Params  map[string]any `json:"params,omitempty"`
 }
 
@@ -147,17 +148,12 @@ func filePartNodesOutput(nodes []domain.NodeIR) ([]map[string]any, error) {
 	}
 	output := make([]map[string]any, len(nodes))
 	for index, node := range nodes {
-		body, err := json.Marshal(node) //nolint:gosec // Node credentials are part of the explicitly requested source document.
+		body, err := json.Marshal(node) // Node credentials are part of the explicitly requested source document.
 		if err != nil {
 			return nil, fmt.Errorf("node %d: %w", index, err)
 		}
-		decoder := json.NewDecoder(bytes.NewReader(body))
-		decoder.UseNumber()
-		if err := decoder.Decode(&output[index]); err != nil {
+		if err := json.Unmarshal(body, &output[index], jsonvalue.PreserveNumbers); err != nil {
 			return nil, fmt.Errorf("node %d: %w", index, err)
-		}
-		if err := ensureJSONEOF(decoder); err != nil {
-			return nil, fmt.Errorf("node %d: trailing JSON: %w", index, err)
 		}
 	}
 	return output, nil

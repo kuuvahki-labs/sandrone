@@ -2,7 +2,7 @@ package script_test
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -146,12 +146,12 @@ func TestExampleNormalizeNodesConnectionDedupPreservesSemanticRawFields(t *testi
 		{
 			Name: "香港 one", Type: domain.NodeTypeShadowsocks, Server: "same.example.com", Port: 8388,
 			Cipher: "aes-128-gcm", Password: "secret", SourceFormat: "mihomo",
-			Raw: map[string]json.RawMessage{"provider.option": json.RawMessage(`"one"`)},
+			Raw: map[string]jsontext.Value{"provider.option": jsontext.Value(`"one"`)},
 		},
 		{
 			Name: "香港 two", Type: domain.NodeTypeShadowsocks, Server: "same.example.com", Port: 8388,
 			Cipher: "aes-128-gcm", Password: "secret", SourceFormat: "sing-box",
-			Raw: map[string]json.RawMessage{"provider.option": json.RawMessage(`"two"`)},
+			Raw: map[string]jsontext.Value{"provider.option": jsontext.Value(`"two"`)},
 		},
 	})
 

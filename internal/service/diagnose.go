@@ -3,14 +3,14 @@ package service
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
+	"github.com/kuuvahki-labs/sandrone/internal/jsonvalue"
 	"github.com/kuuvahki-labs/sandrone/internal/nodevalidation"
 	"github.com/kuuvahki-labs/sandrone/internal/processor"
 )
@@ -342,16 +342,7 @@ func decodeJSONDefinition[T any](content []byte, out *T) error {
 	if trimmed[0] != '{' {
 		return errors.New("resource definitions must use a JSON object")
 	}
-	decoder := json.NewDecoder(bytes.NewReader(trimmed))
-	decoder.UseNumber()
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(out); err != nil {
-		return err
-	}
-	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
-		if err == nil {
-			return errors.New("multiple JSON values are not supported")
-		}
+	if err := json.Unmarshal(trimmed, out, jsonvalue.PreserveNumbers, json.RejectUnknownMembers(true)); err != nil {
 		return err
 	}
 	return nil

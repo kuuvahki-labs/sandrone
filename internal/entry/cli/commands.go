@@ -2,7 +2,8 @@
 package cli
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 	"time"
 
@@ -161,7 +162,7 @@ commands for detailed format contracts.`,
 			if err != nil {
 				return err
 			}
-			out, err := json.MarshalIndent(result, "", "  ")
+			out, err := json.Marshal(result, jsontext.WithIndent("  "))
 			if err != nil {
 				return err
 			}

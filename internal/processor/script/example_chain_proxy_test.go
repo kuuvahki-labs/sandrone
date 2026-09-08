@@ -1,7 +1,7 @@
 package script_test
 
 import (
-	json "encoding/json/v2"
+	"encoding/json/v2"
 	"path/filepath"
 	"testing"
 

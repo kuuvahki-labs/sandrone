@@ -3,7 +3,7 @@ package filedriver
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
@@ -30,13 +30,13 @@ type Descriptor struct {
 type CompileInput struct {
 	Base          []byte
 	RenderedNodes []byte
-	Settings      json.RawMessage
+	Settings      jsontext.Value
 }
 
 // Driver validates and compiles one typed file format.
 type Driver interface {
 	Descriptor() Descriptor
-	ValidateSettings(json.RawMessage) error
+	ValidateSettings(jsontext.Value) error
 	Compile(context.Context, CompileInput) ([]byte, error)
 }
 

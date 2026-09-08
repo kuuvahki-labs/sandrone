@@ -378,14 +378,11 @@ func TestServiceRenderSubscriptionShareSanitizesSuggestedFilename(t *testing.T) 
 		requireInlineShareFilename(t, out.Headers, "配置 🌐.json")
 	})
 
-	t.Run("invalid UTF-8 is replaced", func(t *testing.T) {
+	t.Run("invalid UTF-8 is rejected", func(t *testing.T) {
 		_, err := svc.CreateShare(ctx, domain.ShareCreateRequest{
 			ID: "utf8-share", Name: string([]byte{'b', 'a', 'd', 0xff, 'n', 'a', 'm', 'e'}), TargetKind: "subscription", TargetName: "nodes",
 		})
-		require.NoError(t, err)
-		out, err := svc.RenderShare(ctx, domain.ShareRenderRequest{ID: "utf8-share"})
-		require.NoError(t, err)
-		requireInlineShareFilename(t, out.Headers, "bad�name.txt")
+		require.ErrorContains(t, err, "invalid UTF-8")
 	})
 
 	t.Run("hostile and control characters are replaced", func(t *testing.T) {

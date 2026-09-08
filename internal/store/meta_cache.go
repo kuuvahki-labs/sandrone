@@ -3,7 +3,6 @@ package store
 import (
 	"context"
 	"crypto/sha256"
-	jsonv1 "encoding/json"
 	"encoding/json/v2"
 	"sync"
 	"time"
@@ -129,7 +128,7 @@ func (s *MetaStore) readSummary[T any](ctx context.Context, entry ListedEntry, g
 	c := &s.summaries
 	cached, hit := c.get(entry.Key, generation)
 	if hit && entry.Version != "" && cached.version == entry.Version && c.now().Before(cached.recheckAt) {
-		err := json.Unmarshal(cached.value, &out, jsonv1.DefaultOptionsV1())
+		err := json.Unmarshal(cached.value, &out)
 		return out, err
 	}
 	body, version, err := readVersion(ctx, s.store, entry.Key)
@@ -139,7 +138,7 @@ func (s *MetaStore) readSummary[T any](ctx context.Context, entry ListedEntry, g
 	}
 	fingerprint := sha256.Sum256(body)
 	if hit && fingerprint == cached.fingerprint {
-		err = json.Unmarshal(cached.value, &out, jsonv1.DefaultOptionsV1())
+		err = json.Unmarshal(cached.value, &out)
 	} else {
 		out, err = decode(body)
 	}
@@ -152,7 +151,7 @@ func (s *MetaStore) readSummary[T any](ctx context.Context, entry ListedEntry, g
 	if entry.Version != "" && version != entry.Version {
 		return out, nil
 	}
-	value, err := json.Marshal(out, jsonv1.DefaultOptionsV1())
+	value, err := json.Marshal(out)
 	if err != nil {
 		return out, err
 	}

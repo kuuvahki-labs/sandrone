@@ -1,9 +1,9 @@
 package mcpapi
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -43,7 +43,7 @@ func addTool[In, Out any](
 	}
 
 	server.AddTool(&registeredTool, func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		raw := json.RawMessage(`{}`)
+		raw := jsontext.Value(`{}`)
 		if request.Params.Arguments != nil {
 			raw = request.Params.Arguments
 		}
@@ -82,7 +82,7 @@ func addTool[In, Out any](
 	})
 }
 
-func applyToolSchema(raw json.RawMessage, resolved *jsonschema.Resolved) (json.RawMessage, map[string]any, error) {
+func applyToolSchema(raw jsontext.Value, resolved *jsonschema.Resolved) (jsontext.Value, map[string]any, error) {
 	var value map[string]any
 	if err := decodeToolJSON(raw, &value); err != nil {
 		return nil, nil, fmt.Errorf("decode JSON object: %w", err)
@@ -104,12 +104,10 @@ func applyToolSchema(raw json.RawMessage, resolved *jsonschema.Resolved) (json.R
 }
 
 func decodeToolJSON[T any](raw []byte, output *T) error {
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(output); err != nil {
+	if err := json.Unmarshal(raw, output, json.RejectUnknownMembers(true)); err != nil {
 		return err
 	}
-	return ensureJSONEOF(decoder)
+	return nil
 }
 
 func toolContext(toolName string, input map[string]any) toolErrorContext {

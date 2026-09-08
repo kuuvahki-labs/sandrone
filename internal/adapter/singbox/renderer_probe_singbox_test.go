@@ -4,7 +4,7 @@ package singbox_test
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"testing"
 
 	"github.com/sagernet/sing-box/include"

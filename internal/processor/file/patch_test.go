@@ -2,7 +2,9 @@ package file_test
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -10,11 +12,11 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
 
-func ops(t *testing.T, list []map[string]any) map[string]json.RawMessage {
+func ops(t *testing.T, list []map[string]any) map[string]jsontext.Value {
 	t.Helper()
 	out, err := json.Marshal(list)
 	require.NoError(t, err)
-	return map[string]json.RawMessage{"ops": out}
+	return map[string]jsontext.Value{"ops": out}
 }
 
 func TestYAMLPatchCopyAndMove(t *testing.T) {
@@ -81,6 +83,43 @@ func TestJSONPatchMoveCopyTest(t *testing.T) {
 	require.Contains(t, body, "\"copy\": \"x\"")
 	require.Contains(t, body, "\"moved\": \"x\"")
 	require.NotContains(t, body, "\"src\"")
+}
+
+func TestJSONPatchTestComparesNestedObjects(t *testing.T) {
+	proc, err := makeFileRegistry().BuildFile(domain.ProcessorSpec{Type: "json_patch", Params: ops(t, []map[string]any{
+		{"op": "test", "path": "/object", "value": map[string]any{"z": 1, "a": map[string]any{"right": true, "left": "value"}}},
+	})})
+	require.NoError(t, err)
+	for range 32 {
+		_, err := proc.ApplyFile(t.Context(), domain.FileProcessInput{File: domain.FileDocument{
+			Kind: "json", Content: []byte(`{"object":{"a":{"left":"value","right":true},"z":1}}`),
+		}})
+		require.NoError(t, err)
+	}
+	_, err = proc.ApplyFile(t.Context(), domain.FileProcessInput{File: domain.FileDocument{
+		Kind: "json", Content: []byte(`{"object":{"a":{"left":"changed","right":true},"z":1}}`),
+	}})
+	require.Error(t, err)
+}
+
+func TestYAMLPatchTestReportsUnencodableValueWithPath(t *testing.T) {
+	proc, err := makeFileRegistry().BuildFile(domain.ProcessorSpec{Type: "yaml_patch", Params: ops(t, []map[string]any{
+		{"op": "test", "path": "/value", "value": 1},
+	})})
+	require.NoError(t, err)
+	for _, value := range []string{".nan", ".inf", "-.inf"} {
+		t.Run(value, func(t *testing.T) {
+			input := domain.FileDocument{Kind: "yaml", Content: []byte("value: " + value + "\n")}
+			out, err := proc.ApplyFile(t.Context(), domain.FileProcessInput{File: input})
+			require.ErrorContains(t, err, "encode actual value")
+			appErr, ok := errors.AsType[*domain.AppError](err)
+			require.True(t, ok)
+			require.Equal(t, domain.CodeFileProcessorFailed, appErr.Code)
+			require.Equal(t, "yaml_patch", appErr.Processor)
+			require.Equal(t, "/value", appErr.Path)
+			require.Equal(t, input, out.File)
+		})
+	}
 }
 
 func TestJSONPatchInvalidArrayIndex(t *testing.T) {
@@ -296,7 +335,7 @@ func TestJSONPatchRejectsScalarTraversal(t *testing.T) {
 
 func TestJSONPatchRejectsInvalidValue(t *testing.T) {
 	r := makeFileRegistry()
-	proc, err := r.BuildFile(domain.ProcessorSpec{Type: "json_patch", Params: map[string]json.RawMessage{
+	proc, err := r.BuildFile(domain.ProcessorSpec{Type: "json_patch", Params: map[string]jsontext.Value{
 		"ops": []byte(`[{"op":"add","path":"/a","value":`),
 	}})
 	require.Error(t, err)

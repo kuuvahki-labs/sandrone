@@ -2,7 +2,8 @@ package file_test
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -18,9 +19,9 @@ func makeFileRegistry() *processor.Registry {
 	return r
 }
 
-func params(t *testing.T, m map[string]any) map[string]json.RawMessage {
+func params(t *testing.T, m map[string]any) map[string]jsontext.Value {
 	t.Helper()
-	out := map[string]json.RawMessage{}
+	out := map[string]jsontext.Value{}
 	for k, v := range m {
 		b, err := json.Marshal(v)
 		require.NoError(t, err)

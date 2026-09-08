@@ -2,7 +2,8 @@ package service_test
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -11,14 +12,14 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/probe"
 )
 
-func raw(t *testing.T, v any) json.RawMessage {
+func raw(t *testing.T, v any) jsontext.Value {
 	t.Helper()
 	b, err := json.Marshal(v)
 	require.NoError(t, err)
 	return b
 }
 
-func completeTypedSettings(t *testing.T, settings map[string]any) json.RawMessage {
+func completeTypedSettings(t *testing.T, settings map[string]any) jsontext.Value {
 	t.Helper()
 	complete := make(map[string]any, len(settings)+3)
 	for name, value := range settings {
@@ -32,9 +33,9 @@ func completeTypedSettings(t *testing.T, settings map[string]any) json.RawMessag
 	return raw(t, complete)
 }
 
-func params(t *testing.T, m map[string]any) map[string]json.RawMessage {
+func params(t *testing.T, m map[string]any) map[string]jsontext.Value {
 	t.Helper()
-	out := map[string]json.RawMessage{}
+	out := map[string]jsontext.Value{}
 	for k, v := range m {
 		out[k] = raw(t, v)
 	}

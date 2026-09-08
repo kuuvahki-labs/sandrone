@@ -1,7 +1,8 @@
 package shared
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 	"net"
 	"net/netip"
@@ -39,8 +40,8 @@ func IntValue(v any) (int, error) {
 			return 0, fmt.Errorf("integer out of range: %v", t)
 		}
 		return int(t), nil
-	case json.Number:
-		n, err := t.Int64()
+	case jsontext.Value:
+		n, err := strconv.ParseInt(string(t), 10, 64)
 		if err != nil {
 			return 0, err
 		}
@@ -211,14 +212,14 @@ func AnyMapValue(v any) map[string]any {
 	}
 }
 
-func RawNumberOrString(s string) json.RawMessage {
+func RawNumberOrString(s string) jsontext.Value {
 	if _, err := strconv.Atoi(s); err == nil {
-		return json.RawMessage(s)
+		return jsontext.Value(s)
 	}
-	return json.RawMessage(strconv.Quote(s))
+	return jsontext.Value(strconv.Quote(s))
 }
 
-func AddRaw(raw map[string]json.RawMessage, key string, value any) {
+func AddRaw(raw map[string]jsontext.Value, key string, value any) {
 	if raw == nil {
 		return
 	}
@@ -229,7 +230,7 @@ func AddRaw(raw map[string]json.RawMessage, key string, value any) {
 	raw[key] = b
 }
 
-func AddUnknownRaw(raw map[string]json.RawMessage, prefix string, doc map[string]any, known map[string]bool) {
+func AddUnknownRaw(raw map[string]jsontext.Value, prefix string, doc map[string]any, known map[string]bool) {
 	if raw == nil {
 		return
 	}
@@ -343,7 +344,7 @@ func DecodeName(fragment, fallback string) string {
 
 func EnsureRaw(node *domain.NodeIR) {
 	if node.Raw == nil {
-		node.Raw = map[string]json.RawMessage{}
+		node.Raw = map[string]jsontext.Value{}
 	}
 }
 

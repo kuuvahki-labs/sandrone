@@ -3,7 +3,8 @@ package file
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"strings"
@@ -339,7 +340,7 @@ func yamlOverrideTypeError(part, path, message string) error {
 func mergeJSONOverride(parts []domain.FilePart) ([]byte, error) {
 	var combined *yaml.Node
 	for _, p := range parts {
-		if !json.Valid(p.Content) {
+		if !jsontext.Value(p.Content).IsValid() {
 			var invalid any
 			err := json.Unmarshal(p.Content, &invalid)
 			return nil, &domain.AppError{

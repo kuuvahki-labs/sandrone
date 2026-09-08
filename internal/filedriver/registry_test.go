@@ -2,7 +2,7 @@ package filedriver
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -15,8 +15,8 @@ type registryTestDriver struct {
 	descriptor Descriptor
 }
 
-func (d registryTestDriver) Descriptor() Descriptor               { return d.descriptor }
-func (registryTestDriver) ValidateSettings(json.RawMessage) error { return nil }
+func (d registryTestDriver) Descriptor() Descriptor              { return d.descriptor }
+func (registryTestDriver) ValidateSettings(jsontext.Value) error { return nil }
 func (registryTestDriver) Compile(context.Context, CompileInput) ([]byte, error) {
 	return []byte("compiled"), nil
 }

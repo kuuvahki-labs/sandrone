@@ -21,11 +21,11 @@ type Server struct {
 type renderOutput struct {
 	ContentType    string            `json:"content_type,omitempty"`
 	Body           string            `json:"body,omitempty"`
-	BodyOmitted    bool              `json:"body_omitted,omitempty"`
-	BodyBytes      int               `json:"body_bytes,omitempty"`
-	MaxOutputBytes int               `json:"max_output_bytes,omitempty"`
-	Spec           *fileSpecOutput   `json:"spec,omitempty"`
-	Source         *fileSourceOutput `json:"source,omitempty"`
+	BodyOmitted    bool              `json:"body_omitted,omitzero"`
+	BodyBytes      int               `json:"body_bytes,omitzero"`
+	MaxOutputBytes int               `json:"max_output_bytes,omitzero"`
+	Spec           *fileSpecOutput   `json:"spec,omitzero"`
+	Source         *fileSourceOutput `json:"source,omitzero"`
 	Report         domain.Report     `json:"report,omitempty"`
 	ResourceURI    string            `json:"resource_uri,omitempty"`
 }

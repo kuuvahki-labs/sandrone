@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
+	"encoding/json/v2"
 	"log/slog"
 	"time"
 
@@ -66,7 +66,7 @@ func (s *Service) prepareCacheValueWrite[T any](ctx context.Context, key string,
 }
 
 func cacheIdentity(value any) (string, error) {
-	body, err := json.Marshal(value)
+	body, err := json.Marshal(value, json.Deterministic(true))
 	if err != nil {
 		return "", err
 	}

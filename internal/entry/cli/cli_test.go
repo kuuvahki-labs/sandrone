@@ -3,7 +3,8 @@ package cli
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"io"
 	"log/slog"
@@ -359,7 +360,7 @@ func TestDiagnoseFailedWritesJSONBeforeExitAndArgumentErrorsDoNot(t *testing.T) 
 		WithEngineFactory(func(string) engine { return rec }),
 	)
 	require.Equal(t, 1, code)
-	require.JSONEq(t, `{"status":"failed","input":{"kind":""},"stages":null,"counts":{"input":0,"valid":0,"invalid":0,"error":0,"warning":0},"report":{"created_at":"0001-01-01T00:00:00Z","render":{"success_count":0,"lost_fields":0}},"error":{"code":"input_kind_unrecognized","message":"unknown"}}`, stdout)
+	require.JSONEq(t, `{"status":"failed","input":{"kind":""},"stages":[],"counts":{"input":0,"valid":0,"invalid":0,"error":0,"warning":0},"report":{"render":{"success_count":0,"lost_fields":0}},"error":{"code":"input_kind_unrecognized","message":"unknown"}}`, stdout)
 	require.Contains(t, stderr, "diagnosis failed")
 
 	code, stdout, stderr = runCLI(t,
@@ -427,7 +428,7 @@ func TestFiniteJSONCommandsWriteOutputFile(t *testing.T) {
 			require.Empty(t, stdout)
 			body, err := os.ReadFile(outputPath)
 			require.NoError(t, err)
-			require.True(t, json.Valid(body))
+			require.True(t, jsontext.Value(body).IsValid())
 			require.Equal(t, byte('\n'), body[len(body)-1])
 			if tt.name == "diagnose" {
 				info, err := os.Stat(outputPath)

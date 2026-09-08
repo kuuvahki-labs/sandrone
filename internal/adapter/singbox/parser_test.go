@@ -2,7 +2,7 @@ package singbox_test
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 	"testing"
 
@@ -306,7 +306,7 @@ func TestParseSingBoxUnknownFieldsGoToRaw(t *testing.T) {
 		require.Equal(t, uint16(1080), warning.NodeContext.Port)
 		require.Equal(t, "secret", warning.NodeContext.Raw["password"])
 		require.Equal(t, "value", warning.NodeContext.Raw["private_thing"])
-		require.Equal(t, json.Number("42"), warning.NodeContext.Raw["another_private_thing"])
+		require.Equal(t, jsontext.Value("42"), warning.NodeContext.Raw["another_private_thing"])
 	}
 }
 

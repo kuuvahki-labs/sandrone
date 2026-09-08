@@ -3,7 +3,8 @@ package cli
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"os"
@@ -23,7 +24,7 @@ type doctorResult struct {
 	StorageOK       bool                `json:"storage_ok"`
 	StorageError    string              `json:"storage_error,omitempty"`
 	DataDir         string              `json:"data_dir,omitempty"`
-	DataDirWritable bool                `json:"data_dir_writable,omitempty"`
+	DataDirWritable bool                `json:"data_dir_writable,omitzero"`
 	DataDirError    string              `json:"data_dir_error,omitempty"`
 	ParseFormats    []doctorFormatCheck `json:"parse_formats"`
 	RenderFormats   []doctorFormatCheck `json:"render_formats"`
@@ -55,7 +56,7 @@ func newDoctorCommand(cfg *config) *cobra.Command {
 				return err
 			}
 			result := runDoctor(cmd.Context(), engine, rawStore, storageConfig, cfg.dataDir)
-			body, err := json.MarshalIndent(result, "", "  ")
+			body, err := json.Marshal(result, jsontext.WithIndent("  "))
 			if err != nil {
 				return err
 			}

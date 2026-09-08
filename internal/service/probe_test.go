@@ -2,7 +2,7 @@ package service_test
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 	"net"
 	"testing"
@@ -61,7 +61,7 @@ func TestServiceProbeNormalizesInlineHysteriaBandwidthWithoutMutatingInput(t *te
 				Name: "inline", Type: domain.NodeTypeHysteria, Server: "inline.example", Port: 8443,
 				TLS:      &domain.TLSOptions{Enabled: true},
 				Hysteria: &domain.HysteriaOptions{Up: "55", Down: "100"},
-				Raw:      map[string]json.RawMessage{"caller": json.RawMessage(`"value"`)},
+				Raw:      map[string]jsontext.Value{"caller": jsontext.Value(`"value"`)},
 			}}
 			var captured domain.HysteriaOptions
 			svc := service.New(service.WithProbeEngine(fakeProbeEngine{probe: func(_ context.Context, _ domain.ProbeRequest, nodes []domain.NodeIR, _ ...probe.Payload) (*domain.ProbeResult, error) {
@@ -70,7 +70,7 @@ func TestServiceProbeNormalizesInlineHysteriaBandwidthWithoutMutatingInput(t *te
 				nodes[0].Name = "mutated by engine"
 				nodes[0].Hysteria.UpMbps = 999
 				nodes[0].Raw["caller"][1] = 'X'
-				nodes[0].Raw["engine"] = json.RawMessage(`true`)
+				nodes[0].Raw["engine"] = jsontext.Value(`true`)
 				return &domain.ProbeResult{Results: []domain.NodeProbeResult{{Alive: true}}}, nil
 			}}))
 

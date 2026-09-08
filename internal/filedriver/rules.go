@@ -1,7 +1,7 @@
 package filedriver
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 	"strconv"
 	"strings"
@@ -18,14 +18,14 @@ func singBoxOutboundsWithGroups(groups []map[string]any, names []string, nodeOut
 
 func normalizeConfigMap(value any) any {
 	switch typed := value.(type) {
-	case json.Number:
-		if integer, err := typed.Int64(); err == nil {
+	case jsontext.Value:
+		if integer, err := strconv.ParseInt(string(typed), 10, 64); err == nil {
 			return integer
 		}
 		if unsigned, err := strconv.ParseUint(typed.String(), 10, 64); err == nil {
 			return unsigned
 		}
-		if decimal, err := typed.Float64(); err == nil {
+		if decimal, err := strconv.ParseFloat(string(typed), 64); err == nil {
 			return decimal
 		}
 		return typed.String()

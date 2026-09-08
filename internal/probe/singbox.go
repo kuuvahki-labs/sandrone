@@ -5,7 +5,8 @@ package probe
 import (
 	"context"
 	"crypto/tls"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"net"
 	"sync"
@@ -156,7 +157,7 @@ func (b *SingBoxBackend) probeNode(ctx context.Context, req domain.ProbeRequest,
 }
 
 func singBoxOptions(ctx context.Context, payload *Payload) (option.Options, error) {
-	var doc map[string]json.RawMessage
+	var doc map[string]jsontext.Value
 	if err := json.Unmarshal(payload.Body, &doc); err != nil {
 		return option.Options{}, domain.WrapError(domain.CodeProbeInvalidTarget, "decode sing-box probe payload", err)
 	}
@@ -298,7 +299,7 @@ func (b *SingBoxNTPBackend) ntpRoundTrip(ctx context.Context, outbound interface
 }
 
 func singBoxNTPOptions(ctx context.Context, payload *Payload) (option.Options, error) {
-	var doc map[string]json.RawMessage
+	var doc map[string]jsontext.Value
 	if err := json.Unmarshal(payload.Body, &doc); err != nil {
 		return option.Options{}, domain.WrapError(domain.CodeProbeInvalidTarget, "decode sing-box probe payload", err)
 	}

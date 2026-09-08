@@ -3,7 +3,8 @@ package filedriver
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"reflect"
 	"testing"
 
@@ -58,7 +59,7 @@ func TestCapabilities(t *testing.T) {
 			require.NotEqual(t, "{}", string(settings), "%s example %d settings", capability.Kind, index)
 			if capability.Kind == domain.FileKindMihomo {
 				require.NotContains(t, string(settings), "adaptive_groups", "published Mihomo example %d", index)
-				var fields map[string]json.RawMessage
+				var fields map[string]jsontext.Value
 				require.NoError(t, json.Unmarshal(settings, &fields))
 				for _, name := range []string{"groups", "rule_sets", "rules"} {
 					var items []any
@@ -87,7 +88,7 @@ func TestMihomoCapabilityPrototypeMatchesExecutedSettings(t *testing.T) {
 func TestMihomoFileDriverKeepsLegacyAdaptiveGroupsCompatibleWithExplicitGroups(t *testing.T) {
 	driver, err := New().Lookup(domain.FileKindMihomo)
 	require.NoError(t, err)
-	settings := json.RawMessage(`{
+	settings := jsontext.Value(`{
 	  "adaptive_groups": {"type": "url-test", "regions": ["hk", "jp"]},
 	  "groups": [{"name": "Manual", "type": "select", "proxies": ["hk-node", "DIRECT"]}],
 	  "rule_sets": [],

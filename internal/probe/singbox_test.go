@@ -4,7 +4,7 @@ package probe
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"net"
 	"testing"
 	"time"

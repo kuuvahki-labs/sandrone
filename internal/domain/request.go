@@ -5,15 +5,15 @@ type RemoteInput struct {
 	URL             string `json:"url,omitempty" yaml:"url,omitempty"`
 	UserAgent       string `json:"user_agent,omitempty" yaml:"user_agent,omitempty"`
 	Proxy           string `json:"proxy,omitempty" yaml:"proxy,omitempty"`
-	TimeoutMS       int    `json:"timeout_ms,omitempty" yaml:"timeout_ms,omitempty"`
-	CacheTTLSeconds int    `json:"cache_ttl_seconds,omitempty" yaml:"cache_ttl_seconds,omitempty"`
+	TimeoutMS       int    `json:"timeout_ms,omitzero" yaml:"timeout_ms,omitempty"`
+	CacheTTLSeconds int    `json:"cache_ttl_seconds,omitzero" yaml:"cache_ttl_seconds,omitempty"`
 }
 
 // ParseRequest describes a single parse invocation.
 type ParseRequest struct {
 	Format     string            `json:"format" yaml:"format"`
 	Content    []byte            `json:"content,omitempty" yaml:"content,omitempty"`
-	Remote     *RemoteInput      `json:"remote,omitempty" yaml:"remote,omitempty"`
+	Remote     *RemoteInput      `json:"remote,omitzero" yaml:"remote,omitempty"`
 	Target     string            `json:"target,omitempty" yaml:"target,omitempty"`
 	Processors []ProcessorSpec   `json:"processors,omitempty" yaml:"processors,omitempty"`
 	Meta       map[string]string `json:"meta,omitempty" yaml:"meta,omitempty"`
@@ -21,7 +21,7 @@ type ParseRequest struct {
 
 type ParseResult struct {
 	Nodes  []NodeIR    `json:"nodes,omitempty" yaml:"nodes,omitempty"`
-	Source *SourceInfo `json:"source,omitempty" yaml:"source,omitempty"`
+	Source *SourceInfo `json:"source,omitzero" yaml:"source,omitempty"`
 	Report Report      `json:"report,omitempty" yaml:"report,omitempty"`
 }
 
@@ -40,27 +40,27 @@ type SubscriptionPreviewResult struct {
 type SubscriptionPreviewRequest struct {
 	Name    string      `json:"name" yaml:"name"`
 	Request RequestInfo `json:"request,omitempty" yaml:"request,omitempty"`
-	Refresh bool        `json:"refresh,omitempty" yaml:"refresh,omitempty"`
+	Refresh bool        `json:"refresh,omitzero" yaml:"refresh,omitempty"`
 }
 
 type SubscriptionPreviewNodeDiff struct {
 	RuntimeID   string            `json:"runtime_id" yaml:"runtime_id"`
 	Status      string            `json:"status" yaml:"status"`
-	Before      *NodeIR           `json:"before,omitempty" yaml:"before,omitempty"`
-	After       *NodeIR           `json:"after,omitempty" yaml:"after,omitempty"`
+	Before      *NodeIR           `json:"before,omitzero" yaml:"before,omitempty"`
+	After       *NodeIR           `json:"after,omitzero" yaml:"after,omitempty"`
 	TargetNames map[string]string `json:"target_names,omitempty" yaml:"target_names,omitempty"`
 }
 
 type SubscriptionTrafficRequest struct {
 	Name    string `json:"name,omitempty" yaml:"name,omitempty"`
-	Refresh bool   `json:"refresh,omitempty" yaml:"refresh,omitempty"`
+	Refresh bool   `json:"refresh,omitzero" yaml:"refresh,omitempty"`
 }
 
 type SubscriptionTrafficResult struct {
 	SubscriptionName string                   `json:"subscription_name" yaml:"subscription_name"`
 	Type             SubscriptionType         `json:"type,omitempty" yaml:"type,omitempty"`
 	Format           string                   `json:"format,omitempty" yaml:"format,omitempty"`
-	Traffic          *SubscriptionTrafficItem `json:"traffic,omitempty" yaml:"traffic,omitempty"`
+	Traffic          *SubscriptionTrafficItem `json:"traffic,omitzero" yaml:"traffic,omitempty"`
 }
 
 // RenderRequest describes a single render invocation.
@@ -82,7 +82,7 @@ type SubscriptionRenderRequest struct {
 	Name    string      `json:"name" yaml:"name"`
 	Format  string      `json:"format,omitempty" yaml:"format,omitempty"`
 	Request RequestInfo `json:"request,omitempty" yaml:"request,omitempty"`
-	Refresh bool        `json:"refresh,omitempty" yaml:"refresh,omitempty"`
+	Refresh bool        `json:"refresh,omitzero" yaml:"refresh,omitempty"`
 }
 
 // ConvertRequest describes a direct parse-then-render invocation.
@@ -90,7 +90,7 @@ type ConvertRequest struct {
 	FromFormat       string            `json:"from_format" yaml:"from_format"`
 	ToFormat         string            `json:"to_format" yaml:"to_format"`
 	Content          []byte            `json:"content,omitempty" yaml:"content,omitempty"`
-	Remote           *RemoteInput      `json:"remote,omitempty" yaml:"remote,omitempty"`
+	Remote           *RemoteInput      `json:"remote,omitzero" yaml:"remote,omitempty"`
 	ParseProcessors  []ProcessorSpec   `json:"parse_processors,omitempty" yaml:"parse_processors,omitempty"`
 	RenderProcessors []ProcessorSpec   `json:"render_processors,omitempty" yaml:"render_processors,omitempty"`
 	Options          RenderOptions     `json:"options,omitempty" yaml:"options,omitempty"`
@@ -101,11 +101,11 @@ type ConvertRequest struct {
 // A request may either embed the spec inline (Spec) or refer to a stored spec (Name).
 type FileRequest struct {
 	Name    string            `json:"name,omitempty" yaml:"name,omitempty"`
-	Spec    *FileSpec         `json:"spec,omitempty" yaml:"spec,omitempty"`
+	Spec    *FileSpec         `json:"spec,omitzero" yaml:"spec,omitempty"`
 	Target  string            `json:"target,omitempty" yaml:"target,omitempty"`
 	Request RequestInfo       `json:"request,omitempty" yaml:"request,omitempty"`
 	Meta    map[string]string `json:"meta,omitempty" yaml:"meta,omitempty"`
-	Refresh bool              `json:"refresh,omitempty" yaml:"refresh,omitempty"`
+	Refresh bool              `json:"refresh,omitzero" yaml:"refresh,omitempty"`
 }
 
 type FileResult struct {

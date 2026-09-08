@@ -2,7 +2,8 @@ package processor_test
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"reflect"
 	"strconv"
 	"strings"
@@ -123,9 +124,9 @@ func descriptorKeys(descriptors []processor.Descriptor) []string {
 	return keys
 }
 
-func descriptorRawParams(t *testing.T, example map[string]any) map[string]json.RawMessage {
+func descriptorRawParams(t *testing.T, example map[string]any) map[string]jsontext.Value {
 	t.Helper()
-	params := make(map[string]json.RawMessage, len(example))
+	params := make(map[string]jsontext.Value, len(example))
 	for name, value := range example {
 		body, err := json.Marshal(value)
 		require.NoError(t, err)

@@ -2,14 +2,15 @@ package cli
 
 import (
 	"bytes"
-	"encoding/json"
-	"errors"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/kuuvahki-labs/sandrone/internal/jsonvalue"
 	"github.com/kuuvahki-labs/sandrone/pkg/sandrone"
 )
 
@@ -32,7 +33,7 @@ func writeOutput(outputPath string, stdout io.Writer, body []byte) error {
 }
 
 func writeJSONOutput(outputPath string, stdout io.Writer, value any) error {
-	body, err := json.MarshalIndent(value, "", "  ")
+	body, err := json.Marshal(value, jsontext.WithIndent("  "))
 	if err != nil {
 		return err
 	}
@@ -41,7 +42,7 @@ func writeJSONOutput(outputPath string, stdout io.Writer, value any) error {
 }
 
 func writeSensitiveJSONOutput(outputPath string, stdout io.Writer, value any) error {
-	body, err := json.MarshalIndent(value, "", "  ")
+	body, err := json.Marshal(value, jsontext.WithIndent("  "))
 	if err != nil {
 		return err
 	}
@@ -127,16 +128,7 @@ func decodeJSONResourceDefinition[T any](body []byte, out *T) error {
 	if len(trimmed) == 0 {
 		return fmt.Errorf("JSON resource definition is empty")
 	}
-	decoder := json.NewDecoder(bytes.NewReader(trimmed))
-	decoder.UseNumber()
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(out); err != nil {
-		return err
-	}
-	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
-		if err == nil {
-			return fmt.Errorf("multiple JSON values are not supported")
-		}
+	if err := json.Unmarshal(trimmed, out, jsonvalue.PreserveNumbers, json.RejectUnknownMembers(true)); err != nil {
 		return err
 	}
 	return nil

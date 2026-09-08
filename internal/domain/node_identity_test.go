@@ -1,7 +1,7 @@
 package domain_test
 
 import (
-	"encoding/json"
+	"encoding/json/v2"
 	"reflect"
 	"testing"
 
@@ -102,4 +102,28 @@ func TestNodeConnectionKeySeparatesConnectionFromPresentation(t *testing.T) {
 	changedKey, err := domain.NodeConnectionKey(changed)
 	require.NoError(t, err)
 	require.NotEqual(t, baseKey, changedKey)
+}
+
+func TestNodeConnectionKeyIsStableWithNestedMaps(t *testing.T) {
+	node := domain.NodeIR{Type: domain.NodeTypeShadowsocks, Server: "example.com", Port: 443,
+		PluginOptions: map[string]any{"mode": "tls", "options": map[string]any{"host": "cdn.example.com", "path": "/proxy"}},
+		Headers:       map[string]string{"X-One": "one", "X-Two": "two"},
+	}
+	want, err := domain.NodeConnectionKey(node)
+	require.NoError(t, err)
+	for range 32 {
+		got, err := domain.NodeConnectionKey(node)
+		require.NoError(t, err)
+		require.Equal(t, want, got)
+	}
+}
+
+func TestNodeJSONPreservesExplicitEmptyDownloadOverrides(t *testing.T) {
+	options := domain.XHTTPDownloadSettings{Path: new(""), Host: new(""), Port: new(uint16(0))}
+	body, err := json.Marshal(options)
+	require.NoError(t, err)
+	require.JSONEq(t, `{"path":"","host":"","port":0}`, string(body))
+	var decoded domain.XHTTPDownloadSettings
+	require.NoError(t, json.Unmarshal(body, &decoded))
+	require.Equal(t, options, decoded)
 }

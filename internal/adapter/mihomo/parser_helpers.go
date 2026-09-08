@@ -1,7 +1,7 @@
 package mihomo
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 	"sort"
 
@@ -18,7 +18,7 @@ func sortedMapKeys(values map[string]any) []string {
 	return keys
 }
 
-func unknownWarnings(node domain.NodeIR, raw map[string]json.RawMessage, source string, nodeIndex int, nodeContext domain.WarningNodeContext) []domain.Warning {
+func unknownWarnings(node domain.NodeIR, raw map[string]jsontext.Value, source string, nodeIndex int, nodeContext domain.WarningNodeContext) []domain.Warning {
 	index := nodeIndex
 	return shared.ParseUnknownWarningsWithContext(node, raw, source, &index, &nodeContext)
 }

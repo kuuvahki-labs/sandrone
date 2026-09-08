@@ -2,7 +2,8 @@ package node_test
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"testing"
 	"time"
 
@@ -13,16 +14,16 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/processor/node"
 )
 
-func raw(t *testing.T, v any) json.RawMessage {
+func raw(t *testing.T, v any) jsontext.Value {
 	t.Helper()
 	b, err := json.Marshal(v)
 	require.NoError(t, err)
 	return b
 }
 
-func params(t *testing.T, m map[string]any) map[string]json.RawMessage {
+func params(t *testing.T, m map[string]any) map[string]jsontext.Value {
 	t.Helper()
-	out := map[string]json.RawMessage{}
+	out := map[string]jsontext.Value{}
 	for k, v := range m {
 		out[k] = raw(t, v)
 	}
