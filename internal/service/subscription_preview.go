@@ -23,13 +23,14 @@ func (s *Service) PreviewSubscription(ctx context.Context, name string, args ...
 }
 
 func (s *Service) PreviewSubscriptionRequest(ctx context.Context, req domain.SubscriptionPreviewRequest) (*domain.SubscriptionPreviewResult, error) {
+	ctx = s.withResourceReads(ctx)
 	if s.metaStore == nil {
 		return nil, storeUnavailable()
 	}
 	if req.Refresh {
 		ctx = withCacheReadBypass(ctx)
 	}
-	sub, err := s.metaStore.GetSubscription(ctx, req.Name)
+	sub, err := s.loadSubscription(ctx, req.Name)
 	if err != nil {
 		return nil, err
 	}

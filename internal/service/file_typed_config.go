@@ -99,7 +99,7 @@ func (s *Service) configNodes(ctx context.Context, subscriptions []string, req d
 	nodes := []domain.NodeIR{}
 	warnings := []domain.Warning{}
 	for _, name := range subscriptions {
-		sub, err := s.metaStore.GetSubscription(ctx, name)
+		sub, err := s.loadSubscription(ctx, name)
 		if err != nil {
 			return nil, nil, err
 		}

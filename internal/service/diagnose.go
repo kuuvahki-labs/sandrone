@@ -26,6 +26,7 @@ type diagnosedLocalInput struct {
 // Expected diagnostic failures are returned as a structured failed result;
 // request-shape errors are returned as Go errors.
 func (s *Service) Diagnose(ctx context.Context, req domain.DiagnoseRequest) (*domain.DiagnoseResult, error) {
+	ctx = s.withResourceReads(ctx)
 	if req.Kind == "" {
 		req.Kind = domain.DiagnoseInputAuto
 	}
@@ -436,7 +437,7 @@ func (s *Service) diagnoseStoredSubscription(ctx context.Context, req domain.Dia
 	if s.metaStore == nil {
 		return storeUnavailable()
 	}
-	sub, err := s.metaStore.GetSubscription(ctx, req.SubscriptionName)
+	sub, err := s.loadSubscription(ctx, req.SubscriptionName)
 	if err != nil {
 		return err
 	}

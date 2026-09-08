@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 	"time"
@@ -15,11 +13,12 @@ import (
 )
 
 type MetaStore struct {
-	store Store
+	store     Store
+	summaries summaryCache
 }
 
 func NewMetaStore(store Store) *MetaStore {
-	return &MetaStore{store: store}
+	return &MetaStore{store: store, summaries: summaryCache{now: time.Now}}
 }
 
 func (s *MetaStore) PutSubscription(ctx context.Context, sub domain.Subscription) error {
@@ -87,28 +86,23 @@ func (s *MetaStore) GetShare(ctx context.Context, id string) (domain.Share, erro
 }
 
 func (s *MetaStore) ListShares(ctx context.Context) ([]domain.Share, error) {
-	entries, err := s.store.List(ctx, "shares")
+	entries, generation, err := s.listEntries(ctx, "shares")
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return []domain.Share{}, nil
-		}
 		return nil, err
 	}
-	out := make([]domain.Share, 0, len(entries))
-	for _, entry := range entries {
-		if entry.IsDir || !strings.HasSuffix(entry.Key, ".json") {
-			continue
-		}
-		body, err := s.store.Read(ctx, entry.Key)
+	out, errs := mapMetadata(ctx, s.store, entries, func(entry ListedEntry) (domain.Share, error) {
+		return s.readSummary(ctx, entry, generation, func(body []byte) (domain.Share, error) {
+			var share domain.Share
+			err := json.Unmarshal(body, &share)
+			return share, err
+		})
+	})
+	for _, err := range errs {
 		if err != nil {
 			return nil, err
 		}
-		var share domain.Share
-		if err := json.Unmarshal(body, &share); err != nil {
-			return nil, err
-		}
-		out = append(out, share)
 	}
+
 	sort.Slice(out, func(i, j int) bool {
 		if !out[i].CreatedAt.Equal(out[j].CreatedAt) {
 			return out[i].CreatedAt.Before(out[j].CreatedAt)
@@ -139,6 +133,7 @@ func (s *MetaStore) writeJSON(ctx context.Context, prefix string, name string, v
 	if err != nil {
 		return err
 	}
+	defer s.summaries.invalidate(key)
 	return s.store.Write(ctx, key, body)
 }
 
@@ -174,39 +169,39 @@ func (s *MetaStore) deleteResource(ctx context.Context, prefix string, name stri
 	if err != nil {
 		return err
 	}
+	defer s.summaries.invalidate(key)
 	return s.store.Delete(ctx, key)
 }
 
 func (s *MetaStore) list(ctx context.Context, kind, prefix string, enrich func([]byte, *domain.ResourceSummary)) ([]domain.ResourceSummary, error) {
-	entries, err := s.store.List(ctx, prefix)
+	entries, generation, err := s.listEntries(ctx, prefix)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return []domain.ResourceSummary{}, nil
-		}
 		return nil, err
 	}
-	out := make([]domain.ResourceSummary, 0, len(entries))
-	for _, entry := range entries {
-		if entry.IsDir || !strings.HasSuffix(entry.Key, ".json") {
-			continue
-		}
-		name := strings.TrimPrefix(entry.Key, prefix+"/")
-		name = strings.TrimSuffix(name, ".json")
-		summary := domain.ResourceSummary{
-			Kind: kind,
-			Name: name,
-			Size: entry.Size,
-		}
-		if enrich != nil {
-			body, err := s.store.Read(ctx, entry.Key)
-			if err != nil {
-				summary.Warning = err.Error()
-			} else {
-				populateResourceSummaryTimestamps(body, &summary)
+	out, _ := mapMetadata(ctx, s.store, entries, func(entry ListedEntry) (domain.ResourceSummary, error) {
+		name := strings.TrimSuffix(strings.TrimPrefix(entry.Key, prefix+"/"), ".json")
+		summary := domain.ResourceSummary{Kind: kind, Name: name, Size: entry.Size}
+		parsed, err := s.readSummary(ctx, entry, generation, func(body []byte) (domain.ResourceSummary, error) {
+			populateResourceSummaryTimestamps(body, &summary)
+			if enrich != nil {
 				enrich(body, &summary)
 			}
+			if summary.Warning != "" {
+				return summary, fmt.Errorf("%s", summary.Warning)
+			}
+			return summary, nil
+		})
+		if err != nil {
+			summary.Warning = err.Error()
+		} else {
+			summary = parsed
+			summary.Size = entry.Size
 		}
-		out = append(out, summary)
+
+		return summary, nil
+	})
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	return out, nil
 }

@@ -28,6 +28,7 @@ func (s *Service) PutSubscription(ctx context.Context, sub domain.Subscription) 
 	if err := s.metaStore.PutSubscription(ctx, normalized); err != nil {
 		return err
 	}
+	s.invalidateResourceRead(ctx, "subscription", normalized.Name)
 	s.logResource(ctx, "put", "subscription", normalized.Name)
 	return nil
 }
@@ -42,6 +43,7 @@ func (s *Service) PutFile(ctx context.Context, file domain.FileSpec) error {
 	if err := s.metaStore.PutFile(ctx, file); err != nil {
 		return err
 	}
+	s.invalidateResourceRead(ctx, "file", file.Name)
 	s.logResource(ctx, "put", "file", file.Name)
 	return nil
 }
@@ -53,6 +55,7 @@ func (s *Service) DeleteSubscription(ctx context.Context, name string) error {
 	if err := s.metaStore.DeleteSubscription(ctx, name); err != nil {
 		return err
 	}
+	s.invalidateResourceRead(ctx, "subscription", name)
 	s.deleteCacheOwner(ctx, cacheResourceSubscriptions, name)
 	s.logResource(ctx, "delete", "subscription", name)
 	return nil
@@ -65,6 +68,7 @@ func (s *Service) DeleteFile(ctx context.Context, name string) error {
 	if err := s.metaStore.DeleteFile(ctx, name); err != nil {
 		return err
 	}
+	s.invalidateResourceRead(ctx, "file", name)
 	s.deleteCacheOwner(ctx, cacheResourceFiles, name)
 	s.logResource(ctx, "delete", "file", name)
 	return nil
@@ -74,7 +78,7 @@ func (s *Service) GetSubscription(ctx context.Context, name string) (*domain.Sub
 	if s.metaStore == nil {
 		return nil, storeUnavailable()
 	}
-	sub, err := s.metaStore.GetSubscription(ctx, name)
+	sub, err := s.loadSubscription(ctx, name)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +100,7 @@ func (s *Service) GetFileSpec(ctx context.Context, name string) (*domain.FileSpe
 	if s.metaStore == nil {
 		return nil, storeUnavailable()
 	}
-	file, err := s.metaStore.GetFile(ctx, name)
+	file, err := s.loadFileDefinition(ctx, name)
 	if err != nil {
 		return nil, err
 	}
@@ -211,10 +215,10 @@ func (s *Service) CreateShare(ctx context.Context, req domain.ShareCreateRequest
 func (s *Service) ensureShareTargetExists(ctx context.Context, kind string, name string) error {
 	switch strings.ToLower(strings.TrimSpace(kind)) {
 	case "file":
-		_, err := s.metaStore.GetFile(ctx, strings.TrimSpace(name))
+		_, err := s.loadFileDefinition(ctx, strings.TrimSpace(name))
 		return err
 	case "subscription":
-		_, err := s.metaStore.GetSubscription(ctx, strings.TrimSpace(name))
+		_, err := s.loadSubscription(ctx, strings.TrimSpace(name))
 		return err
 	default:
 		return domain.NewError(domain.CodeInvalidArgument, "unsupported share target kind")

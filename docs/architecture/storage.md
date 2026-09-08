@@ -28,6 +28,13 @@ Store 不提供数据库事务、跨进程锁或自动 schema 迁移。
 
 公开嵌入 API 暴露同构接口，因此自定义后端不需要 import `internal/store`。
 
+内部优化能力通过可选接口和统一 helper 提供，不扩大公开 Store 的必选方法：
+`ListPrefix` 只列举后代，缺失目录或没有后代的文件前缀返回空列表，校验 keys 并按
+key 排序；通用 `List` 保留列举单个对象的语义。文件系统与自定义 Store 用原有
+`List` 回退，S3 直接分页 LIST，省去目录 HEAD。能力经过 Coordinator 时仍受读写
+协调保护。只有明确支持并发读取的后端启用最多 4 路读取；内置两种后端均支持，
+自定义 Store 默认串行。列表输出和错误选择按 key 顺序汇总，取消后停止派发并等待在途操作。
+
 接口与 key 校验定义见 [`internal/store/store.go`](../../internal/store/store.go)，公开适配点见 [`pkg/sandrone/sandrone.go`](../../pkg/sandrone/sandrone.go)。
 
 ## Key 安全
@@ -60,8 +67,8 @@ service 对资源名和备份条目重复应用同一 `CleanKey` 语义。Store 
 仍是默认后端。
 
 每个逻辑 key 映射为配置 namespace 下的一个对象。实现只依赖
-`GetObject`、`PutObject`、`DeleteObject`、`HeadObject` 和分页
-`ListObjectsV2`：
+`GetObject`、`PutObject`、`DeleteObject`、`HeadObject`、分页
+`ListObjectsV2`，并为幂等缓存清理可选使用 `DeleteObjects`：
 
 - 普通写入和 `WriteAtomic` 都是单对象 PUT；后者不模拟 rename，也不使用临时
   对象。
@@ -89,6 +96,15 @@ Sandrone 不调用 AWS 默认凭据链，不读取 shared profile 或 instance m
 - subscription、file 和 share 的 JSON 编解码。
 - 资源摘要列举。
 - share 的覆盖保存。
+
+列表每次列举当前前缀以发现外部变更；摘要仅在当前 MetaStore 内复用，上限为
+1,024 条及估算 8 MiB，按最近使用淘汰，单条超限不缓存。S3 仅在 LIST 与 GET 的
+opaque ETag 一致时保存版本，后续版本相同可省正文 GET；从实际读取起满 10 秒
+强制复核，命中不续期。ETag 不解释为 MD5，版本缺失或不匹配时完整读取。
+文件系统和自定义 Store 每次只读一次正文，按内容指纹复用解析结果，不信任
+size/mtime。返回值深拷贝；本实例写入、删除、恢复后失效，清理已消失的 key，
+并阻止在途旧读取重新填充。读取及 JSON 错误不缓存，继续按资源 warning 或分享
+列表整体失败返回；GET 权限变化最多延迟到绝对复核期限被发现。
 
 每个 file 使用一个 `files/<name>.json` record 保存完整 `FileSpec`。inline
 正文留在 `source.content`，不会拆成相邻 raw key，也不会在保存时改写 source
@@ -164,13 +180,19 @@ FileSpec 每次都会从 canonical NodeSet 执行目标渲染或文件编译，�
 执行设置、Subscription 及请求上下文，且 snapshot TTL 必须为正数；scheduler 能力
 不参与 identity。
 
-除此之外，订阅解析和文件递归各有一次
-请求内 memo，用于去重同一调用中的重复依赖；它们不持久化、没有 TTL，也不是
-可配置 cache 层。当前不做跨请求 singleflight；两个同时发生的冷 miss 可以各自
-执行，但不会改变缓存和资源的正确性。
+订阅解析和文件递归各有请求内结果 memo，按完整执行变体去重重复依赖。顶层
+preview/render/file/produce/diagnose 还共享资源读取作用域：同一订阅或文件定义
+成功读取一次，并复用其持久化语义版本；消费者获得独立值，同作用域写入后失效。
+后续独立请求重新读定义，作用域不跨 service，也不代表整个 Store 的事务快照。
+这些 memo 不持久化、无 TTL；缓存对象的写前 GET 仍保留，用于合并变体和绝对期限。
+当前不做跨请求 singleflight，两个同时发生的冷 miss 可以各自执行。
 
 手动清理调用一次 `Cache.Clear`，不解析业务 value，也不提供按前缀操作或
-统计。并发请求可能在清理期间或之后重新填充缓存。该操作不修改 TTL、`refresh`、
+统计。Store-backed Clear 在一次 Coordinator update 中列举 cache 后代文件，
+使用幂等 `DeleteMany`；S3 每批最多 1,000 keys 并检查响应逐项 Errors，只有明确
+不支持 API 才回退。文件系统与自定义 Store 顺序 Delete，只忽略 not-found。
+批量删除可能部分成功，不改变普通资源或备份恢复的严格删除语义。
+并发请求可能在清理期间或之后重新填充缓存。该操作不修改 TTL、`refresh`、
 请求内 memo 或缓存 value 格式，也不由后台任务自动触发。HTTP 路径见
 [项目设置与缓存管理 API](../reference/http-api/settings.md#缓存管理)。
 

@@ -170,6 +170,7 @@ func requestWithExplicitArgs(base domain.RequestInfo, args map[string]string) do
 }
 
 func (s *Service) ProduceSubscription(ctx context.Context, name string, opts domain.ScriptProduceOptions) (*domain.ScriptSubscriptionProduceResult, error) {
+	ctx = s.withResourceReads(ctx)
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, domain.NewError(domain.CodeInvalidArgument, "subscription name is required")
@@ -194,7 +195,7 @@ func (s *Service) ProduceSubscription(ctx context.Context, name string, opts dom
 		req.Request = requestWithExplicitArgs(fileCtx.req.Request, opts.Args)
 	}
 
-	sub, err := s.metaStore.GetSubscription(ctx, name)
+	sub, err := s.loadSubscription(ctx, name)
 	if err != nil {
 		return nil, err
 	}

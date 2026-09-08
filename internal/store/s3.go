@@ -58,20 +58,25 @@ func newS3Store(client s3API, bucket, prefix string) *S3Store {
 }
 
 func (s *S3Store) Read(ctx context.Context, key string) ([]byte, error) {
+	body, _, err := s.ReadVersion(ctx, key)
+	return body, err
+}
+
+func (s *S3Store) ReadVersion(ctx context.Context, key string) ([]byte, string, error) {
 	key, err := CleanKey(key)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	out, err := s.client.GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(s.objectKey(key))})
 	if err != nil {
-		return nil, s.operationError("read", key, err)
+		return nil, "", s.operationError("read", key, err)
 	}
 	defer func() { _ = out.Body.Close() }()
 	body, err := io.ReadAll(out.Body)
 	if err != nil {
-		return nil, s.operationError("read", key, err)
+		return nil, "", s.operationError("read", key, err)
 	}
-	return body, nil
+	return body, aws.ToString(out.ETag), nil
 }
 
 func (s *S3Store) Write(ctx context.Context, key string, value []byte) error {
@@ -124,6 +129,26 @@ func (s *S3Store) List(ctx context.Context, prefix string) ([]Entry, error) {
 		}
 	}
 
+	listed, err := s.ListPrefix(ctx, prefix)
+	if err != nil {
+		return nil, err
+	}
+	if len(listed) == 0 && prefix != "" {
+		return nil, fmt.Errorf("s3 list %s: %w", prefix, os.ErrNotExist)
+	}
+	entries := make([]Entry, 0, len(listed))
+	for _, entry := range listed {
+		entries = append(entries, entry.Entry)
+	}
+	return entries, nil
+}
+
+func (s *S3Store) ListPrefix(ctx context.Context, prefix string) ([]ListedEntry, error) {
+	prefix, err := cleanPrefix(prefix)
+	if err != nil {
+		return nil, err
+	}
+
 	physicalPrefix := s.prefix
 	if prefix != "" {
 		physicalPrefix += prefix + "/"
@@ -132,17 +157,10 @@ func (s *S3Store) List(ctx context.Context, prefix string) ([]Entry, error) {
 	if err != nil {
 		return nil, s.operationError("list", prefix, err)
 	}
-	if len(objects) == 0 {
-		if prefix == "" {
-			return []Entry{}, nil
-		}
-		return nil, fmt.Errorf("s3 list %s: %w", prefix, os.ErrNotExist)
-	}
-
-	entries := make(map[string]Entry, len(objects))
+	entries := make(map[string]ListedEntry, len(objects))
 	for _, object := range objects {
 		physical := aws.ToString(object.Key)
-		if !strings.HasPrefix(physical, s.prefix) {
+		if !strings.HasPrefix(physical, physicalPrefix) {
 			return nil, fmt.Errorf("s3 list %s: object escaped configured prefix", prefix)
 		}
 		logical := strings.TrimPrefix(physical, s.prefix)
@@ -153,11 +171,11 @@ func (s *S3Store) List(ctx context.Context, prefix string) ([]Entry, error) {
 		if _, exists := entries[logical]; exists {
 			return nil, fmt.Errorf("s3 list %s: duplicate logical key %s", prefix, logical)
 		}
-		entries[logical] = Entry{
+		entries[logical] = ListedEntry{Version: aws.ToString(object.ETag), Entry: Entry{
 			Key:     logical,
 			Size:    aws.ToInt64(object.Size),
 			ModTime: aws.ToTime(object.LastModified),
-		}
+		}}
 	}
 
 	objectKeys := make([]string, 0, len(entries))
@@ -172,11 +190,11 @@ func (s *S3Store) List(ctx context.Context, prefix string) ([]Entry, error) {
 				}
 				continue
 			}
-			entries[dir] = Entry{Key: dir, IsDir: true}
+			entries[dir] = ListedEntry{Entry: Entry{Key: dir, IsDir: true}}
 		}
 	}
 
-	result := make([]Entry, 0, len(entries))
+	result := make([]ListedEntry, 0, len(entries))
 	for _, entry := range entries {
 		result = append(result, entry)
 	}
@@ -226,7 +244,7 @@ func (s *S3Store) listObjects(ctx context.Context, prefix string, maxKeys int32)
 			return nil, err
 		}
 		for _, object := range out.Contents {
-			objects = append(objects, s3typesObject{Key: object.Key, Size: object.Size, LastModified: object.LastModified})
+			objects = append(objects, s3typesObject{Key: object.Key, Size: object.Size, LastModified: object.LastModified, ETag: object.ETag})
 		}
 		if maxKeys > 0 {
 			break
@@ -243,6 +261,7 @@ func (s *S3Store) listObjects(ctx context.Context, prefix string, maxKeys int32)
 }
 
 type s3typesObject struct {
+	ETag         *string
 	Key          *string
 	Size         *int64
 	LastModified *time.Time

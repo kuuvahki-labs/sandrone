@@ -19,7 +19,7 @@ func (s *Service) SubscriptionTraffic(ctx context.Context, req domain.Subscripti
 		ctx = withCacheReadBypass(ctx)
 	}
 
-	sub, err := s.metaStore.GetSubscription(ctx, name)
+	sub, err := s.loadSubscription(ctx, name)
 	if err != nil {
 		return nil, err
 	}

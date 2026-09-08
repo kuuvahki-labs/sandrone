@@ -2,12 +2,14 @@ package store
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"io/fs"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -24,6 +26,8 @@ type fakeS3Object struct {
 }
 
 type fakeS3Client struct {
+	mu           sync.Mutex
+	getCalls     int
 	objects      map[string]fakeS3Object
 	pageSize     int
 	headCalls    int
@@ -38,6 +42,9 @@ func newFakeS3Client() *fakeS3Client {
 }
 
 func (f *fakeS3Client) GetObject(ctx context.Context, in *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.getCalls++
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -48,10 +55,12 @@ func (f *fakeS3Client) GetObject(ctx context.Context, in *s3.GetObjectInput, _ .
 	if !ok {
 		return nil, noSuchKey()
 	}
-	return &s3.GetObjectOutput{Body: io.NopCloser(strings.NewReader(string(object.body)))}, nil
+	return &s3.GetObjectOutput{ETag: aws.String(fmt.Sprintf("%x", sha256.Sum256(object.body))), Body: io.NopCloser(strings.NewReader(string(object.body)))}, nil
 }
 
 func (f *fakeS3Client) PutObject(ctx context.Context, in *s3.PutObjectInput, _ ...func(*s3.Options)) (*s3.PutObjectOutput, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -68,6 +77,8 @@ func (f *fakeS3Client) PutObject(ctx context.Context, in *s3.PutObjectInput, _ .
 }
 
 func (f *fakeS3Client) DeleteObject(ctx context.Context, in *s3.DeleteObjectInput, _ ...func(*s3.Options)) (*s3.DeleteObjectOutput, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -80,6 +91,8 @@ func (f *fakeS3Client) DeleteObject(ctx context.Context, in *s3.DeleteObjectInpu
 }
 
 func (f *fakeS3Client) HeadObject(ctx context.Context, in *s3.HeadObjectInput, _ ...func(*s3.Options)) (*s3.HeadObjectOutput, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -95,6 +108,8 @@ func (f *fakeS3Client) HeadObject(ctx context.Context, in *s3.HeadObjectInput, _
 }
 
 func (f *fakeS3Client) ListObjectsV2(ctx context.Context, in *s3.ListObjectsV2Input, _ ...func(*s3.Options)) (*s3.ListObjectsV2Output, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -128,6 +143,7 @@ func (f *fakeS3Client) ListObjectsV2(ctx context.Context, in *s3.ListObjectsV2In
 	for _, key := range keys[start:limit] {
 		object := f.objects[key]
 		out.Contents = append(out.Contents, types.Object{
+			ETag:         aws.String(fmt.Sprintf("%x", sha256.Sum256(object.body))),
 			Key:          aws.String(key),
 			Size:         aws.Int64(int64(len(object.body))),
 			LastModified: aws.Time(object.modTime),

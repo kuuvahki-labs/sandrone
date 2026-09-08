@@ -39,6 +39,7 @@ func (s *Service) GetFile(ctx context.Context, req domain.FileRequest) (*domain.
 }
 
 func (s *Service) getFile(ctx context.Context, req domain.FileRequest, state *fileResolveState) (*domain.FileResult, error) {
+	ctx = s.withResourceReads(ctx)
 	storedRequest := req.Spec == nil && strings.TrimSpace(req.Name) != ""
 	spec, err := s.resolveSpec(ctx, req)
 	if err != nil {
@@ -152,7 +153,7 @@ func (s *Service) resolveSpec(ctx context.Context, req domain.FileRequest) (doma
 		if s.metaStore == nil {
 			return domain.FileSpec{}, storeUnavailable()
 		}
-		stored, err := s.metaStore.GetFile(ctx, req.Name)
+		stored, err := s.loadFileDefinition(ctx, req.Name)
 		if err != nil {
 			return domain.FileSpec{}, err
 		}

@@ -51,6 +51,8 @@ func (s *Service) RestoreBackup(ctx context.Context, body []byte) error {
 		return domain.NewError(domain.CodeBackupRestoreFailed, "backup Store is not configured")
 	}
 
+	defer s.metaStore.InvalidateLists()
+	defer s.invalidateResourceReads(ctx)
 	mutationCtx := context.WithoutCancel(ctx)
 	var snapshot backuppkg.Snapshot
 	err = s.storeCoordinator.Update(ctx, func(resourceStore store.Store) error {

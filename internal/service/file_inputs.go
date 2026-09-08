@@ -100,7 +100,7 @@ func (s *Service) resolveSubscriptionNodeInput(ctx context.Context, input domain
 	if name == "" {
 		return nil, missingNodeInputError(input, "subscription node input ref is required", nil)
 	}
-	sub, err := s.metaStore.GetSubscription(ctx, name)
+	sub, err := s.loadSubscription(ctx, name)
 	if err != nil {
 		return nil, nodeInputReadError(input, err)
 	}

@@ -179,22 +179,19 @@ func (c *storeCache) Clear(ctx context.Context) error {
 	if c == nil || c.store == nil {
 		return nil
 	}
-	entries, err := c.store.List(ctx, "cache")
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil
-		}
-		return err
-	}
-	for _, listed := range entries {
-		if listed.IsDir {
-			continue
-		}
-		if err := c.store.Delete(ctx, listed.Key); err != nil && !errors.Is(err, os.ErrNotExist) {
+	return c.store.Update(ctx, func(resourceStore store.Store) error {
+		entries, err := store.ListPrefix(ctx, resourceStore, "cache")
+		if err != nil {
 			return err
 		}
-	}
-	return nil
+		keys := make([]string, 0, len(entries))
+		for _, entry := range entries {
+			if !entry.IsDir {
+				keys = append(keys, entry.Key)
+			}
+		}
+		return store.DeleteMany(ctx, resourceStore, keys)
+	})
 }
 
 func cacheStoreKey(key string) (string, error) {

@@ -146,6 +146,7 @@ func (s *Service) RenderSubscription(ctx context.Context, name string, format st
 }
 
 func (s *Service) RenderSubscriptionRequest(ctx context.Context, request domain.SubscriptionRenderRequest) (*domain.RenderResult, error) {
+	ctx = s.withResourceReads(ctx)
 	if s.metaStore == nil {
 		return nil, storeUnavailable()
 	}
@@ -160,7 +161,7 @@ func (s *Service) RenderSubscriptionRequest(ctx context.Context, request domain.
 		format = "uri-list"
 	}
 	name = strings.TrimSpace(name)
-	sub, err := s.metaStore.GetSubscription(ctx, name)
+	sub, err := s.loadSubscription(ctx, name)
 	if err != nil {
 		return nil, err
 	}

@@ -84,15 +84,21 @@ func (s *Service) cacheResourceRevision(ctx context.Context, ref domain.Resource
 	}
 	switch strings.ToLower(strings.TrimSpace(ref.Kind)) {
 	case "subscription":
-		subscription, err := s.metaStore.GetSubscription(ctx, strings.TrimSpace(ref.Name))
+		subscription, revision, err := s.readResource(ctx, "subscription", strings.TrimSpace(ref.Name), s.metaStore.GetSubscription)
 		if err != nil {
 			return "", err
 		}
+		if revision != "" {
+			return revision, nil
+		}
 		return cacheIdentity(subscription)
 	case "file":
-		file, err := s.metaStore.GetFile(ctx, strings.TrimSpace(ref.Name))
+		file, revision, err := s.readResource(ctx, "file", strings.TrimSpace(ref.Name), s.metaStore.GetFile)
 		if err != nil {
 			return "", err
+		}
+		if revision != "" {
+			return revision, nil
 		}
 		return cacheIdentity(file)
 	default:
