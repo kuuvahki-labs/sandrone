@@ -8,6 +8,7 @@ export SANDRONE_TOKEN="sandrone"
 ```
 
 完整 envelope、API 与 sandbox 契约见[脚本 API 参考](../reference/scripting-api.md)。
+多端文件脚本示例见[按域名后缀使用自定义直连 DoH](domain-suffix-doh.md)。
 
 ## Nodes-stage：给节点名加前缀
 
