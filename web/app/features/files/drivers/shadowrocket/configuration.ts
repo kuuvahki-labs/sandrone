@@ -118,7 +118,7 @@ function shadowrocketGroups(): StructuredFileConfigurationAdapter["groups"] {
     id: draftID("group", index),
     name: stringField(value.name),
     type: stringField(value.type) || "select",
-    memberMode: typeof value["policy-regex-filter"] === "string" ? "runtime-filter" : "fixed",
+    memberMode: typeof value["policy-regex-filter"] === "string" ? "regex-filter" : "fixed",
     members: stringList(value.proxies) ?? [],
     filter: stringField(value["policy-regex-filter"]),
     excludeFilter: "",
@@ -130,7 +130,7 @@ function shadowrocketGroups(): StructuredFileConfigurationAdapter["groups"] {
   }));
   const serialize = (values: GroupDraft[]): ConfigMap[] => values.map((draft) => {
     const value: ConfigMap = { name: draft.name, type: draft.type };
-    if (draft.memberMode === "runtime-filter") value["policy-regex-filter"] = draft.filter;
+    if (draft.memberMode === "regex-filter") value["policy-regex-filter"] = draft.filter;
     else value.proxies = [...draft.members];
     if (isHealthCheck(draft.type)) {
       if (draft.healthCheckInterval) value.interval = Number(draft.healthCheckInterval);
@@ -156,14 +156,14 @@ function shadowrocketGroups(): StructuredFileConfigurationAdapter["groups"] {
     serialize,
     supportsExcludeFilter: false,
     supportsHidden: true,
-    supportsRuntimeFilter: true,
+    regexFilter: { execution: "native" },
     transitionMemberMode: (group, mode, restoredMembers) => ({
       ...group,
       memberMode: mode,
       members: mode === "fixed"
         ? fixedRuntimeMembers(restoredMembers?.length ? restoredMembers : group.members)
         : group.members,
-      filter: mode === "runtime-filter" ? group.filter || "(?i)" : "",
+      filter: mode === "regex-filter" ? group.filter || "(?i)" : "",
     }),
     transitionType: (group, type) => !isHealthCheck(type)
       ? { ...group, type, healthCheckInterval: "", healthCheckTimeout: undefined, healthCheckTolerance: undefined }

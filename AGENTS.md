@@ -13,6 +13,7 @@
 - `FileSpec.kind` 必须是显式 canonical 值；typed `config` 只含
   `subscriptions` 和 `settings`，由对应 driver 严格解码。
 - file-stage processor 按声明顺序执行。
+- 配置策略归属遵守[文件管线](docs/architecture/file-pipeline.md#配置策略归属)，平台能力与显式策略分别维护。
 - Web 改动遵守 [web/AGENTS.md](web/AGENTS.md)。
 - adapter 改动以 `NodeIR` 语义为边界判断影响；共享语义、协议值域或客户端共享
   路径变化按[影响矩阵](CONTRIBUTING.md#跨协议与客户端影响矩阵)检查，局部改动

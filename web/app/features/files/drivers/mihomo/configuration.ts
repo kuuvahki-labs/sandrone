@@ -69,7 +69,7 @@ export const mihomoConfigurationAdapter = createStructuredConfigurationAdapter({
       validateFilter: groups.validateFilter,
       validate: (group, index) => {
         const state = stateRecord(group.adapterState);
-        return group.memberMode === "runtime-filter"
+        return group.memberMode === "regex-filter"
           && !group.excludeFilter
           && Object.hasOwn(state, "exclude-filter")
           && !groups.validateFilter(state["exclude-filter"])
@@ -115,7 +115,7 @@ function mihomoGroups(): StructuredFileConfigurationAdapter["groups"] {
     id: draftID("group", index),
     name: stringField(value.name),
     type: stringField(value.type) || "select",
-    memberMode: value["include-all-proxies"] === true ? "runtime-filter" : "fixed",
+    memberMode: value["include-all-proxies"] === true ? "regex-filter" : "fixed",
     members: stringList(value.proxies) ?? [],
     filter: stringField(value.filter),
     excludeFilter: stringField(value["exclude-filter"]),
@@ -127,7 +127,7 @@ function mihomoGroups(): StructuredFileConfigurationAdapter["groups"] {
   }));
   const serialize = (values: GroupDraft[]): ConfigMap[] => values.map((draft) => {
     const value: ConfigMap = { ...stateRecord(draft.adapterState), name: draft.name, type: draft.type };
-    if (draft.memberMode === "runtime-filter") {
+    if (draft.memberMode === "regex-filter") {
       value["include-all-proxies"] = true;
       value.filter = draft.filter;
       if (draft.excludeFilter) value["exclude-filter"] = draft.excludeFilter;
@@ -154,7 +154,7 @@ function mihomoGroups(): StructuredFileConfigurationAdapter["groups"] {
     serialize,
     supportsExcludeFilter: true,
     supportsHidden: true,
-    supportsRuntimeFilter: true,
+    regexFilter: { execution: "native" },
     transitionMemberMode: (group, mode, restoredMembers) => ({
       ...group,
       adapterState: omitKeys(stateRecord(group.adapterState), [
@@ -163,8 +163,8 @@ function mihomoGroups(): StructuredFileConfigurationAdapter["groups"] {
       ]),
       memberMode: mode,
       members: mode === "fixed" ? restoredMembers?.length ? restoredMembers : group.members.length ? group.members : ["$nodes"] : group.members,
-      filter: mode === "runtime-filter" ? group.filter || "(?i)" : "",
-      excludeFilter: mode === "runtime-filter" ? group.excludeFilter : "",
+      filter: mode === "regex-filter" ? group.filter || "(?i)" : "",
+      excludeFilter: mode === "regex-filter" ? group.excludeFilter : "",
     }),
     transitionType: (group, type) => {
       const adapterState = { ...stateRecord(group.adapterState) };

@@ -301,6 +301,39 @@ func TestServiceSingBoxFilePreservesExplicitRouteFinal(t *testing.T) {
 	require.Equal(t, "🚀 节点选择", doc["route"].(map[string]any)["final"])
 }
 
+func TestServiceSingBoxFileDoesNotDefaultRouteFinal(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		base string
+	}{
+		{"implicit source", ""},
+		{"missing final", `{"route":{}}`},
+		{"empty final", `{"route":{"final":""}}`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			spec := domain.FileSpec{
+				Name: "manual.json", Kind: domain.FileKindSingBox,
+				Config: &domain.FileConfig{Settings: completeTypedSettings(t, map[string]any{
+					"groups": []map[string]any{{"type": "selector", "tag": "Manual", "outbounds": []string{"direct"}}},
+				})},
+			}
+			if test.base != "" {
+				spec.Source = domain.FileSource{Type: "inline", Content: test.base}
+			}
+			result, err := service.New().GetFile(t.Context(), domain.FileRequest{Spec: &spec})
+			require.NoError(t, err)
+			var doc map[string]any
+			require.NoError(t, json.Unmarshal(result.Content, &doc))
+			route := doc["route"].(map[string]any)
+			if test.name == "empty final" {
+				require.Equal(t, "", route["final"])
+			} else {
+				require.NotContains(t, route, "final")
+			}
+		})
+	}
+}
+
 func TestServiceTypedConfigRejectsUnknownSetting(t *testing.T) {
 	spec := domain.FileSpec{
 		Name:   "default.yaml",

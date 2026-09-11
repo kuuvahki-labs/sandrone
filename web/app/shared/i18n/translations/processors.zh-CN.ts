@@ -12,6 +12,7 @@ export const processorZhCN = {
   "processors.filePreset.mihomo.fakeIpOpenClash.label": "OpenClash Fake-IP 规则",
   "processors.filePreset.mihomo.fakeIpShellCrash.label": "ShellCrash Fake-IP 规则",
   "processors.filePreset.mihomo.tailscaleNative.label": "Tailscale 原生接管",
+  "processors.filePreset.singBox.outboundAdapter.label": "出站配置适配",
   "processors.filePreset.singBox.sniff.label": "流量嗅探与 DNS 劫持",
   "processors.filePreset.singBox.quicFallback.label": "QUIC 强制回退",
   "processors.filePreset.singBox.tailscaleNative.label": "Tailscale 原生接管",

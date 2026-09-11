@@ -133,7 +133,7 @@ func singBoxWebDefaultSpec(t *testing.T, autoMembers []any) *domain.FileSpec {
 				},
 			}),
 		},
-		Processors: []domain.ProcessorSpec{{
+		Processors: []domain.ProcessorSpec{singBoxOutboundAdapterProcessor(t, map[string]any{"default_outbound": "Proxy"}), {
 			Name:  "Sniff & DNS Hijack",
 			Type:  "merge",
 			Stage: domain.StageFile,

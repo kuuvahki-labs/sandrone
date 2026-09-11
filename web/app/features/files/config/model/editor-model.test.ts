@@ -307,12 +307,12 @@ describe("file config model", () => {
     },
   );
 
-  it("recognizes Shadowrocket fixed and runtime-filter group membership without mixing fields", () => {
+  it("recognizes Shadowrocket fixed and regex-filter group membership without mixing fields", () => {
     expect(proxyGroupMemberMode("shadowrocket", {
       name: "HK",
       type: "url-test",
       "policy-regex-filter": "(?i)HK",
-    })).toBe("runtime-filter");
+    })).toBe("regex-filter");
     expect(proxyGroupHasMemberSource("shadowrocket", {
       name: "HK",
       type: "url-test",
@@ -385,7 +385,7 @@ describe("file config model", () => {
       "exclude-filter": "(?i)(?:家宽|实验)",
     };
 
-    expect(proxyGroupMemberMode("mihomo", group)).toBe("runtime-filter");
+    expect(proxyGroupMemberMode("mihomo", group)).toBe("regex-filter");
     expect(proxyGroupHasMemberSource("mihomo", group)).toBe(true);
     expect(validMihomoGroupFilter(group.filter)).toBe(true);
     expect(validMihomoGroupFilter(group["exclude-filter"])).toBe(true);
@@ -452,7 +452,7 @@ function ruleRequiresPolicy(kind: FileKind, type: string) {
 function proxyGroupMemberMode(kind: FileKind, group: ConfigMap) {
   return (kind === "mihomo" && group["include-all-proxies"] === true)
     || (kind === "shadowrocket" && typeof group["policy-regex-filter"] === "string")
-    ? "runtime-filter"
+    ? "regex-filter"
     : "fixed";
 }
 

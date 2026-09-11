@@ -14,7 +14,7 @@ afterEach(() => {
   localStorage.removeItem("sandrone.locale");
 });
 
-describe("ProxyGroupEditor runtime-filtered Mihomo groups", () => {
+describe("ProxyGroupEditor regex-filtered Mihomo groups", () => {
   it("puts add at the list bottom and opens and focuses the appended group", async () => {
     const user = userEvent.setup();
     render(<ControlledEditor initialGroups={[]} onChange={vi.fn()} />);
@@ -88,7 +88,7 @@ describe("ProxyGroupEditor runtime-filtered Mihomo groups", () => {
       onChange={onChange}
     />);
 
-    expect(screen.getByText("动态筛选")).toBeInTheDocument();
+    expect(screen.getByText("正则筛选")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "展开代理组 香港节点" }));
     const memberSource = screen.getByRole("combobox", { name: /成员来源|Member source/i });
     const hidden = screen.getByRole("checkbox", { name: /隐藏分组|Hide group/i });
@@ -110,7 +110,7 @@ describe("ProxyGroupEditor runtime-filtered Mihomo groups", () => {
     }]);
   });
 
-  it("restores ordered fixed members and offers projected nodes after a runtime-filter round trip", async () => {
+  it("restores ordered fixed members and offers projected nodes after a regex-filter round trip", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     render(<ControlledEditor
@@ -123,7 +123,7 @@ describe("ProxyGroupEditor runtime-filtered Mihomo groups", () => {
     await user.click(screen.getByRole("combobox", { name: "成员 1" }));
     expect(await screen.findByRole("option", { name: /HK Node.*ss/ })).toBeInTheDocument();
     await user.keyboard("{Escape}");
-    await choose(user, "成员来源", "动态筛选");
+    await choose(user, "成员来源", "正则筛选");
     await choose(user, "成员来源", "固定成员");
 
     expect(onChange).toHaveBeenLastCalledWith([{
@@ -198,7 +198,7 @@ describe("ProxyGroupEditor Shadowrocket schema", () => {
       tolerance: 50,
     }]);
 
-    await choose(user, "成员来源", "动态筛选");
+    await choose(user, "成员来源", "正则筛选");
     expect(onChange).toHaveBeenLastCalledWith([{
       name: "Hong Kong",
       type: "url-test",

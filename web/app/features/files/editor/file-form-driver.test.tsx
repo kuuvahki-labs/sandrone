@@ -6,6 +6,8 @@ import { FileConfigEditor } from "~/features/files/config/components/editor";
 import type { FileDriverDefinition } from "~/features/files/drivers/core/file-driver";
 import { requireFileDriver } from "~/features/files/drivers/registry";
 import { requireFileDriverUI } from "~/features/files/editor/file-driver-ui-registry";
+import { createTranslator, I18nProvider, useI18n } from "~/shared/i18n/context";
+import type { ProcessorDetail } from "~/shared/resources/types";
 
 import { FileFormFields, FileKindConfigWorkbench } from "./file-form";
 import { RawFileConfigEditor } from "./raw-config-editor";
@@ -17,6 +19,142 @@ afterEach(() => {
 });
 
 describe("file form drivers", () => {
+  it.each([["en-US", "Proxy"], ["zh-CN", "🚀 节点选择"]] as const)("stores the %s new-file default only in the outbound adapter", (locale, target) => {
+    localStorage.setItem("sandrone.locale", locale);
+    render(<FileFormFields defaultName="client.json" driver={requireFileDriver("sing-box")} mode="create" />);
+    expect(currentProcessors()[0]).toMatchObject({ params: { args: { default_outbound: target } } });
+    const base = JSON.parse(String(currentSource().content));
+    expect(base.route).not.toHaveProperty("final");
+    expect(currentConfig()).toMatchObject({ settings: { groups: expect.arrayContaining([expect.objectContaining({ tag: target })]) } });
+  });
+
+  it("keeps new-file naming and processor parameters stable when the interface language changes", async () => {
+    localStorage.setItem("sandrone.locale", "zh-CN");
+    const user = userEvent.setup();
+    render(<I18nProvider>
+      <SwitchLanguageButton />
+      <FileFormFields defaultName="client.json" driver={requireFileDriver("sing-box")} mode="create" />
+    </I18nProvider>);
+    const processors = currentProcessors();
+    const config = currentConfig();
+    const source = currentSource();
+    await user.click(screen.getByRole("button", { name: "Switch interface language" }));
+    expect(screen.getByRole("group", { name: "Basic information" })).toBeInTheDocument();
+    expect(currentProcessors()).toEqual(processors);
+    expect(currentConfig()).toEqual(config);
+    expect(currentSource()).toEqual(source);
+  });
+
+  it("warns after renaming the default group and clears the notice when its parameter is corrected", async () => {
+    localStorage.setItem("sandrone.locale", "en-US");
+    const user = userEvent.setup();
+    const driver = requireFileDriver("sing-box");
+    const onValidityChange = vi.fn();
+    const processor = driver.processors.defaults(createTranslator("en-US"), { namingLocale: "en-US" })[0];
+    render(<FileFormFields defaultName="client.json" driver={driver} mode="edit"
+      configDefault={{ settingsPresent: true, settings: { groups: [{ type: "selector", tag: "Proxy", outbounds: ["direct"] }], rule_sets: [], rules: [] } }}
+      sourceDefault={{ type: "inline", content: '{"route":{"final":"direct"}}' }}
+      processorsDefault={[processor]} onValidityChange={onValidityChange} />);
+    await user.click(screen.getByRole("button", { name: "Expand proxy group Proxy" }));
+    fireEvent.change(screen.getByDisplayValue("Proxy"), { target: { value: "Manual" } });
+    expect(await screen.findByText(/Default outbound “Proxy” was not found/)).toBeInTheDocument();
+    await waitFor(() => expect(onValidityChange).toHaveBeenLastCalledWith(true));
+    const card = screen.getByRole("group", { name: /Outbound configuration adaptation/ });
+    fireEvent.change(within(card).getByRole("textbox", { name: "Arguments" }), { target: { value: "default_outbound=Manual" } });
+    await waitFor(() => expect(screen.queryByText(/Default outbound “Proxy” was not found/)).not.toBeInTheDocument());
+    fireEvent.change(within(card).getByRole("spinbutton", { name: "Execution timeout (seconds)" }), { target: { value: "10" } });
+    expect(currentProcessors()).toHaveLength(1);
+    expect(currentProcessors()[0]).toMatchObject({ params: { timeout_ms: 10000, args: { default_outbound: "Manual" } } });
+    expect(JSON.parse(String(currentSource().content)).route.final).toBe("direct");
+  });
+
+  it("adds the filter processor once at the front and allows deletion without blocking save", async () => {
+    localStorage.setItem("sandrone.locale", "en-US");
+    const user = userEvent.setup();
+    const onValidityChange = vi.fn();
+    const custom: ProcessorDetail = { type: "script", stage: "file", name: "Custom", params: {
+      source: { type: "inline", content: "function main(input) { return input; }" },
+    } };
+    render(<FileFormFields
+      defaultName="client.json"
+      driver={requireFileDriver("sing-box")}
+      mode="edit"
+      sourceDefault={{ type: "inline", content: "{}" }}
+      configDefault={{ settingsPresent: true, settings: {
+        groups: [{ type: "selector", tag: "Proxy", outbounds: ["direct"] }], rule_sets: [], rules: [],
+      } }}
+      processorsDefault={[custom]}
+      onValidityChange={onValidityChange}
+    />);
+
+    await user.click(screen.getByRole("button", { name: "Expand proxy group Proxy" }));
+    await user.click(screen.getByRole("combobox", { name: "Member source" }));
+    await user.click(await screen.findByRole("option", { name: "Regex filter" }));
+    const include = screen.getByRole("textbox", { name: "Include regex" });
+    expect(include).toHaveValue(".*");
+    const preset = requireFileDriver("sing-box").processors.presets.find((entry) => entry.id === "outbound-adapter")!;
+    await waitFor(() => expect(currentProcessors()).toHaveLength(2));
+    expect(preset.recognize(currentProcessors()[0] as ProcessorDetail)).toBe(true);
+    expect(currentProcessors()[1]).toEqual(custom);
+    fireEvent.change(include, { target: { value: "(?i)HK|香港" } });
+    expect(currentProcessors()).toHaveLength(2);
+
+    const processorGroup = screen.getByRole("group", { name: /Outbound configuration adaptation/ });
+    await user.click(within(processorGroup).getByRole("button", { name: "Delete processor" }));
+    await waitFor(() => expect(currentProcessors()).toEqual([custom]));
+    expect(screen.getByText(/Regex groups need the enabled/)).toBeInTheDocument();
+    await waitFor(() => expect(onValidityChange).toHaveBeenLastCalledWith(true));
+    fireEvent.change(include, { target: { value: "JP" } });
+    expect(currentProcessors()).toEqual([custom]);
+    expect(currentConfig()).toMatchObject({ settings: { groups: [{
+      type: "selector", tag: "Proxy", outbounds: ["$nodes"], filter: "JP",
+    }] } });
+  });
+
+  it("reopens regex definitions without adding a missing processor and warns for disabled processors", async () => {
+    localStorage.setItem("sandrone.locale", "en-US");
+    const config = { settingsPresent: true, settings: {
+      groups: [{ type: "selector", tag: "Proxy", outbounds: ["$nodes"], filter: "(?i)HK", "exclude-filter": "Home" }],
+      rule_sets: [], rules: [],
+    } };
+    const props = { defaultName: "client.json", driver: requireFileDriver("sing-box"), mode: "edit" as const,
+      sourceDefault: { type: "inline", content: "{}" }, configDefault: config };
+    const { unmount } = render(<FileFormFields {...props} />);
+    await waitFor(() => expect(screen.getByText(/Regex groups need the enabled/)).toBeInTheDocument());
+    expect(currentProcessors()).toEqual([]);
+    expect(currentConfig()).toEqual({ settings: config.settings });
+    unmount();
+
+    const preset = props.driver.processors.presets.find((entry) => entry.id === "outbound-adapter")!;
+    const processor = { ...preset.build((key) => key), enabled: false };
+    render(<FileFormFields {...props} processorsDefault={[processor]} />);
+    expect(screen.getByText(/Regex groups need the enabled/)).toBeInTheDocument();
+    expect(currentProcessors()).toHaveLength(1);
+    expect((currentProcessors()[0] as ProcessorDetail).enabled).toBe(false);
+  });
+
+  it("uses the current raw settings for processor addition and missing notices", async () => {
+    localStorage.setItem("sandrone.locale", "en-US");
+    render(<FileFormFields
+      defaultName="client.json"
+      driver={requireFileDriver("sing-box")}
+      mode="edit"
+      configDefault={{ settingsPresent: true, settings: { future: true } }}
+    />);
+    const raw = screen.getByRole("textbox", { name: /settings JSON/i });
+    const settings = { groups: [{ type: "selector", tag: "Proxy", outbounds: ["$nodes"], filter: "HK" }], rule_sets: [], rules: [] };
+    fireEvent.change(raw, { target: { value: JSON.stringify(settings) } });
+    await waitFor(() => expect(currentProcessors()).toHaveLength(1));
+    const user = userEvent.setup();
+    await user.click(within(screen.getByRole("group", { name: /Outbound configuration adaptation/ })).getByRole("button", { name: "Delete processor" }));
+    await waitFor(() => expect(screen.getByText(/Regex groups need the enabled/)).toBeInTheDocument());
+    fireEvent.change(raw, { target: { value: JSON.stringify({ ...settings, groups: [] }) } });
+    await waitFor(() => expect(screen.queryByText(/Regex groups need the enabled/)).not.toBeInTheDocument());
+    fireEvent.change(raw, { target: { value: JSON.stringify(settings) } });
+    expect(currentProcessors()).toEqual([]);
+    expect(screen.getByText(/Regex groups need the enabled/)).toBeInTheDocument();
+  });
+
   it("does not expose subscriptions for Shadowrocket config", () => {
     render(
       <FileKindConfigWorkbench
@@ -123,7 +261,7 @@ describe("file form drivers", () => {
       route: { final?: string };
     };
     expect(base.dns.servers[2]?.detour).toBe("🚀 节点选择");
-    expect(base.route.final).toBe("🚀 节点选择");
+    expect(base.route).not.toHaveProperty("final");
   });
 
   it("clears the base and template settings while preserving the subscription and processors", async () => {
@@ -412,4 +550,9 @@ function structuredAdapter(kind: string) {
   const configuration = requireFileDriver(kind).configuration;
   if (configuration.mode !== "structured") throw new Error(`expected structured driver: ${kind}`);
   return configuration.adapter;
+}
+
+function SwitchLanguageButton() {
+  const { setLocaleMode } = useI18n();
+  return <button type="button" onClick={() => setLocaleMode("en-US")}>Switch interface language</button>;
 }

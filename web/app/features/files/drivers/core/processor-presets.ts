@@ -13,7 +13,18 @@ export interface FileProcessorPreset {
   build(t: Translator): ProcessorDetail;
   recognize(processor: Pick<ProcessorDetail, "type" | "params">): boolean;
   isCurrent?(processor: Pick<ProcessorDetail, "type" | "params">): boolean;
+  configurationNotices?(processor: ProcessorDetail, settings: unknown): readonly FileProcessorConfigurationNotice[];
   readonly replaceConflictsInPlace?: boolean;
+  /** Frontend-only opt-in: prepend once when the settings first use this preset. */
+  readonly configurationUse?: {
+    matches(settings: unknown): boolean;
+    missingNoticeKey: Parameters<Translator>[0];
+  };
+}
+
+export interface FileProcessorConfigurationNotice {
+  readonly messageKey: Parameters<Translator>[0];
+  readonly params?: Parameters<Translator>[1];
 }
 
 export interface FileProcessorPresetPlan {

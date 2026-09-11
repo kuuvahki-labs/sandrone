@@ -46,7 +46,6 @@ export function singBoxDefaultBase(namingLocale: ConfigNamingLocale): string {
   "route": {
     "auto_detect_interface": true,
     "default_domain_resolver": "dns-cn",
-    "final": "${anchor}",
     "rule_set": [],
     "rules": []
   },

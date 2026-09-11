@@ -12,6 +12,7 @@ export const processorEnUS = {
   "processors.filePreset.mihomo.fakeIpOpenClash.label": "OpenClash Fake-IP rules",
   "processors.filePreset.mihomo.fakeIpShellCrash.label": "ShellCrash Fake-IP rules",
   "processors.filePreset.mihomo.tailscaleNative.label": "Native Tailscale",
+  "processors.filePreset.singBox.outboundAdapter.label": "Outbound configuration adaptation",
   "processors.filePreset.singBox.sniff.label": "Sniff & DNS Hijack",
   "processors.filePreset.singBox.quicFallback.label": "Force QUIC fallback",
   "processors.filePreset.singBox.tailscaleNative.label": "Native Tailscale",

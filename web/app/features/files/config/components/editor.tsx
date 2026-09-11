@@ -60,11 +60,12 @@ export interface FileConfigEditorProps {
   onDirty?: () => void;
   onClearBase: () => void;
   onValidityChange?: (valid: boolean) => void;
+  onSettingsChange?: (settings: unknown) => void;
   subscriptions: ResourceOption[];
   ui: Readonly<StructuredConfigurationFieldSlots>;
 }
 
-export function FileConfigEditor({ adapter, allowSubscriptions = true, baseEditor, createNamingLocale = "en-US", defaultValue, loadRuleSetCatalog, loadSubscriptionPreview = emptySubscriptionPreview, mode: formMode, onClearBase, onDirty, onValidityChange, subscriptions, ui }: FileConfigEditorProps) {
+export function FileConfigEditor({ adapter, allowSubscriptions = true, baseEditor, createNamingLocale = "en-US", defaultValue, loadRuleSetCatalog, loadSubscriptionPreview = emptySubscriptionPreview, mode: formMode, onClearBase, onDirty, onValidityChange, onSettingsChange, subscriptions, ui }: FileConfigEditorProps) {
   const { t } = useI18n();
   const [editorState, setEditorState] = useState(() => (
     initializeConfigEditorState(adapter, {
@@ -184,6 +185,7 @@ export function FileConfigEditor({ adapter, allowSubscriptions = true, baseEdito
     : copy.templatePicker;
 
   useEffect(() => onValidityChange?.(valid), [onValidityChange, valid]);
+  useEffect(() => onSettingsChange?.(output.encoded.settings), [onSettingsChange, output.encoded.settings]);
 
   function applyTemplate(choice: ConfigTemplateChoice) {
     onDirty?.();

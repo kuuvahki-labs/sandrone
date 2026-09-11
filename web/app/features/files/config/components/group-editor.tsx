@@ -158,7 +158,7 @@ function SortableProxyGroupRow({ adapter, focusFirstField, group, id, inboundCou
   const fixedTargetsRef = useRef<string[]>(
     targets.length ? targets : adapter.references.includeAllNodesMacro === false ? [] : ["$nodes"],
   );
-  const runtimeFilterRef = useRef(group.filter || "(?i)");
+  const regexFilterRef = useRef(group.filter);
   useEffect(() => {
     if (memberMode === "fixed" && targets.length) fixedTargetsRef.current = targets;
   }, [memberMode, targets]);
@@ -179,10 +179,10 @@ function SortableProxyGroupRow({ adapter, focusFirstField, group, id, inboundCou
 
   function updateMemberMode(value: string) {
     const mode = value as GroupDraft["memberMode"];
-    if (mode === "runtime-filter" && targets.length) fixedTargetsRef.current = targets;
-    if (mode === "fixed" && group.filter) runtimeFilterRef.current = group.filter;
+    if (mode === "regex-filter" && targets.length) fixedTargetsRef.current = targets;
+    if (mode === "fixed" && group.filter) regexFilterRef.current = group.filter;
     const next = adapter.groups.transitionMemberMode(group, mode, fixedTargetsRef.current);
-    onUpdate(mode === "runtime-filter" ? { ...next, filter: runtimeFilterRef.current } : next);
+    onUpdate(mode === "regex-filter" ? { ...next, filter: regexFilterRef.current || next.filter } : next);
   }
 
   return (
@@ -199,7 +199,7 @@ function SortableProxyGroupRow({ adapter, focusFirstField, group, id, inboundCou
             primary={name}
             secondary={[
               typeLabel,
-              ...(memberMode === "runtime-filter"
+              ...(memberMode === "regex-filter"
                 ? [t("files.config.groupRuntimeFilterSummary")]
                 : targets.length
                   ? targets.map((target) => target === "$nodes" ? t("files.config.subscriptionNodes") : target)
@@ -222,12 +222,12 @@ function SortableProxyGroupRow({ adapter, focusFirstField, group, id, inboundCou
               : "grid gap-3"}
             data-group-membership-controls=""
           >
-            {adapter.groups.supportsRuntimeFilter ? (
+            {adapter.groups.regexFilter ? (
               <SelectField
                 label={t("files.config.groupMemberSource")}
                 options={[
                   { value: "fixed", label: t("files.config.groupMemberSourceFixed") },
-                  { value: "runtime-filter", label: t("files.config.groupMemberSourceRuntime") },
+                  { value: "regex-filter", label: t("files.config.groupMemberSourceRuntime") },
                 ]}
                 size="small"
                 value={memberMode}
@@ -242,7 +242,7 @@ function SortableProxyGroupRow({ adapter, focusFirstField, group, id, inboundCou
               />
             ) : null}
           </div>
-          {memberMode === "runtime-filter" ? (
+          {memberMode === "regex-filter" ? (
             <div className={adapter.groups.supportsExcludeFilter ? "grid gap-3 sm:grid-cols-2" : "grid gap-3"}>
               <TextField
                 error={!adapter.groups.validateFilter(group.filter)}
@@ -255,7 +255,7 @@ function SortableProxyGroupRow({ adapter, focusFirstField, group, id, inboundCou
                 size="small"
                 value={group.filter}
                 onChange={(event) => {
-                  runtimeFilterRef.current = event.target.value;
+                  regexFilterRef.current = event.target.value;
                   patchGroup({ filter: event.target.value });
                 }}
               />

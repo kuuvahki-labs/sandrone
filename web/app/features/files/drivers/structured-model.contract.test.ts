@@ -328,6 +328,9 @@ describe("structured file driver editor models", () => {
       status: "added",
       ruleSets: [{ behavior: "domain", format: "mrs", interval: "86400" }],
     });
+    expect(mihomo.groups.regexFilter).toEqual({ execution: "native" });
+    expect(shadowrocket.groups.regexFilter).toEqual({ execution: "native" });
+    expect(structuredAdapter("sing-box").groups.regexFilter).toEqual({ execution: "processor" });
     expect(mihomo.groups.validateFilter("(?i)HK")).toBe(true);
     expect(mihomo.groups.validateFilter("(HK)\\1")).toBe(false);
     expect(shadowrocket.groups.validateFilter("HK,hidden=1")).toBe(false);

@@ -257,6 +257,44 @@ const routes = [
   { path: "/settings/logs", heading: "程序日志", content: "全部级别", focus: false },
 ];
 
+test("sing-box regex groups add a visible processor and allow its removal", async ({ page }, testInfo) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto("/files/new?source=sing-box");
+  const groups = page.getByRole("button", { name: "代理组", exact: true });
+  if (await groups.getAttribute("aria-expanded") === "false") await groups.click();
+  await page.getByRole("button", { name: "添加代理组", exact: true }).click();
+  await page.getByRole("combobox", { name: "成员来源", exact: true }).click();
+  await page.getByRole("option", { name: "正则筛选", exact: true }).click();
+  const pattern = page.getByRole("textbox", { name: "包含正则", exact: true });
+  await expect(pattern).toHaveValue(".*");
+  await pattern.fill("(?i)HK|香港");
+  const processorsInput = page.locator('input[name="processors"]');
+  await expect.poll(async () => JSON.parse(await processorsInput.inputValue())[0]?.name).toBe("出站配置适配");
+  const card = page.getByRole("group", { name: "处理器 出站配置适配", exact: true });
+  await expect(card).toHaveCount(1);
+  await card.getByRole("button", { name: "启用 出站配置适配", exact: true }).click();
+  const notice = page.getByText(/正则分组需要启用/);
+  await expect(notice).toBeVisible();
+  await card.getByRole("button", { name: "启用 出站配置适配", exact: true }).click();
+  await expect(notice).toHaveCount(0);
+  await card.screenshot({ path: testInfo.outputPath("regex-group-processor.png") });
+  if (testInfo.project.name === "mobile") {
+    await card.getByRole("button", { name: "更多处理器操作：出站配置适配" }).click();
+    await page.getByRole("menuitem", { name: "删除处理器" }).click();
+  } else {
+    await card.getByRole("button", { name: "删除处理器" }).click();
+  }
+  await expect(notice).toBeVisible();
+  await pattern.fill("JP");
+  await expect(card).toHaveCount(0);
+  const config = JSON.parse(await page.locator('input[name="config"]').inputValue());
+  expect(config.settings.groups.at(-1)).toMatchObject({ filter: "JP", outbounds: ["$nodes"] });
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+  expect(errors).toEqual([]);
+});
+
 test("settings overview opens service settings", async ({ page }) => {
   const consoleIssues: string[] = [];
   page.on("console", (message) => {

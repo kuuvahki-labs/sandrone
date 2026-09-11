@@ -68,6 +68,8 @@ curl -fsS \
 ## sing-box
 
 sing-box 的 group、rule set 和 rule 使用对象结构：
+需要按名称正则生成成员时，在 Web 组编辑器选择“正则筛选”；处理器配置和
+API/CLI 调用要求见[出站配置适配](../reference/community-config-presets.md#出站配置适配)。
 
 ```sh
 curl -sS -X POST "$SANDRONE_API/v1/files" \
@@ -76,7 +78,7 @@ curl -sS -X POST "$SANDRONE_API/v1/files" \
   --data '{
     "name": "config.json",
     "kind": "sing-box",
-    "source": {},
+    "source": {"type":"inline","content":"{\"route\":{\"final\":\"Proxy\"}}"},
     "config": {
       "subscriptions": ["default"],
       "settings": {

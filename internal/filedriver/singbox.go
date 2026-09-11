@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json/jsontext"
 	"encoding/json/v2"
-	"strings"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/filekind"
@@ -79,9 +78,6 @@ func (singBoxFileDriver) Compile(_ context.Context, in CompileInput) ([]byte, er
 	route := mapValue(doc["route"])
 	route["rule_set"] = configMapList(settings.RuleSets)
 	route["rules"] = configMapList(settings.Rules)
-	if final, ok := route["final"].(string); !ok || strings.TrimSpace(final) == "" {
-		route["final"] = "Proxy"
-	}
 	doc["route"] = route
 	out, err := json.Marshal(doc, jsontext.WithIndent("  "))
 	if err != nil {

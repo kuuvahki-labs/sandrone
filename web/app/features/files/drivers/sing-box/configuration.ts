@@ -31,6 +31,7 @@ import type { FileConfigDraft } from "~/features/files/model/types";
 import type { Translator } from "~/shared/i18n/context";
 import { DEFAULT_PROBE_URL } from "~/shared/probe/defaults";
 
+import { validSingBoxGroupFilter } from "./group-filter";
 import { singBoxConfigurationStrategies } from "./strategies";
 
 const RULE_SET_EXTENSIONS: Readonly<Record<string, string>> = { binary: "srs", source: "json" };
@@ -62,7 +63,7 @@ export const singBoxConfigurationAdapter = createStructuredConfigurationAdapter(
       isHealthCheck: groups.isHealthCheck,
       requireHealthCheckInterval: true,
       requireHealthCheckURL: true,
-      supportsExcludeFilter: false,
+      supportsExcludeFilter: true,
       validateFilter: groups.validateFilter,
       validInterval: validDuration,
     },
@@ -93,17 +94,17 @@ function singBoxGroups(): StructuredFileConfigurationAdapter["groups"] {
     id: draftID("group", index),
     name: stringField(value.tag),
     type: stringField(value.type) === "urltest" ? "url-test" : "select",
-    memberMode: "fixed",
+    memberMode: Object.hasOwn(value, "filter") ? "regex-filter" : "fixed",
     members: stringList(value.outbounds) ?? [],
-    filter: "",
-    excludeFilter: "",
+    filter: stringField(value.filter),
+    excludeFilter: stringField(value["exclude-filter"]),
     healthCheckURL: stringField(value.url),
     healthCheckInterval: scalarString(value.interval),
     interruptExistingConnections: typeof value.interrupt_exist_connections === "boolean"
       ? value.interrupt_exist_connections
       : undefined,
     adapterState: {
-      ...omitKeys(value, ["type", "tag", "outbounds", "url", "interval", "interrupt_exist_connections"]),
+      ...omitKeys(value, ["type", "tag", "outbounds", "filter", "exclude-filter", "url", "interval", "interrupt_exist_connections"]),
       ...(Object.hasOwn(value, "interrupt_exist_connections")
         ? { [INTERRUPT_EXPLICIT_SENTINEL]: true }
         : {}),
@@ -115,8 +116,12 @@ function singBoxGroups(): StructuredFileConfigurationAdapter["groups"] {
       ...adapterState,
       type: draft.type === "url-test" ? "urltest" : "selector",
       tag: draft.name,
-      outbounds: [...draft.members],
+      outbounds: draft.memberMode === "regex-filter" ? ["$nodes"] : [...draft.members],
     };
+    if (draft.memberMode === "regex-filter") {
+      value.filter = draft.filter;
+      if (draft.excludeFilter) value["exclude-filter"] = draft.excludeFilter;
+    }
     if (draft.type === "url-test") {
       value.url = draft.healthCheckURL;
       value.interval = draft.healthCheckInterval;
@@ -140,10 +145,16 @@ function singBoxGroups(): StructuredFileConfigurationAdapter["groups"] {
     isHealthCheck: (type) => type === "url-test",
     project,
     serialize,
-    supportsExcludeFilter: false,
+    supportsExcludeFilter: true,
     supportsHidden: false,
-    supportsRuntimeFilter: false,
-    transitionMemberMode: (group) => group,
+    regexFilter: { execution: "processor" },
+    transitionMemberMode: (group, mode, restoredMembers) => ({
+      ...group,
+      memberMode: mode,
+      members: mode === "fixed" ? restoredMembers?.length ? restoredMembers : ["$nodes"] : group.members,
+      filter: mode === "regex-filter" ? group.filter || ".*" : "",
+      excludeFilter: mode === "regex-filter" ? group.excludeFilter : "",
+    }),
     transitionType: (group, type) => {
       const adapterState = { ...stateRecord(group.adapterState) };
       if (type === "select") {
@@ -159,7 +170,7 @@ function singBoxGroups(): StructuredFileConfigurationAdapter["groups"] {
       };
     },
     typeOptions: GROUP_TYPE_OPTIONS,
-    validateFilter: () => false,
+    validateFilter: validSingBoxGroupFilter,
   };
 }
 

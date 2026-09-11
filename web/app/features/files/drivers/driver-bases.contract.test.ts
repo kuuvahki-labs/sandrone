@@ -129,7 +129,6 @@ describe("file driver default bases", () => {
       route: {
         auto_detect_interface: true,
         default_domain_resolver: "dns-cn",
-        final: "Proxy",
         rule_set: [],
         rules: [],
       },
@@ -145,7 +144,7 @@ describe("file driver default bases", () => {
     };
 
     expect(base.dns.servers[2]?.detour).toBe("🚀 节点选择");
-    expect(base.route.final).toBe("🚀 节点选择");
+    expect(base.route).not.toHaveProperty("final");
   });
 
   it("uses the approved portable Shadowrocket Web base", () => {

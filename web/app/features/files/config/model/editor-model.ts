@@ -2,7 +2,7 @@ import type { FileAdaptiveGroupConfigDetail, RuleSetCatalogItem } from "~/featur
 
 export type ConfigMap = Record<string, unknown>;
 
-export type ProxyGroupMemberMode = "fixed" | "runtime-filter";
+export type ProxyGroupMemberMode = "fixed" | "regex-filter";
 
 export type RuleSetSource = "inline" | "remote";
 

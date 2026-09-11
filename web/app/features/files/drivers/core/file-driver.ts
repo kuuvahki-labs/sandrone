@@ -85,7 +85,7 @@ export interface StructuredGroupDraftAdapter {
   serialize: (groups: GroupDraft[]) => ConfigMap[];
   supportsExcludeFilter: boolean;
   supportsHidden: boolean;
-  supportsRuntimeFilter: boolean;
+  regexFilter?: { execution: "native" | "processor" };
   transitionMemberMode: (group: GroupDraft, mode: ProxyGroupMemberMode, restoredMembers?: string[]) => GroupDraft;
   transitionType: (group: GroupDraft, type: string) => GroupDraft;
   typeOptions: readonly { value: string; label: string }[];
@@ -151,7 +151,7 @@ interface FileDriverBase {
     validate: (source: FileSourceDetail) => FileInputValidationCode | null;
   };
   processors: {
-    defaults: (t: Translator) => ProcessorDetail[];
+    defaults: (t: Translator, context: { namingLocale: ConfigNamingLocale }) => ProcessorDetail[];
     mergeModes: readonly FileMergeMode[];
     presets: readonly FileProcessorPreset[];
     validate: (processors: ProcessorDetail[]) => FileProcessorValidationIssue[];

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ConfigAdaptiveStrategy } from "~/features/files/drivers/core/file-driver";
 import { requireFileDriver } from "~/features/files/drivers/registry";
+import { singBoxGroupMembers } from "~/features/files/drivers/sing-box/group-filter";
 import type { FileAdaptiveGroupConfigDetail, FileConfigDraft } from "~/features/files/model/types";
 
 import { adaptiveGenerationDisabledReasonKey } from "./adaptive-availability";
@@ -461,7 +462,7 @@ describe("adaptive sing-box group generation", () => {
    });
  });
 
-  it("emits selector groups with only unique matching preview node tags", () => {
+  it("persists selector regexes that match current and refreshed subscription nodes", () => {
     const result = generateAdaptiveGroups(
       ["HK-02", "HK-01", "HK-02", "US-日本-01", "亚美尼亚 US-03", "", " "],
       { type: "selector" },
@@ -470,10 +471,12 @@ describe("adaptive sing-box group generation", () => {
 
     expect(result.uniqueNodeCount).toBe(4);
     expect(result.groups).toEqual([
-      { tag: "Hong Kong", type: "selector", outbounds: ["HK-02", "HK-01"] },
-      { tag: "Japan", type: "selector", outbounds: ["US-日本-01"] },
-      { tag: "United States", type: "selector", outbounds: ["US-日本-01"] },
+      { tag: "Hong Kong", type: "selector", outbounds: ["$nodes"], filter: expect.any(String) },
+      { tag: "Japan", type: "selector", outbounds: ["$nodes"], filter: expect.any(String) },
+      { tag: "United States", type: "selector", outbounds: ["$nodes"], filter: expect.any(String), "exclude-filter": expect.any(String) },
     ]);
+    expect(singBoxGroupMembers(result.groups[0], ["HK-03", "JP-01", "HK-03", "香港-04"])).toEqual(["HK-03", "香港-04"]);
+    expect(singBoxGroupMembers(result.groups[2], ["亚美尼亚 US-03", "US-04"])).toEqual(["US-04"]);
  });
 
   it("emits the complete urltest shape with HTTPS health checks", () => {
@@ -486,7 +489,8 @@ describe("adaptive sing-box group generation", () => {
     expect(result.groups).toEqual([{
       tag: "Japan",
       type: "urltest",
-      outbounds: ["JP-01", "東京-02"],
+      outbounds: ["$nodes"],
+      filter: expect.any(String),
       url: "https://cp.cloudflare.com",
       interval: "5m",
       tolerance: 50,
@@ -515,7 +519,7 @@ describe("adaptive sing-box group generation", () => {
     expect(result.warnings).toContainEqual({ code: "node_name_conflict", groupName: "Hong Kong" });
  });
 
-  it("recognizes only strict canonical shapes with unique region-matching members", () => {
+  it("recognizes only strict canonical regex shapes", () => {
     const canonical = generateAdaptiveGroups(
       ["HK-02", "HK-01"],
       { type: "urltest" },
@@ -545,7 +549,7 @@ describe("adaptive Shadowrocket group generation", () => {
  });
 
   it.each(["select", "url-test", "load-balance"] as const)(
-    "emits a strict %s runtime-filter group",
+    "emits a strict %s regex-filter group",
     (type) => {
       const result = generateAdaptiveGroups(
         ["HK-01"],
@@ -569,7 +573,7 @@ describe("adaptive Shadowrocket group generation", () => {
    },
   );
 
-  it("recognizes and reconciles strict canonical runtime-filter groups", () => {
+  it("recognizes and reconciles strict canonical regex-filter groups", () => {
     const base = createConfigFromTemplate("shadowrocket", "minimal");
     const generation = generateAdaptiveGroups(
       ["HK-01", "HK-02"],
@@ -617,7 +621,7 @@ it("rejects a sing-box Proxy anchor that is not a selector", () => {
 });
 
 describe("adaptive sing-box group reconciliation", () => {
-  it("appends static groups and inserts tags before $nodes without mutating the template", () => {
+  it("appends regex groups and inserts tags before $nodes without mutating the template", () => {
     const base = createConfigFromTemplate("sing-box", "minimal");
     const snapshot = structuredClone(base);
     deepFreeze(base);
@@ -640,7 +644,8 @@ describe("adaptive sing-box group reconciliation", () => {
     expect(namedSingBoxGroup(first.config, "Hong Kong")).toEqual({
       tag: "Hong Kong",
       type: "urltest",
-      outbounds: ["HK-02", "HK-01"],
+      outbounds: ["$nodes"],
+      filter: expect.any(String),
       url: "https://cp.cloudflare.com",
       interval: "5m",
       tolerance: 50,
@@ -652,7 +657,7 @@ describe("adaptive sing-box group reconciliation", () => {
     expect(second.config).toEqual(first.config);
  });
 
-  it("updates canonical static members to the current preview order and values", () => {
+  it("retains canonical regexes when the subscription preview changes", () => {
     const base = createConfigFromTemplate("sing-box", "minimal");
     const first = mergeAdaptiveGroups(
       base,
@@ -675,10 +680,12 @@ describe("adaptive sing-box group reconciliation", () => {
     );
 
     expect(result.warnings).not.toContainEqual({ code: "group_name_conflict", groupName: "Hong Kong" });
-    expect(namedSingBoxGroup(result.config, "Hong Kong")?.outbounds).toEqual(["HK-02", "HK-03"]);
+    expect(result.changed).toBe(false);
+    expect(namedSingBoxGroup(result.config, "Hong Kong")).toEqual(namedSingBoxGroup(first.config, "Hong Kong"));
  });
 
   it.each([
+    { type: "selector", tag: "Hong Kong", outbounds: ["HK-01"] },
     { type: "selector", tag: "Hong Kong", outbounds: ["direct"] },
     { type: "selector", tag: "Hong Kong", outbounds: ["HK-01"], icon: "custom" },
     { type: "selector", tag: "Hong Kong" },

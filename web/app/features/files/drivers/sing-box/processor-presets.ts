@@ -1,3 +1,5 @@
+import { isRecord } from "~/features/files/config/model/editor-model";
+import { configAnchorName, type ConfigNamingLocale } from "~/features/files/config/model/naming";
 import type {
   FileProcessorPreset,
   FileProcessorPresetCategory,
@@ -8,12 +10,14 @@ import {
   type OrderedRuleProcessorPresetOptions,
   recognizeOrderedRuleProcessorPreset,
 } from "~/features/files/processors/ordered-rule-preset";
+import singBoxOutboundAdapterScript from "~/features/files/processors/scripts/sing-box-outbound-adapter.js?raw";
 import singBoxTailscaleExternalScript from "~/features/files/processors/scripts/sing-box-tailscale-external.js?raw";
 import singBoxTailscaleNativeScript from "~/features/files/processors/scripts/sing-box-tailscale-native.js?raw";
 import type { Translator } from "~/shared/i18n/context";
 import type { ProcessorDetail } from "~/shared/resources/types";
 
 export type SingBoxProcessorPresetID =
+  | "outbound-adapter"
   | "sniff"
   | "quic-fallback"
   | "tailscale-native"
@@ -52,12 +56,42 @@ const ORDERED_RULE_PRESETS: Record<
 };
 
 export function singBoxProcessorPreset(id: SingBoxProcessorPresetID, name: string): ProcessorDetail {
+  if (id === "outbound-adapter") return outboundAdapterProcessor(name);
   if (id === "sniff") return sniffAndDNSHijackProcessor(name);
   if (isOrderedRulePresetID(id)) return orderedRuleProcessorPreset(ORDERED_RULE_PRESETS[id], name);
   return tailscaleProcessor(id, name);
 }
 
 export const singBoxProcessorPresets: readonly FileProcessorPreset[] = [
+  {
+    id: "outbound-adapter",
+    configurationUse: {
+      matches: (settings) => isRecord(settings) && Array.isArray(settings.groups)
+        && settings.groups.some((group) => isRecord(group) && (Object.hasOwn(group, "filter") || Object.hasOwn(group, "exclude-filter"))),
+      missingNoticeKey: "files.config.outboundAdapterProcessorMissing",
+    },
+    category: "network",
+    labelKey: "processors.filePreset.singBox.outboundAdapter.label",
+    defaultOn: true,
+    dependencies: [],
+    conflicts: [],
+    build: (t) => outboundAdapterProcessor(t("processors.filePreset.singBox.outboundAdapter.label")),
+    recognize: (processor) => {
+      if (processor.type !== "script" || !isRecord(processor.params)) return false;
+      const source = processor.params.source;
+      return isExactRecord(source, ["content", "type"])
+        && source.type === "inline"
+        && source.content === singBoxOutboundAdapterScript;
+    },
+    configurationNotices: (processor, settings) => {
+      const args = processor.params?.args;
+      const target = isRecord(args) ? args.default_outbound : undefined;
+      if (typeof target !== "string" || !target.trim() || !isRecord(settings)) return [];
+      const groups = Array.isArray(settings.groups) ? settings.groups : [];
+      if (groups.some((group) => isRecord(group) && group.tag === target)) return [];
+      return [{ messageKey: "files.config.defaultOutboundReferenceMissing", params: { target } }];
+    },
+  },
   {
     id: "sniff",
     category: "network",
@@ -91,10 +125,15 @@ export const singBoxProcessorPresets: readonly FileProcessorPreset[] = [
   ),
 ];
 
-export function defaultSingBoxProcessors(t: Translator): ProcessorDetail[] {
+export function defaultSingBoxProcessors(t: Translator, { namingLocale }: { namingLocale: ConfigNamingLocale }): ProcessorDetail[] {
   return singBoxProcessorPresets
     .filter((preset) => preset.defaultOn)
-    .map((preset) => preset.build(t));
+    .map((preset) => {
+      const processor = preset.build(t);
+      return preset.id === "outbound-adapter"
+        ? { ...processor, params: { ...processor.params, args: { default_outbound: configAnchorName(namingLocale) } } }
+        : processor;
+    });
 }
 
 function sniffAndDNSHijackProcessor(name: string): ProcessorDetail {
@@ -106,6 +145,15 @@ function sniffAndDNSHijackProcessor(name: string): ProcessorDetail {
       mode: "json_override",
       content: SNIFF_AND_DNS_HIJACK_CONTENT,
     },
+  };
+}
+
+function outboundAdapterProcessor(name: string): ProcessorDetail {
+  return {
+    name,
+    type: "script",
+    stage: "file",
+    params: { source: { type: "inline", content: singBoxOutboundAdapterScript } },
   };
 }
 

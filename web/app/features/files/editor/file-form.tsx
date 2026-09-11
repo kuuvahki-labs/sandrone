@@ -1,4 +1,5 @@
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import Alert from "@mui/material/Alert";
 import TextField from "@mui/material/TextField";
 
 import { FileConfigEditor } from "~/features/files/config/components/editor";
@@ -8,7 +9,7 @@ import type { LoadRuleSetCatalog } from "~/features/files/config/components/rule
 import type { ConfigNamingLocale } from "~/features/files/config/model/naming";
 import type { FileDriverDefinition } from "~/features/files/drivers/core/file-driver";
 import type { FileConfigDetail, FileSourceDetail } from "~/features/files/model/types";
-import { FileProcessorBuilder } from "~/features/files/processors/processor-builder";
+import { FileProcessorBuilder, type FileProcessorBuilderHandle } from "~/features/files/processors/processor-builder";
 import { useI18n } from "~/shared/i18n/context";
 import type { ProcessorDetail, RemoteInputDefaults, ResourceOption } from "~/shared/resources/types";
 
@@ -60,14 +61,41 @@ export function FileFormFields({ configDefault, defaultName, description = "", d
   const [sourceValid, setSourceValid] = useState(true);
   const [processorsValid, setProcessorsValid] = useState(true);
   const [baseResetRevision, setBaseResetRevision] = useState(0);
+  const [currentSettings, setCurrentSettings] = useState<unknown>(configDefault?.settings);
+  const [usedPresetIDs, setUsedPresetIDs] = useState(() => driver.processors.presets
+    .filter((preset) => preset.configurationUse?.matches(configDefault?.settings)).map((preset) => preset.id));
+  const seenPresetIDs = useRef(new Set(usedPresetIDs));
+  const processorBuilderRef = useRef<FileProcessorBuilderHandle>(null);
+  const [initialProcessors] = useState(() => mode === "create"
+    ? driver.processors.defaults(t, { namingLocale: stableNamingLocale })
+    : processorsDefault ?? []);
+  const [currentProcessors, setCurrentProcessors] = useState(initialProcessors);
+  const handleProcessorsChange = useCallback((value: ProcessorDetail[]) => {
+    setCurrentProcessors((current) => JSON.stringify(current) === JSON.stringify(value) ? current : value);
+  }, []);
+  const handleSettingsChange = useCallback((settings: unknown) => {
+    setCurrentSettings((current: unknown) => JSON.stringify(current) === JSON.stringify(settings) ? current : settings);
+    const used = driver.processors.presets.filter((preset) => preset.configurationUse?.matches(settings)).map((preset) => preset.id);
+    setUsedPresetIDs((current) => JSON.stringify(current) === JSON.stringify(used) ? current : used);
+    const additions = used.filter((id) => !seenPresetIDs.current.has(id));
+    additions.forEach((id) => seenPresetIDs.current.add(id));
+    if (additions.length) processorBuilderRef.current?.prependPresets(additions);
+  }, [driver]);
+  const missingProcessorPresets = driver.processors.presets.filter((preset) => (
+    usedPresetIDs.includes(preset.id) && !currentProcessors.some((processor) => (
+      processor.enabled !== false && processor.stage === "file" && preset.recognize(processor)
+    ))
+  ));
+  const processorConfigurationNotices = currentProcessors.flatMap((processor) => {
+    if (processor.enabled === false || processor.stage !== "file") return [];
+    const preset = driver.processors.presets.find((candidate) => candidate.recognize(processor));
+    return preset?.configurationNotices?.(processor, currentSettings) ?? [];
+  });
   const isConfig = driver.configuration.mode !== "none";
   const defaultBase = driver.source.defaultBase(stableNamingLocale);
   const baseSourceDefault = baseResetRevision > 0
     ? { type: "inline" as const, content: emptyBaseContent(driver.source.syntax) }
     : mode === "create" ? { type: "inline" as const, content: defaultBase } : sourceDefault;
-  const processors = mode === "create"
-    ? driver.processors.defaults(t)
-    : processorsDefault;
 
   useEffect(() => {
     onValidityChange?.((!isConfig || configValid && sourceValid) && processorsValid);
@@ -117,6 +145,7 @@ export function FileFormFields({ configDefault, defaultName, description = "", d
             subscriptions={subscriptions}
             onDirty={onDirty}
             onValidityChange={setConfigValid}
+            onSettingsChange={handleSettingsChange}
           />
         </section>
       ) : (
@@ -125,7 +154,9 @@ export function FileFormFields({ configDefault, defaultName, description = "", d
         </WorkbenchGroupSection>
       )}
       <WorkbenchGroupSection keepMounted defaultExpanded id="file-processors" label={t("files.form.processors")}>
-        <FileProcessorBuilder defaultValue={processors} key={driver.kind} kind={driver.kind} onDirty={onDirty} onValidityChange={setProcessorsValid} remoteDefaults={remoteDefaults} scriptFiles={scriptFiles} scriptTimeoutMS={scriptTimeoutMS} />
+        {missingProcessorPresets.map((preset) => <Alert key={preset.id} severity="warning">{t(preset.configurationUse!.missingNoticeKey)}</Alert>)}
+        {processorConfigurationNotices.map((notice, index) => <Alert key={`${notice.messageKey}-${index}`} severity="warning">{t(notice.messageKey, notice.params)}</Alert>)}
+        <FileProcessorBuilder ref={processorBuilderRef} onValueChange={handleProcessorsChange} defaultValue={initialProcessors} key={driver.kind} kind={driver.kind} onDirty={onDirty} onValidityChange={setProcessorsValid} remoteDefaults={remoteDefaults} scriptFiles={scriptFiles} scriptTimeoutMS={scriptTimeoutMS} />
       </WorkbenchGroupSection>
     </div>
   );
@@ -141,6 +172,7 @@ export function FileKindConfigWorkbench({
   onClearBase,
   onDirty,
   onValidityChange,
+  onSettingsChange,
   driver,
   subscriptions,
 }: {
@@ -153,6 +185,7 @@ export function FileKindConfigWorkbench({
   onClearBase: () => void;
   onDirty?: () => void;
   onValidityChange?: (valid: boolean) => void;
+  onSettingsChange?: (settings: unknown) => void;
   driver: Readonly<FileDriverDefinition>;
   subscriptions: ResourceOption[];
 }) {
@@ -182,6 +215,7 @@ export function FileKindConfigWorkbench({
       ui={requireFileDriverUI(driver.kind)}
       onDirty={onDirty}
       onValidityChange={onValidityChange}
+      onSettingsChange={onSettingsChange}
     />
   );
 }

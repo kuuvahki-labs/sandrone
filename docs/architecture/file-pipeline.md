@@ -20,6 +20,22 @@ FileSpec(kind=registered typed kind) -> driver lookup -> read/build base -> opti
 
 两条路径只共享 source 读取、运行时文档、file-stage processor 和结果报告。typed 路径额外拥有 driver registry、订阅物化和客户端编译边界。
 
+## 配置策略归属
+
+平台统一用户的配置意图和操作，生成的策略显式保存在 `FileSpec` 的 source、
+settings 或 processors 中，可查看、修改、排序和删除。统一入口保留各客户端
+的字段语义、正则语法和执行时机差异；能力可由客户端原生实现或显式处理器补齐。
+
+后端负责受控读取、严格解码、节点渲染、目标格式编译和处理链执行，不隐式选择
+默认出口等用户策略。`$nodes` 引用展开和目标端内建策略符号的实体化属于格式
+编译；协议语义、安全校验和 renderer 边界也继续由后端负责。
+
+固定策略通过显式模板或 `merge` 表达；需要计算、条件判断或补齐客户端能力时，
+使用可编辑的 file-stage `script`。处理器在后端执行，但其策略来自调用方保存的
+定义。新建默认只在创建时物化，保存或重开不会强制补回用户删除的处理器。
+
+具体预设参数、默认开启状态及已有文件行为见[社区配置预设](../reference/community-config-presets.md)。
+
 ## 公共契约
 
 `FileSpec.kind` 必须显式使用 canonical 值，`static` 也不能省略。缺失、大小写变体、首尾空白或未注册 kind 返回 `invalid_argument`，不会回退为其它类型。

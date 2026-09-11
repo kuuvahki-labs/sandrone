@@ -108,6 +108,8 @@ Shadowrocket 的 settings 还执行字段级严格校验：
 
 所有 settings 的未知字段都会失败。Shadowrocket 的嵌套对象也拒绝未知字段；
 Mihomo 和 sing-box 的客户端 object 内容保持开放，以容纳各自客户端字段。
+sing-box Web 正则组所用的脚本扩展字段与显式处理器要求见
+[出站配置适配](community-config-presets.md#出站配置适配)。
 当前三个 compiler 的组输出都由 `groups` 决定；`adaptive_groups` 只作为已知
 settings 结构被解码（Shadowrocket 还会校验其取值），不会替代 `groups` 或
 自动合成额外组。
@@ -120,8 +122,8 @@ typed 文件的完整生成顺序只在[文件管线](../architecture/file-pipel
 driver 会重建其拥有的节点和策略位置，而不是简单把节点附加到 base：
 
 - Mihomo 重建 `proxies`、`proxy-groups`、`rule-providers`、`rules`；
-- sing-box 重建 `outbounds`、`route.rule_set`、`route.rules`，缺少
-  `route.final` 时补为 `Proxy`；渲染到 endpoint 的节点写入 `endpoints`；
+- sing-box 重建 `outbounds`、`route.rule_set`、`route.rules`，保留 base 中的
+  `route.final` 值或缺失状态；渲染到 endpoint 的节点写入 `endpoints`；
 - Shadowrocket 清空 `[Proxy]`，重建 `[Proxy Group]`、`[Rule]`，保留其他 section；
   它不会把 Sandrone 订阅节点写进 `.conf`。
 
@@ -152,7 +154,9 @@ config:
 ```yaml
 name: sing-box.json
 kind: sing-box
-source: {}
+source:
+  type: inline
+  content: '{"route":{"final":"Proxy"}}'
 config:
   subscriptions: [provider]
   settings:
@@ -178,6 +182,7 @@ config:
     rules: [FINAL,PROXY]
 ```
 
-这三个示例都使用内建 base。Shadowrocket 的节点订阅须另行添加
+sing-box 示例通过显式 base 声明默认出口，另外两个示例使用内建 base。
+Shadowrocket 的节点订阅须另行添加
 `shadowrocket-proxies` 分享链接。若要自带 base，把 `source` 改成完整的
 `inline` 或 `remote` source。

@@ -19,20 +19,24 @@ const en = createTranslator("en-US");
 const zh = createTranslator("zh-CN");
 
 describe("sing-box file processor defaults", () => {
-  it("uses sniff and GitHub acceleration as the new-file defaults", () => {
-    const processors = defaultSingBoxProcessors(en);
+  it("stores the default outbound in the first new-file processor", () => {
+    const processors = defaultSingBoxProcessors(en, { namingLocale: "en-US" });
 
     expect(processors.map((processor) => processor.name)).toEqual([
+      "Outbound configuration adaptation",
       "Sniff & DNS Hijack",
       "GitHub acceleration",
     ]);
-    expect(processors[0]).toMatchObject({
+    expect(processors[0]).toMatchObject({ params: { args: { default_outbound: "Proxy" } } });
+    expect(defaultSingBoxProcessors(en, { namingLocale: "zh-CN" })[0])
+      .toMatchObject({ params: { args: { default_outbound: "🚀 节点选择" } } });
+    expect(processors[1]).toMatchObject({
       name: "Sniff & DNS Hijack",
       type: "merge",
       stage: "file",
       params: { mode: "json_override" },
     });
-    expect(JSON.parse(String(processors[0].params?.content))).toEqual({
+    expect(JSON.parse(String(processors[1].params?.content))).toEqual({
       route: {
         "+rules": [
           { action: "sniff" },
@@ -45,7 +49,7 @@ describe("sing-box file processor defaults", () => {
         ],
       },
     });
-    expect(defaultSingBoxProcessors(en)[0]).not.toBe(processors[0]);
+    expect(defaultSingBoxProcessors(en, { namingLocale: "en-US" })[0]).not.toBe(processors[0]);
   });
 
   it.each([["en-US", en], ["zh-CN", zh]] as const)("uses every preset label as its %s processor name", (_locale, t) => {
@@ -55,7 +59,7 @@ describe("sing-box file processor defaults", () => {
   });
 
   it("recognizes only the exact managed JSON override", () => {
-    const preset = defaultSingBoxProcessors(en)[0]!;
+    const preset = defaultSingBoxProcessors(en, { namingLocale: "en-US" })[1]!;
     expect(recognizedFileProcessorPresetID(singBoxProcessorPresets, preset)).toBe("sniff");
     expect(recognizedFileProcessorPresetID(singBoxProcessorPresets, {
       ...preset,
@@ -82,8 +86,48 @@ describe("sing-box file processor defaults", () => {
     });
   });
 
+  it("recognizes outbound adaptation by source while preserving editable execution and business parameters", () => {
+    const descriptor = presetDescriptor("outbound-adapter");
+    const processor = buildSingBoxProcessorPreset("outbound-adapter", "Group filter");
+    const source = processor.params!.source as Record<string, unknown>;
+    expect(descriptor).toMatchObject({ defaultOn: true, dependencies: [], conflicts: [] });
+    expect(processor).toMatchObject({
+      name: "Group filter", type: "script", stage: "file",
+      params: { source: { type: "inline", content: expect.any(String) } },
+    });
+    expect(descriptor.recognize(processor)).toBe(true);
+    expect(descriptor.recognize({ ...processor, params: { ...processor.params, args: {} } })).toBe(true);
+    const configured = { ...processor, name: "My outbound adapter", params: {
+      ...processor.params, timeout_ms: 10000, args: { default_outbound: "Manual" },
+    } };
+    expect(descriptor.recognize(configured)).toBe(true);
+    expect(planFileProcessorPresetAddition(singBoxProcessorPresets, "outbound-adapter", [configured], en).additions).toEqual([]);
+    expect(processor.params).not.toHaveProperty("args");
+    expect(descriptor.recognize({
+      ...processor,
+      params: { source: { ...source, content: `${String(source.content)}\n// customized` } },
+    })).toBe(false);
+    expect(descriptor.recognize({
+      ...processor, params: { source: { ...source, type: "file" } },
+    })).toBe(false);
+    expect(planFileProcessorPresetAddition(singBoxProcessorPresets, "outbound-adapter", [processor], en).additions)
+      .toEqual([]);
+  });
+
+  it("reports a default outbound absent from the editable groups without changing the processor", () => {
+    const descriptor = presetDescriptor("outbound-adapter");
+    const processor = defaultSingBoxProcessors(en, { namingLocale: "en-US" })[0]!;
+    expect(descriptor.configurationNotices?.(processor, { groups: [{ tag: "Proxy" }] })).toEqual([]);
+    expect(descriptor.configurationNotices?.(processor, { groups: [{ tag: "Manual" }] })).toEqual([{
+      messageKey: "files.config.defaultOutboundReferenceMissing", params: { target: "Proxy" },
+    }]);
+    expect(descriptor.configurationNotices?.(descriptor.build(en), { groups: [] })).toEqual([]);
+    expect(processor.params?.args).toEqual({ default_outbound: "Proxy" });
+  });
+
   it("declares the complete dependency, conflict, and default matrix", () => {
     expect(singBoxProcessorPresets.map((preset) => preset.id)).toEqual([
+      "outbound-adapter",
       "sniff",
       "github-rule-source-mirror",
       "quic-fallback",

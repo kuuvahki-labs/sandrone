@@ -264,6 +264,18 @@ func TestFileEndpointStoresAndRendersSingBoxWebDefault(t *testing.T) {
     }
   }]
 }`)
+	var submitted domain.FileSpec
+	require.NoError(t, json.Unmarshal(body, &submitted))
+	script, err := os.ReadFile("../../../web/app/features/files/processors/scripts/sing-box-outbound-adapter.js")
+	require.NoError(t, err)
+	source, err := json.Marshal(map[string]any{"type": "inline", "content": string(script)})
+	require.NoError(t, err)
+	submitted.Processors = append([]domain.ProcessorSpec{{
+		Name: "Outbound adaptation", Type: "script", Stage: domain.StageFile,
+		Params: map[string]jsontext.Value{"source": source, "args": jsontext.Value(`{"default_outbound":"Proxy"}`)},
+	}}, submitted.Processors...)
+	body, err = json.Marshal(submitted)
+	require.NoError(t, err)
 	w := httptest.NewRecorder()
 	server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/v1/files", bytes.NewReader(body)))
 	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
@@ -275,7 +287,7 @@ func TestFileEndpointStoresAndRendersSingBoxWebDefault(t *testing.T) {
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &spec))
 	require.Equal(t, domain.FileKindSingBox, spec.Kind)
 	require.Equal(t, []string{"provider"}, spec.Config.Subscriptions)
-	require.JSONEq(t, `"json_override"`, string(spec.Processors[0].Params["mode"]))
+	require.JSONEq(t, `"json_override"`, string(spec.Processors[1].Params["mode"]))
 
 	w = httptest.NewRecorder()
 	server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/v1/files/default.json", nil))
@@ -285,10 +297,12 @@ func TestFileEndpointStoresAndRendersSingBoxWebDefault(t *testing.T) {
 		Outbounds []map[string]any `json:"outbounds"`
 		Route     struct {
 			Rules []map[string]any `json:"rules"`
+			Final string           `json:"final"`
 		} `json:"route"`
 	}
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &rendered))
 	require.Equal(t, "Proxy", rendered.Outbounds[0]["tag"])
+	require.Equal(t, "Proxy", rendered.Route.Final)
 	tags := make([]string, 0, len(rendered.Outbounds))
 	for _, outbound := range rendered.Outbounds {
 		tag, _ := outbound["tag"].(string)

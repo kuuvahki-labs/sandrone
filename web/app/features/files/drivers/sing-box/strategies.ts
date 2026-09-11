@@ -3,7 +3,6 @@ import {
   adaptiveGroupHelpers,
   adaptiveGroupOptionsFromValues,
   adaptiveGroupsAreStale,
-  adaptiveMatchingNodeNames,
   type ConfigAdaptiveDialect,
 } from "~/features/files/config/model/adaptive-groups";
 import { CANONICAL_ADAPTIVE_GROUP_DEFINITIONS } from "~/features/files/config/model/adaptive-regions";
@@ -36,6 +35,8 @@ import {
 } from "~/features/files/drivers/core/strategy-helpers";
 import type { FileConfigDraft } from "~/features/files/model/types";
 import { DEFAULT_PROBE_URL } from "~/shared/probe/defaults";
+
+import { singBoxGroupMembers } from "./group-filter";
 
 const BUILTIN_POLICIES = ["direct", "block"] as const;
 const ADAPTIVE_TYPE_OPTIONS = [
@@ -83,7 +84,7 @@ function singBoxRelations(): ConfigRelationStrategy {
       const severity = nodeNames === undefined ? "warning" : "error";
       const events = groups.flatMap((group, index) => {
         const sourceGroup = groupIdentities[index].name;
-        return strictStringList(group.outbounds).map((target) => relationReferenceEvent({
+        return previewGroupMembers(group, nodeNames).map((target) => relationReferenceEvent({
           allowed: nodeNames === undefined || allowedTargets.has(target) || knownGroups.has(target),
           danglingIssue: relationIssue(
             severity,
@@ -104,7 +105,7 @@ function singBoxRelations(): ConfigRelationStrategy {
         ? []
         : singBoxIdentityIssues(groups, groupIdentities, nodeNames);
       if (nodeNames !== undefined) {
-        events.push(...singBoxEmptyURLTestIssues(groups, nodeNames).map(relationIssueEvent));
+        events.push(...singBoxEmptyGroupIssues(groups, nodeNames).map(relationIssueEvent));
       }
       const deferredIssues = [];
       for (const [index, value] of rules.entries()) {
@@ -218,17 +219,21 @@ function singBoxIdentityIssues(
   return issues;
 }
 
-function singBoxEmptyURLTestIssues(
+function singBoxEmptyGroupIssues(
   groups: Record<string, unknown>[],
   nodeNames: string[],
 ) {
   const issues = [];
   for (const [index, group] of groups.entries()) {
-    if (trimmedString(group.type) !== "urltest") continue;
-    const expanded = strictStringList(group.outbounds)
+    const type = trimmedString(group.type);
+    const filteredSelector = type === "selector" && ("filter" in group || "exclude-filter" in group);
+    if (type !== "urltest" && !filteredSelector) continue;
+    const expanded = previewGroupMembers(group, nodeNames)
       .flatMap((target) => target === "$nodes" ? nodeNames : [target]);
     if (expanded.some((target) => target.trim())) continue;
-    issues.push(relationIssue("error", "singbox_urltest_empty", "groups", `group-${index}`, "URLTest must contain at least one outbound after expanding subscription nodes."));
+    issues.push(type === "urltest"
+      ? relationIssue("error", "singbox_urltest_empty", "groups", `group-${index}`, "URLTest must contain at least one outbound after expanding subscription nodes.")
+      : relationIssue("error", "group_members_empty", "groups", `group-${index}`, "Group filter must match at least one outbound."));
   }
   return issues;
 }
@@ -236,8 +241,11 @@ function singBoxEmptyURLTestIssues(
 function singBoxAdaptiveDialect(
   relationStrategy: ConfigRelationStrategy,
 ): ConfigAdaptiveDialect {
-  const materialize: ConfigAdaptiveDialect["materialize"] = (item, type, nodeNames) => {
-    const group: ConfigMap = { tag: item.name, type, outbounds: [...nodeNames] };
+  const materialize: ConfigAdaptiveDialect["materialize"] = (item, type) => {
+    const group: ConfigMap = {
+      tag: item.name, type, outbounds: ["$nodes"], filter: item.filter,
+      ...(item.excludeFilter ? { "exclude-filter": item.excludeFilter } : {}),
+    };
     if (type === "urltest") {
       group.url = DEFAULT_PROBE_URL;
       group.interval = "5m";
@@ -249,11 +257,9 @@ function singBoxAdaptiveDialect(
     anchorProblem: (config) => anchorProblem(config.groups ?? []),
     canonicalName: (group) => {
       for (const definition of CANONICAL_ADAPTIVE_GROUP_DEFINITIONS) {
-        const members = canonicalMembers(group, definition);
-        if (!members) continue;
         for (const name of [definition.name, ...(definition.legacyNames ?? [])]) {
           for (const { value: type } of ADAPTIVE_TYPE_OPTIONS) {
-            if (nativeValuesEqual(group, materialize({ ...definition, name }, type, members))) return name;
+            if (nativeValuesEqual(group, materialize({ ...definition, name }, type, []))) return name;
           }
         }
       }
@@ -354,15 +360,14 @@ function materializeSingBoxTemplate(
   };
 }
 
-function canonicalMembers(
-  group: ConfigMap,
-  definition: (typeof CANONICAL_ADAPTIVE_GROUP_DEFINITIONS)[number],
-): string[] | undefined {
-  if (!Array.isArray(group.outbounds) || group.outbounds.length === 0) return undefined;
-  if (group.outbounds.some((member) => typeof member !== "string" || !member.trim())) return undefined;
-  const members = group.outbounds as string[];
-  if (new Set(members).size !== members.length) return undefined;
-  return adaptiveMatchingNodeNames(definition, members).length === members.length ? members : undefined;
+function previewGroupMembers(group: ConfigMap, nodeNames?: string[]): string[] {
+  if (!("filter" in group) && !("exclude-filter" in group)) return strictStringList(group.outbounds);
+  if (!nodeNames) return [];
+  try {
+    return singBoxGroupMembers(group, nodeNames);
+  } catch {
+    return [];
+  }
 }
 
 function anchorProblem(groups: readonly ConfigMap[]): AdaptiveGroupAnchorProblem | null {

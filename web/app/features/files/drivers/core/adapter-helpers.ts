@@ -105,7 +105,7 @@ export function validateDraft(
     if (group.memberMode === "fixed" ? group.members.length === 0 : !options.groups.validateFilter(group.filter)) {
       issues.push(issue("group_members_empty", "groups", `group-${index}`, "Proxy group members are required."));
     }
-    if (group.memberMode === "runtime-filter" && (
+    if (group.memberMode === "regex-filter" && (
       !options.groups.validateFilter(group.filter)
       || (options.groups.supportsExcludeFilter && Boolean(group.excludeFilter) && !options.groups.validateFilter(group.excludeFilter))
     )) {
