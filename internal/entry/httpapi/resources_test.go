@@ -136,10 +136,6 @@ func TestFileEndpointStoresAndRendersTypedConfigFile(t *testing.T) {
   "config": {
     "subscriptions": ["provider"],
 	"settings": {
-	  "adaptive_groups": {
-		"type": "url-test",
-		"regions": ["hk", "jp"]
-	  },
 	  "groups": [{
 		"name": "Proxy",
 		"type": "select",
@@ -162,7 +158,6 @@ func TestFileEndpointStoresAndRendersTypedConfigFile(t *testing.T) {
 	require.Equal(t, domain.FileKindMihomo, spec.Kind)
 	require.Equal(t, []string{"provider"}, spec.Config.Subscriptions)
 	require.JSONEq(t, `{
-	  "adaptive_groups":{"type":"url-test","regions":["hk","jp"]},
 	  "groups":[{"name":"Proxy","type":"select","proxies":["$nodes","DIRECT"]}],
 	  "rule_sets":[],
 	  "rules":[]
@@ -197,6 +192,8 @@ func TestFileEndpointRejectsNonCanonicalKindsAndLegacyConfigWire(t *testing.T) {
 		{name: "unknown kind", body: `{"name":"bad.yaml","kind":"future","source":{}}`, want: `file kind \"future\"`},
 		{name: "legacy config", body: `{"name":"bad.yaml","kind":"mihomo","source":{},"config":{"groups":[]}}`, want: "invalid JSON body"},
 		{name: "null settings", body: `{"name":"bad.yaml","kind":"mihomo","source":{},"config":{"settings":null}}`, want: "config.settings"},
+		{name: "removed mihomo adaptive settings", body: `{"name":"bad.yaml","kind":"mihomo","source":{},"config":{"settings":{"groups":[],"rule_sets":[],"rules":[],"adaptive_groups":{"type":"url-test"}}}}`, want: "config.settings.adaptive_groups"},
+		{name: "removed shadowrocket adaptive settings", body: `{"name":"bad.conf","kind":"shadowrocket","source":{},"config":{"settings":{"groups":[],"rule_sets":[],"rules":[],"adaptive_groups":{"type":"url-test"}}}}`, want: "config.settings.adaptive_groups"},
 		{name: "unknown settings", body: `{"name":"bad.yaml","kind":"sing-box","source":{},"config":{"settings":{"future":true}}}`, want: "config.settings.future"},
 		{name: "empty source with content", body: `{"name":"bad.yaml","kind":"mihomo","source":{"content":"ignored"},"config":{}}`, want: "empty file source must not include content or remote"},
 		{name: "empty source with remote", body: `{"name":"bad.yaml","kind":"mihomo","source":{"remote":{"url":"https://example.com/ignored"}},"config":{}}`, want: "empty file source must not include content or remote"},

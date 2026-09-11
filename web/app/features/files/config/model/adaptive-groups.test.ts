@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { ConfigAdaptiveStrategy } from "~/features/files/drivers/core/file-driver";
 import { requireFileDriver } from "~/features/files/drivers/registry";
 import { singBoxGroupMembers } from "~/features/files/drivers/sing-box/group-filter";
-import type { FileAdaptiveGroupConfigDetail, FileConfigDraft } from "~/features/files/model/types";
+import type { FileConfigDraft } from "~/features/files/model/types";
 
 import { adaptiveGenerationDisabledReasonKey } from "./adaptive-availability";
 import type {
@@ -42,20 +42,6 @@ function adaptiveGroupAnchorProblem(
   target: StructuredTarget = "mihomo",
 ) {
   return adaptiveStrategy(target).anchorProblem(config);
-}
-
-function adaptiveGroupConfigFromOptions(
-  options: Readonly<AdaptiveGroupOptions>,
-  target: StructuredTarget = "mihomo",
-): FileAdaptiveGroupConfigDetail | undefined {
-  return adaptiveStrategy(target).configFromOptions(options);
-}
-
-function adaptiveGroupOptionsFromConfig(
-  config: FileAdaptiveGroupConfigDetail | undefined,
-  target: StructuredTarget = "mihomo",
-): AdaptiveGroupOptions {
-  return adaptiveStrategy(target).optionsFromConfig(config);
 }
 
 function canonicalAdaptiveGroupNames(
@@ -223,8 +209,75 @@ describe("adaptive generation availability", () => {
  });
 });
 
+describe.each(["mihomo", "sing-box", "shadowrocket"] as const)("strict %s adaptive option restoration", (kind) => {
+  const strategy = adaptiveStrategy(kind);
+  const type = strategy.defaultOptions().type;
+  const groupNameKey = kind === "sing-box" ? "tag" : "name";
+  const filterKey = kind === "shadowrocket" ? "policy-regex-filter" : "filter";
+  const options = { type, enabledRegionIds: ["hk", "jp"] };
+  const standardGroups = (locale: ConfigNamingLocale = "en-US") => strategy.generate(["HK-01", "JP-01"], options, locale).groups;
+
+  it.each(["en-US", "zh-CN"] as const)("restores the complete %s layer with unrelated custom groups", (locale) => {
+    const groups = [
+      ...(createConfigFromTemplate(kind, "minimal", locale).groups ?? []),
+      ...standardGroups(locale),
+      { [groupNameKey]: "Personal", type: "select", icon: "custom", [filterKey]: "personal-pattern" },
+    ];
+    const snapshot = structuredClone(groups);
+    expect(strategy.recognizeOptions(groups)).toEqual(options);
+    expect(groups).toEqual(snapshot);
+  });
+
+  it.each(strategy.typeOptions)("restores the supported uniform $value group type", ({ value }) => {
+    const selected = { ...options, type: value };
+    expect(strategy.recognizeOptions(strategy.generate(["HK-01", "JP-01"], selected).groups)).toEqual(selected);
+  });
+
+  it("does not claim an empty or entirely unrelated group list", () => {
+    expect(strategy.recognizeOptions([])).toBeNull();
+    expect(strategy.recognizeOptions([{ [groupNameKey]: "Personal", [filterKey]: "^personal" }])).toBeNull();
+  });
+
+  it.each([
+    "extra-field", "missing-field", "renamed", "legacy-name", "fixed-members", "changed-filter", "unknown-type", "mixed-types", "duplicate-name", "custom-name-collision", "duplicate-region-locales",
+  ])("declines the whole layer for %s and preserves every existing group", (scenario) => {
+    const groups = standardGroups();
+    switch (scenario) {
+      case "extra-field": groups[0].icon = "custom"; break;
+      case "missing-field": delete groups[0].interval; break;
+      case "renamed": groups[0][groupNameKey] = "My Hong Kong"; break;
+      case "legacy-name": groups[0][groupNameKey] = "香港节点"; break;
+      case "fixed-members":
+        delete groups[0][filterKey];
+        delete groups[0]["include-all-proxies"];
+        groups[0][kind === "sing-box" ? "outbounds" : "proxies"] = ["HK-01"];
+        break;
+      case "changed-filter": groups[0][filterKey] = "^HK"; break;
+      case "unknown-type": groups[0].type = "future-type"; break;
+      case "mixed-types": {
+        const alternateType = strategy.typeOptions.find((item) => item.value !== type)!.value;
+        groups[0] = strategy.generate(["HK-01"], { type: alternateType, enabledRegionIds: ["hk"] }).groups[0];
+        break;
+      }
+      case "duplicate-name": groups.push(structuredClone(groups[0])); break;
+      case "custom-name-collision": groups.push({ [groupNameKey]: groups[0][groupNameKey], type: "select", icon: "custom" }); break;
+      case "duplicate-region-locales": groups.push(standardGroups("zh-CN")[0]); break;
+    }
+    const snapshot = structuredClone(groups);
+    expect(strategy.recognizeOptions(groups)).toBeNull();
+    expect(groups).toEqual(snapshot);
+  });
+
+  it("accepts reordered object keys but rejects changed native member structure", () => {
+    const groups = standardGroups();
+    expect(strategy.recognizeOptions(groups.map((group) => Object.fromEntries(Object.entries(group).reverse())))).toEqual(options);
+    groups[0][kind === "sing-box" ? "outbounds" : "proxies"] = ["$nodes", "HK-01"];
+    expect(strategy.recognizeOptions(groups)).toBeNull();
+  });
+});
+
 describe("adaptive Mihomo group generation", () => {
-  it("generates the five selected runtime-filter regions without preview nodes", () => {
+  it("generates the five selected regex-filter regions without preview nodes", () => {
     const result = generateAdaptiveGroups(
       [],
       defaultAdaptiveGroupOptions(),
@@ -398,22 +451,6 @@ describe("adaptive Mihomo group generation", () => {
    });
  });
 
-  it("normalizes persisted options with stable region ids and round-trips an empty selection", () => {
-    const options = adaptiveGroupOptionsFromConfig({
-      type: "load-balance",
-      regions: ["us", "unknown", "hk", "us"],
-   });
-
-    expect(options).toEqual({
-      type: "load-balance",
-      enabledRegionIds: ["hk", "us"],
-   });
-    expect(adaptiveGroupConfigFromOptions({ ...options, enabledRegionIds: [] })).toEqual({
-      type: "load-balance",
-      regions: [],
-   });
- });
-
   it("defaults to Hong Kong, Taiwan, Japan, United States, and Singapore", () => {
     expect(defaultAdaptiveGroupOptions().enabledRegionIds).toEqual(["hk", "tw", "jp", "us", "sg"]);
  });
@@ -450,15 +487,6 @@ describe("adaptive sing-box group generation", () => {
     expect(result.warnings).toContainEqual({
       code: "empty_regions_skipped",
       groupNames: ["Taiwan", "Singapore", "Japan", "United States"],
-   });
- });
-
-  it("uses urltest defaults and rejects persisted Mihomo-only types", () => {
-    expect(defaultAdaptiveGroupOptions("sing-box")).toMatchObject({ type: "urltest" });
-    expect(adaptiveGroupOptionsFromConfig({
-      type: "load-balance",
-   }, "sing-box")).toMatchObject({
-      type: "urltest",
    });
  });
 
@@ -540,7 +568,6 @@ describe("adaptive sing-box group generation", () => {
 describe("adaptive Shadowrocket group generation", () => {
   it("uses only Shadowrocket adaptive types", () => {
     expect(defaultAdaptiveGroupOptions("shadowrocket")).toMatchObject({ type: "url-test" });
-    expect(adaptiveGroupOptionsFromConfig({ type: "urltest" }, "shadowrocket")).toMatchObject({ type: "url-test" });
     expect(() => generateAdaptiveGroups(
       ["HK-01"],
       { type: "urltest" },

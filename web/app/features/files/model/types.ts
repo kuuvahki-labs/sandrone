@@ -26,11 +26,6 @@ export interface FileSourceDetail {
   remote?: RemoteInputDetail;
 }
 
-export interface FileAdaptiveGroupConfigDetail {
-  type?: string;
-  regions?: string[];
-}
-
 export interface FileConfigDetail {
   subscriptions?: string[];
   settingsPresent: boolean;
@@ -44,7 +39,6 @@ export interface FileConfigDraft {
   rawSettings?: unknown;
   ruleset_preset?: string;
   group_preset?: string;
-  adaptive_groups?: FileAdaptiveGroupConfigDetail;
   groups?: Record<string, unknown>[];
   rule_sets?: Record<string, unknown>[];
   rules?: unknown[];

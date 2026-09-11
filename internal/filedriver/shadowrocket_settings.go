@@ -14,23 +14,9 @@ import (
 )
 
 type ShadowrocketFileSettings struct {
-	AdaptiveGroups *ShadowrocketAdaptiveGroupSettings `json:"adaptive_groups,omitzero" jsonschema:"Legacy Web and HTTP compatibility metadata"`
-	Groups         []ShadowrocketGroupSettings        `json:"groups,omitempty" jsonschema:"Explicit Shadowrocket proxy groups"`
-	RuleSets       []ShadowrocketRuleSetSettings      `json:"rule_sets,omitempty" jsonschema:"Named remote rule-set declarations"`
-	Rules          []string                           `json:"rules,omitempty" jsonschema:"Ordered Shadowrocket rules"`
-}
-
-// ShadowrocketFileCapabilitySettings is the public settings surface for capabilities.
-// The real decoder remains broader for legacy HTTP and Web compatibility.
-type ShadowrocketFileCapabilitySettings struct {
 	Groups   []ShadowrocketGroupSettings   `json:"groups" jsonschema:"Explicit Shadowrocket proxy groups"`
 	RuleSets []ShadowrocketRuleSetSettings `json:"rule_sets" jsonschema:"Named remote rule-set declarations"`
 	Rules    []string                      `json:"rules" jsonschema:"Ordered Shadowrocket rules"`
-}
-
-type ShadowrocketAdaptiveGroupSettings struct {
-	Type    *string  `json:"type,omitzero" jsonschema:"Generated group type" enum:"select,url-test,load-balance"`
-	Regions []string `json:"regions,omitempty" jsonschema:"Recognized lowercase region identifiers"`
 }
 
 type ShadowrocketGroupSettings struct {
@@ -59,10 +45,9 @@ func decodeShadowrocketFileSettings(raw jsontext.Value) (ShadowrocketFileSetting
 		return ShadowrocketFileSettings{}, shadowrocketSettingsError(err)
 	}
 	allowed := map[string]bool{
-		"adaptive_groups": true,
-		"groups":          true,
-		"rule_sets":       true,
-		"rules":           true,
+		"groups":    true,
+		"rule_sets": true,
+		"rules":     true,
 	}
 	if err := rejectUnknownJSONFields(fields, allowed, "config.settings"); err != nil {
 		return ShadowrocketFileSettings{}, shadowrocketSettingsError(err)
@@ -74,14 +59,6 @@ func decodeShadowrocketFileSettings(raw jsontext.Value) (ShadowrocketFileSetting
 	}
 
 	var settings ShadowrocketFileSettings
-	if value, ok := fields["adaptive_groups"]; ok {
-		var adaptive ShadowrocketAdaptiveGroupSettings
-		if err := decodeStrictJSONObject(value, "config.settings.adaptive_groups", &adaptive,
-			"type", "regions"); err != nil {
-			return ShadowrocketFileSettings{}, shadowrocketSettingsError(err)
-		}
-		settings.AdaptiveGroups = &adaptive
-	}
 	if value, ok := fields["groups"]; ok {
 		items, err := strictJSONArray(value, "config.settings.groups")
 		if err != nil {
@@ -206,42 +183,10 @@ func shadowrocketSettingsError(err error) error {
 }
 
 func validateShadowrocketSettings(settings ShadowrocketFileSettings) error {
-	if err := validateShadowrocketAdaptiveGroups(settings.AdaptiveGroups); err != nil {
-		return err
-	}
 	if err := validateShadowrocketGroups(settings.Groups); err != nil {
 		return err
 	}
 	return validateShadowrocketRules(settings.RuleSets, settings.Rules)
-}
-
-func validateShadowrocketAdaptiveGroups(settings *ShadowrocketAdaptiveGroupSettings) error {
-	if settings == nil {
-		return nil
-	}
-	if settings.Type != nil {
-		value := strings.TrimSpace(*settings.Type)
-		if value != "select" && value != "url-test" && value != "load-balance" {
-			return fmt.Errorf("config.settings.adaptive_groups.type must be select, url-test, or load-balance")
-		}
-	}
-	allowedRegions := map[string]bool{
-		"hk": true, "tw": true, "sg": true, "jp": true, "kr": true, "us": true,
-		"ca": true, "uk": true, "de": true, "fr": true, "mo": true, "au": true,
-		"ru": true, "th": true, "in": true, "my": true, "ph": true, "tr": true,
-		"ua": true, "fi": true, "ar": true, "eg": true,
-	}
-	seen := map[string]bool{}
-	for index, region := range settings.Regions {
-		if !allowedRegions[region] {
-			return fmt.Errorf("config.settings.adaptive_groups.regions[%d] is not a supported region", index)
-		}
-		if seen[region] {
-			return fmt.Errorf("config.settings.adaptive_groups.regions[%d] is duplicated", index)
-		}
-		seen[region] = true
-	}
-	return nil
 }
 
 func validateShadowrocketGroups(groups []ShadowrocketGroupSettings) error {

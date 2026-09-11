@@ -13,15 +13,6 @@ import (
 )
 
 type MihomoFileSettings struct {
-	AdaptiveGroups *domain.FileAdaptiveGroupConfig `json:"adaptive_groups,omitzero" jsonschema:"Legacy Web and HTTP compatibility metadata"`
-	Groups         []map[string]any                `json:"groups,omitempty" jsonschema:"Explicit Mihomo proxy-group objects"`
-	RuleSets       []map[string]any                `json:"rule_sets,omitempty" jsonschema:"Explicit Mihomo rule-provider objects"`
-	Rules          []string                        `json:"rules,omitempty" jsonschema:"Ordered Mihomo rule strings"`
-}
-
-// MihomoFileCapabilitySettings is the public settings surface for capabilities.
-// The real decoder remains broader for legacy HTTP and Web compatibility.
-type MihomoFileCapabilitySettings struct {
 	Groups   []map[string]any `json:"groups" jsonschema:"Explicit Mihomo proxy-group objects"`
 	RuleSets []map[string]any `json:"rule_sets" jsonschema:"Explicit Mihomo rule-provider objects"`
 	Rules    []string         `json:"rules" jsonschema:"Ordered Mihomo rule strings"`
@@ -34,42 +25,11 @@ type SingBoxFileSettings struct {
 }
 
 func decodeMihomoFileSettings(raw jsontext.Value) (MihomoFileSettings, error) {
-	if err := validateMihomoAdaptiveGroupFields(raw); err != nil {
-		return MihomoFileSettings{}, domain.NewError(
-			domain.CodeInvalidArgument,
-			fmt.Sprintf("file kind %q %v", domain.FileKindMihomo, err),
-		)
-	}
 	var settings MihomoFileSettings
 	if err := decodeTypedFileSettings(domain.FileKindMihomo, raw, &settings, "groups", "rule_sets", "rules"); err != nil {
 		return MihomoFileSettings{}, err
 	}
 	return settings, nil
-}
-
-func validateMihomoAdaptiveGroupFields(raw jsontext.Value) error {
-	if len(bytes.TrimSpace(raw)) == 0 {
-		return nil
-	}
-	var fields map[string]jsontext.Value
-	if err := json.Unmarshal(raw, &fields); err != nil {
-		return nil //nolint:nilerr // decodeTypedFileSettings returns the canonical invalid-settings error.
-	}
-	if fields == nil {
-		return nil
-	}
-	adaptive, ok := fields["adaptive_groups"]
-	if !ok || isJSONNull(adaptive) {
-		return nil
-	}
-	adaptiveFields, err := strictJSONObject(adaptive, "config.settings.adaptive_groups")
-	if err != nil {
-		return err
-	}
-	return rejectUnknownJSONFields(adaptiveFields, map[string]bool{
-		"type":    true,
-		"regions": true,
-	}, "config.settings.adaptive_groups")
 }
 
 func decodeSingBoxFileSettings(raw jsontext.Value) (SingBoxFileSettings, error) {

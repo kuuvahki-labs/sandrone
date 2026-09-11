@@ -21,7 +21,6 @@ import {
 } from "~/features/files/drivers/core/adapter-helpers";
 import type { StructuredFileConfigurationAdapter } from "~/features/files/drivers/core/file-driver";
 import {
-  adaptiveGroups,
   createStructuredConfigurationAdapter,
   recordArray,
   strictSettingsObject,
@@ -33,11 +32,6 @@ import { conflictsWithShadowrocketBuiltinRulePolicy } from "./policies";
 import { shadowrocketConfigurationStrategies } from "./strategies";
 
 const GROUP_TYPES = new Set(["select", "url-test", "fallback", "load-balance", "random"]);
-const ADAPTIVE_GROUP_TYPES = new Set(["select", "url-test", "load-balance"]);
-const REGION_IDS = new Set([
-  "hk", "tw", "sg", "jp", "kr", "us", "ca", "uk", "de", "fr", "mo",
-  "au", "ru", "th", "in", "my", "ph", "tr", "ua", "fi", "ar", "eg",
-]);
 const GROUP_KEYS = [
   "name", "type", "proxies", "policy-regex-filter", "interval", "timeout", "tolerance",
   "hidden",
@@ -99,14 +93,12 @@ export const shadowrocketConfigurationAdapter = createStructuredConfigurationAda
 });
 
 function decodeShadowrocketSettings(value: unknown): Partial<FileConfigDraft> | null {
-  const settings = strictSettingsObject(value, ["adaptive_groups", "groups", "rule_sets", "rules"]);
+  const settings = strictSettingsObject(value, ["groups", "rule_sets", "rules"]);
   if (!settings) return null;
-  if ("adaptive_groups" in settings && !validAdaptiveGroups(settings.adaptive_groups)) return null;
   if ("groups" in settings && !validGroups(settings.groups)) return null;
   if ("rule_sets" in settings && !validRuleSets(settings.rule_sets)) return null;
   if ("rules" in settings && !validRules(settings.rules)) return null;
   return {
-    ...(Object.hasOwn(settings, "adaptive_groups") ? { adaptive_groups: adaptiveGroups(settings.adaptive_groups) } : {}),
     ...(Object.hasOwn(settings, "groups") ? { groups: settings.groups as ConfigMap[] } : {}),
     ...(Object.hasOwn(settings, "rule_sets") ? { rule_sets: settings.rule_sets as ConfigMap[] } : {}),
     ...(Object.hasOwn(settings, "rules") ? { rules: settings.rules as string[] } : {}),
@@ -337,17 +329,6 @@ function defaultRules(_locale: ConfigNamingLocale): string[] {
     "GEOIP,CN,DIRECT,no-resolve",
     "FINAL,PROXY",
   ];
-}
-
-function validAdaptiveGroups(value: unknown): boolean {
-  const item = strictSettingsObject(value, ["type", "regions"]);
-  if (!item) return false;
-  if ("type" in item && (typeof item.type !== "string" || !ADAPTIVE_GROUP_TYPES.has(item.type.trim()))) return false;
-  if ("regions" in item) {
-    if (!Array.isArray(item.regions) || item.regions.some((region) => typeof region !== "string" || !REGION_IDS.has(region))) return false;
-    if (new Set(item.regions).size !== item.regions.length) return false;
-  }
-  return true;
 }
 
 function validGroups(value: unknown): value is ConfigMap[] {

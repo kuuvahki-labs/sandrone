@@ -1,7 +1,6 @@
 import {
   type AdaptiveGroupAnchorProblem,
   adaptiveGroupHelpers,
-  adaptiveGroupOptionsFromValues,
   adaptiveGroupsAreStale,
   type ConfigAdaptiveDialect,
 } from "~/features/files/config/model/adaptive-groups";
@@ -265,6 +264,7 @@ function singBoxAdaptiveDialect(
       }
       return undefined;
     },
+    groupFilter: (group) => group["filter"],
     defaultType: "urltest",
     groupMembers: (group) => Array.isArray(group.outbounds)
       && group.outbounds.every((member) => typeof member === "string")
@@ -287,14 +287,8 @@ function singBoxAdaptive(dialect: ConfigAdaptiveDialect): ConfigAdaptiveStrategy
   const helpers = adaptiveGroupHelpers(dialect);
   const strategy: ConfigAdaptiveStrategy = {
     ...helpers,
-    configFromOptions: () => undefined,
-    initiallyEnabled: () => false,
     isStale: (input) => adaptiveGroupsAreStale(dialect, input),
-    optionsFromConfig: (config) => adaptiveGroupOptionsFromValues(dialect, config ? {
-      enabledRegionIds: config.regions,
-      type: config.type,
-    } : undefined),
-    recognizesCanonicalLayer: () => false,
+    recognizesCanonicalLayer: (config) => helpers.recognizeOptions(config.groups ?? []) !== null,
   };
   return Object.freeze(strategy);
 }
@@ -309,8 +303,7 @@ function singBoxTemplates(
     normalizeRecognition: (config) => {
       const adaptiveLayer = adaptiveStrategy.recognizesCanonicalLayer(config);
       const stripped = adaptiveLayer ? adaptiveStrategy.strip(config) : { changed: false, config, strippedGroupNames: [] };
-      const { adaptive_groups: _adaptiveGroups, ...comparable } = stripped.config;
-      return { adaptive: adaptiveLayer, config: comparable };
+      return { adaptive: adaptiveLayer, config: stripped.config };
     },
   });
 }

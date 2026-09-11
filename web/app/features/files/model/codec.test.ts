@@ -164,7 +164,7 @@ describe("file model codec", () => {
       source: {},
       config: {
         subscriptions: ["provider"],
-        settings: { adaptive_groups: { type: "url-test", regions: [] }, groups: [], rule_sets: [], rules: [] },
+        settings: { groups: [], rule_sets: [], rules: [] },
       },
     });
 
@@ -172,30 +172,10 @@ describe("file model codec", () => {
       subscriptions: ["provider"],
       settingsPresent: true,
       settings: {
-        adaptive_groups: { type: "url-test", regions: [] },
         groups: [],
         rule_sets: [],
         rules: [],
       },
-    });
-  });
-
-  it("maps persisted adaptive group settings including an empty region selection", () => {
-    const detail = fileDetailFromAPI({
-      name: "adaptive.yaml",
-      kind: "mihomo",
-      config: {
-        settings: { adaptive_groups: {
-          type: "load-balance",
-        } },
-      },
-    });
-
-    expect(detail.config).toEqual({
-      settingsPresent: true,
-      settings: { adaptive_groups: {
-        type: "load-balance",
-      } },
     });
   });
 

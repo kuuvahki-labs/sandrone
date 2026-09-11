@@ -250,8 +250,7 @@ export function FileConfigEditor({ adapter, allowSubscriptions = true, baseEdito
   const groupIssues = relationModel.issues.filter((issue) => issue.section === "groups");
   const ruleSetIssues = relationModel.issues.filter((issue) => issue.section === "rule_sets");
   const ruleIssues = relationModel.issues.filter((issue) => issue.section === "rules");
-  const configurationEmpty = !adaptiveEnabled
-    && groups.length === 0
+  const configurationEmpty = groups.length === 0
     && ruleSets.length === 0
     && rules.length === 0;
 
@@ -322,6 +321,8 @@ export function FileConfigEditor({ adapter, allowSubscriptions = true, baseEdito
 			) : (
 				<>
       <ConfigAdaptiveGroupControls
+        enabled={adaptiveEnabled}
+        onEnabledChange={(enabled) => updateEditorState({ type: "toggle-adaptive", enabled })}
         candidates={adaptiveCandidates}
         defaultExpanded={!configurationEmpty}
         disabledReason={adaptiveDisabledReason}
@@ -331,7 +332,6 @@ export function FileConfigEditor({ adapter, allowSubscriptions = true, baseEdito
 		typeOptions={adapter.adaptive.typeOptions}
         warnings={adaptiveWarnings}
         onOptionsChange={(options) => {
-          onDirty?.();
           updateEditorState({ type: "change-adaptive-options", options });
         }}
         onGenerate={generateAdaptive}

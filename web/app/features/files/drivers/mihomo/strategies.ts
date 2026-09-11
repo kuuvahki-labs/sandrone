@@ -1,10 +1,7 @@
 import {
-  ADAPTIVE_REGION_IDS,
   type AdaptiveGroupAnchorProblem,
   adaptiveGroupHelpers,
-  adaptiveGroupOptionsFromValues,
   type ConfigAdaptiveDialect,
-  DEFAULT_ADAPTIVE_REGION_IDS,
 } from "~/features/files/config/model/adaptive-groups";
 import { CANONICAL_ADAPTIVE_GROUP_DEFINITIONS } from "~/features/files/config/model/adaptive-regions";
 import type { ConfigMap } from "~/features/files/config/model/editor-model";
@@ -215,6 +212,7 @@ function mihomoAdaptiveDialect(
       }
       return undefined;
     },
+    groupFilter: (group) => group["filter"],
     defaultType: "url-test",
     groupMembers: (group) => Array.isArray(group.proxies)
       && group.proxies.every((member) => typeof member === "string")
@@ -237,20 +235,8 @@ function mihomoAdaptive(dialect: ConfigAdaptiveDialect): ConfigAdaptiveStrategy 
   const helpers = adaptiveGroupHelpers(dialect);
   const strategy: ConfigAdaptiveStrategy = {
     ...helpers,
-    configFromOptions: (options) => {
-      const enabled = new Set(options.enabledRegionIds ?? DEFAULT_ADAPTIVE_REGION_IDS);
-      return {
-        type: options.type,
-        regions: ADAPTIVE_REGION_IDS.filter((id) => enabled.has(id)),
-      };
-    },
-    initiallyEnabled: (formMode, config) => formMode === "create" || config !== undefined,
     isStale: () => false,
-    optionsFromConfig: (config) => adaptiveGroupOptionsFromValues(dialect, config ? {
-      enabledRegionIds: config.regions,
-      type: config.type,
-    } : undefined),
-    recognizesCanonicalLayer: (config) => helpers.canonicalNames(config.groups ?? []).length > 0,
+    recognizesCanonicalLayer: (config) => helpers.recognizeOptions(config.groups ?? []) !== null,
   };
   return Object.freeze(strategy);
 }
@@ -265,8 +251,7 @@ function mihomoTemplates(
     normalizeRecognition: (config) => {
       const adaptiveLayer = adaptiveStrategy.recognizesCanonicalLayer(config);
       const stripped = adaptiveLayer ? adaptiveStrategy.strip(config) : { changed: false, config, strippedGroupNames: [] };
-      const { adaptive_groups: _adaptiveGroups, ...comparable } = stripped.config;
-      return { adaptive: adaptiveLayer, config: comparable };
+      return { adaptive: adaptiveLayer, config: stripped.config };
     },
   });
 }

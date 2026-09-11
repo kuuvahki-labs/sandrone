@@ -273,7 +273,6 @@ describe("file form drivers", () => {
         subscriptions: ["provider"],
         settingsPresent: true,
         settings: {
-          adaptive_groups: { regions: ["hk"] },
           groups: [{ name: "Proxy", type: "select", proxies: ["$nodes", "DIRECT"] }],
           rule_sets: [{ name: "private", type: "inline", behavior: "classical", payload: ["DOMAIN-SUFFIX,local"] }],
           rules: ["RULE-SET,private,DIRECT", "MATCH,Proxy"],

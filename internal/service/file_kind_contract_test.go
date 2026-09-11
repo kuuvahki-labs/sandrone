@@ -91,7 +91,7 @@ func TestServiceTypedSettingsAreStrictPerKind(t *testing.T) {
 		{name: "settings null", kind: domain.FileKindMihomo, settings: `null`, path: "config.settings"},
 		{name: "settings array", kind: domain.FileKindMihomo, settings: `[]`, path: "config.settings"},
 		{name: "unknown field", kind: domain.FileKindMihomo, settings: `{"groups":[],"rule_sets":[],"rules":[],"future":true}`, path: "config.settings.future"},
-		{name: "removed adaptive count", kind: domain.FileKindMihomo, settings: `{"groups":[],"rule_sets":[],"rules":[],"adaptive_groups":{"minimum_node_count":2}}`, path: "config.settings.adaptive_groups.minimum_node_count"},
+		{name: "removed adaptive settings", kind: domain.FileKindMihomo, settings: `{"groups":[],"rule_sets":[],"rules":[],"adaptive_groups":{"type":"url-test","regions":["hk"]}}`, path: "config.settings.adaptive_groups"},
 		{name: "mihomo object rule", kind: domain.FileKindMihomo, settings: `{"groups":[],"rule_sets":[],"rules":[{"outbound":"direct"}]}`, path: "config.settings.rules"},
 		{name: "sing-box string rule", kind: domain.FileKindSingBox, settings: `{"groups":[],"rule_sets":[],"rules":["MATCH,direct"]}`, path: "config.settings.rules"},
 		{name: "null field", kind: domain.FileKindSingBox, settings: `{"groups":null}`, path: "config.settings.groups"},

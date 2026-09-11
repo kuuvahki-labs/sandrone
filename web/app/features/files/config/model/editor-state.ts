@@ -22,10 +22,7 @@ import {
 } from "~/features/files/config/model/relations";
 import type { ConfigTemplateID } from "~/features/files/config/model/templates";
 import type { StructuredFileConfigurationAdapter } from "~/features/files/drivers/core/file-driver";
-import type {
-  FileAdaptiveGroupConfigDetail,
-  FileConfigDraft,
-} from "~/features/files/model/types";
+import type { FileConfigDraft } from "~/features/files/model/types";
 
 export interface ConfigEditorStructureState {
   advancedGroupsText: string;
@@ -42,11 +39,9 @@ export interface ConfigEditorStructureState {
 export interface ConfigEditorState {
   adaptiveEnabled: boolean;
   adaptiveOptions: AdaptiveGroupOptions;
-  adaptiveOptionsChanged: boolean;
   adaptiveWarnings: AdaptiveGroupWarning[];
   formMode: "create" | "edit";
   namingLocale: ConfigNamingLocale;
-  originalAdaptiveGroups?: FileAdaptiveGroupConfigDetail;
   originalRawSettings?: unknown;
   originalSubscriptions: string[];
   rawSettingsText: string;
@@ -67,6 +62,7 @@ export type ConfigEditorAction =
   | { type: "change-advanced-groups"; text: string }
   | { type: "change-advanced-rule-sets"; text: string }
   | { type: "change-advanced-rules"; text: string }
+  | { type: "toggle-adaptive"; enabled: boolean }
   | { type: "change-adaptive-options"; options: AdaptiveGroupOptions };
 
 export function initializeConfigEditorState(
@@ -93,18 +89,14 @@ export function initializeConfigEditorState(
       namingLocale,
     );
   const originalSubscriptions = [...(initial.subscriptions ?? [])];
+  const restoredOptions = adapter.adaptive.recognizeOptions(adapter.toNativeDraft(initial).groups ?? []);
 
   return {
-    adaptiveEnabled: adapter.adaptive.initiallyEnabled(
-      input.formMode,
-      initial.adaptiveGroups,
-    ),
-    adaptiveOptions: adapter.adaptive.optionsFromConfig(initial.adaptiveGroups),
-    adaptiveOptionsChanged: input.formMode === "create",
+    adaptiveEnabled: restoredOptions !== null,
+    adaptiveOptions: restoredOptions ?? adapter.adaptive.defaultOptions(),
     adaptiveWarnings: [],
     formMode: input.formMode,
     namingLocale,
-    originalAdaptiveGroups: initial.adaptiveGroups,
     originalRawSettings: initial.rawSettings,
     originalSubscriptions,
     rawSettingsText: JSON.stringify(initial.rawSettings ?? {}, null, 2),
@@ -162,12 +154,12 @@ export function reduceConfigEditorState(
         state,
         { advancedRulesText: event.text },
       );
+    case "toggle-adaptive":
+      return { ...state, adaptiveEnabled: event.enabled, adaptiveWarnings: [] };
     case "change-adaptive-options":
       return {
         ...state,
-        adaptiveEnabled: true,
         adaptiveOptions: event.options,
-        adaptiveOptionsChanged: true,
         adaptiveWarnings: [],
       };
   }
@@ -208,9 +200,7 @@ export function clearConfigEditor(
   return {
     ...state,
     adaptiveEnabled: false,
-    adaptiveOptionsChanged: false,
     adaptiveWarnings: [],
-    originalAdaptiveGroups: undefined,
     structure: structureFromDraft(empty),
     structureRevision: state.structureRevision + 1,
     templateUndo: null,
@@ -258,7 +248,6 @@ export function applyConfigEditorAdaptiveGeneration(
       ...state,
       adaptiveEnabled: true,
       adaptiveOptions: input.options,
-      adaptiveOptionsChanged: true,
       adaptiveWarnings: result.warnings,
       structure: {
         ...state.structure,
@@ -299,7 +288,7 @@ export function deriveConfigEditorOutput(
   state: ConfigEditorState,
 ) {
   const rawSettings = parseJSONObject(state.rawSettingsText);
-  const structuredDraft = structuredDraftFromState(adapter, state);
+  const structuredDraft = structuredDraftFromState(state);
   const multipleSubscriptions = state.originalSubscriptions.length > 1;
   const envelopeSubscriptions = multipleSubscriptions
     ? state.originalSubscriptions
@@ -454,7 +443,6 @@ function updateStructureSection(
 }
 
 function structuredDraftFromState(
-  adapter: StructuredFileConfigurationAdapter,
   state: Readonly<ConfigEditorState>,
 ): ConfigEditorDraft {
   const { structure } = state;
@@ -462,11 +450,6 @@ function structuredDraftFromState(
     subscriptions: [],
     settingsMode: "structured",
     rawSettings: state.originalRawSettings,
-    adaptiveGroups: state.adaptiveEnabled
-      ? state.adaptiveOptionsChanged
-        ? adapter.adaptive.configFromOptions(state.adaptiveOptions)
-        : state.originalAdaptiveGroups
-      : undefined,
     advancedGroupsText: structure.advancedGroupsText,
     advancedRuleSetsText: structure.advancedRuleSetsText,
     advancedRulesText: structure.advancedRulesText,

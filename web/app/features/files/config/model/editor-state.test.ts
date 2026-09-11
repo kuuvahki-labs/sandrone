@@ -16,13 +16,12 @@ import {
 } from "./editor-state";
 
 describe("config editor state initialization and output", () => {
-  it("materializes omitted sections while preserving adaptive metadata and legacy multi-subscriptions", () => {
+  it("materializes omitted sections while preserving legacy multi-subscriptions", () => {
     const adapter = structuredAdapter("mihomo");
     const state = initializeConfigEditorState(adapter, {
       defaultValue: {
         subscriptions: ["one", "two"],
         settingsMode: "structured",
-        adaptive_groups: { regions: ["hk"] },
       },
       formMode: "edit",
     });
@@ -34,7 +33,6 @@ describe("config editor state initialization and output", () => {
     expect(output.encoded).toEqual({
       subscriptions: ["one", "two"],
       settings: {
-        adaptive_groups: { regions: ["hk"] },
         groups: expect.any(Array),
         rule_sets: expect.any(Array),
         rules: expect.any(Array),
@@ -42,6 +40,28 @@ describe("config editor state initialization and output", () => {
     });
     expect(JSON.parse(output.serialized)).toEqual(output.encoded);
   });
+
+  it.each(["mihomo", "sing-box", "shadowrocket"] as const)(
+    "restores only a complete standard %s layer without rewriting saved groups",
+    (kind) => {
+      const adapter = structuredAdapter(kind);
+      const options = { type: adapter.adaptive.defaultOptions().type, enabledRegionIds: ["hk"] };
+      const groups = adapter.adaptive.generate(["HK-01"], options).groups;
+      const initialize = (values: typeof groups) => initializeConfigEditorState(adapter, {
+        defaultValue: { groups: values, rule_sets: [], rules: [] }, formMode: "edit",
+      });
+      const restored = initialize(groups);
+      expect(restored.adaptiveEnabled).toBe(true);
+      expect(restored.adaptiveOptions).toEqual(options);
+      expect(deriveConfigEditorOutput(adapter, restored).nativeConfig.groups).toEqual(groups);
+
+      const customized = groups.map((group) => ({ ...group, interval: 17 }));
+      const declined = initialize(customized);
+      expect(declined.adaptiveEnabled).toBe(false);
+      expect(declined.adaptiveOptions).toEqual(adapter.adaptive.defaultOptions());
+      expect(deriveConfigEditorOutput(adapter, declined).nativeConfig.groups).toEqual(customized);
+    },
+  );
 
   it("keeps explicit empty structured sections in the serialized envelope", () => {
     const adapter = structuredAdapter("mihomo");
@@ -256,7 +276,6 @@ describe("config editor structure transitions", () => {
     const initial = initializeConfigEditorState(adapter, {
       defaultValue: {
         ...adapter.templates.create("minimal", "en-US"),
-        adaptive_groups: { regions: ["hk"] },
         subscriptions: ["provider"],
       },
       formMode: "edit",
@@ -270,9 +289,7 @@ describe("config editor structure transitions", () => {
 
     expect(cleared.selectedSubscription).toBe("provider");
     expect(cleared.adaptiveEnabled).toBe(false);
-    expect(cleared.adaptiveOptionsChanged).toBe(false);
     expect(cleared.adaptiveWarnings).toEqual([]);
-    expect(cleared.originalAdaptiveGroups).toBeUndefined();
     expect(cleared.templateUndo).toBeNull();
     expect(cleared.structureRevision).toBe(withUndo.structureRevision + 1);
     expect(deriveConfigEditorOutput(adapter, cleared).encoded).toEqual({
@@ -359,7 +376,7 @@ describe("config editor structure transitions", () => {
 
 describe("config editor adaptive and catalog transitions", () => {
   it(
-    "applies five default adaptive groups for Mihomo and persists the selected options",
+    "applies five default adaptive groups and recovers the options from their structure",
     () => {
       const kind = "mihomo";
       const adapter = structuredAdapter(kind);
@@ -377,7 +394,6 @@ describe("config editor adaptive and catalog transitions", () => {
 
       expect(first.applied).toBe(true);
       expect(first.state.adaptiveEnabled).toBe(true);
-      expect(first.state.adaptiveOptionsChanged).toBe(true);
       expect(first.state.structureRevision).toBe(1);
       expect(adapter.adaptive.canonicalNames(output.nativeConfig.groups ?? []))
         .toEqual([
@@ -387,14 +403,13 @@ describe("config editor adaptive and catalog transitions", () => {
           "Japan",
           "United States",
         ]);
-      expect(output.encoded).toMatchObject({
-        settings: {
-          adaptive_groups: {
-            type: options.type,
-            regions: ["hk", "tw", "sg", "jp", "us"],
-          },
-        },
+      expect(output.encoded.settings).not.toHaveProperty("adaptive_groups");
+      const reopened = initializeConfigEditorState(adapter, {
+        defaultValue: adapter.decode({ ...output.encoded, settingsPresent: true }),
+        formMode: "edit",
       });
+      expect(reopened.adaptiveEnabled).toBe(true);
+      expect(reopened.adaptiveOptions).toEqual({ type: options.type, enabledRegionIds: ["hk", "tw", "sg", "jp", "us"] });
 
       const repeated = applyConfigEditorAdaptiveGeneration(
         adapter,
@@ -419,7 +434,7 @@ describe("config editor adaptive and catalog transitions", () => {
     });
     const output = deriveConfigEditorOutput(adapter, transition.state);
 
-    expect(initial.adaptiveEnabled).toBe(true);
+    expect(initial.adaptiveEnabled).toBe(false);
     expect(transition.applied).toBe(true);
     expect(output.nativeConfig.groups?.find((group) => group.name === "Final")?.proxies)
       .toEqual(["PROXY", "Hong Kong", "DIRECT", "REJECT"]);
@@ -450,7 +465,7 @@ describe("config editor adaptive and catalog transitions", () => {
     expect(transition.state).toBe(state);
   });
 
-  it("persists changed adaptive options without clearing template undo", () => {
+  it("keeps changed adaptive options local without clearing template undo", () => {
     const adapter = structuredAdapter("mihomo");
     const initial = initializeConfigEditorState(adapter, {
       defaultValue: adapter.templates.create("minimal"),
@@ -467,18 +482,15 @@ describe("config editor adaptive and catalog transitions", () => {
       options,
     });
 
-    expect(changed.adaptiveEnabled).toBe(true);
-    expect(changed.adaptiveOptionsChanged).toBe(true);
+    expect(changed.adaptiveEnabled).toBe(false);
     expect(changed.adaptiveWarnings).toEqual([]);
     expect(changed.templateUndo).toEqual(withUndo.templateUndo);
-    expect(deriveConfigEditorOutput(adapter, changed).encoded).toMatchObject({
-      settings: {
-        adaptive_groups: {
-          type: "load-balance",
-          regions: ["hk"],
-        },
-      },
-    });
+    expect(deriveConfigEditorOutput(adapter, changed).encoded)
+      .toEqual(deriveConfigEditorOutput(adapter, withUndo).encoded);
+    const toggled = reduceConfigEditorState(changed, { type: "toggle-adaptive", enabled: true });
+    const untoggled = reduceConfigEditorState(toggled, { type: "toggle-adaptive", enabled: false });
+    expect(deriveConfigEditorOutput(adapter, toggled).encoded).toEqual(deriveConfigEditorOutput(adapter, withUndo).encoded);
+    expect(deriveConfigEditorOutput(adapter, untoggled).encoded).toEqual(deriveConfigEditorOutput(adapter, withUndo).encoded);
   });
 
   it("adds a catalog rule set without changing rules and treats conflicts as no-ops", () => {

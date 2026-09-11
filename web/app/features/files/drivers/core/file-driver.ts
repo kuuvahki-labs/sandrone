@@ -25,7 +25,6 @@ import type {
   FileProcessorValidationIssue,
 } from "~/features/files/model/input-validation";
 import type {
-  FileAdaptiveGroupConfigDetail,
   FileConfigDetail,
   FileConfigDraft,
   FileSourceDetail,
@@ -54,23 +53,18 @@ export interface FileCreatePreset {
 export interface ConfigAdaptiveStrategy {
   anchorProblem: (config: Readonly<FileConfigDraft>) => AdaptiveGroupAnchorProblem | null;
   canonicalNames: (groups: readonly ConfigMap[]) => string[];
-  configFromOptions: (options: Readonly<AdaptiveGroupOptions>) => FileAdaptiveGroupConfigDetail | undefined;
   defaultOptions: () => AdaptiveGroupOptions;
   generate: (
     nodeNames: readonly string[],
     options: Readonly<AdaptiveGroupOptions>,
     namingLocale?: ConfigNamingLocale,
   ) => AdaptiveGroupGeneration;
-  initiallyEnabled: (
-    formMode: "create" | "edit",
-    config: FileAdaptiveGroupConfigDetail | undefined,
-  ) => boolean;
   isStale: (input: Readonly<AdaptiveGroupStaleInput>) => boolean;
   merge: (
     config: Readonly<FileConfigDraft>,
     generation: Readonly<AdaptiveGroupGeneration>,
   ) => AdaptiveGroupMergeResult;
-  optionsFromConfig: (config: FileAdaptiveGroupConfigDetail | undefined) => AdaptiveGroupOptions;
+  recognizeOptions: (groups: readonly ConfigMap[]) => AdaptiveGroupOptions | null;
   recognizesCanonicalLayer: (config: Readonly<FileConfigDraft>) => boolean;
   requiresNodePreview: boolean;
   strip: (config: Readonly<FileConfigDraft>) => AdaptiveGroupStripResult;

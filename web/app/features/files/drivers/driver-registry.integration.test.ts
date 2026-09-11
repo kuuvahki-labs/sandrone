@@ -108,11 +108,10 @@ describe("file driver codecs", () => {
     expect(mihomo?.decode({
       subscriptions: ["provider"],
       settingsPresent: true,
-      settings: { adaptive_groups: { type: "url-test" }, groups: [], rule_sets: [], rules: [] },
+      settings: { groups: [], rule_sets: [], rules: [] },
     })).toMatchObject({
       subscriptions: ["provider"],
       settingsMode: "structured",
-      adaptiveGroups: { type: "url-test" },
       groups: [],
       ruleSets: [],
       rules: [],
@@ -133,50 +132,15 @@ describe("file driver codecs", () => {
     });
   });
 
-  it.each([
-    ["mihomo", {}],
-    ["mihomo", { type: "url-test" }],
-    ["mihomo", { regions: ["us", "hk"] }],
-    ["shadowrocket", {}],
-    ["shadowrocket", { type: "url-test" }],
-    ["shadowrocket", { regions: ["us", "hk"] }],
-  ] as const)("materializes partial %s adaptive settings without reordering metadata", (kind, adaptiveGroups) => {
-    const adapter = structuredAdapter(kind);
-    const settings = { adaptive_groups: adaptiveGroups };
-
-    const decoded = adapter.decode({ settingsPresent: true, settings }, "en-US");
-
-    expect(decoded).toMatchObject({ settingsMode: "structured", adaptiveGroups });
-    expect(adapter.encode(decoded!)).toMatchObject({
-      settings: {
-        adaptive_groups: adaptiveGroups,
-        groups: expect.any(Array),
-        rule_sets: expect.any(Array),
-        rules: expect.any(Array),
-      },
-    });
-  });
-
-  it.each([
-    { adaptive_groups: { future: true } },
-    { adaptive_groups: { type: 7 } },
-    { adaptive_groups: { regions: ["hk", 7] } },
-  ])("falls back to raw mode for backend-unrepresentable Mihomo adaptive settings %#", (settings) => {
-    expect(structuredAdapter("mihomo").decode({ settingsPresent: true, settings })).toMatchObject({
-      settingsMode: "raw",
-      rawSettings: settings,
-    });
-  });
-
-  it.each(["mihomo", "shadowrocket"] as const)(
-    "falls back to raw mode when %s receives removed minimum_node_count",
+  it.each(["mihomo", "sing-box", "shadowrocket"] as const)(
+    "rejects removed adaptive settings for %s without silently discarding them",
     (kind) => {
-      const settings = { adaptive_groups: { minimum_node_count: 2 } };
-
-      expect(structuredAdapter(kind).decode({ settingsPresent: true, settings })).toMatchObject({
-        settingsMode: "raw",
-        rawSettings: settings,
-      });
+      const adapter = structuredAdapter(kind);
+      const settings = { groups: [], rule_sets: [], rules: [], adaptive_groups: { type: "url-test", regions: ["hk"] } };
+      const decoded = adapter.decode({ settingsPresent: true, settings });
+      expect(decoded).toMatchObject({ settingsMode: "raw", rawSettings: settings });
+      expect(adapter.validateSettings(settings)).toBe(false);
+      expect(adapter.encode(decoded!)).toEqual({ settings });
     },
   );
 
@@ -207,7 +171,6 @@ describe("file driver codecs", () => {
   it("round-trips complete Shadowrocket settings and materializes omitted sections", () => {
     const adapter = structuredAdapter("shadowrocket");
     const settings = {
-      adaptive_groups: { type: "url-test", regions: [] },
       groups: [{
         name: "Proxy",
         type: "select",

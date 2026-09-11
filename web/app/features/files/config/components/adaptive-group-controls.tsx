@@ -29,6 +29,8 @@ export interface ConfigAdaptiveGroupControlsProps {
   defaultExpanded?: boolean;
   disabledReason?: string;
   generatedCount: number;
+  enabled: boolean;
+  onEnabledChange: (enabled: boolean) => void;
   onOptionsChange: (options: AdaptiveGroupOptions) => void;
   onGenerate: (options: AdaptiveGroupOptions) => void;
   options: AdaptiveGroupOptions;
@@ -41,6 +43,8 @@ export function ConfigAdaptiveGroupControls({
   defaultExpanded = true,
   disabledReason,
   generatedCount,
+  enabled,
+  onEnabledChange,
   onOptionsChange,
   onGenerate,
   options,
@@ -69,11 +73,11 @@ export function ConfigAdaptiveGroupControls({
   const generateButton = (
     <Button
       aria-label={t(generatedCount > 0 ? "files.config.adaptiveRegenerate" : "files.config.adaptiveGenerate")}
-      disabled={Boolean(reason)}
+      disabled={!enabled || Boolean(reason)}
       type="button"
       variant="contained"
       onClick={() => {
-        if (reason) return;
+        if (!enabled || reason) return;
         onGenerate({
           ...options,
           enabledRegionIds: [...enabledRegionIds],
@@ -92,6 +96,10 @@ export function ConfigAdaptiveGroupControls({
       label={t("files.config.adaptiveGroups")}
     >
       <div className="grid gap-3" onChange={(event) => event.stopPropagation()}>
+        <FormControlLabel
+          control={<Checkbox checked={enabled} onChange={(_, checked) => onEnabledChange(checked)} />}
+          label={t("files.config.adaptiveGenerate")}
+        />
         <Typography color="text.secondary" variant="body2">
           {t("files.config.adaptiveDescription")}
         </Typography>

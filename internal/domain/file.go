@@ -69,11 +69,6 @@ func (c FileConfig) MarshalYAML() (any, error) {
 	return wire, nil
 }
 
-type FileAdaptiveGroupConfig struct {
-	Type    string   `json:"type,omitempty" yaml:"type,omitempty"`
-	Regions []string `json:"regions,omitempty" yaml:"regions,omitempty"`
-}
-
 type FileSource struct {
 	Type    string       `json:"type" yaml:"type"`
 	Content string       `json:"content,omitempty" yaml:"content,omitempty"`

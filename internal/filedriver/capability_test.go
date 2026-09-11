@@ -2,7 +2,6 @@ package filedriver
 
 import (
 	"bytes"
-	"context"
 	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"reflect"
@@ -10,7 +9,6 @@ import (
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
@@ -85,32 +83,17 @@ func TestMihomoCapabilityPrototypeMatchesExecutedSettings(t *testing.T) {
 	require.Contains(t, schema.Properties, "rules")
 }
 
-func TestMihomoFileDriverKeepsLegacyAdaptiveGroupsCompatibleWithExplicitGroups(t *testing.T) {
-	driver, err := New().Lookup(domain.FileKindMihomo)
-	require.NoError(t, err)
-	settings := jsontext.Value(`{
-	  "adaptive_groups": {"type": "url-test", "regions": ["hk", "jp"]},
-	  "groups": [{"name": "Manual", "type": "select", "proxies": ["hk-node", "DIRECT"]}],
-	  "rule_sets": [],
-	  "rules": []
-	}`)
-	require.NoError(t, driver.ValidateSettings(settings))
-	result, err := driver.Compile(context.Background(), CompileInput{
-		Base: driver.Descriptor().DefaultBase,
-		RenderedNodes: []byte(`proxies:
-  - name: hk-node
-  - name: jp-node
-  - name: us-node
-`),
-		Settings: settings,
-	})
-	require.NoError(t, err)
-
-	var document map[string]any
-	require.NoError(t, yaml.Unmarshal(result, &document))
-	require.Equal(t, []any{map[string]any{
-		"name": "Manual", "type": "select", "proxies": []any{"hk-node", "DIRECT"},
-	}}, document["proxy-groups"])
+func TestFileDriversRejectRemovedAdaptiveGroups(t *testing.T) {
+	for _, kind := range []domain.FileKind{domain.FileKindMihomo, domain.FileKindShadowrocket} {
+		t.Run(string(kind), func(t *testing.T) {
+			driver, err := New().Lookup(kind)
+			require.NoError(t, err)
+			settings := jsontext.Value(`{"adaptive_groups":{"type":"url-test","regions":["hk"]},"groups":[],"rule_sets":[],"rules":[]}`)
+			err = driver.ValidateSettings(settings)
+			require.True(t, domain.IsCode(err, domain.CodeInvalidArgument))
+			require.ErrorContains(t, err, "config.settings.adaptive_groups")
+		})
+	}
 }
 
 func TestCapabilitiesReturnImmutableCopies(t *testing.T) {

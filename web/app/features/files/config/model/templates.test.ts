@@ -620,6 +620,14 @@ describe("config templates", () => {
    });
   });
 
+  it.each(TEMPLATE_IDS)("recognizes the %s sing-box template beneath a strict regex region layer", (templateID) => {
+    const config = createConfigFromTemplate("sing-box", templateID);
+    const merged = mergeAdaptiveGroups(config, generateAdaptiveGroups(
+      ["HK-01"], { type: "urltest", enabledRegionIds: ["hk"] }, "sing-box",
+    ), "sing-box");
+    expect(recognizeConfigTemplate("sing-box", merged.config)).toEqual({ adaptive: true, match: templateID, namingLocale: "en-US" });
+  });
+
   it("keeps a custom adaptive-like group classified as custom", () => {
     const config = createConfigFromTemplate("mihomo", "minimal");
     const merged = mergeAdaptiveGroups(
@@ -669,7 +677,7 @@ describe("config templates", () => {
     expect(recognizeConfigTemplate("mihomo", referenced)).toEqual({ adaptive: true, match: "custom", namingLocale: "en-US" });
  });
 
-  it("detects duplicate canonical groups but keeps the conflict custom", () => {
+  it("does not claim an ambiguous duplicate region layer", () => {
     const config = createConfigFromTemplate("mihomo", "minimal");
     const merged = mergeAdaptiveGroups(
       config,
@@ -682,7 +690,7 @@ describe("config templates", () => {
       groups: [...(merged.config.groups ?? []), structuredClone(canonical)],
    };
 
-    expect(recognizeConfigTemplate("mihomo", duplicated)).toEqual({ adaptive: true, match: "custom", namingLocale: "en-US" });
+    expect(recognizeConfigTemplate("mihomo", duplicated)).toEqual({ adaptive: false, match: "custom", namingLocale: "en-US" });
  });
 
   it("does not offer config templates for static files", () => {

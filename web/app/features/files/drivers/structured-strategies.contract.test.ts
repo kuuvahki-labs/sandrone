@@ -90,20 +90,6 @@ describe("structured file driver orchestration strategies", () => {
    }
  });
 
-  it.each(CONFIG_KINDS)("owns %s native adaptive metadata cleanup during template recognition", (kind) => {
-    const adapter = task3Adapter(kind);
-    const config = adapter.templates.create("minimal", "en-US");
-
-    expect(adapter.templates.recognize({
-      ...config,
-      adaptive_groups: { type: "driver-native" },
-   })).toEqual({
-      adaptive: false,
-      match: "minimal",
-      namingLocale: "en-US",
-   });
- });
-
   it("keeps Shadowrocket configuration independent from subscription node previews", () => {
     const adapter = task3Adapter("shadowrocket");
     const preview: ConfigNodePreviewInput = {
@@ -173,36 +159,18 @@ describe("structured file driver orchestration strategies", () => {
     expect(previewSource).not.toContain("SHADOWROCKET_SUPPORTED_NODE_TYPES");
  });
 
-  it("lets a fourth driver compose custom adaptive persistence and stale behavior from pure helpers", () => {
+  it("lets a fourth driver compose adaptive recognition and stale behavior from pure helpers", () => {
     const dialect = fakeAdaptiveDialect();
     const custom = {
       ...adaptiveGroupHelpers(dialect),
-      configFromOptions: (options: Readonly<AdaptiveGroupOptions>) => ({ type: `fourth:${options.type}` }),
-      initiallyEnabled: (_mode: "create" | "edit", config: FileConfigDraft["adaptive_groups"]) => config?.type?.startsWith("fourth:") === true,
       isStale: ({ options }: { options: Readonly<AdaptiveGroupOptions> }) => options.type === "stale-by-driver",
-      optionsFromConfig: (config: FileConfigDraft["adaptive_groups"]) => ({
-        ...defaultAdaptiveGroupOptions(dialect),
-        type: config?.type?.replace(/^fourth:/, "") ?? "race",
-     }),
       recognizesCanonicalLayer: () => false,
-   } satisfies Task3AdapterStrategies["adaptive"] & {
-      configFromOptions: (options: Readonly<AdaptiveGroupOptions>) => FileConfigDraft["adaptive_groups"];
-      initiallyEnabled: (mode: "create" | "edit", config: FileConfigDraft["adaptive_groups"]) => boolean;
-      isStale: (input: { options: Readonly<AdaptiveGroupOptions> }) => boolean;
-      optionsFromConfig: (config: FileConfigDraft["adaptive_groups"]) => AdaptiveGroupOptions;
-      recognizesCanonicalLayer: (config: Readonly<FileConfigDraft>) => boolean;
-   };
-
-    const persisted = custom.configFromOptions({ type: "race" });
-    expect(persisted).toEqual({ type: "fourth:race" });
-    expect(custom.initiallyEnabled("edit", persisted)).toBe(true);
-    expect(custom.optionsFromConfig(persisted).type).toBe("race");
+    };
+    expect(custom.defaultOptions()).toEqual(defaultAdaptiveGroupOptions(dialect));
+    expect(custom.recognizeOptions([])).toBeNull();
     expect(custom.isStale({ options: { type: "stale-by-driver" } })).toBe(true);
-    expect(custom.generate(["HK-01"], { type: "race" }).groups[0]).toMatchObject({
-      label: "Hong Kong",
-      members: ["HK-01"],
-   });
- });
+    expect(custom.generate(["HK-01"], { type: "race" }).groups[0]).toMatchObject({ label: "Hong Kong", members: ["HK-01"] });
+  });
 });
 
 function fakeAdaptiveDialect(): ConfigAdaptiveDialect {
@@ -210,6 +178,7 @@ function fakeAdaptiveDialect(): ConfigAdaptiveDialect {
     anchorProblem: () => null,
     canonicalName: () => undefined,
     defaultType: "race",
+    groupFilter: (group) => group.filter,
     groupMembers: (group) => Array.isArray(group.members) ? group.members.map(String) : [],
     groupName: (group) => typeof group.label === "string" ? group.label : "",
     inboundReferences: () => ({}),

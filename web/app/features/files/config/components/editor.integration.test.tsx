@@ -114,6 +114,7 @@ describe("config file workbench integration", { timeout: 20_000 }, () => {
     });
 
     expect(await screen.findByText("Loaded 1 nodes")).toBeInTheDocument();
+    await user.click(screen.getByRole("checkbox", { name: "Generate adaptive groups" }));
     await user.click(screen.getByRole("button", { name: "Generate adaptive groups" }));
     expect(screen.getByRole("button", { name: "Expand proxy group Hong Kong" }))
       .toBeInTheDocument();
@@ -161,7 +162,6 @@ describe("config file workbench integration", { timeout: 20_000 }, () => {
     );
     const startingDraft = {
       ...adapter.adaptive.merge(minimalConfig, generation).config,
-      adaptive_groups: adapter.adaptive.configFromOptions(options),
     };
     const onDirty = vi.fn();
     renderEditor({
@@ -217,7 +217,8 @@ describe("config file workbench integration", { timeout: 20_000 }, () => {
       name: "load-balance",
     }));
 
-    expect(onDirty).toHaveBeenCalled();
+    expect(onDirty).not.toHaveBeenCalled();
+    expect(currentConfig().groups).toEqual(startingGroups);
   });
 
   it("updates hidden output and validity after a structured edit", async () => {

@@ -80,6 +80,7 @@ export interface ConfigAdaptiveDialect {
   defaultType: string;
   groupMembers: (group: ConfigMap) => string[] | undefined;
   groupName: (group: ConfigMap) => string;
+  groupFilter: (group: ConfigMap) => unknown;
   inboundReferences: (config: Readonly<FileConfigDraft>) => Readonly<Record<string, number>>;
   referenceTargets?: readonly string[];
   referenceInsertionIndex?: (members: readonly string[]) => number;
@@ -94,6 +95,7 @@ export interface ConfigAdaptiveDialect {
 }
 
 export interface ConfigAdaptiveHelpers {
+  recognizeOptions: (groups: readonly ConfigMap[]) => AdaptiveGroupOptions | null;
   anchorProblem: (config: Readonly<FileConfigDraft>) => AdaptiveGroupAnchorProblem | null;
   canonicalNames: (groups: readonly ConfigMap[]) => string[];
   defaultOptions: () => AdaptiveGroupOptions;
@@ -130,6 +132,7 @@ export function adaptiveGroupHelpers(
 ): ConfigAdaptiveHelpers {
   const helpers: ConfigAdaptiveHelpers = {
     anchorProblem: dialect.anchorProblem,
+    recognizeOptions: (groups) => recognizeAdaptiveGroupOptions(dialect, groups),
     canonicalNames: (groups) => canonicalAdaptiveGroupNames(dialect, groups),
     defaultOptions: () => defaultAdaptiveGroupOptions(dialect),
     generate: (nodeNames, options, namingLocale = "en-US") => generateAdaptiveGroups(
@@ -155,19 +158,42 @@ export function defaultAdaptiveGroupOptions(
   };
 }
 
-export function adaptiveGroupOptionsFromValues(
-  dialect: Pick<ConfigAdaptiveDialect, "defaultType" | "typeOptions">,
-  values: Readonly<{
-    enabledRegionIds?: readonly string[];
-    type?: unknown;
-  }> | undefined,
-): AdaptiveGroupOptions {
-  const defaults = defaultAdaptiveGroupOptions(dialect);
-  if (!values) return defaults;
-  const enabled = new Set(values.enabledRegionIds ?? []);
+/** Restore generator inputs only when the whole region layer is unambiguous. */
+export function recognizeAdaptiveGroupOptions(
+  dialect: Readonly<ConfigAdaptiveDialect>,
+  groups: readonly ConfigMap[],
+): AdaptiveGroupOptions | null {
+  const regions = ADAPTIVE_REGION_GROUPS.map((region) => ({
+    region,
+    names: [adaptiveRegionName(region.id, "en-US"), adaptiveRegionName(region.id, "zh-CN")],
+    filter: dialect.groupFilter(dialect.materialize(region, dialect.defaultType, [])),
+  }));
+  const selected = new Set<string>();
+  const types = new Set<string>();
+  const names = groups.map(dialect.groupName);
+  for (const group of groups) {
+    const name = dialect.groupName(group);
+    const candidates = regions.filter((item) => (
+      item.names.includes(name)
+      || item.region.legacyNames?.includes(name)
+      || (item.filter !== undefined && dialect.groupFilter(group) === item.filter)
+    ));
+    if (candidates.length === 0) continue;
+    if (candidates.length !== 1 || names.filter((value) => value === name).length !== 1) return null;
+    const { region, names: standardNames } = candidates[0];
+    if (!standardNames.includes(name) || selected.has(region.id)) return null;
+    const matches = dialect.typeOptions.filter(({ value }) => (
+      exactValueEqual(group, dialect.materialize({ ...region, name }, value, []))
+    ));
+    if (matches.length !== 1) return null;
+    selected.add(region.id);
+    types.add(matches[0].value);
+    if (types.size > 1) return null;
+  }
+  if (selected.size === 0) return null;
   return {
-    type: isAdaptiveGroupType(dialect, values.type) ? values.type : defaults.type,
-    enabledRegionIds: ADAPTIVE_REGION_IDS.filter((id) => enabled.has(id)),
+    type: [...types][0],
+    enabledRegionIds: ADAPTIVE_REGION_IDS.filter((id) => selected.has(id)),
   };
 }
 

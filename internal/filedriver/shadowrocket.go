@@ -23,7 +23,7 @@ func (shadowrocketFileDriver) Descriptor() Descriptor {
 		MediaType:        "text/plain; charset=utf-8",
 		Syntax:           "ini",
 		DefaultExtension: ".conf",
-		SettingsPrototype: ShadowrocketFileCapabilitySettings{
+		SettingsPrototype: ShadowrocketFileSettings{
 			Groups: []ShadowrocketGroupSettings{}, RuleSets: []ShadowrocketRuleSetSettings{}, Rules: []string{},
 		},
 		SourceRules: filekind.SourceRules{

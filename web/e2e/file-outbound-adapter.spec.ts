@@ -180,3 +180,48 @@ test("new sing-box saves an explicit default in the adapter and reopens a missin
   await notice.scrollIntoViewIfNeeded();
   await captureEvidence(page, testInfo, "sing-box-reopened.png", issues, api);
 });
+
+test("generated Mihomo regions restore their switch, selection and group type after saving", async ({ page }, testInfo) => {
+  const issues = collectConsoleIssues(page);
+  const api = await mockFileAPI(page);
+  await page.goto("/files/new?source=mihomo");
+  await assertPageIdentity(page, "New file");
+  const controls = page.getByRole("group", { name: "Adaptive groups", exact: true });
+  const enabled = controls.getByRole("checkbox", { name: "Generate adaptive groups", exact: true });
+  await expect(enabled).not.toBeChecked();
+  const initialConfig = await page.locator('input[name="config"]').inputValue();
+  await enabled.check();
+  await controls.getByRole("combobox", { name: "Proxy group type", exact: true }).click();
+  await page.getByRole("option", { name: "load-balance", exact: true }).click();
+  await controls.getByRole("button", { name: /^Groups to generate/ }).click();
+  await controls.getByRole("button", { name: "Clear", exact: true }).click();
+  await controls.getByRole("checkbox", { name: /^Hong Kong/ }).check();
+  expect(await page.locator('input[name="config"]').inputValue()).toBe(initialConfig);
+  await controls.getByRole("button", { name: "Generate adaptive groups", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Expand proxy group Hong Kong", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save file", exact: true })).toBeEnabled();
+  await page.getByRole("button", { name: "Save file", exact: true }).click();
+  await expect(page).toHaveURL(/\/files\/mihomo\.yaml\/edit$/);
+  await assertPageIdentity(page, "Edit file");
+  expect(api.saves).toHaveLength(1);
+  expect(api.saves[0].config.settings).not.toHaveProperty("adaptive_groups");
+  expect(api.saves[0].config.settings.groups.find((group) => group.name === "Hong Kong")).toMatchObject({ type: "load-balance", "include-all-proxies": true, filter: expect.any(String) });
+
+  await page.reload();
+  await assertPageIdentity(page, "Edit file");
+  await expect(enabled).toBeChecked();
+  await expect(controls.getByRole("combobox", { name: "Proxy group type", exact: true })).toHaveText("load-balance");
+  await controls.getByRole("button", { name: /^Groups to generate/ }).click();
+  await expect(controls.getByRole("checkbox", { name: /^Hong Kong/ })).toBeChecked();
+  await expect(controls.getByRole("checkbox", { name: /^Japan/ })).not.toBeChecked();
+  await expect(controls.getByRole("checkbox", { checked: true })).toHaveCount(2);
+  expect(api.subscriptionPreviews).toBe(0);
+  expect(api.specReads.filter((name) => name === "mihomo.yaml").length).toBeGreaterThanOrEqual(2);
+  const savedGroups = api.saves[0].config.settings.groups;
+  await enabled.uncheck();
+  expect(JSON.parse(await page.locator('input[name="config"]').inputValue()).settings.groups).toEqual(savedGroups);
+  await expect(controls.getByRole("button", { name: "Regenerate adaptive groups", exact: true })).toBeDisabled();
+  await enabled.check();
+  await controls.scrollIntoViewIfNeeded();
+  await captureEvidence(page, testInfo, "mihomo-regions-reopened.png", issues, api);
+});

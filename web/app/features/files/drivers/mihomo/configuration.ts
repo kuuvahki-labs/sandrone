@@ -22,7 +22,6 @@ import {
 } from "~/features/files/drivers/core/adapter-helpers";
 import type { StructuredFileConfigurationAdapter } from "~/features/files/drivers/core/file-driver";
 import {
-  adaptiveGroups,
   createStructuredConfigurationAdapter,
   omitKeys,
   recordArray,
@@ -88,26 +87,16 @@ export const mihomoConfigurationAdapter = createStructuredConfigurationAdapter({
 });
 
 function decodeMihomoSettings(value: unknown): Partial<FileConfigDraft> | null {
-  const settings = strictSettingsObject(value, ["adaptive_groups", "groups", "rule_sets", "rules"]);
+  const settings = strictSettingsObject(value, ["groups", "rule_sets", "rules"]);
   if (!settings) return null;
   if ("groups" in settings && !recordArray(settings.groups)) return null;
   if ("rule_sets" in settings && !recordArray(settings.rule_sets)) return null;
   if ("rules" in settings && (!Array.isArray(settings.rules) || !settings.rules.every((rule) => typeof rule === "string"))) return null;
-  if ("adaptive_groups" in settings && !validMihomoAdaptiveGroups(settings.adaptive_groups)) return null;
   return {
-    ...(Object.hasOwn(settings, "adaptive_groups") ? { adaptive_groups: adaptiveGroups(settings.adaptive_groups) } : {}),
     ...(Object.hasOwn(settings, "groups") ? { groups: settings.groups as ConfigMap[] } : {}),
     ...(Object.hasOwn(settings, "rule_sets") ? { rule_sets: settings.rule_sets as ConfigMap[] } : {}),
     ...(Object.hasOwn(settings, "rules") ? { rules: settings.rules as unknown[] } : {}),
   };
-}
-
-function validMihomoAdaptiveGroups(value: unknown): boolean {
-  const item = strictSettingsObject(value, ["type", "regions"]);
-  if (!item) return false;
-  if ("type" in item && typeof item.type !== "string") return false;
-  return !("regions" in item)
-    || (Array.isArray(item.regions) && item.regions.every((region) => typeof region === "string"));
 }
 
 function mihomoGroups(): StructuredFileConfigurationAdapter["groups"] {

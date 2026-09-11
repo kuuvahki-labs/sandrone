@@ -85,9 +85,9 @@ examples 见 [MCP resources](mcp.md#resources-与-schema-templates)。
 
 | kind | `settings` 允许的顶层字段 | 必填字段 | 显式 `[]` |
 | --- | --- | --- | --- |
-| `mihomo` | `adaptive_groups`、`groups`、`rule_sets`、`rules` | `groups`、`rule_sets`、`rules` | 对应的 `proxy-groups`、`rule-providers` 或 `rules` 为空 |
+| `mihomo` | `groups`、`rule_sets`、`rules` | `groups`、`rule_sets`、`rules` | 对应的 `proxy-groups`、`rule-providers` 或 `rules` 为空 |
 | `sing-box` | `groups`、`rule_sets`、`rules` | `groups`、`rule_sets`、`rules` | 对应的 selector、`route.rule_set` 或 `route.rules` 为空 |
-| `shadowrocket` | `adaptive_groups`、`groups`、`rule_sets`、`rules` | `groups`、`rule_sets`、`rules` | 对应的 `[Proxy Group]`、规则集映射或 `[Rule]` 不生成条目 |
+| `shadowrocket` | `groups`、`rule_sets`、`rules` | `groups`、`rule_sets`、`rules` | 对应的 `[Proxy Group]`、规则集映射或 `[Rule]` 不生成条目 |
 
 省略整个 `config`、省略 `settings`、提交 `settings: {}` 或漏掉任一必填字段都返回
 `invalid_argument`。空数组表示调用方明确选择该输出集合为空，不触发任何后端默认值。
@@ -103,16 +103,15 @@ Shadowrocket 的 settings 还执行字段级严格校验：
   `policy-regex-filter`；使用 `PROXY` 引用客户端当前代理，或用
   `policy-regex-filter` 匹配客户端订阅节点；
 - `rule_sets[]` 使用 `name`、`type`、`url`；
-- `rules[]` 是 Shadowrocket 规则字符串；
-- Web/HTTP 兼容元数据 `adaptive_groups` 只接受已声明的 type 和 region 值。
+- `rules[]` 是 Shadowrocket 规则字符串。
 
 所有 settings 的未知字段都会失败。Shadowrocket 的嵌套对象也拒绝未知字段；
 Mihomo 和 sing-box 的客户端 object 内容保持开放，以容纳各自客户端字段。
 sing-box Web 正则组所用的脚本扩展字段与显式处理器要求见
 [出站配置适配](community-config-presets.md#出站配置适配)。
-当前三个 compiler 的组输出都由 `groups` 决定；`adaptive_groups` 只作为已知
-settings 结构被解码（Shadowrocket 还会校验其取值），不会替代 `groups` 或
-自动合成额外组。
+当前三个 compiler 的组输出都由 `groups` 决定。已移除的 `adaptive_groups`
+按未知字段拒绝，调用方须删除该键。Web 地区组工具的恢复规则见
+[生成地区组](../how-to/render-client-config.md#生成地区组)。
 
 ## 编译与所有权
 

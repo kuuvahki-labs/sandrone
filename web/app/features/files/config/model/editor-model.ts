@@ -1,4 +1,4 @@
-import type { FileAdaptiveGroupConfigDetail, RuleSetCatalogItem } from "~/features/files/model/types";
+import type { RuleSetCatalogItem } from "~/features/files/model/types";
 
 export type ConfigMap = Record<string, unknown>;
 
@@ -70,7 +70,6 @@ export interface RuleDraft {
 
 /** Complete target-neutral state for the shared structured editor lifecycle. */
 export interface ConfigEditorDraft {
-  adaptiveGroups?: FileAdaptiveGroupConfigDetail;
   advancedGroupsText: string;
   advancedRuleSetsText: string;
   advancedRulesText: string;

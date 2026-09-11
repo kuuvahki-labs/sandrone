@@ -21,7 +21,7 @@ func (mihomoFileDriver) Descriptor() Descriptor {
 		Syntax:           "yaml",
 		DefaultExtension: ".yaml",
 		NodeRenderFormat: "mihomo-proxies",
-		SettingsPrototype: MihomoFileCapabilitySettings{
+		SettingsPrototype: MihomoFileSettings{
 			Groups: []map[string]any{}, RuleSets: []map[string]any{}, Rules: []string{},
 		},
 		SourceRules: filekind.SourceRules{

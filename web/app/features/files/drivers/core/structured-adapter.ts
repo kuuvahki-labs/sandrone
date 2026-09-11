@@ -47,7 +47,6 @@ export function createStructuredConfigurationAdapter(
       subscriptions: value.subscriptions,
       settingsMode: value.settingsMode === "raw" ? "raw" : "structured",
       rawSettings: value.rawSettings,
-      adaptiveGroups: value.adaptive_groups,
       advancedGroupsText: configJSON(nativeGroups),
       advancedRuleSetsText: configJSON(nativeRuleSets),
       advancedRulesText: configJSON(nativeRules),
@@ -75,7 +74,6 @@ export function createStructuredConfigurationAdapter(
       subscriptions: draft.subscriptions,
       group_preset: draft.groupPreset,
       ruleset_preset: draft.ruleSetPreset,
-      adaptive_groups: draft.adaptiveGroups,
       groups: draft.mode === "wizard" ? spec.groups.serialize(draft.groups) : advancedGroups,
       rule_sets: draft.mode === "wizard" ? spec.ruleSets.serialize(draft.ruleSets) : advancedRuleSets,
       rules: draft.mode === "wizard" ? spec.rules.serialize(draft.rules) : advancedRules,
@@ -105,7 +103,6 @@ export function createStructuredConfigurationAdapter(
       const settings = native.settingsMode === "raw"
         ? native.rawSettings
         : Object.fromEntries(Object.entries({
-          adaptive_groups: native.adaptive_groups,
           groups: native.groups,
           rule_sets: native.rule_sets,
           rules: native.rules,
@@ -150,12 +147,6 @@ export function strictSettingsObject(
 
 export function recordArray(value: unknown): value is ConfigMap[] {
   return Array.isArray(value) && value.every(isRecord);
-}
-
-export function adaptiveGroups(value: unknown): FileConfigDraft["adaptive_groups"] {
-  return isRecord(value)
-    ? { ...value } as FileConfigDraft["adaptive_groups"]
-    : undefined;
 }
 
 export function omitKeys(value: ConfigMap, keys: readonly string[]): ConfigMap {

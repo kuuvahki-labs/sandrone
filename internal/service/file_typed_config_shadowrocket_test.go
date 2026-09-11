@@ -54,9 +54,6 @@ func TestServiceShadowrocketFileUsesExplicitGroupsRuleSetsAndRules(t *testing.T)
 		Kind: domain.FileKindShadowrocket,
 		Config: &domain.FileConfig{
 			Settings: shadowrocketSettings(t, map[string]any{
-				"adaptive_groups": map[string]any{
-					"type": "url-test", "regions": []string{"hk", "jp"},
-				},
 				"groups": []map[string]any{
 					{"name": "Manual", "type": "select", "proxies": []string{"PROXY", "DIRECT"}},
 					{
@@ -245,9 +242,7 @@ func TestServiceShadowrocketSettingsValidation(t *testing.T) {
 		{name: "rule section escape", settings: `{"rules":["[General]"]}`, path: "config.settings.rules[0]"},
 		{name: "group filter newline injection", settings: `{"groups":[{"name":"Proxy","type":"select","policy-regex-filter":".*\n[Rule]\nFINAL,REJECT"}],"rules":[]}`, path: "config.settings.groups[0].policy-regex-filter"},
 		{name: "group filter comma injection", settings: `{"groups":[{"name":"Proxy","type":"select","policy-regex-filter":".*,hidden=1"}],"rules":[]}`, path: "config.settings.groups[0].policy-regex-filter"},
-		{name: "bad adaptive type", settings: `{"adaptive_groups":{"type":"fallback"}}`, path: "config.settings.adaptive_groups.type"},
-		{name: "removed adaptive count", settings: `{"adaptive_groups":{"minimum_node_count":2}}`, path: "config.settings.adaptive_groups.minimum_node_count"},
-		{name: "bad adaptive region", settings: `{"adaptive_groups":{"regions":["moon"]}}`, path: "config.settings.adaptive_groups.regions[0]"},
+		{name: "removed adaptive settings", settings: `{"adaptive_groups":{"type":"url-test","regions":["hk"]}}`, path: "config.settings.adaptive_groups"},
 		{name: "duplicate rule set", settings: `{"rule_sets":[{"name":"a","type":"rule-set","url":"https://example.com/a"},{"name":"a","type":"rule-set","url":"https://example.com/b"}]}`, path: "config.settings.rule_sets[1].name"},
 		{name: "bad rule set type", settings: `{"rule_sets":[{"name":"a","type":"classical","url":"https://example.com/a"}]}`, path: "config.settings.rule_sets[0].type"},
 		{name: "bad rule set URL", settings: `{"rule_sets":[{"name":"a","type":"rule-set","url":"file:///tmp/a"}]}`, path: "config.settings.rule_sets[0].url"},
