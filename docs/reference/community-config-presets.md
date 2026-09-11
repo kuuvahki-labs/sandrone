@@ -50,7 +50,7 @@
 | ShellCrash Fake-IP 规则（跟随上游） | 使用 ShellCrash 维护的完整兼容列表；Mihomo。 | 关 | 添加唯一 `domain`/`text` HTTP rule-provider，并通过 `fake-ip-filter+` 引用；每 86400 秒检查 jsDelivr 上的 ShellCrash `dev`。 | 初次下载失败时扩展列表不生效；上游变更会在用户未修改 FileSpec 时改变实际命中集合。 | 与稳定、OpenClash Fake-IP 规则互斥。 | [ShellCrash 列表](https://github.com/juewuy/ShellCrash/blob/dev/public/fake_ip_filter.list) |
 | QUIC 强制回退 | 绕开质量差或受限的 UDP/443 路径；Mihomo。 | 关 | 在通用规则前拒绝 UDP 目标端口 443。 | 强制 TCP 回退、失去 HTTP/3 优势；依赖 UDP/443 的应用可能失败。 | 无。 | [RFC 9000](https://www.rfc-editor.org/rfc/rfc9000)、[社区配置索引](https://gui-for-cores.github.io/guide/gfs/community) |
 | Tailscale 原生接管 | 由 Mihomo 自身建立 Tailnet 端点；Mihomo。 | 关 | 创建唯一 `{name: TAILSCALE,type: tailscale,ephemeral:false,udp:true,accept-routes:false}` proxy；可编辑 processor 参数 `auth_key` 非空时写入 `auth-key`；为 `+.ts.net` 配置 MagicDNS；移除两个标准外部 exclusions；在通用/最终规则前依次插入域名、IPv4 与 IPv6 TAILSCALE 规则。 | 未填写 Auth Key 时由目标核心在日志打印交互式登录 URL；端点启动时首次访问可能超时。 | 依赖 TUN；与外部共存。 | [Mihomo Tailscale](https://wiki.metacubex.one/en/config/proxies/tailscale/)、[Tailscale MagicDNS](https://tailscale.com/docs/features/magicdns) |
-| Tailscale 共存 | 让系统中独立运行的 Tailscale 与 Mihomo TUN 共存；Mihomo。 | 关 | 把 `+.ts.net` 加入 fake-IP 例外并定向到 `100.100.100.100`；把 `100.64.0.0/10`、`fd7a:115c:a1e0::/48` 追加到 TUN route exclusions；不创建 Tailscale proxy。 | 系统 Tailscale 必须已运行并正确配置。 | 依赖 TUN；与原生接管。 | [Tailscale MagicDNS](https://tailscale.com/docs/features/magicdns)、[Tailscale DNS](https://tailscale.com/docs/reference/dns-in-tailscale) |
+| Tailscale 共存 | 让系统中独立运行的 Tailscale 与 Mihomo TUN 共存；Mihomo。 | 关 | 把 `+.ts.net` 与 `+.tailscale.com` 加入 fake-IP 例外以返回真实 IP；仅将 `+.ts.net` 定向到 MagicDNS `100.100.100.100`；把 `100.64.0.0/10`、`fd7a:115c:a1e0::/48` 追加到 TUN route exclusions；不创建 Tailscale proxy。 | 系统 Tailscale 必须已运行并正确配置。 | 依赖 TUN；与原生接管。 | [Tailscale MagicDNS](https://tailscale.com/docs/features/magicdns)、[Tailscale DNS](https://tailscale.com/docs/reference/dns-in-tailscale) |
 | Tailnet 代理共享 | 允许 Tailnet 设备访问 Mihomo LAN listener；Mihomo。 | 关 | 把标准 Tailnet IPv4/IPv6 段追加到 `lan-allowed-ips`。 | 扩大入站来源范围；必须核对监听端口和访问控制。 | 依赖 TUN 与 Tailscale 外部共存。 | [Mihomo 全局配置](https://wiki.metacubex.one/en/config/general/)、[Tailscale CGNAT](https://tailscale.com/kb/1015/100.x-addresses) |
 
 ## sing-box 预设
@@ -60,7 +60,7 @@
 | Sniff & DNS Hijack | 在路由前识别协议并接管 DNS。 | 开 | 通过 JSON override 前插 `{action:"sniff"}`，再前插匹配 DNS 协议或端口 53 的 `hijack-dns` logical rule。 | 检查连接元数据并改变 resolver 路径。 | QUIC 预设依赖它。 | [sing-box Sniff](https://sing-box.sagernet.org/configuration/route/rule_action/#sniff)、[DNS Hijack](https://sing-box.sagernet.org/configuration/route/rule_action/#hijack-dns) |
 | QUIC 强制回退 | 迫使兼容流量回退至 TCP。 | 关 | 依赖 sniff，在通用规则前插入 `{protocol:"quic",action:"reject"}`。 | 失去 HTTP/3 优势，必须使用 QUIC 的应用可能失败。 | 依赖 Sniff & DNS Hijack。 | [RFC 9000](https://www.rfc-editor.org/rfc/rfc9000)、[sing-box Protocol](https://sing-box.sagernet.org/configuration/route/rule/#protocol) |
 | Tailscale 原生接管 | 由 sing-box v1.13.14 自身建立 Tailnet endpoint。 | 关 | 创建唯一 `{type:"tailscale",tag:"ts-ep",ephemeral:false,accept_routes:false}` endpoint；可编辑 processor 参数 `auth_key` 非空时写入同名 endpoint 字段；移除标准外部 exclusions；添加 `{type:"tailscale",tag:"ts-dns",endpoint:"ts-ep",accept_default_resolvers:false}` DNS server、legacy `{ip_accept_any:true,server:"ts-dns"}` DNS rule，以及在通用/最终规则前的 `{preferred_by:["ts-ep"],action:"route",outbound:"ts-ep"}` route rule；`dns.final`、`route.final` 不变。 | 未填写 Auth Key 时由目标核心在日志打印交互式登录 URL；端点启动时首次访问可能超时。 | 需要当前配置已有唯一 TUN；与外部共存。 | [sing-box Tailscale endpoint](https://sing-box.sagernet.org/configuration/endpoint/tailscale/)、[Tailscale DNS server](https://sing-box.sagernet.org/configuration/dns/server/tailscale/)、[preferred_by](https://sing-box.sagernet.org/configuration/route/rule/#preferred_by) |
-| Tailscale 共存 | 让系统 Tailscale 与 sing-box TUN 共存。 | 关 | 精确去重后把两个标准地址段加入选定 TUN `route_exclude_address`；添加 `{type:"udp",tag:"ts-dns",server:"100.100.100.100"}`，并只用 `domain_suffix:["ts.net"]` DNS rule 路由到它；不创建 endpoint；`dns.final`、`route.final` 不变。 | 系统 Tailscale 必须已运行并正确配置。 | 需要当前配置已有唯一 TUN；与原生接管。 | [Tailscale MagicDNS](https://tailscale.com/docs/features/magicdns)、[Tailscale DNS](https://tailscale.com/docs/reference/dns-in-tailscale) |
+| Tailscale 共存 | 让系统 Tailscale 与 sing-box TUN 共存。 | 关 | 精确去重后把两个标准地址段加入选定 TUN `route_exclude_address`；添加 `{type:"udp",tag:"ts-dns",server:"100.100.100.100"}`，并置顶 `domain_suffix:["ts.net"]` DNS rule 路由到它；存在 FakeIP server 时，另在原有规则前将 `tailscale.com` 路由到原默认真实 DNS，选择边界见下文；不创建 endpoint；`dns.final`、`route.final` 不变。 | 系统 Tailscale 必须已运行并正确配置；FakeIP 配置的默认 DNS 不符合复用条件时处理器报错。 | 需要当前配置已有唯一 TUN；与原生接管。 | [Tailscale MagicDNS](https://tailscale.com/docs/features/magicdns)、[Tailscale DNS](https://tailscale.com/docs/reference/dns-in-tailscale) |
 
 ## Shadowrocket 预设
 
@@ -100,6 +100,14 @@ sing-box 的固定目标 v1.13.14 在 route rule 使用 `preferred_by` 匹配 en
 `ip_accept_any`，不是 v1.14 才支持的 DNS-rule `preferred_by`，并明确关闭
 `accept_default_resolvers`，因此普通查询不会把 Tailscale resolver 当作全局
 fallback。
+
+sing-box 共存预设识别 `type:"fakeip"` 和 legacy `address:"fakeip"` server；
+仅在存在 FakeIP server 时添加 `domain_suffix:["tailscale.com"]` 真实 DNS 规则。
+该规则复用原 `dns.final` 指向的 server；未指定 `dns.final` 时按核心语义取原首个
+server。所选 server 必须有非空 tag 且为通用真实 DNS；默认引用无效、指向 FakeIP、
+MagicDNS 或其他非通用 resolver 时明确报错，不另选上游。两条域名规则均优先于原有
+规则，避免通配 FakeIP 抢先匹配；`tailscale.com` 不使用 MagicDNS。参见
+[sing-box DNS 默认 server](https://sing-box.sagernet.org/configuration/dns/#final)。
 
 ## 可编辑 GitHub 加速快捷项
 

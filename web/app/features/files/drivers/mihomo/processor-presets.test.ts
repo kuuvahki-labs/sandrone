@@ -63,7 +63,7 @@ describe("Mihomo processor presets", () => {
     const tailscale = presetYAML("tailscale-external");
     expect(tailscale).toEqual({
       dns: {
-        "fake-ip-filter+": ["+.ts.net"],
+        "fake-ip-filter+": ["+.ts.net", "+.tailscale.com"],
         "nameserver-policy": { "<+.ts.net>": "100.100.100.100" },
       },
       tun: { "route-exclude-address+": ["100.64.0.0/10", "fd7a:115c:a1e0::/48"] },

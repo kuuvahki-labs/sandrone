@@ -183,8 +183,8 @@ describe("sing-box file processor defaults", () => {
       dns: {
         servers: [{ type: "local", tag: "dns-local" }, ownedDNS],
         rules: [
-          { rule_set: ["private"], action: "route", server: "dns-local" },
           ownedDNSRule,
+          { rule_set: ["private"], action: "route", server: "dns-local" },
         ],
         final: "LockedDNSFinal",
       },
@@ -206,6 +206,96 @@ describe("sing-box file processor defaults", () => {
     const second = runTailscale("tailscale-external", first.document);
     expect(second.document).toEqual(first.document);
     expect(second.stringifyCalls).toBe(1);
+  });
+
+  it.each([
+    { type: "fakeip", tag: "fake", inet4_range: "198.18.0.0/15" },
+    { address: "fakeip", tag: "fake" },
+  ])("routes Tailscale DNS before catch-all FakeIP rules (%j)", (fakeServer) => {
+    const magicDNSRule = { domain_suffix: ["ts.net"], action: "route", server: "ts-dns" };
+    const catchAll = { query_type: ["A", "AAAA"], action: "route", server: "fake" };
+    const original = {
+      inbounds: [{ type: "tun", tag: "tun-in" }],
+      dns: {
+        servers: [
+          { type: "local", tag: "local" },
+          fakeServer,
+          { type: "https", tag: "chosen-resolver", server: "192.0.2.53", detour: "proxy" },
+        ],
+        rules: [catchAll, magicDNSRule, magicDNSRule],
+        final: "chosen-resolver",
+      },
+    };
+
+    const first = runTailscale("tailscale-external", original);
+    expect(first.document.dns).toEqual({
+      ...original.dns,
+      servers: [...original.dns.servers, { type: "udp", tag: "ts-dns", server: "100.100.100.100" }],
+      rules: [
+        magicDNSRule,
+        { domain_suffix: ["tailscale.com"], action: "route", server: "chosen-resolver" },
+        catchAll,
+      ],
+    });
+    expect(runTailscale("tailscale-external", first.document).document).toEqual(first.document);
+  });
+
+  it.each([
+    { type: "udp", tag: "first-resolver", server: "192.0.2.53" },
+    { tag: "first-resolver", address: "https://dns.example.com/dns-query" },
+    { type: "legacy", tag: "first-resolver", address: "https://dns.example.com/dns-query" },
+    { type: "", tag: "first-resolver", address: "local" },
+    { type: "resolved", tag: "first-resolver", accept_default_resolvers: true },
+  ])("uses the first real DNS server when FakeIP is present without dns.final (%j)", (realServer) => {
+    const original = {
+      inbounds: [{ type: "tun", tag: "tun-in" }],
+      dns: {
+        servers: [realServer, { type: "fakeip", tag: "fake" }],
+        rules: [{ server: "fake" }],
+      },
+    };
+    expect(runTailscale("tailscale-external", original).document.dns).toEqual({
+      servers: [...original.dns.servers, { type: "udp", tag: "ts-dns", server: "100.100.100.100" }],
+      rules: [
+        { domain_suffix: ["ts.net"], action: "route", server: "ts-dns" },
+        { domain_suffix: ["tailscale.com"], action: "route", server: "first-resolver" },
+        ...original.dns.rules,
+      ],
+    });
+  });
+
+  it.each([
+    { type: "fakeip", tag: "default" },
+    { type: "hosts", tag: "default" },
+    { type: "tailscale", tag: "default" },
+    { type: "resolved", tag: "default", accept_default_resolvers: false },
+    { type: "udp", tag: "default", server: "100.100.100.100" },
+    { tag: "default", address: "rcode://success" },
+    { tag: "default", address: "udp://100.100.100.100:53" },
+    { type: "local" },
+  ])("rejects an unsuitable default DNS atomically when FakeIP is present (%j)", (defaultServer) => {
+    const execution = prepareTailscale("tailscale-external", {
+      inbounds: [{ type: "tun", tag: "tun-in" }],
+      dns: { servers: [defaultServer, { type: "fakeip", tag: "fake" }] },
+    });
+    const before = execution.input.file.content;
+    expect(execution.run).toThrowError("requires a tagged real default DNS server");
+    expect(execution.input.file.content).toBe(before);
+    expect(execution.stringifyCalls()).toBe(0);
+  });
+
+  it.each(["fake", "missing"])("does not replace an invalid explicit dns.final=%s with another resolver", (final) => {
+    const execution = prepareTailscale("tailscale-external", {
+      inbounds: [{ type: "tun", tag: "tun-in" }],
+      dns: {
+        servers: [{ type: "local", tag: "real" }, { type: "fakeip", tag: "fake" }],
+        final,
+      },
+    });
+    const before = execution.input.file.content;
+    expect(execution.run).toThrowError("requires a tagged real default DNS server");
+    expect(execution.input.file.content).toBe(before);
+    expect(execution.stringifyCalls()).toBe(0);
   });
 
   it("applies native Tailscale with v1.13.14 endpoint, DNS, and route shapes", () => {

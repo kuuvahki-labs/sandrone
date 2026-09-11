@@ -2,6 +2,7 @@
 dns:
   fake-ip-filter+:
     - "+.ts.net"
+    - "+.tailscale.com"
   nameserver-policy:
     "<+.ts.net>": 100.100.100.100
 tun:

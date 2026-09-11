@@ -55,6 +55,15 @@ function main(input, api) {
     }
   }
 
+  const ownedDNSRules = [EXTERNAL_DNS_RULE];
+  if (dnsServers.some(isFakeIPServer)) {
+    ownedDNSRules.push({
+      domain_suffix: ["tailscale.com"],
+      action: "route",
+      server: defaultRealDNSTag(dns, dnsServers),
+    });
+  }
+
   const updatedInbounds = [...inbounds];
   updatedInbounds[selectedIndex] = {
     ...selectedTun,
@@ -65,7 +74,10 @@ function main(input, api) {
     dns: {
       ...dns,
       servers: ensureOneExactObject(dnsServers, EXTERNAL_DNS_SERVER),
-      rules: ensureOneExactObject(dnsRules, EXTERNAL_DNS_RULE),
+      rules: [
+        ...ownedDNSRules,
+        ...dnsRules.filter((rule) => !ownedDNSRules.some((owned) => exactEqual(rule, owned))),
+      ],
     },
     inbounds: updatedInbounds,
   };
@@ -88,6 +100,34 @@ const EXTERNAL_DNS_RULE = {
   action: "route",
   server: "ts-dns",
 };
+
+function isFakeIPServer(server) {
+  return server.type === "fakeip" || server.address === "fakeip";
+}
+
+function defaultRealDNSTag(dns, servers) {
+  // Match sing-box's default resolver selection, including an omitted dns.final.
+  const matches = dns.final ? servers.filter((server) => server.tag === dns.final) : servers.slice(0, 1);
+  const server = matches.length === 1 ? matches[0] : null;
+  if (!server || typeof server.tag !== "string" || !server.tag.trim() || !isRealDNSServer(server)) {
+    throw new Error("Sandrone sing-box Tailscale external preset with FakeIP requires a tagged real default DNS server (dns.final or the first DNS server)");
+  }
+  return server.tag;
+}
+
+function isRealDNSServer(server) {
+  if (server.tag === "ts-dns" || server.server === "100.100.100.100" || isFakeIPServer(server)) return false;
+  if (server.type === "resolved") return server.accept_default_resolvers === true;
+  const types = ["local", "udp", "tcp", "tls", "https", "quic", "h3", "dhcp"];
+  if (server.type !== undefined && server.type !== "" && server.type !== "legacy") return types.includes(server.type);
+
+  const address = server.address;
+  if (typeof address !== "string" || !address.trim() || address.startsWith("rcode://")) return false;
+  const host = address.replace(/^[a-z0-9]+:\/\//, "").split(/[/:]/)[0];
+  if (host === "100.100.100.100") return false;
+  const scheme = address.match(/^([a-z0-9]+):\/\//);
+  return !scheme || types.includes(scheme[1]);
+}
 
 function assertSelectedTun(selectedIndex) {
   if (selectedIndex === -2) {
