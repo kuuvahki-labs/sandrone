@@ -413,12 +413,12 @@ func TestServiceCommunityPresetSingBoxTailscaleExternalGeneratesDistinctFullFile
 		map[string]any{"type": "udp", "tag": "ts-dns", "server": "100.100.100.100"},
 	}, dns["servers"])
 	require.Equal(t, []any{
-		map[string]any{"domain_suffix": []any{"user-dns.example"}, "server": "dns-local"},
 		map[string]any{
 			"domain_suffix": []any{"ts.net"},
 			"action":        "route",
 			"server":        "ts-dns",
 		},
+		map[string]any{"domain_suffix": []any{"user-dns.example"}, "server": "dns-local"},
 	}, dns["rules"])
 	inbounds := requireAnySlice(t, doc["inbounds"])
 	require.Equal(t, []any{
