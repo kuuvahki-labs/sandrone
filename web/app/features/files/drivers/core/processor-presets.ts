@@ -38,6 +38,7 @@ export function planFileProcessorPresetAddition(
   requestedPresetID: string,
   current: readonly ProcessorDetail[],
   t: Translator,
+  options: { position?: "prepend" | "append" } = {},
 ): FileProcessorPresetPlan {
   validateFileProcessorPresetCatalog(catalog);
   const byID = new Map(catalog.map((preset) => [preset.id, preset]));
@@ -107,17 +108,22 @@ export function planFileProcessorPresetAddition(
     : firstIndex(refreshIndices);
   for (const preset of ordered) {
     if (survivingPresetIDs.has(preset.id)) continue;
+    let beforeIndex = firstRefreshIndex(preset.id, recognizedCurrent, refreshIndices)
+      ?? earliestSurvivingConsumerIndex(preset.id, byID, recognizedCurrent, removedIndices)
+      ?? replacementBeforeIndex
+      ?? (options.position === "prepend" ? prependIndex(preset, byID, recognizedCurrent, removedIndices) : null);
+    if (options.position === "prepend") {
+      const dependencies = new Set(dependencyOrder(byID, preset).slice(0, -1).map((item) => item.id));
+      for (const addition of additions) {
+        if (dependencies.has(addition.presetID) && (addition.beforeIndex ?? current.length) > (beforeIndex ?? current.length)) {
+          beforeIndex = addition.beforeIndex;
+        }
+      }
+    }
     additions.push({
       presetID: preset.id,
       processor: preset.build(t),
-      beforeIndex: firstRefreshIndex(preset.id, recognizedCurrent, refreshIndices)
-        ?? earliestSurvivingConsumerIndex(
-          preset.id,
-          byID,
-          recognizedCurrent,
-          removedIndices,
-        )
-        ?? replacementBeforeIndex,
+      beforeIndex,
     });
     addedPresetIDs.push(preset.id);
     survivingPresetIDs.add(preset.id);
@@ -132,6 +138,20 @@ export function planFileProcessorPresetAddition(
     updatedPresetIDs,
     requestedPresetID,
   };
+}
+
+function prependIndex(
+  preset: FileProcessorPreset,
+  byID: ReadonlyMap<string, FileProcessorPreset>,
+  current: readonly (string | null)[],
+  removedIndices: ReadonlySet<number>,
+): number | null {
+  const dependencies = new Set(dependencyOrder(byID, preset).slice(0, -1).map((item) => item.id));
+  let index = 0;
+  current.forEach((id, currentIndex) => {
+    if (id !== null && dependencies.has(id) && !removedIndices.has(currentIndex)) index = currentIndex + 1;
+  });
+  return index < current.length ? index : null;
 }
 
 function firstIndex(...sets: readonly ReadonlySet<number>[]): number | null {

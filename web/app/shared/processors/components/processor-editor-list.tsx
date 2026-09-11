@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import type { ReactNode } from "react";
+import { useEffect, useImperativeHandle, useMemo, useState } from "react";
+import type { ReactNode, Ref } from "react";
 import AddIcon from "@mui/icons-material/Add";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
@@ -73,7 +73,12 @@ export function KeyValueParamsEditor({
   );
 }
 
+export interface ProcessorEditorListHandle {
+  updateDrafts: (update: (current: ProcessorDraft[]) => ProcessorDraft[]) => void;
+}
+
 type ProcessorEditorListProps = {
+  ref?: Ref<ProcessorEditorListHandle>;
   addProcessorDrafts?: (type: string, current: ProcessorDraft[]) => ProcessorDraft[];
   createDraftId: (index?: number) => string;
   defaultParams: (type: string) => Record<string, unknown>;
@@ -88,6 +93,7 @@ type ProcessorEditorListProps = {
 };
 
 export function ProcessorEditorList({
+  ref,
   addProcessorDrafts,
   createDraftId,
   defaultParams,
@@ -165,6 +171,10 @@ export function ProcessorEditorList({
     setDrafts(next);
     onDirty?.();
   }
+
+  useImperativeHandle(ref, () => ({
+    updateDrafts: (update) => commitDrafts(update(drafts)),
+  }));
 
   return (
     <div className="grid gap-4">

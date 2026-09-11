@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { createRef } from "react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -6,11 +7,26 @@ import { singBoxProcessorPreset } from "~/features/files/drivers/sing-box/proces
 import type { ProcessorDetail } from "~/shared/resources/types";
 
 import { FileMergeParamsEditor } from "./merge-params-editor";
-import { FileProcessorBuilder } from "./processor-builder";
+import { FileProcessorBuilder, type FileProcessorBuilderHandle } from "./processor-builder";
 
 const typedRuleSourceKinds = ["mihomo", "sing-box", "shadowrocket"] as const;
 
 describe("FileProcessorBuilder", () => {
+  it("uses the shared dependency planner when configuration adds a preset", () => {
+    const ref = createRef<FileProcessorBuilderHandle>();
+    const custom: ProcessorDetail = { name: "Custom", type: "script", stage: "file", params: {
+      source: { type: "inline", content: "function main(input) { return input; }" },
+    } };
+    render(<FileProcessorBuilder ref={ref} kind="sing-box" defaultValue={[custom]} />);
+    act(() => ref.current!.prependPresets(["quic-fallback"]));
+    expect(currentProcessors()).toHaveLength(3);
+    expect(currentProcessors()[0].type).toBe("merge");
+    expect(currentProcessors()[1].params?.args).toMatchObject({ preset_id: "quic-fallback" });
+    expect(currentProcessors()[2]).toEqual(custom);
+    act(() => ref.current!.prependPresets(["quic-fallback"]));
+    expect(currentProcessors()).toHaveLength(3);
+  });
+
   it("serializes script and merge processors through the hidden form contract", () => {
     render(
       <FileProcessorBuilder

@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { type Ref, useCallback, useImperativeHandle, useRef, useState } from "react";
 import Alert from "@mui/material/Alert";
 
 import type { FileDriverDefinition, FileMergeMode } from "~/features/files/drivers/core/file-driver";
@@ -17,6 +17,7 @@ import { type Translator, useI18n } from "~/shared/i18n/context";
 import {
   KeyValueParamsEditor,
   ProcessorEditorList,
+  type ProcessorEditorListHandle,
   type ProcessorParamsEditorProps,
 } from "~/shared/processors/components/processor-editor-list";
 import {
@@ -61,8 +62,13 @@ type PresetNotice = {
   updatedLabels: string[];
 };
 
-export function FileProcessorBuilder({ defaultValue = [], kind, onDirty, onValidityChange, remoteDefaults = emptyRemoteDefaults, scriptFiles = [], scriptTimeoutMS }: { defaultValue?: ProcessorDetail[]; kind: FileKind; onDirty?: () => void; onValidityChange?: (valid: boolean) => void; remoteDefaults?: RemoteInputDefaults; scriptFiles?: ResourceOption[]; scriptTimeoutMS?: number }) {
+export interface FileProcessorBuilderHandle {
+  prependPresets: (ids: readonly string[]) => void;
+}
+
+export function FileProcessorBuilder({ ref, onValueChange, defaultValue = [], kind, onDirty, onValidityChange, remoteDefaults = emptyRemoteDefaults, scriptFiles = [], scriptTimeoutMS }: { ref?: Ref<FileProcessorBuilderHandle>; onValueChange?: (value: ProcessorDetail[]) => void; defaultValue?: ProcessorDetail[]; kind: FileKind; onDirty?: () => void; onValidityChange?: (valid: boolean) => void; remoteDefaults?: RemoteInputDefaults; scriptFiles?: ResourceOption[]; scriptTimeoutMS?: number }) {
   const { t } = useI18n();
+  const listRef = useRef<ProcessorEditorListHandle>(null);
   const [presetNotice, setPresetNotice] = useState<PresetNotice | null>(null);
   const [validationIssueCount, setValidationIssueCount] = useState(0);
   const driver = requireFileDriver(kind);
@@ -92,21 +98,18 @@ export function FileProcessorBuilder({ defaultValue = [], kind, onDirty, onValid
     [kind, t],
   );
   const handleValueChange = useCallback((value: ProcessorDetail[]) => {
+    onValueChange?.(value);
     const issues = driver.processors.validate(value);
     setValidationIssueCount(issues.length);
     onValidityChange?.(issues.length === 0);
-  }, [driver, onValidityChange]);
-  const addProcessorDrafts = useCallback((type: string, current: ProcessorDraft[]): ProcessorDraft[] => {
-    setPresetNotice(null);
-    if (type.startsWith(FILE_PRESET_OPTION_PREFIX)) {
-      const presetID = type.slice(FILE_PRESET_OPTION_PREFIX.length);
-      const requested = driver.processors.presets.find((preset) => preset.id === presetID);
-      if (!requested) throw new Error(`unknown file processor preset: ${presetID}`);
+  }, [driver, onValidityChange, onValueChange]);
+  const addPresetDrafts = useCallback((presetID: string, current: ProcessorDraft[], position: "prepend" | "append") => {
       const plan = planFileProcessorPresetAddition(
         driver.processors.presets,
         presetID,
         current.map(serializeProcessorDraft),
         t,
+        { position },
       );
       const addedIDs = new Set(plan.addedPresetIDs);
       const notice = {
@@ -122,9 +125,21 @@ export function FileProcessorBuilder({ defaultValue = [], kind, onDirty, onValid
           : null,
       );
       return applyFileProcessorPresetPlan(current, plan);
+  }, [driver, serializeProcessorDraft, t]);
+  const addProcessorDrafts = useCallback((type: string, current: ProcessorDraft[]): ProcessorDraft[] => {
+    setPresetNotice(null);
+    if (type.startsWith(FILE_PRESET_OPTION_PREFIX)) {
+      return addPresetDrafts(type.slice(FILE_PRESET_OPTION_PREFIX.length), current, "append");
     }
     return [...current, { enabled: true, id: createProcessorID(), name: "", type, params: defaultParams(type, kind) }];
-  }, [driver, kind, serializeProcessorDraft, t]);
+  }, [addPresetDrafts, kind]);
+  useImperativeHandle(ref, () => ({
+    prependPresets: (ids) => {
+      listRef.current?.updateDrafts((current) => {
+        return ids.reduceRight((drafts, id) => addPresetDrafts(id, drafts, "prepend"), current);
+      });
+    },
+  }));
   const normalizedDefaultValue = filterForeignManagedProcessors(
     driver.processors.presets,
     FILE_PROCESSOR_PRESET_CATALOGS,
@@ -134,6 +149,7 @@ export function FileProcessorBuilder({ defaultValue = [], kind, onDirty, onValid
   return (
     <div className="grid gap-3">
       <ProcessorEditorList
+        ref={listRef}
         addProcessorDrafts={addProcessorDrafts}
         createDraftId={createProcessorID}
         defaultParams={(type) => defaultParams(type, kind)}

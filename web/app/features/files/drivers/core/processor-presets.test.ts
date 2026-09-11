@@ -12,6 +12,27 @@ import {
 } from "./processor-presets";
 
 describe("file processor preset planner", () => {
+  it("prepends with the same dependency and conflict rules as manual insertion", () => {
+    const current = [custom("before"), built("stun"), custom("after")];
+    const plan = buildPresetPlan(catalog, "mptcp", current, t, { position: "prepend" });
+    expect(plan.removedPresetIDs).toEqual(["stun"]);
+    expect(applyPlan(current, plan).map(nameOf)).toEqual(["TUN", "Linux", "MPTCP", "before", "after"]);
+  });
+
+  it("places prepended additions after their surviving dependencies", () => {
+    const current = [custom("before"), built("tun"), custom("after")];
+    const plan = buildPresetPlan(catalog, "mptcp", current, t, { position: "prepend" });
+    expect(applyPlan(current, plan).map(nameOf)).toEqual(["before", "TUN", "Linux", "MPTCP", "after"]);
+    expect(current[1]).toBe(applyPlan(current, plan)[1]);
+  });
+
+  it("places a new consumer after a dependency inserted before another surviving consumer", () => {
+    const newConsumer = preset("other-native", "Other Native", { dependencies: ["native-base"] });
+    const current = [custom("before"), built("tailscale-native")];
+    const plan = buildPresetPlan([...catalog, newConsumer], "other-native", current, t, { position: "prepend" });
+    expect(applyPlan(current, plan).map(nameOf)).toEqual(["before", "Native Base", "Other Native", "Tailscale Native"]);
+  });
+
   it("adds dependencies once in topological order", () => {
     const plan = planFileProcessorPresetAddition(catalog, "mptcp", []);
 
