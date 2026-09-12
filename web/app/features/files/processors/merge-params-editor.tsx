@@ -44,6 +44,7 @@ export function FileMergeParamsEditor({
       ) : null}
       <div className="grid gap-1.5 md:col-span-2">
         <HighlightedTextarea
+          showLineNumbers
           label={t("processor.merge.content")}
           labelAction={isOverride ? (
             <Tooltip title={t(mode === "ini_override" ? "processor.merge.iniOverrideDescription" : "processor.merge.overrideDescription")}>
