@@ -445,6 +445,47 @@ describe("file actions", () => {
     expect(client.createFile).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["source", "{"], ["source", "null"], ["source", "[]"], ["source", "42"],
+    ["config", "{"], ["config", "null"], ["config", "[]"], ["config", "false"],
+    ["processors", "["], ["processors", "{}"], ["processors", "null"],
+    ["processors", '[{"type":"script"},null]'],
+    ["processors", '[{"type":"script"},[]]'],
+    ["processors", '[{"type":"script"},"invalid"]'],
+  ])("rejects invalid %s JSON (%s) before create or edit effects", async (field, value) => {
+    const { client, createFile, saveFileEdit, refreshResources, closeSheet, navigate, showNotice } = setupActions();
+    const form = validCreateForm();
+    form.set(field, value);
+    const item: FileItem = { name: "default.yaml", title: "default.yaml", kind: "static" };
+
+    await expect(createFile("static", form)).rejects.toThrow(field);
+    await expect(saveFileEdit(item, form)).rejects.toThrow(field);
+
+    expect(client.createFile).not.toHaveBeenCalled();
+    expect(refreshResources).not.toHaveBeenCalled();
+    expect(closeSheet).not.toHaveBeenCalled();
+    expect(navigate).not.toHaveBeenCalled();
+    expect(showNotice).not.toHaveBeenCalled();
+  });
+
+  it("preserves implicit source and opaque settings and processor fields on both save paths", async () => {
+    const { client, createFile, saveFileEdit } = setupActions();
+    const form = validCreateForm();
+    const config = { settings: { extension: [1, { enabled: false }] } };
+    const processors = [{ type: "future-processor", options: { extension: [null, 1] } }];
+    form.set("source", "{}");
+    form.set("config", JSON.stringify(config));
+    form.set("processors", JSON.stringify(processors));
+
+    await createFile("mihomo", form);
+    await saveFileEdit({ name: "default.yaml", title: "default.yaml", kind: "mihomo" }, form);
+
+    expect(client.createFile).toHaveBeenCalledTimes(2);
+    for (const [payload] of client.createFile.mock.calls) {
+      expect(payload).toEqual(expect.objectContaining({ source: {}, config, processors }));
+    }
+  });
+
 });
 
 function setupActions() {

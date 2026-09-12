@@ -26,25 +26,8 @@ export function createFileActions({
   async function createFile(kind: string, form: FormData, existing?: FileItem) {
     const name = String(form.get("name") ?? "").trim();
     if (!name) throw new Error("file name is required");
-    assertRegisteredFileKind(kind);
-    const displayName = String(form.get("display_name") ?? "").trim();
-    const description = String(form.get("description") ?? "").trim();
-    const timestamps = fileTimestamps(existing);
-    const config = parseOptionalObjectField(form, "config");
-    assertSingleSubscription(config);
-    await client.createFile({
-      name,
-      display_name: displayName || undefined,
-      ...timestamps,
-      kind,
-      source: parseObjectField(form, "source", { type: "inline", content: "" }),
-      config,
-      processors: parseArrayField(form, "processors"),
-      meta: {
-        ...(description ? { description } : {}),
-        ui: "web",
-      },
-    });
+    const payload = buildFilePayload(name, kind, form, fileTimestamps(existing, new Date().toISOString()));
+    await client.createFile(payload);
     await refreshResources();
     closeSheet();
     showNotice(t(existing ? "messages.fileOverwritten" : "messages.fileSaved"));
@@ -55,25 +38,8 @@ export function createFileActions({
     const existingKind = detail ? detail.kind : item.kind;
     assertRegisteredFileKind(existingKind);
     if ((detail?.config?.subscriptions?.length ?? 0) > 1) throw new Error("multiple subscriptions must be combined in a collection subscription before saving");
-    const name = item.name;
-    const displayName = String(form.get("display_name") ?? "").trim();
-    const description = String(form.get("description") ?? "").trim();
-    const timestamps = fileTimestamps(detail);
-    const config = parseOptionalObjectField(form, "config");
-    assertSingleSubscription(config);
-    await client.createFile({
-      name,
-      display_name: displayName || undefined,
-      ...timestamps,
-      kind: existingKind,
-      source: parseObjectField(form, "source", { type: "inline", content: "" }),
-      config,
-      processors: parseArrayField(form, "processors"),
-      meta: {
-        ...(description ? { description } : {}),
-        ui: "web",
-      },
-    });
+    const payload = buildFilePayload(item.name, existingKind, form, fileTimestamps(detail, new Date().toISOString()));
+    await client.createFile(payload);
     await refreshResources();
     showNotice(t("messages.fileSaved"));
   }
@@ -81,6 +47,32 @@ export function createFileActions({
   return {
     createFile,
     saveFileEdit,
+  };
+}
+
+function buildFilePayload(
+  name: string,
+  kind: string,
+  form: FormData,
+  timestamps: Pick<FileSpecInput, "created_at" | "updated_at">,
+): FileSpecInput {
+  assertRegisteredFileKind(kind);
+  const displayName = String(form.get("display_name") ?? "").trim();
+  const description = String(form.get("description") ?? "").trim();
+  const config = parseOptionalObjectField(form, "config");
+  assertSingleSubscription(config);
+  return {
+    name,
+    display_name: displayName || undefined,
+    ...timestamps,
+    kind,
+    source: parseOptionalObjectField(form, "source") ?? { type: "inline", content: "" },
+    config,
+    processors: parseArrayField(form, "processors"),
+    meta: {
+      ...(description ? { description } : {}),
+      ui: "web",
+    },
   };
 }
 
@@ -94,8 +86,7 @@ function assertSingleSubscription(config: Record<string, unknown> | undefined): 
   }
 }
 
-function fileTimestamps(detail: Pick<FileDetail, "createdAt" | "updatedAt"> | null | undefined): Pick<FileSpecInput, "created_at" | "updated_at"> {
-  const now = new Date().toISOString();
+function fileTimestamps(detail: Pick<FileDetail, "createdAt" | "updatedAt"> | null | undefined, now: string): Pick<FileSpecInput, "created_at" | "updated_at"> {
   if (!detail) {
     return { created_at: now, updated_at: now };
   }
@@ -105,41 +96,32 @@ function fileTimestamps(detail: Pick<FileDetail, "createdAt" | "updatedAt"> | nu
   };
 }
 
-function parseOptionalObjectField(form: FormData, name: string): Record<string, unknown> | undefined {
+function parseJSONField(form: FormData, name: string): unknown {
   const raw = String(form.get(name) ?? "").trim();
   if (!raw) return undefined;
   try {
-    const parsed = JSON.parse(raw) as unknown;
-    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
-      : undefined;
+    return JSON.parse(raw) as unknown;
   } catch {
-    return undefined;
+    throw new Error(`${name} must contain valid JSON`);
   }
 }
 
-function parseObjectField(form: FormData, name: string, fallback: Record<string, unknown>): Record<string, unknown> {
-  const raw = String(form.get(name) ?? "").trim();
-  if (!raw) return fallback;
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
-      : fallback;
-  } catch {
-    return fallback;
-  }
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseOptionalObjectField(form: FormData, name: string): Record<string, unknown> | undefined {
+  const parsed = parseJSONField(form, name);
+  if (parsed === undefined) return undefined;
+  if (!isObject(parsed)) throw new Error(`${name} must be a JSON object`);
+  return parsed;
 }
 
 function parseArrayField(form: FormData, name: string): Array<Record<string, unknown>> {
-  const raw = String(form.get(name) ?? "").trim();
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    return Array.isArray(parsed)
-      ? parsed.filter((entry): entry is Record<string, unknown> => typeof entry === "object" && entry !== null && !Array.isArray(entry))
-      : [];
-  } catch {
-    return [];
+  const parsed = parseJSONField(form, name);
+  if (parsed === undefined) return [];
+  if (!Array.isArray(parsed) || !parsed.every(isObject)) {
+    throw new Error(`${name} must be a JSON array of objects`);
   }
+  return parsed;
 }
