@@ -257,6 +257,142 @@ const routes = [
   { path: "/settings/logs", heading: "程序日志", content: "全部级别", focus: false },
 ];
 
+const transferredProcessors = [
+  { name: "外部脚本", type: "script", enabled: false, params: { source: { type: "inline", content: "function main(input) { return input; }" } } },
+  { name: "第二个脚本", type: "script", params: { source: { type: "inline", content: "function main(input) { return input; }" }, timeout_ms: 3000 } },
+];
+
+for (const path of ["/subscriptions/new?type=local", "/files/new?source=mihomo"]) {
+  test(`processor transfer uses clipboard first and appends in ${path}`, async ({ page }, testInfo) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
+    await page.addInitScript((processors) => {
+      sessionStorage.setItem("processor-clipboard", JSON.stringify(processors));
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: {
+          readText: () => Promise.resolve(sessionStorage.getItem("processor-clipboard") ?? ""),
+          writeText: (value: string) => {
+            sessionStorage.setItem("processor-clipboard", value);
+            return Promise.resolve();
+          },
+        },
+      });
+    }, transferredProcessors);
+    await page.goto(path);
+    await expect(page.getByRole("heading", { name: path.startsWith("/files") ? "新建文件" : "新建订阅", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "添加处理器", exact: true }).click();
+    const processorsInput = page.locator('input[name="processors"]');
+    const existing = JSON.parse(await processorsInput.inputValue());
+    const isFile = path.startsWith("/files");
+    const processorGroup = page.getByRole("group", { name: isFile ? "文件处理" : "处理链", exact: true });
+    const copyButton = processorGroup.getByRole("button", { name: "复制处理器", exact: true });
+    const importButton = processorGroup.getByRole("button", { name: "导入处理器", exact: true });
+    const collapseButton = processorGroup.getByRole("button", { name: /^(收起|展开)$/ });
+    await expect(copyButton).toBeVisible();
+    await expect(importButton).toBeVisible();
+    await expect(copyButton).toHaveText("");
+    await expect(importButton).toHaveText("");
+    const copyBounds = (await copyButton.boundingBox())!;
+    const importBounds = (await importButton.boundingBox())!;
+    const titleBounds = (await processorGroup.getByText(isFile ? "文件处理" : "处理链", { exact: true }).boundingBox())!;
+    expect(copyBounds.x + copyBounds.width).toBeLessThanOrEqual(importBounds.x + 1);
+    expect(Math.abs(copyBounds.y + copyBounds.height / 2 - importBounds.y - importBounds.height / 2)).toBeLessThanOrEqual(1);
+    expect(Math.abs(titleBounds.y + titleBounds.height / 2 - copyBounds.y - copyBounds.height / 2)).toBeLessThanOrEqual(1);
+    if (isFile) {
+      const collapseBounds = (await collapseButton.boundingBox())!;
+      expect(importBounds.x + importBounds.width).toBeLessThanOrEqual(collapseBounds.x + 1);
+      expect(Math.abs(collapseBounds.y + collapseBounds.height / 2 - importBounds.y - importBounds.height / 2)).toBeLessThanOrEqual(1);
+      await expect(collapseButton).toHaveAttribute("aria-expanded", "true");
+    } else {
+      const processorHeader = processorGroup.getByRole("heading", { name: "处理链", exact: true }).locator("..");
+      await expect(processorHeader.locator("button[aria-expanded]")).toHaveCount(0);
+      await processorHeader.evaluate((element) => element.scrollIntoView({ block: "center" }));
+      await processorHeader.screenshot({ animations: "disabled", path: `/tmp/sandrone-processor-transfer-subscription-${testInfo.project.name}.png` });
+    }
+
+    await importButton.click();
+    await expect.poll(async () => JSON.parse(await processorsInput.inputValue())).toEqual([...existing, ...transferredProcessors]);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "启用 外部脚本", exact: true })).toHaveAttribute("aria-pressed", "false");
+    if (isFile) {
+      await expect(collapseButton).toHaveAttribute("aria-expanded", "true");
+      await collapseButton.click();
+      await expect(collapseButton).toHaveAttribute("aria-expanded", "false");
+      await expect(page.getByRole("button", { name: "添加处理器", exact: true })).toBeHidden();
+    }
+
+    await importButton.click();
+    const expected = [...existing, ...transferredProcessors, ...transferredProcessors];
+    await expect.poll(async () => JSON.parse(await processorsInput.inputValue())).toEqual(expected);
+    await copyButton.click();
+    await expect.poll(() => page.evaluate(() => JSON.parse(sessionStorage.getItem("processor-clipboard") ?? "null"))).toEqual(expected);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    if (isFile) {
+      await expect(collapseButton).toHaveAttribute("aria-expanded", "false");
+      await expect(page.getByRole("button", { name: "添加处理器", exact: true })).toBeHidden();
+      await processorGroup.screenshot({ animations: "disabled", path: `/tmp/sandrone-processor-transfer-${testInfo.project.name}.png` });
+    }
+
+    await page.evaluate(() => sessionStorage.setItem("processor-clipboard", "not processor JSON"));
+    await page.getByRole("button", { name: "导入处理器", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "导入处理器", exact: true });
+    await expect(dialog.getByRole("textbox", { name: "处理器 JSON", exact: true })).toBeVisible();
+    expect(JSON.parse(await processorsInput.inputValue())).toEqual(expected);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+    expect(errors).toEqual([]);
+  });
+
+  test(`processor transfer falls back to manual JSON in ${path}`, async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: {
+          readText: () => Promise.reject(new DOMException("Clipboard denied", "NotAllowedError")),
+          writeText: () => Promise.reject(new DOMException("Clipboard denied", "NotAllowedError")),
+        },
+      });
+      document.execCommand = () => false;
+    });
+    await page.goto(path);
+    await expect(page.getByRole("heading", { name: path.startsWith("/files") ? "新建文件" : "新建订阅", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "添加处理器", exact: true }).click();
+    const processorsInput = page.locator('input[name="processors"]');
+    const existing = JSON.parse(await processorsInput.inputValue());
+
+    await page.getByRole("button", { name: "复制处理器", exact: true }).click();
+    const copyDialog = page.getByRole("dialog", { name: "复制处理器", exact: true });
+    const copiedJSON = copyDialog.getByRole("textbox", { name: "处理器 JSON", exact: true });
+    await expect(copiedJSON).toHaveAttribute("readonly", "");
+    expect(JSON.parse(await copiedJSON.inputValue())).toEqual(existing);
+    await page.keyboard.press("Escape");
+    await expect(copyDialog).toBeHidden();
+
+    await page.getByRole("button", { name: "导入处理器", exact: true }).click();
+    const importDialog = page.getByRole("dialog", { name: "导入处理器", exact: true });
+    const jsonInput = importDialog.getByRole("textbox", { name: "处理器 JSON", exact: true });
+    await jsonInput.fill(JSON.stringify(transferredProcessors));
+    await importDialog.getByRole("button", { name: "导入", exact: true }).click();
+    await expect(importDialog).toBeHidden();
+    await expect.poll(async () => JSON.parse(await processorsInput.inputValue())).toEqual([...existing, ...transferredProcessors]);
+
+    await page.getByRole("button", { name: "导入处理器", exact: true }).click();
+    await importDialog.getByLabel("选择 JSON 文件", { exact: true }).setInputFiles({
+      name: "processors.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify(transferredProcessors)),
+    });
+    await expect(importDialog).toBeHidden();
+    await expect.poll(async () => JSON.parse(await processorsInput.inputValue())).toEqual([...existing, ...transferredProcessors, ...transferredProcessors]);
+    expect(errors).toEqual([]);
+  });
+}
+
 test("sing-box regex groups add a visible processor and allow its removal", async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));

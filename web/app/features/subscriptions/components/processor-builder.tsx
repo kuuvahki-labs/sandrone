@@ -48,7 +48,7 @@ import { ProbeURLField } from "~/shared/ui/probe-url-field";
 const fields = ["name", "type", "server"];
 const fieldOptions = fields.map((field) => ({ value: field, label: field }));
 
-export function ProcessorBuilder({ defaultValue = [], onDirty, probeCacheTTLSeconds, probeDefaults, remoteDefaults = emptyRemoteDefaults, scriptFiles = [], scriptTimeoutMS }: { defaultValue?: ProcessorDetail[]; onDirty?: () => void; probeCacheTTLSeconds: number; probeDefaults: ProbeDefaultsInput; remoteDefaults?: RemoteInputDefaults; scriptFiles?: ResourceOption[]; scriptTimeoutMS?: number }) {
+export function ProcessorBuilder({ actionsContainer, defaultValue = [], onDirty, probeCacheTTLSeconds, probeDefaults, remoteDefaults = emptyRemoteDefaults, scriptFiles = [], scriptTimeoutMS }: { actionsContainer?: HTMLElement | null; defaultValue?: ProcessorDetail[]; onDirty?: () => void; probeCacheTTLSeconds: number; probeDefaults: ProbeDefaultsInput; remoteDefaults?: RemoteInputDefaults; scriptFiles?: ResourceOption[]; scriptTimeoutMS?: number }) {
   const { t } = useI18n();
   const { hasFeature } = useUICapabilities();
   const options = processorOptions(t, hasFeature("probe.enabled"));
@@ -59,6 +59,7 @@ export function ProcessorBuilder({ defaultValue = [], onDirty, probeCacheTTLSeco
 
   return (
     <ProcessorEditorList
+      actionsContainer={actionsContainer}
       createDraftId={createProcessorID}
       defaultParams={defaultParams}
       defaultType="script"

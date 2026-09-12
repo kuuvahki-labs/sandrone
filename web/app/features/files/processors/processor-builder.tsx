@@ -66,7 +66,7 @@ export interface FileProcessorBuilderHandle {
   prependPresets: (ids: readonly string[]) => void;
 }
 
-export function FileProcessorBuilder({ ref, onValueChange, defaultValue = [], kind, onDirty, onValidityChange, remoteDefaults = emptyRemoteDefaults, scriptFiles = [], scriptTimeoutMS }: { ref?: Ref<FileProcessorBuilderHandle>; onValueChange?: (value: ProcessorDetail[]) => void; defaultValue?: ProcessorDetail[]; kind: FileKind; onDirty?: () => void; onValidityChange?: (valid: boolean) => void; remoteDefaults?: RemoteInputDefaults; scriptFiles?: ResourceOption[]; scriptTimeoutMS?: number }) {
+export function FileProcessorBuilder({ actionsContainer, ref, onValueChange, defaultValue = [], kind, onDirty, onValidityChange, remoteDefaults = emptyRemoteDefaults, scriptFiles = [], scriptTimeoutMS }: { actionsContainer?: HTMLElement | null; ref?: Ref<FileProcessorBuilderHandle>; onValueChange?: (value: ProcessorDetail[]) => void; defaultValue?: ProcessorDetail[]; kind: FileKind; onDirty?: () => void; onValidityChange?: (valid: boolean) => void; remoteDefaults?: RemoteInputDefaults; scriptFiles?: ResourceOption[]; scriptTimeoutMS?: number }) {
   const { t } = useI18n();
   const listRef = useRef<ProcessorEditorListHandle>(null);
   const [presetNotice, setPresetNotice] = useState<PresetNotice | null>(null);
@@ -149,6 +149,7 @@ export function FileProcessorBuilder({ ref, onValueChange, defaultValue = [], ki
   return (
     <div className="grid gap-3">
       <ProcessorEditorList
+        actionsContainer={actionsContainer}
         ref={listRef}
         addProcessorDrafts={addProcessorDrafts}
         createDraftId={createProcessorID}

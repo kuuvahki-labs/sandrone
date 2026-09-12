@@ -52,6 +52,7 @@ export function SubscriptionFormFields({ definition, item, mode, onCopySource, o
   const description = meta.description ?? item?.description ?? "";
   const displayName = definition?.displayName ?? item?.displayName ?? "";
   const processorDefaultValue = definition?.processors;
+  const [processorActionsContainer, setProcessorActionsContainer] = useState<HTMLSpanElement | null>(null);
   const originalType = item?.kind;
   const useOriginalTypeFields = !item || type === originalType;
   const remote = useOriginalTypeFields ? definition?.remote : undefined;
@@ -165,11 +166,14 @@ export function SubscriptionFormFields({ definition, item, mode, onCopySource, o
       <SnapshotCachePolicyField defaultValue={definition?.snapshotTTLSeconds} />
         </div>
       </Paper>
-      <Paper className="m-0 min-w-0 p-4" component="fieldset" variant="outlined">
-        <Typography className="px-1 font-semibold" component="legend">
-          {t("subscriptions.form.processors")}
-        </Typography>
-        <ProcessorBuilder defaultValue={processorDefaultValue} onDirty={onDirty} probeCacheTTLSeconds={probeCacheTTLSeconds} probeDefaults={probeDefaults} remoteDefaults={remoteDefaults} scriptFiles={scriptFiles} scriptTimeoutMS={scriptTimeoutMS} />
+      <Paper aria-label={t("subscriptions.form.processors")} className="m-0 min-w-0 p-4" component="section" role="group" variant="outlined">
+        <div className="mb-4 flex min-w-0 items-center justify-between gap-2">
+          <Typography className="font-semibold" component="h3">
+            {t("subscriptions.form.processors")}
+          </Typography>
+          <span ref={setProcessorActionsContainer} />
+        </div>
+        <ProcessorBuilder actionsContainer={processorActionsContainer} defaultValue={processorDefaultValue} onDirty={onDirty} probeCacheTTLSeconds={probeCacheTTLSeconds} probeDefaults={probeDefaults} remoteDefaults={remoteDefaults} scriptFiles={scriptFiles} scriptTimeoutMS={scriptTimeoutMS} />
       </Paper>
     </div>
   );

@@ -11,6 +11,8 @@ export default defineConfig({
     minify: "oxc",
     rolldownOptions: {
       output: {
+        // Manual chunk merging must preserve MUI's module initialization order.
+        strictExecutionOrder: true,
         codeSplitting: {
           minSize: 20 * 1024,
           groups: [

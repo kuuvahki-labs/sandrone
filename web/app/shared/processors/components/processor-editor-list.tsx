@@ -35,6 +35,8 @@ import {
 } from "~/shared/ui/form-fields";
 import { ActionMenu } from "~/shared/ui/resource-list";
 
+import { ProcessorTransfer } from "./processor-transfer";
+
 export type ProcessorParamsEditorProps = {
   draft: ProcessorDraft;
   onChange: (patch: Record<string, unknown>) => void;
@@ -78,6 +80,7 @@ export interface ProcessorEditorListHandle {
 }
 
 type ProcessorEditorListProps = {
+  actionsContainer?: HTMLElement | null;
   ref?: Ref<ProcessorEditorListHandle>;
   addProcessorDrafts?: (type: string, current: ProcessorDraft[]) => ProcessorDraft[];
   createDraftId: (index?: number) => string;
@@ -93,6 +96,7 @@ type ProcessorEditorListProps = {
 };
 
 export function ProcessorEditorList({
+  actionsContainer,
   ref,
   addProcessorDrafts,
   createDraftId,
@@ -110,7 +114,7 @@ export function ProcessorEditorList({
   const [drafts, setDrafts] = useState(() => draftProcessors ? draftProcessors(defaultValue) : defaultValue.map((processor, index) => draftFromProcessor(processor, index, createDraftId)));
   const [newType, setNewType] = useState(defaultType);
   const [editingIds, setEditingIds] = useState<Set<string>>(() => new Set());
-  const processors = useMemo(() => drafts.map(serializeDraft), [drafts, serializeDraft]);
+  const processors = useMemo(() => drafts.map((draft) => draft.imported ?? serializeDraft(draft)), [drafts, serializeDraft]);
   const serialized = useMemo(() => JSON.stringify(processors), [processors]);
 
   useEffect(() => onValueChange?.(processors), [onValueChange, processors]);
@@ -120,11 +124,30 @@ export function ProcessorEditorList({
   }
 
   function updateDraft(index: number, patch: Partial<ProcessorDraft>) {
-    commitDrafts(drafts.map((draft, i) => (i === index ? { ...draft, ...patch } : draft)));
+    commitDrafts(drafts.map((draft, i) => {
+      if (i !== index) return draft;
+      return { ...draft, ...patch, ...(draft.imported ? { imported: {
+        ...draft.imported,
+        ...(patch.name !== undefined ? { name: patch.name } : {}),
+        ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
+      } } : {}) };
+    }));
   }
 
   function updateParams(index: number, patch: Record<string, unknown>) {
-    commitDrafts(drafts.map((draft, i) => (i === index ? { ...draft, params: cleanParams({ ...draft.params, ...patch }) } : draft)));
+    commitDrafts(drafts.map((draft, i) => {
+      if (i !== index) return draft;
+      const next = { ...draft, params: cleanParams({ ...draft.params, ...patch }) };
+      if (draft.imported) {
+        next.imported = { ...draft.imported, params: serializeDraft(next).params ?? {} };
+      }
+      return next;
+    }));
+  }
+
+  function importProcessors(imported: ProcessorDetail[]) {
+    const additions = draftProcessors ? draftProcessors(imported) : imported.map((processor, index) => draftFromProcessor(processor, index, createDraftId));
+    commitDrafts([...drafts, ...additions.map((draft, index) => ({ ...draft, id: createDraftId(), imported: imported[index] }))]);
   }
 
   function addProcessor() {
@@ -167,7 +190,7 @@ export function ProcessorEditorList({
   }
 
   function commitDrafts(next: ProcessorDraft[]) {
-    if (JSON.stringify(next.map(serializeDraft)) === serialized) return;
+    if (JSON.stringify(next.map((draft) => draft.imported ?? serializeDraft(draft))) === serialized) return;
     setDrafts(next);
     onDirty?.();
   }
@@ -179,6 +202,7 @@ export function ProcessorEditorList({
   return (
     <div className="grid gap-4">
       <input name="processors" type="hidden" value={serialized} />
+      <ProcessorTransfer actionsContainer={actionsContainer} processors={processors} onImport={importProcessors} />
       {drafts.length ? (
         <div className="grid gap-4">
           {drafts.map((draft, index) => {

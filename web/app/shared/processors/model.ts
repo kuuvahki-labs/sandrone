@@ -7,6 +7,8 @@ export type ProcessorDraft = {
   type: string;
   params: Record<string, unknown>;
 	opaque?: ProcessorDetail;
+  /** Preserve external declarations, rewriting only fields the user edits. */
+  imported?: ProcessorDetail;
 };
 
 export function createProcessorDraftId(prefix: string, index = Date.now()): string {

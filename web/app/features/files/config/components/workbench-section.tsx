@@ -6,8 +6,11 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import Collapse from "@mui/material/Collapse";
+import IconButton from "@mui/material/IconButton";
 import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
+
+import { useI18n } from "~/shared/i18n/context";
 
 export type ConfigWorkbenchSectionSeverity = "default" | "success" | "warning" | "error";
 
@@ -18,6 +21,7 @@ export interface ConfigWorkbenchSectionProps {
   defaultExpanded?: boolean;
   expanded?: boolean;
   headerActions?: ReactNode;
+  headerActionsBeforeToggle?: boolean;
   id: string;
   label: string;
   onExpandedChange?: (expanded: boolean) => void;
@@ -40,6 +44,7 @@ export function ConfigWorkbenchSection({
   defaultExpanded = false,
   expanded,
   headerActions,
+  headerActionsBeforeToggle = false,
   id,
   label,
   onExpandedChange,
@@ -47,6 +52,7 @@ export function ConfigWorkbenchSection({
   severityLabel,
   summary,
 }: ConfigWorkbenchSectionProps) {
+  const { t } = useI18n();
   const [uncontrolledExpanded, setUncontrolledExpanded] = useState(defaultExpanded);
   const isExpanded = expanded ?? uncontrolledExpanded;
   const headerId = `${id}-header`;
@@ -107,9 +113,9 @@ export function ConfigWorkbenchSection({
             onClick={toggleExpanded}
           >
             {headerContent}
-            <span aria-hidden className="flex shrink-0 text-text-secondary">
+            {!headerActionsBeforeToggle ? <span aria-hidden className="flex shrink-0 text-text-secondary">
               {isExpanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
-            </span>
+            </span> : null}
           </button>
         ) : (
           <div className="flex min-h-11 min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left">
@@ -118,8 +124,15 @@ export function ConfigWorkbenchSection({
           </div>
         )}
         {headerActions ? (
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 py-2 pr-3" data-slot="section-actions">
+          <div className={`flex shrink-0 flex-wrap items-center justify-end gap-2 py-2 ${headerActionsBeforeToggle ? "" : "pr-3"}`} data-slot="section-actions">
             {headerActions}
+          </div>
+        ) : null}
+        {collapsible && headerActionsBeforeToggle ? (
+          <div className="flex shrink-0 items-center pr-3">
+            <IconButton aria-controls={contentId} aria-expanded={isExpanded} aria-label={t(isExpanded ? "actions.collapse" : "actions.expand")} size="small" type="button" onClick={toggleExpanded}>
+              {isExpanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+            </IconButton>
           </div>
         ) : null}
       </div>
