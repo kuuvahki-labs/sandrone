@@ -65,6 +65,83 @@ describe("useResourcePreview", () => {
     expect(refreshPreview).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps the visible preview and finishes pending when a refresh rejects", async () => {
+    const loadPreview = vi.fn().mockResolvedValue({ body: "initial" });
+    const refreshLoader = vi.fn().mockRejectedValue(new Error("preview unavailable"));
+    const { result } = renderHook(() => useResourcePreview("profile", loadPreview, refreshLoader));
+    await waitFor(() => expect(result.current.preview).toEqual({ body: "initial" }));
+
+    act(() => result.current.refreshPreview());
+
+    await waitFor(() => expect(result.current.pending).toBe(false));
+    expect(result.current.preview).toEqual({ body: "initial" });
+    expect(result.current.failed).toBe(true);
+  });
+
+  it("ignores an old refresh while the next resource is loading", async () => {
+    const refresh = deferred<{ body: string } | null>();
+    const next = deferred<{ body: string } | null>();
+    const loadPreview = vi.fn()
+      .mockResolvedValueOnce({ body: "first" })
+      .mockImplementationOnce(() => next.promise);
+    const refreshLoader = vi.fn(() => refresh.promise);
+    const { rerender, result } = renderHook(
+      ({ resourceKey }: { resourceKey: string }) => useResourcePreview(resourceKey, loadPreview, refreshLoader),
+      { initialProps: { resourceKey: "first" } },
+    );
+    await waitFor(() => expect(result.current.preview).toEqual({ body: "first" }));
+    act(() => result.current.refreshPreview());
+    rerender({ resourceKey: "second" });
+
+    await act(async () => refresh.resolve({ body: "stale" }));
+
+    expect(result.current.preview).toBeUndefined();
+    expect(result.current.pending).toBe(true);
+    await act(async () => next.resolve({ body: "second" }));
+    expect(result.current.preview).toEqual({ body: "second" });
+    expect(result.current.pending).toBe(false);
+  });
+
+  it("does not overwrite the next resource with an old refresh", async () => {
+    const refresh = deferred<{ body: string } | null>();
+    const loadPreview = vi.fn()
+      .mockResolvedValueOnce({ body: "first" })
+      .mockResolvedValueOnce({ body: "second" });
+    const refreshLoader = vi.fn(() => refresh.promise);
+    const { rerender, result } = renderHook(
+      ({ resourceKey }: { resourceKey: string }) => useResourcePreview(resourceKey, loadPreview, refreshLoader),
+      { initialProps: { resourceKey: "first" } },
+    );
+    await waitFor(() => expect(result.current.preview).toEqual({ body: "first" }));
+    act(() => result.current.refreshPreview());
+    rerender({ resourceKey: "second" });
+    await waitFor(() => expect(result.current.preview).toEqual({ body: "second" }));
+
+    await act(async () => refresh.resolve({ body: "stale" }));
+
+    expect(result.current.preview).toEqual({ body: "second" });
+    expect(result.current.failed).toBe(false);
+  });
+
+  it("keeps the newest refresh when requests finish out of order", async () => {
+    const first = deferred<{ body: string } | null>();
+    const second = deferred<{ body: string } | null>();
+    const loadPreview = vi.fn().mockResolvedValue({ body: "initial" });
+    const refreshLoader = vi.fn()
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise);
+    const { result } = renderHook(() => useResourcePreview("profile", loadPreview, refreshLoader));
+    await waitFor(() => expect(result.current.preview).toEqual({ body: "initial" }));
+    act(() => result.current.refreshPreview());
+    act(() => result.current.refreshPreview());
+    await act(async () => second.resolve({ body: "newest" }));
+    await act(async () => first.resolve(null));
+
+    expect(result.current.preview).toEqual({ body: "newest" });
+    expect(result.current.failed).toBe(false);
+    expect(result.current.pending).toBe(false);
+  });
+
   it("ignores a stale result after the resource key changes", async () => {
     const first = deferred<{ body: string } | null>();
     const second = deferred<{ body: string } | null>();

@@ -204,42 +204,11 @@ function PreviewNodeCard({
   const [detailMode, setDetailMode] = useState<PreviewDetailMode>("diff");
   const detailsId = useId();
   const node = previewNodeForSummary(diff);
-  const nodeDiff = formatNodeDiff(diff);
-  const detailValue = detailMode === "meta" ? formatNodeMetadataDiff(diff) : nodeDiff;
   const nodeName = node?.name || t("subscriptions.preview.unnamedNode");
   const probeSummary = previewProbePresentation(diff.after?.probe, locale, t);
   const detailLabel = probeSummary
     ? t("subscriptions.preview.detailWithNameAndProbe", { name: nodeName, probe: probeSummary.accessibleLabel })
     : t("subscriptions.preview.detailWithName", { name: nodeName });
-  const hasMetadata = Boolean(nodeMetadataPayload(diff));
-  const detailModeControl = (
-    <ToggleButtonGroup
-      aria-label={t("subscriptions.preview.detailDisplay")}
-      exclusive
-      size="small"
-      value={detailMode}
-      onChange={(_, value: PreviewDetailMode | null) => {
-        if (value) {
-          setDetailMode(value);
-        }
-      }}
-    >
-      <ToggleButton aria-label={t("subscriptions.preview.diff")} value="diff">{t("subscriptions.preview.diff")}</ToggleButton>
-      {hasMetadata ? <ToggleButton aria-label={t("subscriptions.preview.meta")} value="meta">{t("subscriptions.preview.meta")}</ToggleButton> : null}
-    </ToggleButtonGroup>
-  );
-  const detailToolbar = (
-    <>
-      {detailModeControl}
-      {diff.after ? (
-        <Tooltip title={t("subscriptions.nodeTools.open")}>
-          <IconButton aria-label={t("subscriptions.nodeTools.openNamed", { name: nodeName })} size="small" onClick={() => onOpenNodeInfo(diff.after!)}>
-            <InfoOutlinedIcon aria-hidden fontSize="small" />
-          </IconButton>
-        </Tooltip>
-      ) : null}
-    </>
-  );
 
   return (
     <ListItem className="block min-w-0" disablePadding>
@@ -264,12 +233,68 @@ function PreviewNodeCard({
           </CardContent>
         </CardActionArea>
         <Collapse id={detailsId} in={expanded} timeout="auto" unmountOnExit>
-          <CardContent className="min-w-0 border-t border-divider pt-3">
-            <CodeBlock label={t("subscriptions.preview.detailLabel")} language="json-diff" showLanguage={false} toolbar={detailToolbar} value={detailValue} />
-          </CardContent>
+          <PreviewNodeDetails
+            detailMode={detailMode}
+            diff={diff}
+            nodeName={nodeName}
+            onOpenNodeInfo={onOpenNodeInfo}
+            onSetDetailMode={setDetailMode}
+          />
         </Collapse>
       </Card>
     </ListItem>
+  );
+}
+
+function PreviewNodeDetails({
+  detailMode,
+  diff,
+  nodeName,
+  onOpenNodeInfo,
+  onSetDetailMode,
+}: {
+  detailMode: PreviewDetailMode;
+  diff: SubscriptionPreviewNodeDiff;
+  nodeName: string;
+  onOpenNodeInfo: (node: SubscriptionPreviewNode) => void;
+  onSetDetailMode: (mode: PreviewDetailMode) => void;
+}) {
+  const { t } = useI18n();
+  const detailValue = detailMode === "meta" ? formatNodeMetadataDiff(diff) : formatNodeDiff(diff);
+  const hasMetadata = Boolean(nodeMetadataPayload(diff));
+  const detailModeControl = (
+    <ToggleButtonGroup
+      aria-label={t("subscriptions.preview.detailDisplay")}
+      exclusive
+      size="small"
+      value={detailMode}
+      onChange={(_, value: PreviewDetailMode | null) => {
+        if (value) {
+          onSetDetailMode(value);
+        }
+      }}
+    >
+      <ToggleButton aria-label={t("subscriptions.preview.diff")} value="diff">{t("subscriptions.preview.diff")}</ToggleButton>
+      {hasMetadata ? <ToggleButton aria-label={t("subscriptions.preview.meta")} value="meta">{t("subscriptions.preview.meta")}</ToggleButton> : null}
+    </ToggleButtonGroup>
+  );
+  const detailToolbar = (
+    <>
+      {detailModeControl}
+      {diff.after ? (
+        <Tooltip title={t("subscriptions.nodeTools.open")}>
+          <IconButton aria-label={t("subscriptions.nodeTools.openNamed", { name: nodeName })} size="small" onClick={() => onOpenNodeInfo(diff.after!)}>
+            <InfoOutlinedIcon aria-hidden fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      ) : null}
+    </>
+  );
+
+  return (
+    <CardContent className="min-w-0 border-t border-divider pt-3">
+      <CodeBlock label={t("subscriptions.preview.detailLabel")} language="json-diff" showLanguage={false} toolbar={detailToolbar} value={detailValue} />
+    </CardContent>
   );
 }
 
@@ -342,7 +367,7 @@ function PreviewNodeSummary({ diff }: { diff: SubscriptionPreviewNodeDiff }) {
   const remainingChanges = changes.length - visibleChanges.length;
 
   return (
-    <div className="grid min-w-0 gap-2">
+    <div className="grid min-w-0 grid-cols-1 gap-2">
       <NodeSummaryItem node={node} />
       {visibleChanges.length ? (
         <div aria-label={t("subscriptions.preview.nodeChangeSummary")} className="grid min-w-0 gap-1">
@@ -370,7 +395,7 @@ function PreviewNodeSummary({ diff }: { diff: SubscriptionPreviewNodeDiff }) {
 function NodeSummaryItem({ node }: { node?: SubscriptionPreviewNode }) {
   const { t } = useI18n();
   return (
-    <div className="grid min-w-0 gap-1">
+    <div className="grid min-w-0 grid-cols-1 gap-1">
       <Typography className="break-words font-medium [overflow-wrap:anywhere]" component="p" variant="subtitle1">
         {node?.name || t("subscriptions.preview.unnamedNode")}
       </Typography>

@@ -447,6 +447,12 @@ for (const route of routes) {
     }
     if (route.path === "/subscriptions/remote/provider/preview") {
       await expect(page.getByText("42 ms")).toBeVisible();
+      const nameBounds = await page.getByText(longPreviewNode, { exact: true }).boundingBox();
+      const probeBounds = await page.getByText("42 ms", { exact: true }).boundingBox();
+      expect(nameBounds).not.toBeNull();
+      expect(probeBounds).not.toBeNull();
+      expect(nameBounds!.x + nameBounds!.width, "node names must not overlap probe latency")
+        .toBeLessThanOrEqual(probeBounds!.x);
       const previewFilters = page.getByLabel("节点状态筛选");
       const filterMetrics = await previewFilters.getByRole("button").evaluateAll((buttons) => ({
         tops: buttons.map((button) => Math.round(button.getBoundingClientRect().top)),

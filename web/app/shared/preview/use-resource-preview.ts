@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export function useResourcePreview<TPreview>(
   resourceKey: string | undefined,
@@ -9,6 +9,7 @@ export function useResourcePreview<TPreview>(
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const requestGeneration = useRef(0);
 
   useEffect(() => {
     if (!pending) {
@@ -28,48 +29,40 @@ export function useResourcePreview<TPreview>(
     return () => window.clearTimeout(timeoutID);
   }, [pending, resourceKey]);
 
+  const runPreview = useCallback(async (loader: () => Promise<TPreview | null>) => {
+    const generation = ++requestGeneration.current;
+    setPending(true);
+    setFailed(false);
+    try {
+      const result = await loader();
+      if (generation !== requestGeneration.current) return;
+      setFailed(result === null);
+      if (result !== null) setPreview(result);
+    } catch {
+      if (generation === requestGeneration.current) setFailed(true);
+    } finally {
+      if (generation === requestGeneration.current) setPending(false);
+    }
+  }, []);
+
+  const invalidatePreview = useCallback(() => {
+    requestGeneration.current++;
+  }, []);
+
   useEffect(() => {
+    setPreview(null);
     if (!resourceKey) {
-      setPreview(null);
       setPending(false);
       setFailed(false);
       return;
     }
-    let active = true;
-    setPreview(null);
-    setPending(true);
-    setFailed(false);
-    void loadPreview().then((result) => {
-      if (active) {
-        setPreview(result);
-        setFailed(result === null);
-      }
-    }).finally(() => {
-      if (active) {
-        setPending(false);
-      }
-    });
-    return () => {
-      active = false;
-    };
-  }, [loadPreview, resourceKey]);
+    void runPreview(loadPreview);
+    return invalidatePreview;
+  }, [invalidatePreview, loadPreview, resourceKey, runPreview]);
 
   const refreshPreview = useCallback(() => {
-    if (!resourceKey) {
-      return;
-    }
-    setPending(true);
-    setFailed(false);
-    void refreshPreviewLoader().then((result) => {
-      if (result === null) {
-        setFailed(true);
-        return;
-      }
-      setPreview(result);
-    }).finally(() => {
-      setPending(false);
-    });
-  }, [refreshPreviewLoader, resourceKey]);
+    if (resourceKey) void runPreview(refreshPreviewLoader);
+  }, [refreshPreviewLoader, resourceKey, runPreview]);
 
   return {
     elapsedSeconds,

@@ -290,6 +290,13 @@ describe("SubscriptionPreviewPage", () => {
     expect(detailBlock).not.toHaveTextContent('"after"');
     expect(detailBlock).not.toHaveTextContent('"before"');
     expect(detailBlock).not.toHaveTextContent('"server": "example.com"');
+
+    await user.click(screen.getByRole("button", { name: "node-a 节点详情" }));
+    await vi.waitFor(() => expect(screen.queryByRole("region", { name: "节点详情" })).not.toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: "node-a 节点详情" }));
+    const reopenedDetails = screen.getByRole("region", { name: "节点详情" });
+    expect(within(reopenedDetails).getByRole("button", { name: "元数据" })).toHaveAttribute("aria-pressed", "true");
+    expect(reopenedDetails).toHaveTextContent('+ "probe.duration_ms": "11"');
   });
   it("shows current probe summaries without reusing removed-node metadata", async () => {
     const user = userEvent.setup();
