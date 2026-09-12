@@ -1,9 +1,11 @@
+import { codeZhCN } from "./code.zh-CN";
 import { fileZhCN } from "./files.zh-CN";
 import { processorZhCN } from "./processors.zh-CN";
 import { settingsZhCN } from "./settings.zh-CN";
 import { shareZhCN } from "./shares.zh-CN";
 
 export const zhCN = {
+  ...codeZhCN,
   ...fileZhCN,
   ...processorZhCN,
   ...settingsZhCN,

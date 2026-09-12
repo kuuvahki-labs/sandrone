@@ -1,3 +1,4 @@
+import { codeEnUS } from "./code.en-US";
 import { fileEnUS } from "./files.en-US";
 import { processorEnUS } from "./processors.en-US";
 import { settingsEnUS } from "./settings.en-US";
@@ -5,6 +6,7 @@ import { shareEnUS } from "./shares.en-US";
 import { type TranslationKey } from "./zh-CN";
 
 export const enUS: Record<TranslationKey, string> = {
+  ...codeEnUS,
   ...fileEnUS,
   ...processorEnUS,
   ...settingsEnUS,

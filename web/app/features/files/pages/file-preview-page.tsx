@@ -7,9 +7,10 @@ import Typography from "@mui/material/Typography";
 import type { FilePreview } from "~/features/files/model/types";
 import { useI18n } from "~/shared/i18n/context";
 import { PreviewPendingStatus } from "~/shared/preview/preview-pending-status";
-import { CollapsibleWarningPanel } from "~/shared/resources/warning-panel";
-import { CodeBlock } from "~/shared/ui/code-editor";
+import { FileContentPreview } from "~/shared/ui/file-content-preview";
 import { PageHeader } from "~/shared/ui/page";
+
+import { FilePreviewWarnings } from "./file-preview-warnings";
 
 export interface FilePreviewPageProps {
   backLabel: string;
@@ -40,20 +41,22 @@ export function FilePreviewPage({
     <section
       className={
         preview
-          ? "flex min-h-[calc(100dvh-2.5rem)] min-w-0 flex-col gap-4 min-[820px]:min-h-[calc(100dvh-3rem)]"
+          ? "flex h-[calc(100dvh-2.5rem)] min-h-0 min-w-0 flex-col gap-3 min-[820px]:h-[calc(100dvh-3rem)]"
           : "grid min-w-0 gap-4"
       }
     >
-      <PageHeader
-        backAction={{ label: backLabel, onSelect: onBack }}
-        label=""
-        primaryAction={{ accessibleLabel: t("files.preview.refresh"), disabled: pending, icon: <RefreshIcon aria-hidden fontSize="small" />, label: t("actions.refresh"), onSelect: onRefresh }}
-        secondaryActions={[{ accessibleLabel: t("files.actions.share"), icon: <ShareOutlinedIcon aria-hidden fontSize="small" />, label: t("actions.share"), onSelect: onShare }]}
-        sticky
-        title={t("files.preview.title")}
-      />
+      <div className="shrink-0">
+        <PageHeader
+          backAction={{ label: backLabel, onSelect: onBack }}
+          label=""
+          primaryAction={{ accessibleLabel: t("files.preview.refresh"), disabled: pending, icon: <RefreshIcon aria-hidden fontSize="small" />, label: t("actions.refresh"), onSelect: onRefresh }}
+          secondaryActions={[{ accessibleLabel: t("files.actions.share"), icon: <ShareOutlinedIcon aria-hidden fontSize="small" />, label: t("actions.share"), onSelect: onShare }]}
+          sticky
+          title={t("files.preview.title")}
+        />
+      </div>
 
-      {pending ? <PreviewPendingStatus elapsedSeconds={elapsedSeconds} /> : null}
+      {pending && !preview ? <PreviewPendingStatus elapsedSeconds={elapsedSeconds} /> : null}
 
       {failed && !preview ? (
         <Card component="article" variant="outlined">
@@ -71,17 +74,14 @@ export function FilePreviewPage({
       {preview ? (
         <>
           {preview.warnings.length ? (
-            <CollapsibleWarningPanel label={t("files.preview.warnings")} warnings={preview.warnings} />
+            <FilePreviewWarnings warnings={preview.warnings} />
           ) : null}
 
-          <div className="flex h-[min(70dvh,640px)] min-w-0 shrink-0">
-            <CodeBlock
-              fillHeight
-              label={t("files.preview.finalContent")}
-              language={languageFromPreview(preview.contentType, fileName)}
-              value={preview.body}
-            />
-          </div>
+          <FileContentPreview
+            label={t("files.preview.finalContent")}
+            language={languageFromPreview(preview.contentType, fileName)}
+            value={preview.body}
+          />
         </>
       ) : null}
     </section>

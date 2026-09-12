@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -42,7 +42,7 @@ describe("FilePreviewPage", () => {
       if (body) {
         expect(code?.textContent).toContain(expected);
       } else {
-        expect(code?.textContent.trim()).toBe("");
+        expect(code?.querySelector("[data-code-line-content]")?.textContent?.trim()).toBe("");
       }
     }
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
@@ -96,7 +96,7 @@ describe("FilePreviewPage", () => {
     expect(screen.getByRole("region", { name: "最终文件内容" })).toHaveTextContent("[General]");
   });
 
-  it("keeps server warnings collapsed above the final body", async () => {
+  it("opens server warning details outside the final body and restores the details trigger", async () => {
     const user = userEvent.setup();
     render(
       <FilePreviewPage
@@ -113,9 +113,89 @@ describe("FilePreviewPage", () => {
     expect(screen.queryByText(/processor kept output/)).not.toBeInTheDocument();
     expect(screen.getByRole("region", { name: "最终文件内容" })).toHaveTextContent("processor output");
 
-    await user.click(screen.getByRole("button", { name: "展开预览警告" }));
+    const body = screen.getByRole("region", { name: "最终文件内容" });
+    const details = screen.getByRole("button", { name: "展开预览警告" });
+    await user.click(details);
 
-    expect(screen.getByText(/processor kept output/)).toBeInTheDocument();
+    const warnings = screen.getByRole("dialog", { name: "预览警告" });
+    expect(within(warnings).getByText(/processor kept output/)).toBeInTheDocument();
+    expect(body).not.toContainElement(warnings);
+    await user.click(within(warnings).getByRole("button", { name: "关闭" }));
+    await waitFor(() => expect(screen.getByRole("region", { name: "最终文件内容" })).toBe(body));
+    expect(details).toHaveFocus();
+  });
+
+  it("keeps the visible content mounted without inserting a waiting card during refresh", () => {
+    const preview = { body: "retained output", contentType: "text/plain", warnings: [] };
+    const view = render(<FilePreviewPage {...pageActions} preview={preview} />);
+    const body = screen.getByRole("region", { name: "最终文件内容" }).querySelector("pre")!;
+    body.scrollTop = 120;
+
+    view.rerender(<FilePreviewPage {...pageActions} elapsedSeconds={5} pending preview={preview} />);
+
+    expect(screen.getByRole("button", { name: "刷新文件预览" })).toBeDisabled();
+    expect(screen.queryByRole("heading", { name: /正在处理/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "最终文件内容" }).querySelector("pre")).toBe(body);
+    expect(body.scrollTop).toBe(120);
+
+    view.rerender(<FilePreviewPage {...pageActions} failed preview={preview} />);
+    expect(body).toHaveTextContent("retained output");
+    expect(screen.queryByRole("heading", { name: "生成失败" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "刷新文件预览" })).toBeEnabled();
+  });
+
+  it("copies the original output without line numbers or search decoration", async () => {
+    const user = userEvent.setup();
+    const copy = vi.spyOn(navigator.clipboard, "writeText");
+    const body = "const answer = 42;\nconst second = answer;\n";
+    render(<FilePreviewPage {...pageActions} preview={{ body, contentType: "text/javascript", warnings: [] }} />);
+
+    await user.click(screen.getByRole("button", { name: "复制最终文件内容" }));
+
+    expect(copy).toHaveBeenCalledWith(body);
+    expect(screen.getByRole("button", { name: "已复制最终文件内容" })).toBeInTheDocument();
+    copy.mockRestore();
+  });
+
+  it("finds occurrences in the output and navigates them without changing the content", async () => {
+    const user = userEvent.setup();
+    const body = "const answer = 42;\nconst second = answer;\n";
+    render(<FilePreviewPage {...pageActions} preview={{ body, contentType: "text/javascript", warnings: [] }} />);
+    const region = screen.getByRole("region", { name: "最终文件内容" });
+
+    await user.click(within(region).getByRole("button", { name: "查找最终文件内容" }));
+    const searchbox = within(region).getByRole("searchbox");
+    await user.type(searchbox, "answer");
+
+    expect(region.querySelectorAll("mark")).toHaveLength(2);
+    expect(region.querySelector("[data-code-active-match]")).toHaveAttribute("data-code-match-start", String(body.indexOf("answer")));
+    await user.keyboard("{Enter}");
+    expect(region.querySelector("[data-code-active-match]")).toHaveAttribute("data-code-match-start", String(body.lastIndexOf("answer")));
+    await user.keyboard("{Shift>}{Enter}{/Shift}");
+    expect(region.querySelector("[data-code-active-match]")).toHaveAttribute("data-code-match-start", String(body.indexOf("answer")));
+
+    await user.keyboard("{Escape}");
+    expect(within(region).queryByRole("searchbox")).not.toBeInTheDocument();
+    expect(region.querySelectorAll("mark")).toHaveLength(0);
+    expect(region.querySelector("pre")).toHaveFocus();
+  });
+
+  it("preserves the same content scroller when expanding and collapsing the preview", async () => {
+    const user = userEvent.setup();
+    render(<FilePreviewPage {...pageActions} preview={{ body: "first\nsecond", contentType: "text/plain", warnings: [] }} />);
+    const originalScroller = screen.getByRole("region", { name: "最终文件内容" }).querySelector("pre")!;
+    const dialog = originalScroller.closest("dialog")!;
+    // jsdom has no native dialog top layer; browser coverage verifies modality.
+    dialog.close = () => dialog.removeAttribute("open");
+    dialog.show = dialog.showModal = () => dialog.setAttribute("open", "");
+    originalScroller.scrollTop = 25;
+
+    await user.click(screen.getByRole("button", { name: "放大预览" }));
+
+    expect(screen.getByRole("region", { name: "最终文件内容" }).querySelector("pre")).toBe(originalScroller);
+    await user.click(screen.getByRole("button", { name: "收起预览" }));
+    expect(screen.getByRole("region", { name: "最终文件内容" }).querySelector("pre")).toBe(originalScroller);
+    expect(originalScroller.scrollTop).toBe(25);
   });
 
   it("keeps loading, failure, and refresh behavior", async () => {
