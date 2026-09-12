@@ -35,14 +35,14 @@ jobs:
         shell: bash
         run: |
           git fetch --force --tags origin
-          version="$(sh ./scripts/next-release-version.sh)"
+          version="$(sh ./scripts/release.sh next-version)"
           tag="v${version}"
           if git show-ref --verify --quiet "refs/tags/${tag}"; then
             echo "release tag ${tag} already exists" >&2
             exit 1
           fi
           printf '%s\n' "${version}" > internal/buildinfo/VERSION
-          GITHUB_REF_NAME="${tag}" sh ./scripts/validate-release-tag.sh
+          GITHUB_REF_NAME="${tag}" sh ./scripts/release.sh validate-tag
           {
             echo "version=${version}"
             echo "tag=${tag}"

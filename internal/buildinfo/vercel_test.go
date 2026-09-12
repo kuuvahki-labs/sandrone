@@ -10,21 +10,21 @@ import (
 
 func TestVerifyVercelAssetsRequiresWebAndCatalog(t *testing.T) {
 	root := newVercelAssetFixture(t)
-	verify := filepath.Join(root, "scripts", "verify-vercel-assets.sh")
+	verify := filepath.Join(root, "scripts", "vercel-assets.sh")
 
-	output, err := runCommand(root, "sh", verify)
+	output, err := runCommand(root, "sh", verify, "verify")
 	if err == nil || !strings.Contains(string(output), "static/index.html is missing or empty") {
 		t.Fatalf("missing Web UI check: err=%v\n%s", err, output)
 	}
 
 	writeTestFile(t, filepath.Join(root, "internal", "entry", "webui", "static", "index.html"), "<!doctype html>\n")
-	output, err = runCommand(root, "sh", verify)
+	output, err = runCommand(root, "sh", verify, "verify")
 	if err == nil || !strings.Contains(string(output), "catalog.json.gz is missing or empty") {
 		t.Fatalf("missing catalog check: err=%v\n%s", err, output)
 	}
 
 	writeTestFile(t, filepath.Join(root, "internal", "service", "catalog_builtin", "catalog.json.gz"), "not gzip\n")
-	output, err = runCommand(root, "sh", verify)
+	output, err = runCommand(root, "sh", verify, "verify")
 	if err == nil || !strings.Contains(string(output), "catalog.json.gz is not valid gzip") {
 		t.Fatalf("invalid catalog check: err=%v\n%s", err, output)
 	}
@@ -52,7 +52,7 @@ cp "$CATALOG_FIXTURE" internal/service/catalog_builtin/catalog.json.gz
 		"MAKE=" + makeStub,
 		"MAKE_LOG=" + makeLog,
 		"CATALOG_FIXTURE=" + catalogFixture,
-	}, "sh", filepath.Join(root, "scripts", "build-vercel-assets.sh"))
+	}, "sh", filepath.Join(root, "scripts", "vercel-assets.sh"), "build")
 	if err != nil {
 		t.Fatalf("build Vercel assets: %v\n%s", err, output)
 	}
@@ -62,6 +62,16 @@ cp "$CATALOG_FIXTURE" internal/service/catalog_builtin/catalog.json.gz
 	}
 	if got, want := strings.TrimSpace(string(logBody)), "ruleset-catalog build-webui"; got != want {
 		t.Fatalf("make targets = %q, want %q", got, want)
+	}
+
+	writeTestFile(t, catalogFixture, "not gzip\n")
+	output, err = runCommandEnv(root, []string{
+		"MAKE=" + makeStub,
+		"MAKE_LOG=" + makeLog,
+		"CATALOG_FIXTURE=" + catalogFixture,
+	}, "sh", filepath.Join(root, "scripts", "vercel-assets.sh"), "build")
+	if err == nil || !strings.Contains(string(output), "catalog.json.gz is not valid gzip") {
+		t.Fatalf("build must reject invalid generated assets: err=%v\n%s", err, output)
 	}
 }
 
@@ -83,8 +93,7 @@ func TestVercelWorkflowUsesPrebuiltAssetPipeline(t *testing.T) {
 		"VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}",
 		"VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}",
 		"npm install --global \"vercel@${VERCEL_CLI_VERSION}\"",
-		"./scripts/build-vercel-assets.sh",
-		"./scripts/verify-vercel-assets.sh",
+		"./scripts/vercel-assets.sh build",
 		"vercel build --standalone --prod",
 		"vercel build --standalone --token",
 		"vercel deploy --prebuilt --prod",
@@ -94,12 +103,11 @@ func TestVercelWorkflowUsesPrebuiltAssetPipeline(t *testing.T) {
 			t.Errorf("Vercel workflow does not contain %q", want)
 		}
 	}
-	buildAssetsAt := strings.Index(content, "./scripts/build-vercel-assets.sh")
-	verifyAssetsAt := strings.Index(content, "./scripts/verify-vercel-assets.sh")
+	buildAssetsAt := strings.Index(content, "./scripts/vercel-assets.sh build")
 	vercelBuildAt := strings.Index(content, "vercel build --standalone --prod")
 	vercelDeployAt := strings.Index(content, "vercel deploy --prebuilt --prod")
-	if buildAssetsAt < 0 || !(buildAssetsAt < verifyAssetsAt && verifyAssetsAt < vercelBuildAt && vercelBuildAt < vercelDeployAt) {
-		t.Error("Vercel workflow must generate, verify, build, and deploy in order")
+	if buildAssetsAt < 0 || !(buildAssetsAt < vercelBuildAt && vercelBuildAt < vercelDeployAt) {
+		t.Error("Vercel workflow must build assets, build deployment, and deploy in order")
 	}
 	if strings.Contains(content, "vercel@latest") {
 		t.Error("Vercel workflow must pin the CLI version")
@@ -120,8 +128,7 @@ func newVercelAssetFixture(t *testing.T) string {
 	}
 	fixture := t.TempDir()
 	for _, name := range []string{
-		filepath.Join("scripts", "build-vercel-assets.sh"),
-		filepath.Join("scripts", "verify-vercel-assets.sh"),
+		filepath.Join("scripts", "vercel-assets.sh"),
 	} {
 		body, err := os.ReadFile(filepath.Join(root, name))
 		if err != nil {

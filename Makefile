@@ -79,18 +79,7 @@ validate-build-identity: override export VERSION := $(value VERSION)
 validate-build-identity: override export REVISION := $(value REVISION)
 validate-build-identity: override export BUILD_TIME := $(value BUILD_TIME)
 validate-build-identity:
-	@if [ "$$(sh ./scripts/validate-build-version.sh)" != "ok" ]; then \
-		printf '%s\n' 'VERSION must be empty or contain only ASCII letters, digits, dots, plus signs, and hyphens' >&2; \
-		exit 2; \
-	fi
-	@if [ "$$(sh ./scripts/validate-build-revision.sh)" != "ok" ]; then \
-		printf '%s\n' 'REVISION must be empty or a complete 40- or 64-character hexadecimal Git object ID' >&2; \
-		exit 2; \
-	fi
-	@if [ "$$(sh ./scripts/validate-build-time.sh)" != "ok" ]; then \
-		printf '%s\n' 'BUILD_TIME must use UTC RFC3339 format YYYY-MM-DDTHH:MM:SSZ' >&2; \
-		exit 2; \
-	fi
+	@sh ./scripts/validate-build-identity.sh
 
 help: ## Show available targets.
 	@printf '%s\n' 'Common targets:'

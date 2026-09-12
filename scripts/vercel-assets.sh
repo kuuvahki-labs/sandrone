@@ -3,6 +3,18 @@ set -eu
 
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 repo_root=$(CDPATH='' cd -- "$script_dir/.." && pwd)
+case "${1-}" in
+  build)
+    cd "$repo_root"
+    "${MAKE-make}" ruleset-catalog build-webui
+    ;;
+  verify) ;;
+  *)
+    printf '%s\n' 'usage: vercel-assets.sh build|verify' >&2
+    exit 2
+    ;;
+esac
+
 web_index=$repo_root/internal/entry/webui/static/index.html
 ruleset_catalog=$repo_root/internal/service/catalog_builtin/catalog.json.gz
 

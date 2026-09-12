@@ -36,9 +36,9 @@ VERCEL_PROJECT_ID=<Vercel project ID>
 执行 `vercel link` 生成的 `.vercel/project.json` 包含 `orgId` 和 `projectId`；不要
 提交 `.vercel/` 或把这些值硬编码进 workflow。
 
-部署 job 先运行 `scripts/build-vercel-assets.sh`，生成
+部署 job 先运行 `scripts/vercel-assets.sh build`，生成
 `internal/entry/webui/static/index.html` 和
-`internal/service/catalog_builtin/catalog.json.gz`，再运行契约检查、`vercel build`
+`internal/service/catalog_builtin/catalog.json.gz`并完成契约检查，再运行 `vercel build`
 和 `vercel deploy --prebuilt`。`vercel build --standalone` 会将 Go `bootstrap` 和全部
 依赖写入 Function 输出目录，避免预构建产物引用 CI runner 的临时路径。这些生成物
 继续由 `.gitignore` 排除，不属于源码提交。

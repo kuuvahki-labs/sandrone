@@ -37,18 +37,8 @@ make_command=${MAKE-make}
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 repo_root=$(CDPATH='' cd -- "$script_dir/.." && pwd)
 
-if [ "$(VERSION="$VERSION" sh "$script_dir/validate-build-version.sh")" != ok ]; then
-	printf '%s\n' 'VERSION must contain only ASCII letters, digits, dots, plus signs, and hyphens' >&2
-	exit 2
-fi
-if [ "$(REVISION="$REVISION" sh "$script_dir/validate-build-revision.sh")" != ok ]; then
-	printf '%s\n' 'REVISION must be a complete 40- or 64-character hexadecimal Git object ID' >&2
-	exit 2
-fi
-if [ "$(BUILD_TIME="$BUILD_TIME" sh "$script_dir/validate-build-time.sh")" != ok ]; then
-	printf '%s\n' 'BUILD_TIME must use UTC RFC3339 format YYYY-MM-DDTHH:MM:SSZ' >&2
-	exit 2
-fi
+VERSION="$VERSION" REVISION="$REVISION" BUILD_TIME="$BUILD_TIME" \
+	sh "$script_dir/validate-build-identity.sh"
 
 # RELEASE_TARGETS is a space-separated list by contract.
 # shellcheck disable=SC2086

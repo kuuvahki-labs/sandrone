@@ -595,9 +595,7 @@ func newReleaseArtifactFixture(t *testing.T) (repo, makeScript, makeLog string) 
 	for _, name := range []string{
 		"LICENSE",
 		filepath.Join("scripts", "build-release-artifacts.sh"),
-		filepath.Join("scripts", "validate-build-revision.sh"),
-		filepath.Join("scripts", "validate-build-time.sh"),
-		filepath.Join("scripts", "validate-build-version.sh"),
+		filepath.Join("scripts", "validate-build-identity.sh"),
 	} {
 		content, readErr := os.ReadFile(filepath.Join(root, name))
 		if readErr != nil {
@@ -830,7 +828,7 @@ func TestBuildMetadataContracts(t *testing.T) {
           version="$(tr -d '\r\n' < internal/buildinfo/VERSION)"
           build_time="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           git fetch --force --tags origin
-          tags="$(./scripts/container-image-tags.sh)"
+          tags="$(./scripts/release.sh image-tags)"
           {
             echo "version=${version}"
             echo "build_time=${build_time}"
@@ -894,7 +892,7 @@ func TestBuildMetadataContracts(t *testing.T) {
 
 	releaseJob := workflowNamedJob(t, workflowText, "release")
 	if got, want := workflowNamedStep(t, releaseJob, "Validate release tag"), `      - name: Validate release tag
-        run: sh ./scripts/validate-release-tag.sh`; got != want {
+        run: sh ./scripts/release.sh validate-tag`; got != want {
 		t.Errorf("Validate release tag step =\n%s\nwant:\n%s", got, want)
 	}
 	for _, want := range []string{
@@ -948,10 +946,10 @@ func TestManualReleaseWorkflowIncrementsPatchAndDispatchesTagCI(t *testing.T) {
 		"group: create-release-tag",
 		`if [[ "${GITHUB_REF}" != "refs/heads/main" ]]`,
 		"fetch-depth: 0",
-		`version="$(sh ./scripts/next-release-version.sh)"`,
+		`version="$(sh ./scripts/release.sh next-version)"`,
 		`git show-ref --verify --quiet "refs/tags/${tag}"`,
 		`printf '%s\n' "${version}" > internal/buildinfo/VERSION`,
-		`GITHUB_REF_NAME="${tag}" sh ./scripts/validate-release-tag.sh`,
+		`GITHUB_REF_NAME="${tag}" sh ./scripts/release.sh validate-tag`,
 		`git commit -m "chore(release): bump version to ${RELEASE_VERSION}"`,
 		`git tag -a "${RELEASE_TAG}" -m "Release ${RELEASE_TAG}"`,
 		`git push --atomic origin HEAD:refs/heads/main "refs/tags/${RELEASE_TAG}"`,
@@ -970,7 +968,7 @@ func TestManualReleaseWorkflowIncrementsPatchAndDispatchesTagCI(t *testing.T) {
 }
 
 func TestNextReleaseVersionIncrementsLatestStablePatch(t *testing.T) {
-	script, err := filepath.Abs(filepath.Join("..", "..", "scripts", "next-release-version.sh"))
+	script, err := filepath.Abs(filepath.Join("..", "..", "scripts", "release.sh"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -980,7 +978,7 @@ func TestNextReleaseVersionIncrementsLatestStablePatch(t *testing.T) {
 		for _, tag := range []string{"v0.9.9", "v1.2.9", "v1.3.0-rc.1", "not-a-version"} {
 			runCommandOK(t, repo, "git", "tag", tag)
 		}
-		output := runCommandOK(t, repo, "sh", script)
+		output := runCommandOK(t, repo, "sh", script, "next-version")
 		if got, want := string(output), "1.2.10\n"; got != want {
 			t.Fatalf("next release version = %q, want %q", got, want)
 		}
@@ -989,7 +987,7 @@ func TestNextReleaseVersionIncrementsLatestStablePatch(t *testing.T) {
 	t.Run("no stable tag", func(t *testing.T) {
 		repo, _ := newGitRepo(t)
 		runCommandOK(t, repo, "git", "tag", "v1.0.0-rc.1")
-		output, err := runCommand(repo, "sh", script)
+		output, err := runCommand(repo, "sh", script, "next-version")
 		if err == nil {
 			t.Fatalf("missing stable release tag was accepted:\n%s", output)
 		}
@@ -1000,7 +998,7 @@ func TestNextReleaseVersionIncrementsLatestStablePatch(t *testing.T) {
 }
 
 func TestValidateReleaseTagMatchesVersionFile(t *testing.T) {
-	script, err := filepath.Abs(filepath.Join("..", "..", "scripts", "validate-release-tag.sh"))
+	script, err := filepath.Abs(filepath.Join("..", "..", "scripts", "release.sh"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1013,7 +1011,7 @@ func TestValidateReleaseTagMatchesVersionFile(t *testing.T) {
 		return runCommandEnv(".", []string{
 			"GITHUB_REF_NAME=" + refName,
 			"VERSION_FILE=" + versionFile,
-		}, "sh", script)
+		}, "sh", script, "validate-tag")
 	}
 
 	t.Run("matching tag", func(t *testing.T) {
@@ -1110,7 +1108,7 @@ func TestMakeImageUsesSharedImageVariable(t *testing.T) {
 }
 
 func TestContainerImageTagsFollowReleasePolicy(t *testing.T) {
-	script, err := filepath.Abs(filepath.Join("..", "..", "scripts", "container-image-tags.sh"))
+	script, err := filepath.Abs(filepath.Join("..", "..", "scripts", "release.sh"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1132,7 +1130,7 @@ func TestContainerImageTagsFollowReleasePolicy(t *testing.T) {
 			"GITHUB_REF_TYPE=" + refType,
 			"GITHUB_REF_NAME=" + refName,
 			"VERSION_FILE=" + versionFile,
-		}, "sh", script)
+		}, "sh", script, "image-tags")
 	}
 
 	t.Run("main publishes nothing", func(t *testing.T) {
@@ -1331,9 +1329,7 @@ func newMakeFixtureRepo(t *testing.T) (string, string) {
 		"Makefile",
 		filepath.Join("internal", "buildinfo", "VERSION"),
 		filepath.Join("scripts", "resolve-build-revision.sh"),
-		filepath.Join("scripts", "validate-build-revision.sh"),
-		filepath.Join("scripts", "validate-build-time.sh"),
-		filepath.Join("scripts", "validate-build-version.sh"),
+		filepath.Join("scripts", "validate-build-identity.sh"),
 	} {
 		content, err := os.ReadFile(filepath.Join(root, name))
 		if err != nil {
