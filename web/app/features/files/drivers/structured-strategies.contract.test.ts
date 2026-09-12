@@ -159,16 +159,14 @@ describe("structured file driver orchestration strategies", () => {
     expect(previewSource).not.toContain("SHADOWROCKET_SUPPORTED_NODE_TYPES");
  });
 
-  it("lets a fourth driver compose adaptive recognition and stale behavior from pure helpers", () => {
+  it("lets a fourth driver compose adaptive recognition and generation from pure helpers", () => {
     const dialect = fakeAdaptiveDialect();
     const custom = {
       ...adaptiveGroupHelpers(dialect),
-      isStale: ({ options }: { options: Readonly<AdaptiveGroupOptions> }) => options.type === "stale-by-driver",
       recognizesCanonicalLayer: () => false,
     };
     expect(custom.defaultOptions()).toEqual(defaultAdaptiveGroupOptions(dialect));
     expect(custom.recognizeOptions([])).toBeNull();
-    expect(custom.isStale({ options: { type: "stale-by-driver" } })).toBe(true);
     expect(custom.generate(["HK-01"], { type: "race" }).groups[0]).toMatchObject({ label: "Hong Kong", members: ["HK-01"] });
   });
 });
@@ -185,7 +183,7 @@ function fakeAdaptiveDialect(): ConfigAdaptiveDialect {
     materialize: (definition, _type, nodeNames) => ({ label: definition.name, members: [...nodeNames] }),
     replaceGroupMembers: (group, members) => ({ ...group, members: [...members] }),
     requiresNodePreview: true,
-    typeOptions: [{ label: "race", value: "race" }, { label: "stale", value: "stale-by-driver" }],
+    typeOptions: [{ label: "race", value: "race" }],
  };
 }
 

@@ -51,13 +51,11 @@ describe("config editor state initialization and output", () => {
         defaultValue: { groups: values, rule_sets: [], rules: [] }, formMode: "edit",
       });
       const restored = initialize(groups);
-      expect(restored.adaptiveEnabled).toBe(true);
       expect(restored.adaptiveOptions).toEqual(options);
       expect(deriveConfigEditorOutput(adapter, restored).nativeConfig.groups).toEqual(groups);
 
       const customized = groups.map((group) => ({ ...group, interval: 17 }));
       const declined = initialize(customized);
-      expect(declined.adaptiveEnabled).toBe(false);
       expect(declined.adaptiveOptions).toEqual(adapter.adaptive.defaultOptions());
       expect(deriveConfigEditorOutput(adapter, declined).nativeConfig.groups).toEqual(customized);
     },
@@ -288,7 +286,6 @@ describe("config editor structure transitions", () => {
     });
 
     expect(cleared.selectedSubscription).toBe("provider");
-    expect(cleared.adaptiveEnabled).toBe(false);
     expect(cleared.adaptiveWarnings).toEqual([]);
     expect(cleared.templateUndo).toBeNull();
     expect(cleared.structureRevision).toBe(withUndo.structureRevision + 1);
@@ -393,7 +390,6 @@ describe("config editor adaptive and catalog transitions", () => {
       const output = deriveConfigEditorOutput(adapter, first.state);
 
       expect(first.applied).toBe(true);
-      expect(first.state.adaptiveEnabled).toBe(true);
       expect(first.state.structureRevision).toBe(1);
       expect(adapter.adaptive.canonicalNames(output.nativeConfig.groups ?? []))
         .toEqual([
@@ -408,7 +404,6 @@ describe("config editor adaptive and catalog transitions", () => {
         defaultValue: adapter.decode({ ...output.encoded, settingsPresent: true }),
         formMode: "edit",
       });
-      expect(reopened.adaptiveEnabled).toBe(true);
       expect(reopened.adaptiveOptions).toEqual({ type: options.type, enabledRegionIds: ["hk", "tw", "sg", "jp", "us"] });
 
       const repeated = applyConfigEditorAdaptiveGeneration(
@@ -434,7 +429,6 @@ describe("config editor adaptive and catalog transitions", () => {
     });
     const output = deriveConfigEditorOutput(adapter, transition.state);
 
-    expect(initial.adaptiveEnabled).toBe(false);
     expect(transition.applied).toBe(true);
     expect(output.nativeConfig.groups?.find((group) => group.name === "Final")?.proxies)
       .toEqual(["PROXY", "Hong Kong", "DIRECT", "REJECT"]);
@@ -482,15 +476,10 @@ describe("config editor adaptive and catalog transitions", () => {
       options,
     });
 
-    expect(changed.adaptiveEnabled).toBe(false);
     expect(changed.adaptiveWarnings).toEqual([]);
     expect(changed.templateUndo).toEqual(withUndo.templateUndo);
     expect(deriveConfigEditorOutput(adapter, changed).encoded)
       .toEqual(deriveConfigEditorOutput(adapter, withUndo).encoded);
-    const toggled = reduceConfigEditorState(changed, { type: "toggle-adaptive", enabled: true });
-    const untoggled = reduceConfigEditorState(toggled, { type: "toggle-adaptive", enabled: false });
-    expect(deriveConfigEditorOutput(adapter, toggled).encoded).toEqual(deriveConfigEditorOutput(adapter, withUndo).encoded);
-    expect(deriveConfigEditorOutput(adapter, untoggled).encoded).toEqual(deriveConfigEditorOutput(adapter, withUndo).encoded);
   });
 
   it("adds a catalog rule set without changing rules and treats conflicts as no-ops", () => {
@@ -590,7 +579,6 @@ describe("config editor derived validity", () => {
     });
 
     expect(validity(adapter, state)).toMatchObject({
-      adaptiveStale: false,
       structureValid: true,
       valid: true,
     });
@@ -669,7 +657,7 @@ describe("config editor derived validity", () => {
     });
   });
 
-  it("derives adaptive staleness from current preview projection without mutating state", () => {
+  it("keeps saved regex groups valid without preview or after changing local generator options", () => {
     const adapter = structuredAdapter("sing-box");
     const initial = initializeConfigEditorState(adapter, {
       defaultValue: {
@@ -695,25 +683,34 @@ describe("config editor derived validity", () => {
       warnings: [],
     });
     const projectedNodes = adapter.preview.projectNodes(preview);
-    const snapshot = structuredClone(generated.state);
     const output = deriveConfigEditorOutput(adapter, generated.state);
+    const reopened = initializeConfigEditorState(adapter, {
+      defaultValue: adapter.decode({ ...output.encoded, settingsPresent: true }),
+      formMode: "edit",
+    });
+    const changed = reduceConfigEditorState(reopened, {
+      type: "change-adaptive-options",
+      options: { type: "selector", enabledRegionIds: ["jp"] },
+    });
+    const snapshot = structuredClone(changed);
 
-    const stale = deriveConfigEditorValidity(
+    const withoutPreview = deriveConfigEditorValidity(
       adapter,
-      generated.state,
-      output,
+      reopened,
+      deriveConfigEditorOutput(adapter, reopened),
       { currentPreview: null, projectedNodes: null },
     );
-    const current = deriveConfigEditorValidity(
+    const changedOptions = deriveConfigEditorValidity(
       adapter,
-      generated.state,
-      output,
+      changed,
+      deriveConfigEditorOutput(adapter, changed),
       { currentPreview: preview, projectedNodes },
     );
 
-    expect(stale).toMatchObject({ adaptiveStale: true, valid: false });
-    expect(current).toMatchObject({ adaptiveStale: false, valid: true });
-    expect(generated.state).toEqual(snapshot);
+    expect(withoutPreview).toMatchObject({ structureValid: true, valid: true });
+    expect(changedOptions).toMatchObject({ structureValid: true, valid: true });
+    expect(deriveConfigEditorOutput(adapter, changed).encoded).toEqual(output.encoded);
+    expect(changed).toEqual(snapshot);
   });
 });
 

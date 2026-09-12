@@ -82,7 +82,6 @@ export function FileConfigEditor({ adapter, allowSubscriptions = true, baseEdito
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [clearConfirmationOpen, setClearConfirmationOpen] = useState(false);
   const {
-    adaptiveEnabled,
     adaptiveOptions,
     adaptiveWarnings,
     namingLocale,
@@ -138,7 +137,6 @@ export function FileConfigEditor({ adapter, allowSubscriptions = true, baseEdito
     serialized,
   } = output;
   const {
-    adaptiveStale,
     previewValidation,
     relationModel,
     valid,
@@ -321,8 +319,6 @@ export function FileConfigEditor({ adapter, allowSubscriptions = true, baseEdito
 			) : (
 				<>
       <ConfigAdaptiveGroupControls
-        enabled={adaptiveEnabled}
-        onEnabledChange={(enabled) => updateEditorState({ type: "toggle-adaptive", enabled })}
         candidates={adaptiveCandidates}
         defaultExpanded={!configurationEmpty}
         disabledReason={adaptiveDisabledReason}
@@ -336,7 +332,6 @@ export function FileConfigEditor({ adapter, allowSubscriptions = true, baseEdito
         }}
         onGenerate={generateAdaptive}
       />
-      {adaptiveStale ? <Alert severity="error">{t("files.config.adaptiveStale")}</Alert> : null}
       {editorMode === "advanced" ? <Alert severity="warning"><Typography className="font-semibold" component="p" variant="body2">{t("files.config.rawConfig")}</Typography>{t("files.config.advancedUnsupported")}</Alert> : null}
       {editorMode === "wizard" ? (
         <>

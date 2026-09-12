@@ -22,15 +22,12 @@ afterEach(() => {
 });
 
 describe("ConfigAdaptiveGroupControls", () => {
-  it("requires the generator switch while leaving region inputs local", async () => {
+  it("allows generation directly without a separate enable switch", async () => {
     const user = userEvent.setup();
     const onGenerate = vi.fn();
     render(<ControlsHarness generatedCount={0} onGenerate={onGenerate} />);
-    const switchControl = screen.getByRole("checkbox", { name: /生成自适应分组|Generate adaptive groups/ });
-    await user.click(switchControl);
-    expect(screen.getByRole("button", { name: /生成自适应分组|Generate adaptive groups/ })).toBeDisabled();
-    expect(onGenerate).not.toHaveBeenCalled();
-    await user.click(switchControl);
+    expect(screen.queryByRole("checkbox", { name: /生成自适应分组|Generate adaptive groups/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /生成自适应分组|Generate adaptive groups/ })).toBeEnabled();
     expect(onGenerate).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: /生成自适应分组|Generate adaptive groups/ }));
     expect(onGenerate).toHaveBeenCalledOnce();
@@ -162,7 +159,7 @@ describe("ConfigAdaptiveGroupControls", () => {
     render(<ControlsHarness generatedCount={0} onGenerate={vi.fn()} />);
 
     await user.click(screen.getByRole("button", { name: /生成范围/ }));
-    const labels = screen.getAllByRole("checkbox").slice(1).map((checkbox) => checkbox.closest("label")?.textContent ?? "");
+    const labels = screen.getAllByRole("checkbox").map((checkbox) => checkbox.closest("label")?.textContent ?? "");
 
     expect(labels.slice(0, 5)).toEqual([
       expect.stringMatching(/Hong Kong/),
@@ -190,12 +187,9 @@ function ControlsHarness({
   warnings?: readonly AdaptiveGroupWarning[];
 }) {
   const [options, setOptions] = useState(initialOptions);
-  const [enabled, setEnabled] = useState(true);
   const candidates = adaptive.generate(["HK-01", "香港-02", "JP-01"], options).candidates;
   return (
     <ConfigAdaptiveGroupControls
-      enabled={enabled}
-      onEnabledChange={setEnabled}
       candidates={candidates}
       disabledReason={disabledReason}
       generatedCount={generatedCount}

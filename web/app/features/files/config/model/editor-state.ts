@@ -37,7 +37,6 @@ export interface ConfigEditorStructureState {
 }
 
 export interface ConfigEditorState {
-  adaptiveEnabled: boolean;
   adaptiveOptions: AdaptiveGroupOptions;
   adaptiveWarnings: AdaptiveGroupWarning[];
   formMode: "create" | "edit";
@@ -62,7 +61,6 @@ export type ConfigEditorAction =
   | { type: "change-advanced-groups"; text: string }
   | { type: "change-advanced-rule-sets"; text: string }
   | { type: "change-advanced-rules"; text: string }
-  | { type: "toggle-adaptive"; enabled: boolean }
   | { type: "change-adaptive-options"; options: AdaptiveGroupOptions };
 
 export function initializeConfigEditorState(
@@ -92,7 +90,6 @@ export function initializeConfigEditorState(
   const restoredOptions = adapter.adaptive.recognizeOptions(adapter.toNativeDraft(initial).groups ?? []);
 
   return {
-    adaptiveEnabled: restoredOptions !== null,
     adaptiveOptions: restoredOptions ?? adapter.adaptive.defaultOptions(),
     adaptiveWarnings: [],
     formMode: input.formMode,
@@ -154,8 +151,6 @@ export function reduceConfigEditorState(
         state,
         { advancedRulesText: event.text },
       );
-    case "toggle-adaptive":
-      return { ...state, adaptiveEnabled: event.enabled, adaptiveWarnings: [] };
     case "change-adaptive-options":
       return {
         ...state,
@@ -199,7 +194,6 @@ export function clearConfigEditor(
 
   return {
     ...state,
-    adaptiveEnabled: false,
     adaptiveWarnings: [],
     structure: structureFromDraft(empty),
     structureRevision: state.structureRevision + 1,
@@ -246,7 +240,6 @@ export function applyConfigEditorAdaptiveGeneration(
     applied: true,
     state: {
       ...state,
-      adaptiveEnabled: true,
       adaptiveOptions: input.options,
       adaptiveWarnings: result.warnings,
       structure: {
@@ -347,22 +340,13 @@ export function deriveConfigEditorValidity(
       && !parseJSONList(state.structure.advancedRuleSetsText).error
       && !parseJSONList(state.structure.advancedRulesText).error
     : !relationModel.issues.some((issue) => issue.severity === "error");
-  const adaptiveStale = adapter.adaptive.isStale({
-    config: output.effectiveAdaptiveConfig,
-    editorMode: state.structure.editorMode,
-    enabled: state.adaptiveEnabled,
-    namingLocale: state.namingLocale,
-    nodeNames: preview.projectedNodes?.map((node) => node.name),
-    options: state.adaptiveOptions,
-  });
   const valid = !output.multipleSubscriptions
     && previewValidation.valid
     && (state.settingsMode === "raw"
       ? output.rawSettingsValid
-      : structureValid && !adaptiveStale);
+      : structureValid);
 
   return {
-    adaptiveStale,
     previewValidation,
     relationModel,
     structureValid,

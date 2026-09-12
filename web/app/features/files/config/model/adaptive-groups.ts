@@ -65,15 +65,6 @@ export interface AdaptiveGroupStripResult {
   strippedGroupNames: string[];
 }
 
-export interface AdaptiveGroupStaleInput {
-  config: Readonly<FileConfigDraft>;
-  editorMode: "wizard" | "advanced";
-  enabled: boolean;
-  namingLocale: ConfigNamingLocale;
-  nodeNames?: readonly string[];
-  options: Readonly<AdaptiveGroupOptions>;
-}
-
 export interface ConfigAdaptiveDialect {
   anchorProblem: (config: Readonly<FileConfigDraft>) => AdaptiveGroupAnchorProblem | null;
   canonicalName: (group: ConfigMap) => string | undefined;
@@ -429,24 +420,6 @@ export function adaptiveMatchingNodeNames(
   const include = browserRegex(item.filter);
   const exclude = item.excludeFilter ? browserRegex(item.excludeFilter) : null;
   return nodeNames.filter((nodeName) => include.test(nodeName) && !exclude?.test(nodeName));
-}
-
-export function adaptiveGroupsAreStale(
-  dialect: Readonly<ConfigAdaptiveDialect>,
-  input: Readonly<AdaptiveGroupStaleInput>,
-): boolean {
-  if (input.editorMode === "advanced" || !input.enabled) return false;
-  if (canonicalAdaptiveGroupNames(dialect, input.config.groups ?? []).length === 0) return false;
-  if (!input.nodeNames) return true;
-  const generation = generateAdaptiveGroups(
-    dialect,
-    input.nodeNames,
-    input.options,
-    input.namingLocale,
-  );
-  const result = mergeAdaptiveGroups(dialect, input.config, generation);
-  return result.changed
-    || result.warnings.some((warning) => warning.code === "referenced_stale_group");
 }
 
 function isAdaptiveGroupType(

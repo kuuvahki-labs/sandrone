@@ -114,7 +114,6 @@ describe("config file workbench integration", { timeout: 20_000 }, () => {
     });
 
     expect(await screen.findByText("Loaded 1 nodes")).toBeInTheDocument();
-    await user.click(screen.getByRole("checkbox", { name: "Generate adaptive groups" }));
     await user.click(screen.getByRole("button", { name: "Generate adaptive groups" }));
     expect(screen.getByRole("button", { name: "Expand proxy group Hong Kong" }))
       .toBeInTheDocument();

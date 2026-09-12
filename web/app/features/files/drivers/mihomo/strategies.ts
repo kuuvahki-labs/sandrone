@@ -235,7 +235,6 @@ function mihomoAdaptive(dialect: ConfigAdaptiveDialect): ConfigAdaptiveStrategy 
   const helpers = adaptiveGroupHelpers(dialect);
   const strategy: ConfigAdaptiveStrategy = {
     ...helpers,
-    isStale: () => false,
     recognizesCanonicalLayer: (config) => helpers.recognizeOptions(config.groups ?? []) !== null,
   };
   return Object.freeze(strategy);

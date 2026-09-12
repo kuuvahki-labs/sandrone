@@ -1,7 +1,6 @@
 import {
   type AdaptiveGroupAnchorProblem,
   adaptiveGroupHelpers,
-  adaptiveGroupsAreStale,
   type ConfigAdaptiveDialect,
 } from "~/features/files/config/model/adaptive-groups";
 import { CANONICAL_ADAPTIVE_GROUP_DEFINITIONS } from "~/features/files/config/model/adaptive-regions";
@@ -287,7 +286,6 @@ function singBoxAdaptive(dialect: ConfigAdaptiveDialect): ConfigAdaptiveStrategy
   const helpers = adaptiveGroupHelpers(dialect);
   const strategy: ConfigAdaptiveStrategy = {
     ...helpers,
-    isStale: (input) => adaptiveGroupsAreStale(dialect, input),
     recognizesCanonicalLayer: (config) => helpers.recognizeOptions(config.groups ?? []) !== null,
   };
   return Object.freeze(strategy);

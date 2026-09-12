@@ -288,7 +288,6 @@ function shadowrocketAdaptive(dialect: ConfigAdaptiveDialect): ConfigAdaptiveStr
   const helpers = adaptiveGroupHelpers(dialect);
   const strategy: ConfigAdaptiveStrategy = {
     ...helpers,
-    isStale: () => false,
     recognizesCanonicalLayer: (config) => helpers.recognizeOptions(config.groups ?? []) !== null,
   };
   return Object.freeze(strategy);

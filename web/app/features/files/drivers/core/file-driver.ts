@@ -3,7 +3,6 @@ import type {
   AdaptiveGroupGeneration,
   AdaptiveGroupMergeResult,
   AdaptiveGroupOptions,
-  AdaptiveGroupStaleInput,
   AdaptiveGroupStripResult,
 } from "~/features/files/config/model/adaptive-groups";
 import type {
@@ -59,7 +58,6 @@ export interface ConfigAdaptiveStrategy {
     options: Readonly<AdaptiveGroupOptions>,
     namingLocale?: ConfigNamingLocale,
   ) => AdaptiveGroupGeneration;
-  isStale: (input: Readonly<AdaptiveGroupStaleInput>) => boolean;
   merge: (
     config: Readonly<FileConfigDraft>,
     generation: Readonly<AdaptiveGroupGeneration>,

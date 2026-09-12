@@ -66,7 +66,6 @@ export const fileZhCN = {
   "files.form.sourceJsonInvalid": "基础内容必须是有效的 JSON。",
   "files.form.sourceJsonObjectRequired": "基础内容必须是 JSON 对象。",
   "files.form.sourceRemoteURLInvalid": "请输入 HTTP(S) 地址。",
-  "files.config.adaptiveStale": "sing-box 自适应分组与当前节点预览不一致，请重新生成后再保存。",
   "files.config.adaptiveProxyTypeInvalid": "sing-box 的 Proxy 主组必须是 selector。",
   "files.config.multipleSubscriptions": "此文件引用了多个订阅（{names}）。请先创建集合订阅，才能保存。",
   "files.config.rawSettings": "原始 settings JSON",

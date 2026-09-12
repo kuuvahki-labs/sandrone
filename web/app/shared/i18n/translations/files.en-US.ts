@@ -66,7 +66,6 @@ export const fileEnUS = {
   "files.form.sourceJsonInvalid": "The base content must be valid JSON.",
   "files.form.sourceJsonObjectRequired": "The base content must be a JSON object.",
   "files.form.sourceRemoteURLInvalid": "Enter an HTTP(S) URL.",
-  "files.config.adaptiveStale": "Adaptive sing-box groups no longer match the current node preview. Regenerate them before saving.",
   "files.config.adaptiveProxyTypeInvalid": "The sing-box Proxy group must be a selector.",
   "files.config.multipleSubscriptions": "This file references multiple subscriptions ({names}). Create a collection subscription before saving.",
   "files.config.rawSettings": "Raw settings JSON",

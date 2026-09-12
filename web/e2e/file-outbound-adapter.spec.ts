@@ -181,16 +181,15 @@ test("new sing-box saves an explicit default in the adapter and reopens a missin
   await captureEvidence(page, testInfo, "sing-box-reopened.png", issues, api);
 });
 
-test("generated Mihomo regions restore their switch, selection and group type after saving", async ({ page }, testInfo) => {
+test("Mihomo regions generate directly and restore selection and group type after saving", async ({ page }, testInfo) => {
   const issues = collectConsoleIssues(page);
   const api = await mockFileAPI(page);
   await page.goto("/files/new?source=mihomo");
   await assertPageIdentity(page, "New file");
   const controls = page.getByRole("group", { name: "Adaptive groups", exact: true });
-  const enabled = controls.getByRole("checkbox", { name: "Generate adaptive groups", exact: true });
-  await expect(enabled).not.toBeChecked();
+  await expect(controls.getByRole("checkbox", { name: "Generate adaptive groups", exact: true })).toHaveCount(0);
+  await expect(controls.getByRole("button", { name: "Generate adaptive groups", exact: true })).toBeEnabled();
   const initialConfig = await page.locator('input[name="config"]').inputValue();
-  await enabled.check();
   await controls.getByRole("combobox", { name: "Proxy group type", exact: true }).click();
   await page.getByRole("option", { name: "load-balance", exact: true }).click();
   await controls.getByRole("button", { name: /^Groups to generate/ }).click();
@@ -209,19 +208,51 @@ test("generated Mihomo regions restore their switch, selection and group type af
 
   await page.reload();
   await assertPageIdentity(page, "Edit file");
-  await expect(enabled).toBeChecked();
   await expect(controls.getByRole("combobox", { name: "Proxy group type", exact: true })).toHaveText("load-balance");
   await controls.getByRole("button", { name: /^Groups to generate/ }).click();
   await expect(controls.getByRole("checkbox", { name: /^Hong Kong/ })).toBeChecked();
   await expect(controls.getByRole("checkbox", { name: /^Japan/ })).not.toBeChecked();
-  await expect(controls.getByRole("checkbox", { checked: true })).toHaveCount(2);
+  await expect(controls.getByRole("checkbox", { checked: true })).toHaveCount(1);
   expect(api.subscriptionPreviews).toBe(0);
   expect(api.specReads.filter((name) => name === "mihomo.yaml").length).toBeGreaterThanOrEqual(2);
   const savedGroups = api.saves[0].config.settings.groups;
-  await enabled.uncheck();
+  await controls.getByRole("checkbox", { name: /^Japan/ }).check();
   expect(JSON.parse(await page.locator('input[name="config"]').inputValue()).settings.groups).toEqual(savedGroups);
-  await expect(controls.getByRole("button", { name: "Regenerate adaptive groups", exact: true })).toBeDisabled();
-  await enabled.check();
+  await expect(controls.getByRole("button", { name: "Regenerate adaptive groups", exact: true })).toBeEnabled();
   await controls.scrollIntoViewIfNeeded();
   await captureEvidence(page, testInfo, "mihomo-regions-reopened.png", issues, api);
+});
+
+test("sing-box generator option changes leave existing regex groups saveable", async ({ page }, testInfo) => {
+  const issues = collectConsoleIssues(page);
+  const api = await mockFileAPI(page);
+  await page.goto("/files/new?source=sing-box");
+  await assertPageIdentity(page, "New file");
+  await page.getByRole("combobox", { name: "Subscription", exact: true }).click();
+  await page.getByRole("option", { name: "provider", exact: true }).click();
+  await expect(page.getByText("Loaded 1 nodes", { exact: true })).toBeVisible();
+  const controls = page.getByRole("group", { name: "Adaptive groups", exact: true });
+  await controls.getByRole("button", { name: "Generate adaptive groups", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Expand proxy group Hong Kong", exact: true })).toBeVisible();
+  const config = await page.locator('input[name="config"]').inputValue();
+
+  await controls.getByRole("combobox", { name: "Proxy group type", exact: true }).click();
+  await page.getByRole("option", { name: "selector", exact: true }).click();
+  await controls.getByRole("button", { name: /^Groups to generate/ }).click();
+  await controls.getByRole("button", { name: "Clear", exact: true }).click();
+  await controls.getByRole("checkbox", { name: /^Japan/ }).check();
+  expect(await page.locator('input[name="config"]').inputValue()).toBe(config);
+  await expect(page.getByRole("button", { name: "Save file", exact: true })).toBeEnabled();
+  await page.getByRole("button", { name: "Save file", exact: true }).click();
+  await expect(page).toHaveURL(/\/files\/sing-box\.json\/edit$/);
+  await page.reload();
+  await assertPageIdentity(page, "Edit file");
+  expect(api.saves[0].config).toEqual(JSON.parse(config));
+  await expect(controls.getByRole("combobox", { name: "Proxy group type", exact: true })).toHaveText("urltest");
+  await controls.getByRole("button", { name: /^Groups to generate/ }).click();
+  await expect(controls.getByRole("checkbox", { name: /^Hong Kong/ })).toBeChecked();
+  await expect(controls.getByRole("checkbox", { name: /^Japan/ })).not.toBeChecked();
+  await expect(page.getByRole("button", { name: "Save file", exact: true })).toBeEnabled();
+  await controls.scrollIntoViewIfNeeded();
+  await captureEvidence(page, testInfo, "sing-box-regions-reopened.png", issues, api);
 });
