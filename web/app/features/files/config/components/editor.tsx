@@ -48,6 +48,8 @@ import { RuleListEditor, RuleSetListEditor } from "./rule-editor";
 import { type LoadRuleSetCatalog, RuleSetCatalogDialog } from "./rule-set-catalog-dialog";
 import { ConfigTemplateAppliedNotice, type ConfigTemplateChoice, ConfigTemplatePicker, type ConfigTemplatePickerCopy } from "./template-picker";
 
+const DEFAULT_EXPANDED_COLLECTION_LIMIT = 10;
+
 export interface FileConfigEditorProps {
   adapter: StructuredFileConfigurationAdapter;
   allowSubscriptions?: boolean;
@@ -335,15 +337,15 @@ export function FileConfigEditor({ adapter, allowSubscriptions = true, baseEdito
       {editorMode === "advanced" ? <Alert severity="warning"><Typography className="font-semibold" component="p" variant="body2">{t("files.config.rawConfig")}</Typography>{t("files.config.advancedUnsupported")}</Alert> : null}
       {editorMode === "wizard" ? (
         <>
-          <ProxyGroupEditor adapter={adapter} defaultExpanded={!configurationEmpty} groups={groups} inboundReferences={relationModel.groupInboundReferences} issues={groupIssues} key={`groups-${structureRevision}`} namingLocale={namingLocale} nodes={nodeOptions ?? []} ui={ui} onChange={(value) => updateEditorState({ type: "change-groups", groups: value })} />
-          <RuleSetListEditor adapter={adapter} defaultExpanded={!configurationEmpty} inboundReferences={relationModel.ruleSetInboundReferences} issues={ruleSetIssues} key={`rule-sets-${structureRevision}`} ruleSets={ruleSets} ui={ui} onChange={(value) => updateEditorState({ type: "change-rule-sets", ruleSets: value })} onOpenCatalog={loadRuleSetCatalog ? () => setCatalogOpen(true) : undefined} />
-          <RuleListEditor adapter={adapter} defaultExpanded={!configurationEmpty} groups={groups} issues={ruleIssues} key={`rules-${structureRevision}`} namingLocale={namingLocale} nodes={nodeOptions ?? []} rules={rules} ruleSets={ruleSets} ui={ui} onChange={(value) => updateEditorState({ type: "change-rules", rules: value })} />
+          <ProxyGroupEditor adapter={adapter} defaultExpanded={!configurationEmpty && collectionExpandsByDefault(groups.length)} groups={groups} inboundReferences={relationModel.groupInboundReferences} issues={groupIssues} key={`groups-${structureRevision}`} namingLocale={namingLocale} nodes={nodeOptions ?? []} ui={ui} onChange={(value) => updateEditorState({ type: "change-groups", groups: value })} />
+          <RuleSetListEditor adapter={adapter} defaultExpanded={!configurationEmpty && collectionExpandsByDefault(ruleSets.length)} inboundReferences={relationModel.ruleSetInboundReferences} issues={ruleSetIssues} key={`rule-sets-${structureRevision}`} ruleSets={ruleSets} ui={ui} onChange={(value) => updateEditorState({ type: "change-rule-sets", ruleSets: value })} onOpenCatalog={loadRuleSetCatalog ? () => setCatalogOpen(true) : undefined} />
+          <RuleListEditor adapter={adapter} defaultExpanded={!configurationEmpty && collectionExpandsByDefault(rules.length)} groups={groups} issues={ruleIssues} key={`rules-${structureRevision}`} namingLocale={namingLocale} nodes={nodeOptions ?? []} rules={rules} ruleSets={ruleSets} ui={ui} onChange={(value) => updateEditorState({ type: "change-rules", rules: value })} />
         </>
       ) : (
         <>
-          <RawListSection defaultExpanded error={advancedGroups.error} id="config-proxy-groups" label={t("files.config.proxyGroups")} textLabel={t("files.config.groupsRaw")} value={groupsText} onChange={(text) => updateEditorState({ type: "change-advanced-groups", text })} />
-          <RawListSection defaultExpanded error={advancedRuleSets.error} id="config-rule-sets" label={t("files.config.ruleSets")} textLabel={t("files.config.ruleSetsRaw")} value={ruleSetsText} onChange={(text) => updateEditorState({ type: "change-advanced-rule-sets", text })} />
-          <RawListSection defaultExpanded error={advancedRules.error} id="config-routing-rules" label={t("files.config.rules")} textLabel={t("files.config.rulesRaw")} value={rulesText} onChange={(text) => updateEditorState({ type: "change-advanced-rules", text })} />
+          <RawListSection defaultExpanded={collectionExpandsByDefault(advancedGroups.value?.length)} error={advancedGroups.error} id="config-proxy-groups" label={t("files.config.proxyGroups")} textLabel={t("files.config.groupsRaw")} value={groupsText} onChange={(text) => updateEditorState({ type: "change-advanced-groups", text })} />
+          <RawListSection defaultExpanded={collectionExpandsByDefault(advancedRuleSets.value?.length)} error={advancedRuleSets.error} id="config-rule-sets" label={t("files.config.ruleSets")} textLabel={t("files.config.ruleSetsRaw")} value={ruleSetsText} onChange={(text) => updateEditorState({ type: "change-advanced-rule-sets", text })} />
+          <RawListSection defaultExpanded={collectionExpandsByDefault(advancedRules.value?.length)} error={advancedRules.error} id="config-routing-rules" label={t("files.config.rules")} textLabel={t("files.config.rulesRaw")} value={rulesText} onChange={(text) => updateEditorState({ type: "change-advanced-rules", text })} />
         </>
       )}
       {loadRuleSetCatalog && adapter.catalogTarget ? (
@@ -393,6 +395,10 @@ const emptySubscriptionPreview: LoadSubscriptionPreview = async (name: string) =
   nodes: [],
   warnings: [],
 });
+
+function collectionExpandsByDefault(count?: number): boolean {
+  return count === undefined || count <= DEFAULT_EXPANDED_COLLECTION_LIMIT;
+}
 
 function RawListSection({ defaultExpanded, error, id, label, onChange, textLabel, value }: {
   defaultExpanded?: boolean; error?: string; id: string; label: string; onChange: (value: string) => void; textLabel: string; value: string;

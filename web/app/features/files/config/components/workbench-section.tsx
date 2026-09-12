@@ -11,6 +11,7 @@ import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
 
 import { useI18n } from "~/shared/i18n/context";
+import { CountBadge } from "~/shared/ui/count-badge";
 
 export type ConfigWorkbenchSectionSeverity = "default" | "success" | "warning" | "error";
 
@@ -68,15 +69,11 @@ export function ConfigWorkbenchSection({
 
   const headerContent = (
     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5" data-slot="section-info">
-      <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+      <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5">
         <Typography className="min-w-0 font-semibold" component="span" variant="body2">
           {label}
         </Typography>
-        {count !== undefined ? (
-          <Typography className="shrink-0 rounded-full bg-action-hover px-2 py-0.5" color="text.secondary" component="span" variant="caption">
-            {count}
-          </Typography>
-        ) : null}
+        {count !== undefined ? <CountBadge count={count} /> : null}
         {summary !== undefined && summary !== null ? (
           <Typography className="min-w-0 truncate max-sm:basis-full" color="text.secondary" component="span" variant="caption">
             {summary}

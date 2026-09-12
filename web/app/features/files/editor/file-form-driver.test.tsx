@@ -94,6 +94,8 @@ describe("file form drivers", () => {
     expect(include).toHaveValue(".*");
     const preset = requireFileDriver("sing-box").processors.presets.find((entry) => entry.id === "outbound-adapter")!;
     await waitFor(() => expect(currentProcessors()).toHaveLength(2));
+    expect(screen.getByRole("group", { name: "File processing" })
+      .querySelector('[data-slot="count-badge"]')).toHaveTextContent("2");
     expect(preset.recognize(currentProcessors()[0] as ProcessorDetail)).toBe(true);
     expect(currentProcessors()[1]).toEqual(custom);
     fireEvent.change(include, { target: { value: "(?i)HK|香港" } });
@@ -102,6 +104,8 @@ describe("file form drivers", () => {
     const processorGroup = screen.getByRole("group", { name: /Outbound configuration adaptation/ });
     await user.click(within(processorGroup).getByRole("button", { name: "Delete processor" }));
     await waitFor(() => expect(currentProcessors()).toEqual([custom]));
+    expect(screen.getByRole("group", { name: "File processing" })
+      .querySelector('[data-slot="count-badge"]')).toHaveTextContent("1");
     expect(screen.getByText(/Regex groups need the enabled/)).toBeInTheDocument();
     await waitFor(() => expect(onValidityChange).toHaveBeenLastCalledWith(true));
     fireEvent.change(include, { target: { value: "JP" } });

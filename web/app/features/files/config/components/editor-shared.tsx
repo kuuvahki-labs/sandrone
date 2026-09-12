@@ -109,10 +109,12 @@ export function ConfigRowDisclosure({ children, contentID, expanded, label, onTo
       type="button"
       onClick={onToggle}
     >
-      {expanded
-        ? <KeyboardArrowDownIcon aria-hidden fontSize="small" />
-        : <KeyboardArrowRightIcon aria-hidden fontSize="small" />}
       {children}
+      <span aria-hidden className="flex shrink-0 text-text-secondary" data-slot="disclosure-indicator">
+        {expanded
+          ? <KeyboardArrowDownIcon fontSize="small" />
+          : <KeyboardArrowRightIcon fontSize="small" />}
+      </span>
     </button>
   );
 }

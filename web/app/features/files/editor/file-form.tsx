@@ -154,7 +154,7 @@ export function FileFormFields({ configDefault, defaultName, description = "", d
           <FileSourceEditor defaultValue={sourceDefault} key={sourceEditorKey} onDirty={onDirty} remoteDefaults={remoteDefaults} />
         </WorkbenchGroupSection>
       )}
-      <WorkbenchGroupSection keepMounted defaultExpanded headerActionsBeforeToggle headerActions={<span ref={setProcessorActionsContainer} />} id="file-processors" label={t("files.form.processors")}>
+      <WorkbenchGroupSection keepMounted count={currentProcessors.length} defaultExpanded headerActionsBeforeToggle headerActions={<span ref={setProcessorActionsContainer} />} id="file-processors" label={t("files.form.processors")}>
         {missingProcessorPresets.map((preset) => <Alert key={preset.id} severity="warning">{t(preset.configurationUse!.missingNoticeKey)}</Alert>)}
         {processorConfigurationNotices.map((notice, index) => <Alert key={`${notice.messageKey}-${index}`} severity="warning">{t(notice.messageKey, notice.params)}</Alert>)}
         <FileProcessorBuilder actionsContainer={processorActionsContainer} ref={processorBuilderRef} onValueChange={handleProcessorsChange} defaultValue={initialProcessors} key={driver.kind} kind={driver.kind} onDirty={onDirty} onValidityChange={setProcessorsValid} remoteDefaults={remoteDefaults} scriptFiles={scriptFiles} scriptTimeoutMS={scriptTimeoutMS} />

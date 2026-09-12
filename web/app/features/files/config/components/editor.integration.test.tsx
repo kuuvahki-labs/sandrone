@@ -131,7 +131,7 @@ describe("config file workbench integration", { timeout: 20_000 }, () => {
     expect(policyOption).not.toHaveTextContent(/ss|node-1\.example:8388/);
   });
 
-  it("keeps a large rule-set collection expanded by default", () => {
+  it("collapses configuration collections with more than ten entries by default", () => {
     localStorage.setItem("sandrone.locale", "en-US");
     const adapter = structuredAdapter("shadowrocket");
 
@@ -140,8 +140,10 @@ describe("config file workbench integration", { timeout: 20_000 }, () => {
       defaultValue: adapter.templates.create("full"),
     });
 
-    expect(screen.getByRole("button", { name: "Rule sets" }))
-      .toHaveAttribute("aria-expanded", "true");
+    for (const section of ["Proxy groups", "Rule sets", "Rules"]) {
+      expect(screen.getByRole("button", { name: section }))
+        .toHaveAttribute("aria-expanded", "false");
+    }
   });
 
   it("restores catalog state after a template round trip and reports adaptive changes", async () => {

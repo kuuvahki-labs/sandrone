@@ -6,6 +6,8 @@ import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
 import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 import Button from "@mui/material/Button";
 import Collapse from "@mui/material/Collapse";
@@ -114,6 +116,7 @@ export function ProcessorEditorList({
   const [drafts, setDrafts] = useState(() => draftProcessors ? draftProcessors(defaultValue) : defaultValue.map((processor, index) => draftFromProcessor(processor, index, createDraftId)));
   const [newType, setNewType] = useState(defaultType);
   const [editingIds, setEditingIds] = useState<Set<string>>(() => new Set());
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set(drafts.map((draft) => draft.id)));
   const processors = useMemo(() => drafts.map((draft) => draft.imported ?? serializeDraft(draft)), [drafts, serializeDraft]);
   const serialized = useMemo(() => JSON.stringify(processors), [processors]);
 
@@ -147,20 +150,25 @@ export function ProcessorEditorList({
 
   function importProcessors(imported: ProcessorDetail[]) {
     const additions = draftProcessors ? draftProcessors(imported) : imported.map((processor, index) => draftFromProcessor(processor, index, createDraftId));
-    commitDrafts([...drafts, ...additions.map((draft, index) => ({ ...draft, id: createDraftId(), imported: imported[index] }))]);
+    const importedDrafts = additions.map((draft, index) => ({ ...draft, id: createDraftId(), imported: imported[index] }));
+    expandDrafts(importedDrafts);
+    commitDrafts([...drafts, ...importedDrafts]);
   }
 
   function addProcessor() {
-    commitDrafts(addProcessorDrafts ? addProcessorDrafts(newType, drafts) : [...drafts, {
+    const nextDrafts = addProcessorDrafts ? addProcessorDrafts(newType, drafts) : [...drafts, {
       enabled: true,
       id: createDraftId(),
       name: "",
       type: newType,
       params: defaultParams(newType),
-    }]);
+    }];
+    expandDrafts(nextDrafts.filter((draft) => !drafts.some((current) => current.id === draft.id)));
+    commitDrafts(nextDrafts);
   }
 
   function toggleEditor(id: string) {
+    if (!editingIds.has(id)) expandDrafts([{ id }]);
     setEditingIds((current) => {
       const next = new Set(current);
       if (next.has(id)) {
@@ -168,6 +176,27 @@ export function ProcessorEditorList({
       } else {
         next.add(id);
       }
+      return next;
+    });
+  }
+
+  function toggleProcessor(id: string) {
+    setExpandedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
+
+  function expandDrafts(values: ReadonlyArray<Pick<ProcessorDraft, "id">>) {
+    if (!values.length) return;
+    setExpandedIds((current) => {
+      const next = new Set(current);
+      for (const value of values) next.add(value.id);
       return next;
     });
   }
@@ -187,6 +216,11 @@ export function ProcessorEditorList({
       next.delete(id);
       return next;
     });
+    setExpandedIds((current) => {
+      const next = new Set(current);
+      next.delete(id);
+      return next;
+    });
   }
 
   function commitDrafts(next: ProcessorDraft[]) {
@@ -196,7 +230,11 @@ export function ProcessorEditorList({
   }
 
   useImperativeHandle(ref, () => ({
-    updateDrafts: (update) => commitDrafts(update(drafts)),
+    updateDrafts: (update) => {
+      const nextDrafts = update(drafts);
+      expandDrafts(nextDrafts.filter((draft) => !drafts.some((current) => current.id === draft.id)));
+      commitDrafts(nextDrafts);
+    },
   }));
 
   return (
@@ -209,21 +247,37 @@ export function ProcessorEditorList({
             const typeLabel = labelForType(draft.type);
             const displayName = processorDisplayName(draft, index, labelForType, t);
             const isEditing = editingIds.has(draft.id);
+            const isExpanded = expandedIds.has(draft.id);
             const editorId = `${draft.id}-name-editor`;
+            const processorBodyId = `${draft.id}-body`;
             const groupLabel = customProcessorName(draft, labelForType) ? displayName : typeLabel;
             const enabledActionLabel = t(draft.enabled ? "processor.disable" : "processor.enable", { label: displayName });
             return (
               <Paper aria-label={t("processor.group", { label: groupLabel })} className="p-4" component="section" key={draft.id} role="group" variant="outlined">
-                <div className="grid gap-4">
-                  <div className="flex min-w-0 items-start justify-between gap-2 sm:items-center">
-                    <div className="min-w-0">
-                      <Typography className="break-words" component="h4" variant="subtitle1">
-                        {displayName}
-                      </Typography>
-                      <Typography className="break-words" color="text.secondary" variant="body2">
-                        {typeLabel}
-                      </Typography>
-                    </div>
+                <div>
+                  <div className="flex min-w-0 items-center justify-between gap-2">
+                    <button
+                      aria-controls={processorBodyId}
+                      aria-expanded={isExpanded}
+                      aria-label={t(isExpanded ? "processor.collapse" : "processor.expand", { label: displayName })}
+                      className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-sm text-left focus-visible:outline-2 focus-visible:outline-offset-2"
+                      type="button"
+                      onClick={() => toggleProcessor(draft.id)}
+                    >
+                      <span className="min-w-0 flex-1">
+                        <Typography className="break-words" component="span" variant="subtitle1">
+                          {displayName}
+                        </Typography>
+                        <Typography className="block break-words" color="text.secondary" component="span" variant="body2">
+                          {typeLabel}
+                        </Typography>
+                      </span>
+                      <span aria-hidden className="flex shrink-0 text-text-secondary" data-slot="disclosure-indicator">
+                        {isExpanded
+                          ? <KeyboardArrowDownIcon fontSize="small" />
+                          : <KeyboardArrowRightIcon fontSize="small" />}
+                      </span>
+                    </button>
                     <div className="flex shrink-0 items-center gap-1">
                       <Tooltip title={enabledActionLabel}>
                         <IconButton aria-label={t("processor.toggleEnabled", { label: displayName })} aria-pressed={draft.enabled} color={draft.enabled ? "primary" : "default"} size="small" type="button" onClick={() => updateDraft(index, { enabled: !draft.enabled })}>
@@ -285,15 +339,19 @@ export function ProcessorEditorList({
                       </div>
                     </div>
                   </div>
-                  <Collapse id={editorId} in={isEditing} timeout="auto" unmountOnExit>
-                    <div className="pt-2">
-                      <TextField fullWidth label={t("labels.name")} placeholder={t("processor.namePlaceholder")} value={draft.name} onChange={(event) => updateDraft(index, { name: event.target.value })} />
+                  <Collapse id={processorBodyId} in={isExpanded} timeout="auto" unmountOnExit>
+                    <div className="grid gap-4 pt-4">
+                      <Collapse id={editorId} in={isEditing} timeout="auto" unmountOnExit>
+                        <div className="pt-2">
+                          <TextField fullWidth label={t("labels.name")} placeholder={t("processor.namePlaceholder")} value={draft.name} onChange={(event) => updateDraft(index, { name: event.target.value })} />
+                        </div>
+                      </Collapse>
+                      <Divider />
+                      <div className="grid gap-4 md:grid-cols-2">
+                        {paramsEditor({ draft, onChange: (patch) => updateParams(index, patch) })}
+                      </div>
                     </div>
                   </Collapse>
-                  <Divider />
-                  <div className="grid gap-4 md:grid-cols-2">
-                    {paramsEditor({ draft, onChange: (patch) => updateParams(index, patch) })}
-                  </div>
                 </div>
               </Paper>
             );

@@ -431,6 +431,39 @@ test("sing-box regex groups add a visible processor and allow its removal", asyn
   expect(errors).toEqual([]);
 });
 
+test("large configuration collections start collapsed and remain available", async ({ page }) => {
+  const consoleIssues: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error" || message.type() === "warning") {
+      consoleIssues.push(`${message.type()}: ${message.text()}`);
+    }
+  });
+  await page.goto("/files/new?source=mihomo");
+  await page.getByRole("radio", { name: "完整", exact: true }).click();
+  await expect(page.getByRole("group", { name: "文件处理", exact: true })
+    .locator('[data-slot="count-badge"]')).toHaveText("2");
+
+  const sectionLabels = ["代理组", "规则集", "规则策略"];
+  for (const section of sectionLabels) {
+    await expect(page.getByRole("button", { name: section, exact: true }))
+      .toHaveAttribute("aria-expanded", "false");
+  }
+  const statusCenters = await Promise.all(sectionLabels.map(async (section) => {
+    const bounds = await page.getByRole("button", { name: section, exact: true })
+      .locator('[data-slot="section-status"]')
+      .boundingBox();
+    return Math.round((bounds?.x ?? 0) + (bounds?.width ?? 0) / 2);
+  }));
+  expect(new Set(statusCenters).size, "section status icons should share one column")
+    .toBe(1);
+
+  const groups = page.getByRole("button", { name: "代理组", exact: true });
+  await groups.click();
+  await expect(groups).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("button", { name: /展开代理组/ }).first()).toBeVisible();
+  expect(consoleIssues).toEqual([]);
+});
+
 test("settings overview opens service settings", async ({ page }) => {
   const consoleIssues: string[] = [];
   page.on("console", (message) => {
@@ -631,8 +664,31 @@ for (const route of routes) {
       await addProcessor.click();
       const processorCards = page.getByRole("group", { name: "处理器 脚本" });
       await expect(processorCards).toHaveCount(2);
+      await expect(page.getByRole("group", { name: "处理链", exact: true })
+        .locator('[data-slot="count-badge"]')).toHaveText("2");
+      const firstProcessor = processorCards.nth(0);
       const secondProcessor = processorCards.nth(1);
+      const firstDisclosure = firstProcessor.getByRole("button", { name: "收起处理器 1" });
+      const secondDisclosure = secondProcessor.getByRole("button", { name: "收起处理器 2" });
+      await firstDisclosure.click();
+      await expect(firstProcessor.getByRole("button", { name: "展开处理器 1" }))
+        .toHaveAttribute("aria-expanded", "false");
+      await expect(secondDisclosure).toHaveAttribute("aria-expanded", "true");
       const enabledButton = secondProcessor.getByRole("button", { name: "启用 处理器 2" });
+      for (const [card, disclosure, enabled] of [
+        [firstProcessor, firstProcessor.getByRole("button", { name: "展开处理器 1" }), firstProcessor.getByRole("button", { name: "启用 处理器 1" })],
+        [secondProcessor, secondDisclosure, enabledButton],
+      ] as const) {
+        const [disclosureBounds, enabledBounds] = await Promise.all([
+          disclosure.boundingBox(),
+          enabled.boundingBox(),
+        ]);
+        const disclosureCenter = (disclosureBounds?.y ?? 0) + (disclosureBounds?.height ?? 0) / 2;
+        const enabledCenter = (enabledBounds?.y ?? 0) + (enabledBounds?.height ?? 0) / 2;
+        expect(Math.abs(disclosureCenter - enabledCenter), "processor header icons should be vertically centered")
+          .toBeLessThanOrEqual(1);
+        await expect(card.locator('[data-slot="disclosure-indicator"]')).toBeVisible();
+      }
       await expect(enabledButton).toHaveAttribute("aria-pressed", "true");
       await enabledButton.click();
       await expect(enabledButton).toHaveAttribute("aria-pressed", "false");

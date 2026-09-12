@@ -82,6 +82,38 @@ describe("processor clipboard transfer", () => {
   });
 });
 
+describe("processor card disclosure", () => {
+  it("collapses and expands each processor independently without losing its draft", async () => {
+    const user = userEvent.setup();
+    render(<Harness defaultValue={[
+      existing,
+      { type: "script", stage: "file", params: { code: "second" } },
+    ]} />);
+
+    const cards = screen.getAllByRole("group", { name: "处理器 脚本" });
+    const firstToggle = within(cards[0]).getByRole("button", { name: "收起处理器 1" });
+    const secondToggle = within(cards[1]).getByRole("button", { name: "收起处理器 2" });
+    expect(firstToggle).toHaveAttribute("aria-expanded", "true");
+    expect(secondToggle).toHaveAttribute("aria-expanded", "true");
+    expect(within(cards[0]).getByText("处理器 1").compareDocumentPosition(
+      firstToggle.querySelector('[data-slot="disclosure-indicator"]')!,
+    )).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+
+    await user.click(firstToggle);
+
+    expect(within(cards[0]).getByRole("button", { name: "展开处理器 1" }))
+      .toHaveAttribute("aria-expanded", "false");
+    expect(within(cards[0]).queryByRole("textbox", { name: "Code" }))
+      .not.toBeInTheDocument();
+    expect(within(cards[1]).getByRole("textbox", { name: "Code" }))
+      .toHaveValue("second");
+
+    await user.click(within(cards[0]).getByRole("button", { name: "展开处理器 1" }));
+    expect(within(cards[0]).getByRole("textbox", { name: "Code" }))
+      .toHaveValue("existing");
+  });
+});
+
 function setClipboard(value: unknown) {
   Object.defineProperty(navigator, "clipboard", { configurable: true, value });
 }
@@ -90,12 +122,12 @@ function currentProcessors(): ProcessorDetail[] {
   return JSON.parse(document.querySelector<HTMLInputElement>('input[name="processors"]')!.value) as ProcessorDetail[];
 }
 
-function Harness({ onDirty }: { onDirty?: () => void }) {
+function Harness({ defaultValue = [existing], onDirty }: { defaultValue?: ProcessorDetail[]; onDirty?: () => void }) {
   return <ProcessorEditorList
     createDraftId={() => createProcessorDraftId("test")}
     defaultParams={() => ({ code: "new" })}
     defaultType="script"
-    defaultValue={[existing]}
+    defaultValue={defaultValue}
     paramsEditor={({ draft, onChange }) => <label>Code<input value={String(draft.params.code ?? "")} onChange={(event) => onChange({ code: event.target.value })} /></label>}
     processorOptions={[{ value: "script", label: "脚本" }]}
     serializeDraft={(draft) => ({ type: draft.type, stage: "file", params: draft.params })}

@@ -186,7 +186,8 @@ describe("SubscriptionEditPage", () => {
     expect(screen.queryByRole("group", { name: "处理器 快捷设置" })).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "第 1 个处理器类型" })).not.toBeInTheDocument();
     const renamedProcessorGroup = screen.getByRole("group", { name: "处理器 入口重命名" });
-    expect(within(renamedProcessorGroup).getByRole("heading", { name: "入口重命名" })).toBeInTheDocument();
+    expect(within(renamedProcessorGroup).getByRole("button", { name: "收起入口重命名" }))
+      .toHaveTextContent("入口重命名");
     expect(within(renamedProcessorGroup).getByText("名称处理")).toBeInTheDocument();
     expect(within(renamedProcessorGroup).queryByRole("textbox", { name: "名称" })).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "第 2 个处理器类型" })).not.toBeInTheDocument();
@@ -199,6 +200,8 @@ describe("SubscriptionEditPage", () => {
 
     const sourceInfo = screen.getByRole("group", { name: "基本信息" });
     const processorRules = screen.getByRole("group", { name: "处理链" });
+    expect(within(processorRules).getByText("1"))
+      .toHaveAttribute("data-slot", "count-badge");
     expect(Boolean(sourceInfo.compareDocumentPosition(processorRules) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
     expect(within(sourceInfo).getByRole("textbox", { name: "名称" })).toHaveValue("provider");
     expect(within(sourceInfo).getByRole("textbox", { name: "名称" })).toBeDisabled();

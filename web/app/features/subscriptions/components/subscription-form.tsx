@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useId, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useId, useMemo, useState } from "react";
 import AccountTreeOutlinedIcon from "@mui/icons-material/AccountTreeOutlined";
 import CloudDownloadOutlinedIcon from "@mui/icons-material/CloudDownloadOutlined";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
@@ -18,9 +18,10 @@ import type { SubscriptionDefinition, SubscriptionItem } from "~/features/subscr
 import type { ProbeDefaultsInput } from "~/shared/api/client";
 import { millisecondsToSecondsInput } from "~/shared/api/duration";
 import { useI18n } from "~/shared/i18n/context";
-import type { RemoteInputDefaults, ResourceOption } from "~/shared/resources/types";
+import type { ProcessorDetail, RemoteInputDefaults, ResourceOption } from "~/shared/resources/types";
 import type { SubscriptionCreateType } from "~/shared/routing/paths";
 import { HighlightedTextarea } from "~/shared/ui/code-editor";
+import { CountBadge } from "~/shared/ui/count-badge";
 import { SnapshotCachePolicyField } from "~/shared/ui/snapshot-cache-policy-field";
 
 import { ProcessorBuilder } from "./processor-builder";
@@ -52,6 +53,7 @@ export function SubscriptionFormFields({ definition, item, mode, onCopySource, o
   const description = meta.description ?? item?.description ?? "";
   const displayName = definition?.displayName ?? item?.displayName ?? "";
   const processorDefaultValue = definition?.processors;
+  const [processorCount, setProcessorCount] = useState(() => processorDefaultValue?.length ?? 0);
   const [processorActionsContainer, setProcessorActionsContainer] = useState<HTMLSpanElement | null>(null);
   const originalType = item?.kind;
   const useOriginalTypeFields = !item || type === originalType;
@@ -77,6 +79,10 @@ export function SubscriptionFormFields({ definition, item, mode, onCopySource, o
   function copySourceValue(target: SubscriptionCopyTarget) {
     void onCopySource?.(sourceInputValue, target);
   }
+
+  const handleProcessorsChange = useCallback((processors: ProcessorDetail[]) => {
+    setProcessorCount(processors.length);
+  }, []);
 
   return (
     <div className="grid gap-4">
@@ -168,12 +174,15 @@ export function SubscriptionFormFields({ definition, item, mode, onCopySource, o
       </Paper>
       <Paper aria-label={t("subscriptions.form.processors")} className="m-0 min-w-0 p-4" component="section" role="group" variant="outlined">
         <div className="mb-4 flex min-w-0 items-center justify-between gap-2">
-          <Typography className="font-semibold" component="h3">
-            {t("subscriptions.form.processors")}
-          </Typography>
+          <span className="flex min-w-0 items-center gap-2">
+            <Typography className="font-semibold" component="h3">
+              {t("subscriptions.form.processors")}
+            </Typography>
+            <CountBadge count={processorCount} />
+          </span>
           <span ref={setProcessorActionsContainer} />
         </div>
-        <ProcessorBuilder actionsContainer={processorActionsContainer} defaultValue={processorDefaultValue} onDirty={onDirty} probeCacheTTLSeconds={probeCacheTTLSeconds} probeDefaults={probeDefaults} remoteDefaults={remoteDefaults} scriptFiles={scriptFiles} scriptTimeoutMS={scriptTimeoutMS} />
+        <ProcessorBuilder actionsContainer={processorActionsContainer} defaultValue={processorDefaultValue} onDirty={onDirty} onValueChange={handleProcessorsChange} probeCacheTTLSeconds={probeCacheTTLSeconds} probeDefaults={probeDefaults} remoteDefaults={remoteDefaults} scriptFiles={scriptFiles} scriptTimeoutMS={scriptTimeoutMS} />
       </Paper>
     </div>
   );

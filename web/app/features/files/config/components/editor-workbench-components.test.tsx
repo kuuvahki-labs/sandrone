@@ -268,6 +268,9 @@ describe("config editor disclosure primitives", () => {
     expect(disclosure).toHaveAttribute("aria-controls", "proxy-row-editor");
     expect(disclosure).toHaveAttribute("aria-expanded", "false");
     expect(screen.getByText("Proxy").closest("button")).toBe(disclosure);
+    expect(screen.getByText("Proxy").compareDocumentPosition(
+      disclosure.querySelector('[data-slot="disclosure-indicator"]')!,
+    )).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 
     await user.click(screen.getByText("Proxy"));
     expect(onToggle).toHaveBeenCalledOnce();
