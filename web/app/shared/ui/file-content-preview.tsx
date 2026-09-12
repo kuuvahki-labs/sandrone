@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseFullscreenIcon from "@mui/icons-material/CloseFullscreen";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
@@ -12,6 +12,7 @@ import Typography from "@mui/material/Typography";
 import { useI18n } from "~/shared/i18n/context";
 import { CodeExpansion } from "~/shared/ui/code-expansion";
 import { PrismCode } from "~/shared/ui/code-highlight";
+import { formatCodePreview } from "~/shared/ui/code-preview-format";
 import { type CodeMatch, CodeSearchBar, useCodeSearch } from "~/shared/ui/code-search";
 
 export function FileContentPreview({ label, language, value }: { label: string; language: string; value: string }) {
@@ -21,7 +22,8 @@ export function FileContentPreview({ label, language, value }: { label: string; 
   const copyTimer = useRef<number | undefined>(undefined);
   const scrollRef = useRef<HTMLPreElement>(null);
   const previousQuery = useRef("");
-  const search = useCodeSearch(value);
+  const displayValue = useMemo(() => formatCodePreview(value, language), [value, language]);
+  const search = useCodeSearch(displayValue);
   const copyLabel = copyState === "copied" ? t("actions.copied") : copyState === "failed" ? t("code.copyFailed") : t("actions.copy");
   const expandLabel = t(expanded ? "code.collapsePreview" : "code.expandPreview");
 
@@ -121,7 +123,7 @@ export function FileContentPreview({ label, language, value }: { label: string; 
           className="m-0 min-h-0 min-w-0 flex-1 overflow-auto overscroll-contain whitespace-pre-wrap bg-background-default p-3 text-sm text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
           ref={scrollRef}
         >
-          <PrismCode activeMatch={search.activeMatch} language={language} matches={search.open ? search.matches : undefined} showLineNumbers value={value} wrap />
+          <PrismCode activeMatch={search.activeMatch} language={language} matches={search.open ? search.matches : undefined} showLineNumbers value={displayValue} wrap />
         </pre>
       </Paper>
     </CodeExpansion>

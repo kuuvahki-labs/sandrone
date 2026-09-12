@@ -14,7 +14,7 @@ const settings = {
   subscriptions: { auto_load_traffic: false, ignored_warnings: [] },
 };
 
-async function mockApp(page: Page) {
+async function mockApp(page: Page, content = { body: previewBody, contentType: "application/yaml", name: "reader.yaml" }) {
   let releaseRefresh: (() => void) | undefined;
   let delayRefresh = false;
   const issues: string[] = [];
@@ -34,11 +34,11 @@ async function mockApp(page: Page) {
   });
   await page.route("**/v1/**", async (route) => {
     const url = new URL(route.request().url());
-    if (url.pathname.startsWith("/v1/files/reader.yaml")) {
+    if (url.pathname.startsWith(`/v1/files/${content.name}`)) {
       if (delayRefresh && url.searchParams.has("refresh")) await new Promise<void>((resolve) => { releaseRefresh = resolve; });
-      await route.fulfill({ json: { body: previewBody, content_type: "application/yaml", warnings: [warning] } });
+      await route.fulfill({ json: { body: content.body, content_type: content.contentType, warnings: [warning] } });
     } else if (url.pathname === "/v1/files") {
-      await route.fulfill({ json: { items: [{ name: "reader.yaml", kind: "static", type: "inline" }] } });
+      await route.fulfill({ json: { items: [{ name: content.name, kind: "static", type: "inline" }] } });
     } else if (url.pathname === "/v1/settings") {
       await route.fulfill({ json: { settings, effective: settings, overrides: {}, restart_required: [] } });
     } else if (url.pathname === "/v1/capabilities/ui") {
@@ -118,6 +118,31 @@ test("file preview keeps warnings separate and locates text without moving the p
   await page.keyboard.press("Escape");
   await expect(page.locator("dialog:modal")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "放大预览" })).toBeFocused();
+  expect(app.issues).toEqual([]);
+});
+
+test("compact JSON previews format for reading and search while copying the original output", async ({ page }) => {
+  const outbounds = Array.from({ length: 60 }, (_, index) => ({ tag: `node-${index + 1}`, type: "direct" }));
+  const original = `{"id":9007199254740993,"value":1e3,"value":-0,"outbounds":${JSON.stringify(outbounds)}}`;
+  const app = await mockApp(page, { body: original, contentType: "application/json", name: "reader.json" });
+  await page.goto("/files/reader.json/preview");
+  const body = page.getByRole("region", { name: "最终文件内容", exact: true });
+  const lines = body.locator("[data-code-line-content]");
+  await expect(lines.nth(1)).toContainText('"id": 9007199254740993,');
+  expect((await lines.allTextContents()).slice(0, 7)).toEqual([
+    "{", '  "id": 9007199254740993,', '  "value": 1e3,', '  "value": -0,', '  "outbounds": [', "    {", '      "tag": "node-1",',
+  ]);
+
+  await body.getByRole("button", { name: "查找最终文件内容" }).click();
+  await body.getByRole("searchbox").fill("node-55");
+  const match = body.locator("mark").first();
+  await expect(match).toBeInViewport();
+  await expect(match).toHaveText("node-55");
+  await expect(body.getByRole("status").filter({ hasText: "1 / 1" })).toBeVisible();
+  await body.getByRole("button", { name: "复制最终文件内容" }).click();
+  expect(await page.evaluate(() => sessionStorage.getItem("code-reading-copy"))).toBe(original);
+  await body.getByRole("button", { name: "放大预览" }).click();
+  await expect(page.locator("dialog:modal mark").first()).toBeInViewport();
   expect(app.issues).toEqual([]);
 });
 

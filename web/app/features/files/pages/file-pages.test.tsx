@@ -157,6 +157,37 @@ describe("FilePreviewPage", () => {
     copy.mockRestore();
   });
 
+  it("formats JSON for reading and searching while preserving large numbers and the original copied body", async () => {
+    const user = userEvent.setup();
+    const copy = vi.spyOn(navigator.clipboard, "writeText");
+    const body = '{"id":900719925474099312345,"nested":{"name":"target","alias":"target"}}';
+    const displayed = [
+      "{",
+      '  "id": 900719925474099312345,',
+      '  "nested": {',
+      '    "name": "target",',
+      '    "alias": "target"',
+      "  }",
+      "}",
+    ].join("\n");
+    render(<FilePreviewPage {...pageActions} fileName="config.json" preview={{ body, contentType: "application/json", warnings: [] }} />);
+    const region = screen.getByRole("region", { name: "最终文件内容" });
+    const renderedText = Array.from(region.querySelectorAll("[data-code-line-content]"), (line) => line.textContent).join("\n");
+    expect(renderedText).toBe(displayed);
+
+    await user.click(within(region).getByRole("button", { name: "查找最终文件内容" }));
+    await user.type(within(region).getByRole("searchbox"), "target");
+
+    expect(Array.from(region.querySelectorAll("mark"), (mark) => mark.textContent)).toEqual(["target", "target"]);
+    expect(region.querySelector("[data-code-active-match]")).toHaveAttribute("data-code-match-start", String(displayed.indexOf("target")));
+    await user.keyboard("{Enter}");
+    expect(region.querySelector("[data-code-active-match]")).toHaveAttribute("data-code-match-start", String(displayed.lastIndexOf("target")));
+
+    await user.click(within(region).getByRole("button", { name: "复制最终文件内容" }));
+    expect(copy).toHaveBeenCalledWith(body);
+    copy.mockRestore();
+  });
+
   it("finds occurrences in the output and navigates them without changing the content", async () => {
     const user = userEvent.setup();
     const body = "const answer = 42;\nconst second = answer;\n";

@@ -1,4 +1,4 @@
-import { type ChangeEventHandler, type CSSProperties, type ReactNode, useCallback, useId, useLayoutEffect, useRef, useState } from "react";
+import { type ChangeEventHandler, type CSSProperties, type ReactNode, useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseFullscreenIcon from "@mui/icons-material/CloseFullscreen";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
@@ -13,6 +13,7 @@ import { useI18n } from "~/shared/i18n/context";
 
 import { CodeExpansion } from "./code-expansion";
 import { type CodeLanguage, JsonDiffCode, PrismCode } from "./code-highlight";
+import { formatCodePreview } from "./code-preview-format";
 import { type CodeMatch, CodeSearchBar, findCodeMatches, useCodeSearch } from "./code-search";
 
 export function CodeBlock({
@@ -32,6 +33,7 @@ export function CodeBlock({
 }) {
   const { t } = useI18n();
   const [copied, setCopied] = useState(false);
+  const displayValue = useMemo(() => formatCodePreview(value, language), [value, language]);
 
   async function copyCode() {
     try {
@@ -83,7 +85,7 @@ export function CodeBlock({
             : "m-0 max-h-[min(70vh,640px)] overflow-auto whitespace-pre bg-background-default p-3 text-xs text-text-primary"
         }
       >
-        {language === "json-diff" ? <JsonDiffCode value={value} /> : <PrismCode language={language} value={value} />}
+        {language === "json-diff" ? <JsonDiffCode value={value} /> : <PrismCode language={language} value={displayValue} />}
       </pre>
     </Paper>
   );

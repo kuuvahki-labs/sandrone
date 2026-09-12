@@ -231,7 +231,7 @@ describe("shared UI primitives", () => {
     }
   });
 
-  it("renders long code content with Prism tokens and a copy action", async () => {
+  it("formats compact JSON with Prism tokens while copying the original source", async () => {
     const user = userEvent.setup();
     const writeText = vi.fn(async (_value: string) => undefined);
     Object.defineProperty(navigator, "clipboard", {
@@ -239,7 +239,8 @@ describe("shared UI primitives", () => {
       value: { writeText },
     });
 
-    render(<CodeBlock label="最终文件内容" language="json" value={"{\n  \"name\": \"node\"\n}\n"} />);
+    const source = '{"name":"node","nested":{"enabled":true}}';
+    render(<CodeBlock label="最终文件内容" language="json" value={source} />);
 
     expect(screen.getByText("json")).toBeInTheDocument();
     const code = screen.getByRole("region", { name: "最终文件内容" }).querySelector("code");
@@ -247,10 +248,13 @@ describe("shared UI primitives", () => {
     expect(code).toHaveTextContent("\"name\": \"node\"");
     expect(code?.querySelector(".token.property")).toHaveTextContent("\"name\"");
     expect(code!.tagName.toLowerCase()).toBe("code");
+    const displayedLines = Array.from(code!.querySelectorAll("[data-code-line-content]"), (line) => line.textContent);
+    expect(displayedLines).toContain('  "name": "node",');
+    expect(displayedLines).toContain('    "enabled": true');
 
     await user.click(screen.getByRole("button", { name: "复制最终文件内容" }));
 
-    expect(writeText).toHaveBeenCalledWith("{\n  \"name\": \"node\"\n}\n");
+    expect(writeText).toHaveBeenCalledWith(source);
     expect(await screen.findByRole("button", { name: "已复制最终文件内容" })).toBeInTheDocument();
   });
 
@@ -301,6 +305,15 @@ describe("shared UI primitives", () => {
 
     expect(textarea).toHaveValue("return input;");
     expect(highlightLayer).toHaveTextContent("return input;");
+  });
+
+  it("preserves compact JSON in editable content and its highlight layer", () => {
+    const source = '{"id":900719925474099312345,"nested":{"enabled":true}}';
+    const { container } = render(<HighlightedTextarea defaultValue={source} label="JSON 内容" language="json" />);
+
+    expect(screen.getByRole("textbox", { name: "JSON 内容" })).toHaveValue(source);
+    const highlightedText = Array.from(container.querySelectorAll("[data-highlighted-textarea-layer] [data-code-line-content]"), (line) => line.textContent).join("\n");
+    expect(highlightedText).toBe(source);
   });
 
   it("renders synchronized line numbers when requested", async () => {
