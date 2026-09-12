@@ -17,16 +17,10 @@ NodeIR                    -> NodeProbeResult
 
 ## JSON 表达
 
-项目 Go 代码统一使用 `encoding/json/v2` 与 `encoding/json/jsontext`，采用 v2 默认语义，
-不启用 v1 兼容选项。结构体字段名按大小写精确匹配；重复对象成员、非法 UTF-8 和
-一个输入中的多个 JSON 值均被拒绝。未知字段是否拒绝由对应入口或模型决定，
-`FileConfig`、typed settings 和 processor 参数继续严格解码。
-
-原始 JSON 使用 `jsontext.Value`；可选数值、布尔值、指针和时间用 `omitzero`
-表达省略规则，集合用 `omitempty` 省略空集合，未省略的 nil slice/map 输出为 `[]`/`{}`。
-节点来源和 typed settings 中需要精确保留的泛型数字使用原始 JSON 数值，避免经过
-`float64` 丢失精度。缓存身份、连接身份、内容比较和承诺稳定的输出显式启用
-`json.Deterministic(true)`；其它输出不承诺对象成员顺序。
+JSON 字段名区分大小写；重复对象成员、非法 UTF-8 和同一输入中的多个值均被拒绝。
+未知字段是否拒绝由入口或模型决定，`FileConfig`、typed settings 和 processor 参数
+严格解码。集合未省略时，nil slice/map 输出为 `[]`/`{}`；一般输出不承诺对象成员顺序。
+字段和省略规则以领域源码为准。
 
 ## `NodeIR`
 
@@ -41,14 +35,14 @@ NodeIR                    -> NodeProbeResult
 - `Raw`，保存来源格式中尚未提升为稳定 IR 的字段。
 - `SourceFormat`、`Lossy` 和 `Warnings`，保留来源与兼容诊断。
 
-相似名称不会因为字符串相同就合并。字段只有在协议语义一致、且 capability catalog 有依据时才进入显式 IR；目标私有值保留在带来源前缀的 `Raw` key 中。
+字段语义与来源私有值的接纳边界见[节点管线](node-pipeline.md#字段接纳与-warning-处置)。
 
 节点完成规范化和校验后会附带一个不序列化的 `RuntimeID`。它标识本次物化链路中的
 一个节点实例，跨 processor 保留，但不跨独立请求承诺稳定，也不属于脚本或公开
 `NodeIR` 字段。连接相等性则按需从规范化节点计算 `ConnectionKey`；该 key
 覆盖完整连接语义，排除名称、标签、metadata、来源原文和诊断状态，不保存到节点，
 也不出现在公开响应中。preview 用前者追踪实例，连接去重和 probe cache 用后者判断
-连接语义，二者不再各自维护私有身份算法。
+连接语义。
 
 `Raw` 是保留信息的边界，不是任意字段都能跨格式回填的承诺。renderer 仍须根据目标能力决定输出、报告字段损失或跳过节点。
 
@@ -101,14 +95,12 @@ subscription 的定义见 [`subscription.go`](../../internal/domain/subscription
 - 按顺序声明的 file-stage processors。
 - 名称、时间与 metadata。
 
-`kind` 必须显式提供，包括 `static`。缺失、大小写变体或未注册值不是另一种默认行为。
-
 typed file 的公共 `FileConfig` 只包含：
 
 - `subscriptions`：编译时要物化的命名订阅。
 - `settings`：JSON object，由对应 typed-file driver 严格解码。
 
-公共模型不包含 Mihomo、sing-box 或 Shadowrocket 的联合字段，也不根据 settings 形状推断客户端。客户端默认值、严格 schema 和编译语义属于 driver。
+客户端 schema 和编译语义属于 driver；公共模型不根据 settings 形状推断客户端。
 
 `FileDocument` 是一次请求中的运行时文件，携带正文、media type、encoding、metadata、warnings，以及处理器需要时使用的 parts。静态 source 读取和 typed driver 编译都会先形成 `FileDocument`，但生成结果不会写回 `FileSpec`。
 
@@ -126,8 +118,6 @@ typed file 的公共 `FileConfig` 只包含：
 - source ref 回答“内容或字段映射来自哪里”。
 
 `Report` 汇总一次调用的状态、依赖、来源、warnings、render 统计和可选 probe 统计。它随结果返回，不作为可管理资源持久化，也不自动修改 `Subscription`、`FileSpec` 或 `NodeIR`。
-
-warning 上下文允许 parser 携带原始行或结构化原值，其中可能出现凭据。调用方不能假定 report 已脱敏；记录、缓存或公开返回前必须遵守自己的安全边界。
 
 定义见 [`diagnostics.go`](../../internal/domain/diagnostics.go)、[`source.go`](../../internal/domain/source.go)、[`resource.go`](../../internal/domain/resource.go) 和 [`report.go`](../../internal/domain/report.go)。错误与 warning 的 wire 约定见[错误与诊断参考](../reference/errors.md)。
 
@@ -154,12 +144,3 @@ warning 上下文允许 parser 携带原始行或结构化原值，其中可能�
 本来会执行的 processor/script 调用，不改变正常流水线输出。定义见
 [`diagnose.go`](../../internal/domain/diagnose.go)，CLI wire 与退出码见
 [CLI 参考](../reference/cli.md#diagnose)。
-
-## 稳定不变量
-
-- 持久化定义不吸收一次请求的派生结果。
-- 外部格式只通过 adapter 或 typed-file driver 进入核心模型。
-- warning 能解释局部降级；致命错误不伪装成空成功结果。
-- report、dependency 和 source trace 由 service 汇总，不由入口层拼接。
-- probe 与 traffic 是运行时观测，不是协议字段。
-- 字段级 wire 契约以领域源码和公开 API 参考为准，架构页不复制完整 Go struct。

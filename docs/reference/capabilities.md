@@ -38,19 +38,11 @@ Shadowrocket 无节点配置由 [FileSpec](file-spec.md) 和对应 typed-file dr
 - `core.mihomo`、`core.sing_box`：对应测活 core backend 是否可用。
 
 这些 feature 不只是 Web 展示提示。`probe.enabled=false` 时，内建 `probe`
-processor 按[处理器契约](processors.md#nodes-probe)降级为 warning 并继续处理链；
+processor 按[处理器契约](processors.md#probe)降级为 warning 并继续处理链；
 显式 Probe 调用仍报错，但可以复用共享 Store 中由有能力运行时物化的兼容订阅快照。
 `scheduler.enabled=false` 时，导入或保存的定时配置原样保留，
 但 effective 设置强制为未启用，当前进程不创建 cron 或执行目标。这样备份迁移到
 具备相应能力的运行时后不需要重建配置。
-
-格式集合当前由前后端同版本发布，继续使用现有格式 capability 和前端固定资源
-配置，不纳入 UI feature catalog。未来出现独立发布或动态变化的格式能力时，
-再增加对应的 UI feature。
-
-Web 在能力未加载或请求失败时，只隐藏依赖后端能力的控件；固定导航和基础资源
-页面仍然可用。feature 的 `enabled` 和 `reason` 由后端计算，前端不根据底层
-`probe.backends` 或编译标签自行推导。
 
 `probe_methods` 的封闭集合是 `tcp_connect`、`udp_ntp` 和 `url_test`；
 具体可用 core/backend 仍以当前进程返回的 `probe.backends` 为准。
@@ -110,6 +102,11 @@ canonical UUID 字符串，否则静默映射为以 nil UUID 为 namespace、原
 身份；这项语义保持规范化不产生 warning。空用户 ID 仍无效。TUIC 不使用该映射，
 其 UUID/password 凭据中的 UUID 必须能被标准 UUID parser 接受。
 
+VLESS 的 canonical `flow` 只接受空值或 `xtls-rprx-vision`；已知 Vision 值会
+去除首尾空白并统一大小写。解析阶段遇到 Vision 搭配非 TCP transport 时会移除
+flow，产生 `node_normalized_incompatible_flow`；缺省、`tcp`、`raw` transport
+保留 Vision。未知 flow 交给 validation 隔离，不按前缀猜测兼容。
+
 Reality TLS 的有效 client fingerprint 也在共享 service 边界规范化：顶层
 `tls.reality` 或 xHTTP download TLS 包含 Reality、但
 `tls.client_fingerprint` 为空时，Sandrone 静默补为 `chrome`。显式 fingerprint
@@ -147,6 +144,7 @@ VLESS URI 的 `pqv` 与 `spx` 分别映射到 canonical
 | `sing-box-outbounds` | 带 `outbounds` 和/或 `endpoints` 的 JSON 节点文档 |
 | `shadowrocket-proxies` | 面向 Shadowrocket Subscribe 的 Clash YAML 节点文档；wire shape 与 `mihomo-proxies` 相同 |
 | `uri-list` | 未做 Base64 包装的逐行分享 URI |
+| `base64` | 标准 Base64 编码的 URI 列表；协议与字段边界同 `uri-list` |
 
 `shadowrocket-proxies` 是纯输出 adapter，不参与自动检测。它表示 Shadowrocket
 Subscribe 所消费的 Clash YAML，不表示原生 INI。Shadowrocket 分享 URI 仍由
@@ -202,8 +200,8 @@ parser 识别到字段但没有稳定 IR 抽象时，将原始值保存在 `Node
 raw 字段会产生 `render_lossy_field`。`json-nodes` 会原样承载 `raw`，适合诊断
 或保存规范化 IR。
 
-少数上游字段在严格值域内与 Sandrone 当前语义等价，因此 parser 会把它们作为
-无操作兼容项消费而不产生 `parse_unknown_field`：
+下列上游字段在指定值域内映射到已有 IR 字段，或作为无操作兼容项消费，
+不产生 `parse_unknown_field`：
 
 - URI TLS 查询参数 `disable_sni` 映射到 `TLS.DisableSNI`，包括显式
   `0`/`false`；`allowInsecure`、`allowinsecure`、`allow_insecure`、
@@ -311,8 +309,8 @@ provenance 的非空字符串优先；其它 provenance 的正整数 `*_mbps` �
 层支持 lowercase `bps`，但 locked sing-box rate decoder 不支持这个单位；sing-box
 renderer 会把能被 8 整除的值无损转换为 `Bps`（例如 `56 bps` 变成 `7 Bps`），
 不能整除时只跳过该节点并产生 `render_node_skipped`。其它可到达 renderer 的显式
-单位与整数 Mbps 按目标原生字段输出并保持互斥。URI 和 Shadowrocket 只表达整数
-Mbps，因此只转换可精确换算的显式速率，其余方向省略并产生
+单位与整数 Mbps 按目标原生字段输出并保持互斥。Shadowrocket 复用 Mihomo 的
+带宽输出。URI 只表达整数 Mbps，因此只转换可精确换算的显式速率，其余方向省略并产生
 `render_lossy_field`。Mihomo 和 sing-box renderer 遇到缺方向、双字段、超出安全
 Mbps 界限或其它无效 canonical 速率时只跳过该节点，不会使仍可渲染的同批节点
 失败。

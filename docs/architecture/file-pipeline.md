@@ -4,7 +4,7 @@
 
 文件管线生成完整、可直接交付的文件。`FileSpec` 是持久化定义，`FileDocument` 是一次请求中的运行时文件；节点 renderer 只生成节点片段，不能替代完整客户端配置编译。
 
-文件分为两条路径，完整数据流只在本页定义。
+文件分为两条路径。
 
 静态文件：
 
@@ -30,11 +30,9 @@ settings 或 processors 中，可查看、修改、排序和删除。统一入�
 默认出口等用户策略。`$nodes` 引用展开和目标端内建策略符号的实体化属于格式
 编译；协议语义、安全校验和 renderer 边界也继续由后端负责。
 
-固定策略通过显式模板或 `merge` 表达；需要计算、条件判断或补齐客户端能力时，
-使用可编辑的 file-stage `script`。处理器在后端执行，但其策略来自调用方保存的
-定义。新建默认只在创建时物化，保存或重开不会强制补回用户删除的处理器。
-
-具体预设参数、默认开启状态及已有文件行为见[社区配置预设](../reference/community-config-presets.md)。
+固定内容可用模板或 `merge` 表达；动态策略可用合适的显式 processor 或 `script`。
+新建默认只在创建时物化，保存或重开不会强制补回用户删除的处理器。
+具体预设参数与已有文件行为见[社区配置预设](../reference/community-config-presets.md)。
 
 ## 公共契约
 
@@ -48,11 +46,8 @@ settings 或 processors 中，可查看、修改、排序和删除。统一入�
 
 公共 service 不读取 Mihomo、sing-box 或 Shadowrocket 的联合 settings，也不通过字段形状推断目标客户端。未知公共 config 字段会在领域解码时拒绝；unknown settings 字段和类型错误由选中的 driver 拒绝。
 
-typed file 必须显式提交 `config.settings`，其中 `groups`、`rule_sets`、`rules`
-三个数组都必须出现。数组可以为空；省略任何一级或任何一个数组都返回
-`invalid_argument`。driver 只编译调用方已经完整物化的 settings，不在渲染时补业务默认值。
-
-字段级 wire 契约见 [`internal/domain/file.go`](../../internal/domain/file.go) 和 [FileSpec 参考](../reference/file-spec.md)。
+settings 的结构、必填项和编译语义由各 driver 定义；当前内建客户端的要求见
+[FileSpec 参考](../reference/file-spec.md)。driver 按保存的定义编译，不隐式补回用户策略。
 
 ## Source 读取
 
@@ -61,8 +56,6 @@ typed file 必须显式提交 `config.settings`，其中 `groups`、`rule_sets`�
 - `inline`：使用定义内的正文。
 - `remote`：通过统一 HTTP(S) fetcher 读取，并应用超时、User-Agent、代理与 TTL cache 设置。
 
-保存时，inline 正文作为完整 `FileSpec` 的 `source.content` 留在单个 JSON
-record 中；remote source 只保存读取配置，生成时重新获取或命中内部缓存。
 source 读取不会让 processor 获得任意宿主路径；remote 内容受 fetcher 的协议、
 响应状态和大小边界限制。
 
@@ -72,25 +65,14 @@ source 读取不会让 processor 获得任意宿主路径；remote 内容受 fet
 - 对 typed 文件，它是显式 source，或没有显式 source 时的 driver 默认 base。
 - 它不物化订阅、不执行 driver compile，也不运行 file-stage processors。
 
-Store key 布局和持久化一致性见[存储架构](storage.md)。
-
-typed file 引用已保存 Subscription 时，订阅节点执行可以先命中
-`subscription_snapshot`，因此不同文件和输出 kind 可以复用相同的 canonical
-`NodeSet`。最终 driver compile 与 file-stage processor 每次请求都会执行；服务不缓存
-完整 `FileResult`。缓存 identity、失效和刷新边界见[存储架构](storage.md#cache)。
+持久化与[缓存](storage.md#cache)由存储层管理。最终 driver compile 与 file-stage
+processor 每次请求都会执行；服务不缓存完整 `FileResult`。
 
 ## Static 路径
 
-static 文件适合原样交付或在文件阶段做有限改写。service 的职责依次是：
-
-1. 从请求内 spec 或 MetaStore 解析 `FileSpec`。
-2. 校验 kind、禁止的 config 和 source 声明。
-3. 读取 inline 或 remote source。
-4. 构造带名称、kind、正文、metadata 和 source trace 的 `FileDocument`。
-5. 按声明顺序执行 file-stage processors。
-6. 在全部步骤成功后构造 `FileResult` 和本次 report。
-
-static 路径不隐式解析正文中的节点，也不会根据文件扩展名选择 typed driver。需要动态消费订阅时，调用方必须显式使用受控脚本 API 或改用 typed file。
+static 路径解析并校验定义、读取 source，形成 `FileDocument` 后执行 file-stage
+processors。它不隐式解析正文中的节点，也不按扩展名选择 typed driver；动态读取
+订阅可使用受控脚本 API，完整客户端编译可使用 typed file。
 
 ## Typed 路径
 
@@ -113,7 +95,7 @@ config-only driver，因此不声明 renderer。
 
 typed file 有显式 source 时，其正文作为 base；`source.type` 为空时使用 driver 的内建 base。base 是客户端配置的输入，不是编译后的历史快照。
 
-具体内建模板内容属于 driver 和测试，不进入架构契约。调用方保存的显式 inline base 与后端内建 base 也是两个独立边界，不能互相隐式回填。
+显式 inline base 与 driver 内建 base 分别维护，后端不会用内建内容覆盖已保存的 source。
 
 ### Subscription materialization
 
@@ -133,39 +115,24 @@ Shadowrocket）拒绝非空 subscriptions，直接基于 base 和 settings 编�
 
 ### Node render 与 driver compile
 
-descriptor 声明 renderer 时，service 才把聚合后的 `NodeIR` 生成目标节点片段。
-该 renderer 继续遵守能力与有损边界：
+descriptor 声明 renderer 时，service 将聚合节点渲染为目标片段并汇总兼容 warning；
+config-only driver 收到空片段。节点能否输出遵守[节点渲染边界](node-pipeline.md#5-rendernodeir-进入目标节点格式)。
 
-- 可选字段损失产生结构化 warning。
-- 不安全的节点变体可以被跳过。
-- 没有任何可渲染节点且 renderer 要求非空结果时返回错误。
-
-renderer warnings 合并进 file report。config-only driver 则直接收到空节点片段。
-service 不解析节点片段的客户端语义；driver 接收 base、可选节点片段和原始
-settings，并负责：
-
-- 严格解码自身 settings。
-- 解析和校验 base。
-- 把节点、分组、规则集、规则或其它受管结构编译到客户端文档。
-- 按显式提交的集合编译，不补 `groups`、`rule_sets` 或 `rules`。
-- 返回完整 YAML、JSON 或 INI 正文。
-
-节点 renderer 与 driver compiler 是正交边界：前者回答“这些节点如何写成目标片段”，后者回答“片段和策略如何组成完整客户端文件”。
+driver 接收 base、可选节点片段和 settings，严格解码并校验客户端结构，生成完整
+正文。service 不再解析片段的客户端语义：renderer 负责节点表达，driver 负责完整配置。
 
 ## `process(file)` 阶段
 
 static source 读取完成或 typed driver 编译完成后，service 才运行 file-stage processor。所有 specs 严格按 `FileSpec.processors` 的声明顺序执行，每一步读取上一步返回的 `FileDocument`。
 
-结构化修改的首选是 `merge`：
+`merge` 提供以下结构化修改：
 
 - YAML/JSON overlay 处理对象递归合并和整体替换。
 - YAML/JSON override 提供有序的数组与强制替换语义。
 - INI override 以 section 运算修改文档，并保留未修改文本的格式。
 - 语法或类型不匹配返回带 part/path 上下文的 `file_merge_failed`。
 
-需要请求参数、资源组合或项目私有逻辑时使用 file-stage `script`。脚本通过序列化 envelope 修改最终文档，并且只能使用 service 注入的受控 API；它没有通用文件系统、子进程或网络访问。
-
-`merge` 和 `script` 没有固定的相互优先级。声明为先 merge 后 script 时，脚本看到合并结果；反向声明时，merge 看到脚本结果。多个同类 processor 也遵守同一顺序。
+需要请求参数、资源组合或项目私有逻辑时，可以使用 file-stage `script`。脚本通过序列化 envelope 修改最终文档，并且只能使用 service 注入的受控 API；它没有通用文件系统、子进程或网络访问。
 
 其它已注册 file processor 属于同一阶段，当前可用集合由 runtime capability summary 给出。脚本接口与示例见[脚本编写指南](../how-to/write-processor-script.md)。
 

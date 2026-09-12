@@ -49,19 +49,15 @@ SANDRONE_DEV_API_TARGET=http://127.0.0.1:18080 pnpm dev
 pnpm build
 ```
 
-Web 构建只生成 `web/build/client` 中的 client-side 静态资源，并为不小于
-8 KiB 的 JavaScript 和 CSS 生成构建期 Brotli 副本。普通资源保留为兼容兜底，
-生产 Sandrone HTTP server 会按请求的 `Accept-Encoding` 自动选择 `.br` 表示。
-如需让仓库内的 Sandrone HTTP server 按默认路径发现这些资源，在仓库根目录执行：
+产物位于 `web/build/client`。要让 Go server 嵌入 Web UI，在仓库根目录执行：
 
 ```sh
 make build-webui
 ```
 
-该目标会安装锁定依赖、构建 Web UI，并把 client 产物复制到
-`internal/entry/webui/static`，供随后的 Go 构建嵌入二进制。`web/build/` 和复制后
-的静态资源均为生成物，不应提交；仓库只保留让无前端产物的普通 Go 构建仍可编译
-的占位文件。
+该目标安装锁定依赖、构建并复制资源到 `internal/entry/webui/static`，供随后
+Go 构建嵌入。两处产物都不提交；生产二进制不需要 Node server，也不读取外部
+静态目录。
 
 ## 运行
 
@@ -71,17 +67,14 @@ make build-webui
 pnpm start
 ```
 
-预览地址默认为 `http://127.0.0.1:4173`。生产运行时不需要 Node server；在仓库
-根目录先执行 `make build-webui`，再启动 Sandrone HTTP server。Go 构建会把当前
-静态资源嵌入可执行文件：
+预览地址默认为 `http://127.0.0.1:4173`。完成 `make build-webui` 后，在仓库根目录
+启动带嵌入资源的 Sandrone HTTP server：
 
 ```sh
 go run -mod=readonly -tags probe_singbox ./cmd/sandrone serve
 ```
 
 然后访问 `http://127.0.0.1:1137/`。
-
-发布二进制只使用构建时嵌入的 Web 资源，不读取运行时外部静态目录。
 
 列表的短期复用、后台刷新与写后失效见[页面数据复用](AGENTS.md#页面数据复用)。
 

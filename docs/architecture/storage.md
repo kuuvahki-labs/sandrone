@@ -4,15 +4,8 @@
 
 Sandrone 不要求数据库。持久化层保存命名资源和统一项目设置，并为内部缓存提供统一 key 空间；转换、文件生成和探测仍是 service 的请求级编排。
 
-稳定目标是：
-
-- 本地服务默认使用文件系统目录，也可以显式选择 S3-compatible 对象存储。
-- 测试可以使用内存或只读文件系统。
-- 嵌入方可以提供自定义 Store。
-- 复合读取和维护操作在单进程内有一致性边界。
-- 备份能够搬运完整的非 cache Store，而不解释领域对象。
-
-Store 不提供数据库事务、跨进程锁或自动 schema 迁移。
+默认使用本地文件系统，也支持 S3-compatible 对象存储和嵌入方自定义 Store。
+Store 不要求数据库事务、跨进程锁或自动 schema 迁移；复合操作的一致性由下文说明。
 
 ## `Store`
 
@@ -28,14 +21,9 @@ Store 不提供数据库事务、跨进程锁或自动 schema 迁移。
 
 公开嵌入 API 暴露同构接口，因此自定义后端不需要 import `internal/store`。
 
-内部优化能力通过可选接口和统一 helper 提供，不扩大公开 Store 的必选方法：
-`ListPrefix` 只列举后代，缺失目录或没有后代的文件前缀返回空列表，校验 keys 并按
-key 排序；通用 `List` 保留列举单个对象的语义。文件系统与自定义 Store 用原有
-`List` 回退，S3 直接分页 LIST，省去目录 HEAD。能力经过 Coordinator 时仍受读写
-协调保护。只有明确支持并发读取的后端启用最多 4 路读取；内置两种后端均支持，
-自定义 Store 默认串行。列表输出和错误选择按 key 顺序汇总，取消后停止派发并等待在途操作。
-
-接口与 key 校验定义见 [`internal/store/store.go`](../../internal/store/store.go)，公开适配点见 [`pkg/sandrone/sandrone.go`](../../pkg/sandrone/sandrone.go)。
+可选优化接口不扩大公开 Store 的必选方法；自定义后端未声明并发读取能力时按串行读取。
+接口与 key 校验见 [`internal/store/store.go`](../../internal/store/store.go)，公开适配点见
+[`pkg/sandrone/sandrone.go`](../../pkg/sandrone/sandrone.go)。
 
 ## Key 安全
 
@@ -66,21 +54,10 @@ service 对资源名和备份条目重复应用同一 `CleanKey` 语义。Store 
 `afero.Fs`。运行时通过 `SANDRONE_STORAGE_BACKEND=s3` 选择它；filesystem
 仍是默认后端。
 
-每个逻辑 key 映射为配置 namespace 下的一个对象。实现只依赖
-`GetObject`、`PutObject`、`DeleteObject`、`HeadObject`、分页
-`ListObjectsV2`，并为幂等缓存清理可选使用 `DeleteObjects`：
-
-- 普通写入和 `WriteAtomic` 都是单对象 PUT；后者不模拟 rename，也不使用临时
-  对象。
-- 删除先检查对象存在性，使删除缺失 key 继续返回 `os.ErrNotExist`。
-- `List` 读取全部分页，移除物理 namespace，拒绝非法或重复逻辑 key，并合成
-  中间目录 entry。
-- `Stat` 优先读取对象 metadata；只有后代对象存在时才返回合成目录。
-- provider 的 `NoSuchKey`/`NotFound` 映射为现有 not-found 语义。
-
-支持的 S3-compatible 服务必须对对象读取、覆盖、删除和列举提供强一致语义。
-Cloudflare R2 是文档化并执行集成验证的首个目标。实现不依赖 ACL、versioning、
-object lock、multipart upload、presigned URL 或 provider 专属 metadata。
+每个逻辑 key 映射为 namespace 下的一个对象，普通写入和 `WriteAtomic` 都使用
+单对象 PUT。删除缺失 key 返回 not-found；列举会合成中间目录并校验 keys。
+后端须对读取、覆盖、删除和列举提供强一致语义，才能满足资源管理和恢复的预期。
+实现见 [`s3.go`](../../internal/store/s3.go)。
 
 S3 endpoint、region、bucket、namespace 和显式 access key 由进程环境提供。
 Sandrone 不调用 AWS 默认凭据链，不读取 shared profile 或 instance metadata。
@@ -91,20 +68,11 @@ Sandrone 不调用 AWS 默认凭据链，不读取 shared profile 或 instance m
 `MetaStore` 构建在任意 Store 上，把 JSON 资源映射到 keys。它不是另一个
 持久化后端，也不向 service 暴露数据库式查询。
 
-它负责：
-
-- subscription、file 和 share 的 JSON 编解码。
-- 资源摘要列举。
-- share 的覆盖保存。
-
-列表每次列举当前前缀以发现外部变更；摘要仅在当前 MetaStore 内复用，上限为
-1,024 条及估算 8 MiB，按最近使用淘汰，单条超限不缓存。S3 仅在 LIST 与 GET 的
-opaque ETag 一致时保存版本，后续版本相同可省正文 GET；从实际读取起满 10 秒
-强制复核，命中不续期。ETag 不解释为 MD5，版本缺失或不匹配时完整读取。
-文件系统和自定义 Store 每次只读一次正文，按内容指纹复用解析结果，不信任
-size/mtime。返回值深拷贝；本实例写入、删除、恢复后失效，清理已消失的 key，
-并阻止在途旧读取重新填充。读取及 JSON 错误不缓存，继续按资源 warning 或分享
-列表整体失败返回；GET 权限变化最多延迟到绝对复核期限被发现。
+它负责编解码 subscription、file、share 并列举资源摘要。列表每次列举当前前缀，
+以发现外部变更；已读取的摘要可以复用。S3 按 opaque ETag 判断版本并定期强制复核，
+GET 权限变化可能延迟到复核时发现。文件系统及自定义 Store 按正文指纹复用解析结果。
+本实例写入、删除和恢复后失效，返回独立值；读取和解码错误不缓存。
+复核期限与缓存实现见 [`meta_cache.go`](../../internal/store/meta_cache.go)。
 
 每个 file 使用一个 `files/<name>.json` record 保存完整 `FileSpec`。inline
 正文留在 `source.content`，不会拆成相邻 raw key，也不会在保存时改写 source
@@ -128,24 +96,13 @@ value 和整个 key 的 TTL，不解释 key 路径或 value 内容：
 | `Delete` | 删除单个 key |
 | `Clear` | 清空该 Cache 实例管理的全部 key |
 
-service 分别持有权威 `Store` 与非权威 `Cache`，因此自定义 Cache 不需要充当
-资源 Store。service 使用 `remote_fetch/subscriptions/A` 这类普通字符串作为 key；
-当前 Store-backed 实现把它映射为 `cache/remote_fetch/subscriptions/A.json`，以后
-替换为内存或 Redis 实现时可以直接把同一字符串作为缓存 key。Cache 接口没有
-layer、资源种类、JSON 或内部 record 概念。`internal/cache` 另外提供可选的
-`GetJSON[T]`/`SetJSON` 辅助函数，把业务结构体与 opaque bytes 相互转换；它们不改变
-Cache 接口，也不决定 value 的业务结构。Store-backed 实现会尝试用 gzip 压缩
-超过 4 KiB 的 opaque value，只有压缩结果更小时才在内部 envelope 标记并保存，
-`Get` 会透明解压；该存储选择不会进入 Cache 接口或 service 业务文档。
+service 分别持有权威 `Store` 与非权威 `Cache`；自定义 Cache 无需实现资源 Store。
+业务层拥有 value 的结构与匹配规则，Cache 只保存 opaque bytes，当前实现使用
+Store-backed Cache。
 
-每类 service 业务拥有自己的 typed JSON value，负责读取完整内容、比较当前语义、
-修改适用记录并全量覆盖保存；Cache 不提供通用 document、RawMessage entry map 或
-合并规则。读取或普通全量保存都采用现有绝对过期时间与 `now + effectiveTTL` 中较早
-者；较短的新策略会缩短整个 key，普通保存不会延长旧 value。整个 value 到期后全部
-miss。`refresh` 对每个 key 第一次写入时丢弃旧 value 并重建 TTL，同一 refresh 请求
-后续访问该 key 时使用本次已重建的业务 value。多个实例共享 Store-backed Cache 时，
-并发 read-modify-write 可能最后写入覆盖并降低后续命中率，但不会影响权威资源或业务
-正确性。
+整个 key 共用一个绝对过期时间。普通读取或保存可按较短的新 TTL 缩短期限，但不会
+延长旧 value；`refresh` 跳过旧值并重建 TTL。同一 refresh 请求后续访问会复用本次
+新值。共享缓存的并发更新可能降低命中率，不改变权威资源。
 
 持久缓存共有三类 key 前缀：
 
@@ -160,69 +117,41 @@ Subscription 的 `snapshot_ttl_seconds` 是 nullable 三态字段：省略时
 或 File：inline FileSpec、直接 parse/render/convert、临时 diagnose 和未保存草稿
 不读写任何持久层，只保留请求内 memo。share 没有独立缓存层，但生成已保存订阅目标时
 可以复用订阅执行快照。
-单个序列化后超过 16 MiB 的 subscription-snapshot 同样不会写入缓存。
+过大的 subscription-snapshot 会跳过缓存写入，仍返回本次执行结果。
 
-各业务缓存记录的 identity 只包含影响对应结果的有效语义。subscription-snapshot
-包含构建身份、完整 Subscription、请求 args/meta 和 remote/probe/script 设置，
-不包含输出 target；它保存 `Before`、`After` 和 RuntimeID 私有 sidecar，因此多个
-renderer、typed file、preview、share、定时更新及 `api.subscription.produce` 可以共享
-同一次 nodes-stage 执行。订阅执行快照记录实际使用资源的 definition revision，命中前逐项验证；资源
-变化立即 miss，不等待 TTL。remote 内容和 probe 观测不使用资源 revision 失效，
-snapshot TTL 可以有意冻结较旧的观测。`refresh` 请求跳过 subscription-snapshot、
-remote-fetch 和 probe 的缓存读取，成功执行后仍按当前 TTL 重新填充。订阅 render 与
-FileSpec 每次都会从 canonical NodeSet 执行目标渲染或文件编译，不持久化最终正文。
+订阅执行快照的 identity 包含构建身份、Subscription 定义、请求上下文和
+remote/probe/script 执行设置，不包含输出 target。它保存处理前后的 canonical
+`NodeSet`，供 preview、renderer、typed file、share 和脚本订阅调用复用。
+命中前核对实际依赖资源的 revision，定义变化立即 miss；远程内容与 probe 观测则
+可以在 snapshot TTL 内保持旧值。`refresh` 跳过各持久缓存读取，成功后按当前 TTL
+重新填充。最终目标正文每次生成，不作为持久缓存结果保存。
 
-运行时 probe 可用性有意不属于 subscription-snapshot identity：共享同一 Store 的
-有能力实例可以通过定时 `refresh` 物化包含测活结果的快照，无 probe backend 的实例
-会在 processor 执行前复用该快照。若无 backend 的实例冷 miss，processor 会 warning
-并继续，但这份未执行 probe 的降级结果不会写入 subscription-snapshot，避免覆盖或
-抢先填充共享缓存。生产者和消费者仍必须具有相同的构建身份、remote/probe/script
-执行设置、Subscription 及请求上下文，且 snapshot TTL 必须为正数；scheduler 能力
-不参与 identity。
+probe 和 scheduler 的运行时可用性不参与快照 identity，因此具备 probe 能力的
+实例可刷新共享快照，其他实例直接消费。双方仍需上述 identity 一致且 snapshot TTL
+为正数。无 probe 能力的实例冷 miss 时，processor 会 warning 并继续；这种跳过 probe
+的降级结果不回填快照，避免覆盖可复用的测活结果。
 
-订阅解析和文件递归各有请求内结果 memo，按完整执行变体去重重复依赖。顶层
-preview/render/file/produce/diagnose 还共享资源读取作用域：同一订阅或文件定义
-成功读取一次，并复用其持久化语义版本；消费者获得独立值，同作用域写入后失效。
-后续独立请求重新读定义，作用域不跨 service，也不代表整个 Store 的事务快照。
-这些 memo 不持久化、无 TTL；缓存对象的写前 GET 仍保留，用于合并变体和绝对期限。
-当前不做跨请求 singleflight，两个同时发生的冷 miss 可以各自执行。
+请求内 memo 复用相同执行变体及资源读取，返回独立值，同作用域写入后失效。
+它不跨请求或 service，不代表 Store 事务快照；同时发生的冷 miss 可以各自执行。
 
-手动清理调用一次 `Cache.Clear`，不解析业务 value，也不提供按前缀操作或
-统计。Store-backed Clear 在一次 Coordinator update 中列举 cache 后代文件，
-使用幂等 `DeleteMany`；S3 每批最多 1,000 keys 并检查响应逐项 Errors，只有明确
-不支持 API 才回退。文件系统与自定义 Store 顺序 Delete，只忽略 not-found。
-批量删除可能部分成功，不改变普通资源或备份恢复的严格删除语义。
-并发请求可能在清理期间或之后重新填充缓存。该操作不修改 TTL、`refresh`、
-请求内 memo 或缓存 value 格式，也不由后台任务自动触发。HTTP 路径见
-[项目设置与缓存管理 API](../reference/http-api/settings.md#缓存管理)。
+手动清理调用 `Cache.Clear`。当前 Store-backed 清理可能部分成功，并发请求也可能
+重新填充；它不修改权威资源或 TTL 设置。接口见[缓存管理 API](../reference/http-api/settings.md#缓存管理)。
 
 ### 定时更新
 
-长驻的 HTTP、MCP HTTP 和合并 serve 模式会启动一个进程内定时更新器；直接 CLI
-操作和嵌入 `Engine` 不启动它。项目设置用一个 cron 计划和一组显式目标控制该
-更新器。每次触发按配置顺序逐个执行目标，不并发物化目标：
+长驻 HTTP、MCP HTTP 和合并 serve 模式启动进程内更新器，直接 CLI 与嵌入
+`Engine` 不启动。运行时禁用 scheduler 时，保存的计划仍保留但不执行。
 
-运行时声明 `scheduler.enabled=false` 时不启动更新器；stored 定时配置仍保留，
-effective 设置为未启用。能力语义见[格式与能力参考](../reference/capabilities.md#运行时能力发现)。
+每次触发按配置顺序运行目标，不带请求 args，使用 `refresh=true`：subscription
+执行 preview，file 执行完整 render。这些操作预热适用缓存，不覆盖 TTL，也不保存
+最终正文或历史 report。
 
-- subscription 目标执行不带 args、`refresh=true` 的 preview，完成订阅物化和
-  nodes-stage processors，但不要求或生成某个 renderer 目标；
-- file 目标执行不带 args、`refresh=true` 的完整文件 render，最终格式由
-  `FileSpec.kind` 决定。
+同一进程中，重叠触发被跳过，单个目标失败后继续后续目标。启动和计划热更新本身
+等待下一次 cron；显式运行一次复用当前 targets 和重叠保护，不移动下次计划。
+状态仅在内存中，关闭会取消当前任务并等待返回。多个实例没有 leader 选举或分布式锁，
+共享 Store 的部署需自行选择启用调度的实例。
 
-两类操作都跳过本次 remote-fetch、probe 与 subscription-snapshot 缓存读取，
-并在成功时按资源与项目现有 TTL 填充适用缓存。调度器不覆盖 TTL，不保存 preview、
-report、最终正文、历史记录或额外产物。subscription preview 预热订阅执行快照及其实际
-使用的 remote-fetch 与 probe 层；file render 可预热所引用订阅的快照层。
-
-一个进程只运行一个调度任务；上次触发尚未结束时，新触发会被计数并跳过，不会
-排队。单个目标失败只记录错误并继续后续目标，不立即重试。启动和计划热更新本身
-都等待下一次 cron 时间，不自动补跑；显式的一次性运行复用当前 effective targets
-和同一重叠保护，但不移动下一次 cron 时间。关闭时取消 service context，并等待
-当前任务返回。状态只保存在内存中，重启后清零。多个 Sandrone 实例之间没有 leader
-选举或分布式锁，因此共享 Store 的部署必须自行确保只有预期实例启用调度。
-
-设置 wire、cron 约束和状态接口见[项目设置接口](../reference/http-api/settings.md#定时更新)。
+cron、状态和一次性运行接口见[项目设置接口](../reference/http-api/settings.md#定时更新)。
 
 ## Key 布局
 
@@ -257,9 +186,8 @@ cache/<cache-key-prefix>/files/<name>.json
 - `View`：共享锁内执行一致读取回调。
 - `Update`：独占锁内执行复合修改回调。
 
-回调接收底层 raw Store，避免在持锁期间再次通过 coordinator 获取同一把锁。普通 Store 方法也分别通过 `View` 或 `Update` 执行。
-
-service 装配 Store 时使用 `Coordinate` 包装它；如果传入对象已经实现 `Coordinator`，则直接复用，避免同一后端出现互不相知的嵌套锁。
+回调接收底层 raw Store，避免持锁期间重复获取同一把锁。service 中的资源与备份操作
+共享 Coordinator；已有 Coordinator 会直接复用。
 
 Coordinator 提供的是单进程 isolation：
 
@@ -300,14 +228,10 @@ cache 被排除，因为它可重建、可能过期，也不应决定恢复后�
    `settings.json` 的严格设置契约。
 2. 进入 Coordinator 独占 update。
 3. 快照旧的非 cache bytes。
-4. 删除现有文件，包括 cache，再写入备份内容；`settings.json` 使用原子
-   `0600` 写入。
+4. 删除现有文件，包括 cache，再写入备份内容；`settings.json` 使用原子写入，
+   文件系统后端的权限为 `0600`。
 5. 普通写入失败时，尝试恢复旧的非 cache bytes；cache 保持为空。
 6. 替换成功后重新载入动态项目设置；若载入意外失败，则回滚 Store 和内存设置。
-
-恢复和回滚清理目录时保留 `List` 返回的 `IsDir` 标记。子项删除后已经不存在的
-目录（包括 S3 的虚拟目录）视为清理完成；真实文件的删除错误和目录的其它错误
-仍使操作失败。
 
 这是 best-effort rollback，不是 crash-atomic restore：
 
@@ -330,11 +254,3 @@ cache 被排除，因为它可重建、可能过期，也不应决定恢复后�
 归档 wire、大小限制、HTTP 鉴权和错误响应属于管理接口契约，见
 [项目设置与备份接口](../reference/http-api/settings.md)；本页只定义存储一致性
 与恢复后果。
-
-## 部署不变量
-
-- 单进程部署可以依赖 Coordinator 避免备份与普通写入交错。
-- 多进程共享 Store 时，维护窗口、写入者停止和存储级快照由外部协调。
-- 关键数据仍需独立的存储级备份；应用归档不能替代底层 durability。
-- 自定义 Store 必须通过 key、列举和读写契约测试，再用于 share 或恢复场景。
-- cache 永远可以丢弃，领域资源和其它非 cache Store 数据才是恢复目标。

@@ -47,8 +47,7 @@ Authorization: Bearer <token>
 MCP path 不能覆盖 `/`、`/healthz`、`/version`、`/convert`、`/s` 或 `/s/*`
 公开 route；启动参数和持久化设置都会拒绝这些冲突值。
 
-只要配置了 token，该 header 就必须精确匹配。绑定非 loopback 地址时必须提供
-token；完整启动与鉴权规则见 [CLI 参考的 serve 章节](cli.md#serve)和
+启动、监听与鉴权要求见 [CLI serve](cli.md#serve)和
 [HTTP API 鉴权](http-api/README.md#鉴权)。
 
 ## 能力与缓存
@@ -72,8 +71,7 @@ Sandrone metadata 或定义：
 
 成功响应由 SDK 标记 `resultType: "complete"`，并在 `_meta` 的
 `io.modelcontextprotocol/serverInfo` 中携带 Sandrone identity。`resources/read`
-使用零 TTL，因为保存的 subscription 和 FileSpec 定义可能随时变化且可能包含
-凭据；调用方每次使用前都应重新读取。
+使用零 TTL，因为保存的 subscription 和 FileSpec 定义可能随时变化。
 
 ## Agent Skill
 
@@ -95,21 +93,13 @@ script，以 `SANDRONE_URL` 指向 Sandrone server，并通过可选
 
 ## Tool 注册与管理边界
 
-固定注册下列十一个 tool，其中七个只读或执行现有定义，四个可以修改保存的定义。
-
-MCP 面向可信 Agent，不是多租户授权边界。任何能连接该 server 的客户端（配置
-token 时需通过 bearer 鉴权）都可以写入当前 data dir：`put` 会立即保存并覆盖
-同名定义，
-`delete` 会立即删除，不提供确认、回收站或预览式写入。调用方应先读取当前
-resource，并只在用户明确要求持久化或删除时调用管理 tool。
-`sandrone_delete_file` 只删除保存完整 FileSpec 的单个 JSON record；如需备份，
-Agent 应先读取 definition。完整删除语义见
-[文件 HTTP API 的删除章节](http-api/files.md#delete-v1filesname)。
+MCP 面向能读写当前存储的可信 Agent，不提供多租户隔离。通过鉴权的客户端均可
+调用管理 tools：`put` 立即保存并覆盖同名定义，`delete` 立即删除；没有确认或
+回收站。修改前可读取当前 definition 以比较或备份，写入与删除应在用户授权范围内。
 
 MCP SDK 发布每个 tool 的封闭 input schema。调用方应以 `tools/list` 返回的
-schema 为准；未知字段会被拒绝。与 Go/持久化表示不同，MCP wire 上
-`ProcessorSpec.params` 和 `FileSpec.config.settings` 都是 JSON object，而不是
-编码后的 JSON 字节。领域结构和严格解码规则分别见
+schema 为准；未知字段会被拒绝。`ProcessorSpec.params` 和
+`FileSpec.config.settings` 都直接传 JSON object，不编码为字符串。领域结构见
 [Processors](processors.md)与 [FileSpec](file-spec.md)。
 
 ## Tools
@@ -160,8 +150,7 @@ subscription 或 file flow 访问外部世界，`openWorldHint` 为 `true`。
 
 四个管理 tool 的 annotations 相同：`readOnlyHint: false`、
 `destructiveHint: true`、`idempotentHint: true`、`openWorldHint: false`。
-这里的幂等表示重复相同调用的最终存储状态一致，不表示调用前会确认，也不表示
-可恢复；put 可能覆盖，delete 立即生效。
+这里的幂等表示重复相同调用的最终存储状态一致。
 
 ## Resources 与 schema templates
 
@@ -252,34 +241,19 @@ inline `body`：
 
 ## 推荐 Agent 流程
 
-```text
-inspect → read capability/schema index → list → read exact definition/schema
-→ optional prompt → preview/render → put/delete/render
-```
+先用 `sandrone_inspect` 获取运行时摘要，按任务读取所需 capability、schema 和
+已存定义；需要起草或解释时可调用 prompt。执行后检查 `report/warnings`。
 
-先用 `sandrone_inspect` 确认当前运行时摘要和目录入口，按需读取
-`sandrone://capabilities/formats`、`sandrone://schemas` 及 exact detail，再用
-`sandrone_list_resources` 发现已存定义；通过标准 MCP resource 读取定义及其
-processor、file-kind 或 script schema。只有需要起草或解释时才调用 prompt。
-随后用 convert/preview 做无持久化检查。只有用户明确要求时才 put 或
-delete；最后按目标 render 或 get file，并检查 structured output 中的
-report/warnings。
-
-Preview/render 不是 put 的服务端前置条件。subscription preview/render 与 file
-render 都只接受已存定义，因此新资源通常要在用户授权后先 put，再执行并检查
-report。需要统一诊断本地草稿时使用 CLI `sandrone diagnose`。
+`convert` 可检查一次性节点输入；subscription preview/render 与 file render
+只接受已存定义，所以新资源通常需要先在授权范围内 `put` 再检查结果。
+本地草稿可用 CLI `sandrone diagnose`，preview/render 不是 put 的服务端前置条件。
 
 ## 安全边界
 
-- MCP 不是通用代码执行入口。所有 tool 都调用 service 层，不提供任意 Store key、
-  宿主路径、网络客户端或 processor 注册面。
-- `sandrone_convert` 的 remote 输入、订阅/file flow 中的远程 source，以及
-  probe 都只能经受控 fetch/probe 边界执行。
-- `script` processor 在 Go 内嵌 ECMAScript sandbox 中运行，不是 Node.js；
-  没有任意文件系统、子进程、环境变量或通用网络能力。`permissions` 是保留
-  object，当前不会授予这些宿主能力。完整契约见[脚本 API](scripting-api.md)。
-- Resource URI 和 tool 名称参数只能使用单段公开名称，不能穿越为宿主路径。
-- MCP 输出和 resource 定义可能包含订阅 URL、节点凭据、脚本、source reference
-  或原始 warning 上下文，不能假定已经脱敏。
+- 远程 source、资源读取和 probe 经 service 的受控 I/O 执行；resource URI
+  不映射宿主路径或任意 Store key。
+- 脚本能力见[脚本 API](scripting-api.md#超时隔离与敏感信息)。
+- 输出可能包含资源定义和节点凭据；对外分享前按
+  [敏感诊断边界](errors.md#敏感诊断边界)检查。
 - 内建 Streamable HTTP listener 不终止 TLS。跨主机使用时应在可信网络或提供
   TLS 的反向代理之后部署，并保护 bearer token。

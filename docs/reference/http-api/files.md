@@ -10,8 +10,7 @@
 [FileSpec 参考](../file-spec.md)为准；处理器参数见
 [Processors 参考](../processors.md)。本页只定义 HTTP 资源操作和读取模式。
 
-本页中的接口都属于受保护的 `/v1/*` 管理 API。服务启用 token 鉴权时，请求须
-携带 `Authorization: Bearer <token>`。
+通用鉴权、资源名和错误响应见 [HTTP API 约定](README.md)。
 
 ## 接口
 
@@ -58,7 +57,7 @@ path segment，`kind` 也必须显式使用 canonical 值，包括 `static`。�
 | `mode=render` | 运行完整文件管线并返回最终正文。省略 `mode` 时与此相同。 |
 | `response=json` | 把 source 或 render 正文放入 JSON envelope；对 `mode=spec` 没有额外作用。值按大小写不敏感匹配。 |
 | `arg.<key>=<value>` | 仅为本次 render 提供字符串请求参数；不写入 `FileSpec`。空 key 忽略，同一 key 重复出现时取最后一个值。 |
-| `refresh=true` | 仅对 render 生效；跳过最终结果以及本次 remote-fetch/probe 缓存读取，成功后按当前 TTL 重新填充。 |
+| `refresh=true` | 仅对 render 生效；跳过本次 subscription-snapshot、remote-fetch 和 probe 缓存读取，成功后按当前 TTL 重新填充。 |
 
 `mode` 会去除首尾空白并按大小写不敏感匹配；其他值会失败。
 
@@ -113,20 +112,10 @@ JSON envelope：
 附带 warning envelope。
 warning 结构见[错误与诊断参考](../errors.md)。
 
-三个 mode 的边界是固定的：
-
-```text
-spec   = 保存后的定义
-source = 编译前的基础正文
-render = 最终生成正文
-```
-
 typed render 的完整阶段顺序见[文件管线](../../architecture/file-pipeline.md)。
 
 ## 失败与安全边界
 
-- `{name}` 必须非空，URL 解码后只能是一个 path segment；包含 `/`、`\`，
-  或名称为 `.`、`..` 都会被拒绝。创建、读取和删除使用同一约束。
 - `source.type: "remote"` 只经受控 HTTP(S) fetcher 读取。详细抓取和缓存边界见
   [FileSpec 参考](../file-spec.md)。
 - source 可能包含凭据、脚本或未处理配置；`mode=source` 与 `mode=spec`
@@ -134,8 +123,6 @@ typed render 的完整阶段顺序见[文件管线](../../architecture/file-pipe
 - render 每次执行目标文件生成，但可以复用 remote-fetch、probe 和订阅执行快照。引用缺失、远程抓取失败、typed
   配置无效或 processor 失败都会使本次请求失败，不会保存部分生成结果。
 - 文件生成结果只随本次读取返回，不是独立的持久化下载资源。
-- handler 级错误码、状态映射和 warning 字段见[错误与诊断参考](../errors.md)；
-  router 的 plain-text `404`/`405` 边界见[通用约定](README.md#响应与失败)。
 
 ## 最小示例
 

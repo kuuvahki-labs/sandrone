@@ -54,15 +54,7 @@ pnpm --dir web install --frozen-lockfile
 
 [架构总览](docs/architecture/overview.md)说明层级职责和依赖方向；领域对象见[领域模型](docs/architecture/domain-model.md)。完整数据流分别归属[节点管线](docs/architecture/node-pipeline.md)和[文件管线](docs/architecture/file-pipeline.md)，运行时观测与持久化边界见[节点探测](docs/architecture/probing.md)和[存储架构](docs/architecture/storage.md)。
 
-所有变更都必须保持以下约束：
-
-- `internal/service` 是唯一业务编排层；CLI、HTTP、MCP 和 Web 入口调用 service，不复制业务逻辑。
-- `internal/adapter/*` 负责外部格式解析与渲染，不直接读写 store。
-- processor 不 import adapter，也不绕过受控 API 访问网络或文件系统。
-- service 和 domain 不 import entrypoint framework 类型。
-- `FileSpec.kind` 显式使用 canonical 值，包括 `static`；typed 公共 `config` 只含 `subscriptions` 和 JSON object `settings`。
-- typed-file driver 严格解码自身 settings；file-stage processor 按声明顺序执行。
-- Web 依赖方向、模块所有权和 `FileDriver` 边界以 [Web 模块约定](web/AGENTS.md)为准。
+Web 依赖方向和 FileDriver 分工见 [Web 模块约定](web/AGENTS.md)。
 
 ## 选择验证范围
 
@@ -98,72 +90,52 @@ make test PKGS=./internal/service TESTFLAGS='-run ^TestName$'
 
 按变更类型选择额外覆盖：
 
-- adapter：先判断来源字段与 canonical `NodeIR` 语义是否等价，验证受影响的
-  parse/render、validation、capability 和 raw/lossy/skip warning 路径。局部修复
-  覆盖其转换边界；共享语义变化再按下方矩阵展开。新增字段或扩大值域时，按
-  [字段接纳与 warning 处置](docs/architecture/node-pipeline.md#字段接纳与-warning-处置)
-  记录来源证据、未知值策略、私有配置边界及所有目标的 supported/lossy/skip 结论。
-  warning 本身不是兼容需求，probe 或 renderer 特判不能绕过字段接纳。
+- adapter：按下方影响矩阵确定受影响路径，检查 parse/render、validation、capability
+  和 warning 是否仍一致。新增 IR 语义的判断见
+  [字段接纳与 warning 处置](docs/architecture/node-pipeline.md#字段接纳与-warning-处置)。
 - processor、service、store、entrypoint：在最接近公开或层间契约的位置测试；文件流不要只依赖 renderer golden。
 - probe：默认门禁覆盖 sing-box；修改 Mihomo backend 时额外运行
   `go test -mod=readonly -tags probe_mihomo ./internal/probe ./internal/service`。
 - 用户可见 API、CLI、文件模型或 processor 行为：同时核对 canonical reference 和相关 tutorial/how-to。
-- 删除功能：用 `rg` 扫描旧标识，除明确的兼容说明外应为零命中。
+- 删除功能：用 `rg` 查找旧标识，清理失效实现与说明，保留仍有效的兼容和回归覆盖。
 
 ### 跨协议与客户端影响矩阵
 
-“全局考虑”要求审查完整影响面，不要求无差别修改所有实现。每个必查项都必须得出
-`已修改`、`静态分析或已有测试证明无需修改` 或 `不适用（附原因）` 之一；不能因为当前 fixture、
-目标客户端或报错路径只出现一个协议，就省略其它相关项。
+按语义与依赖确定影响面，用调用关系或测试验证判断。局部修复检查受影响的转换
+边界；共享语义变化沿调用者展开。交付说明只记录相关结论和未验证的风险。
 
-矩阵按语义与依赖影响触发，文件路径用于定位，不把注释、局部整理自动升级为全局审查。
-结论可按同一影响集合汇总，附调用关系、分支隔离或测试证据，不要求逐文件填写无关项。
-
-最小审查范围按改动性质确定：协议 canonical 语义变化覆盖该协议的全部输入和客户端
-输出；客户端共享 adapter 变化覆盖该客户端支持的全部协议；domain、service
-normalization/validation 或 shared helper 变化覆盖全部调用者、受影响协议和客户端。
-
-| 修改触点 | 必须审查的代码与契约 |
+| 修改触点 | 关注的影响 |
 | --- | --- |
-| `internal/domain/node*.go`、协议 option、枚举或 canonical 常量 | 所有 parser/renderer、`nodevalidation`、capability catalog、JSON Nodes、script envelope、`pkg/sandrone` 公共别名，以及节点 clone、preview identity、cache/hash/比较逻辑 |
-| `internal/adapter/shared` 的 helper、字段表或 source ref | 用 `rg` 找出全部调用者；检查每个调用协议、输入格式和目标客户端，不能只测新增分支 |
-| parser 的来源别名、默认值或 canonical 映射语义变化 | 同协议的其它 parser、受影响 renderer、Raw/unknown warning、validation、capability parse 声明和跨格式转换 |
-| renderer 的客户端共享映射变化 | 该客户端支持的全部协议分支、skip/lossy warning、capability render 声明和代表性跨协议测试；若改变 canonical 解释，同时检查其它 renderer |
-| `internal/service` 的节点 normalize/validate/输入编排，或 nodes-stage processor/script 节点结构 | 显式/自动/remote/local/ref/inline 输入、processor 前后 validation、直接 render、subscription/file flow、script envelope/schema 和 probe 前校验 |
-| capability catalog、warning/error code、report 聚合或上游 revision | 对应 parser/renderer、supported/lossy/raw_only 互斥关系、source ref、阶段与顶层 report、HTTP/CLI/MCP 展示、聚合脱敏和测试计数 |
-| probe payload、core backend 或探测前 renderer | sing-box 与 Mihomo 等已注册 core、节点级隔离、raw CLI 路径与保存订阅 processor 链；probe 不得补做 canonical 修复 |
-| 删除协议、字段、客户端能力或兼容分支 | parser、renderer、validation、capability、processor/script/API、fixture、文档和旧标识全仓扫描 |
+| `NodeIR` 字段、协议语义、normalize/validation | 使用该语义的输入与输出、JSON/script 表达、clone、identity 与缓存比较 |
+| shared helper 或客户端共享映射 | 全部调用者及受影响协议；其它 renderer 是否解释相同语义 |
+| parser 来源映射或 renderer 输出 | 跨格式转换、未知字段、skip/lossy warning、capability 声明 |
+| service 或 processor 编排 | 直接转换、保存订阅与文件流程，以及处理前后校验 |
+| capability、warning 或 report | 生成与聚合行为，以及受影响的 HTTP/CLI/MCP 展示 |
+| probe backend 或 payload | 受影响核心、节点隔离和保存订阅处理链；共享语义修复应在转换边界完成 |
+| 删除功能或兼容分支 | 调用者、fixture、公开契约与迁移影响 |
 
-审查时先用 `rg` 确认定义、读写点和 switch/capability 分支，再选择测试。共享 IR 或
-共享语义变化至少覆盖一条“一个来源 → `NodeIR` → 两个语义不同的目标”跨格式测试；
-客户端共享代码变化至少覆盖两个受影响协议。若实际只支持一个目标或协议，应在交付说明
-中明确写出该事实，而不是省略影响分析。
+跨格式或跨协议回归选择能区分语义的代表性输入，避免只证明报错 fixture 已通过。
+新增字段不要求每个目标都能表达，但应明确相关目标的等价输出、有损或跳过行为。
 
 ## 文档政策
 
-公开文档只描述当前产品，并按读者意图区分：
+每段内容都应能说明：省略后，读者会产生什么具体误解或漏掉什么操作。
+没有实际影响就删除，不以行数、篇幅或减字比例决定取舍。
 
-- Tutorial 带第一次使用者完成一条有可观察结果的路径，目标约 `120–200` 行。
-- How-to 假设读者已有基础，只解决一个任务，目标约 `60–150` 行。
-- Reference 可检索、穷举当前契约，通常约 `80–250` 行。
-- Architecture 解释边界、关系和数据流，通常约 `100–180` 行，复杂页面不超过约 `250` 行。
+- 教程和操作指南保留完成任务所需输入、命令、前提和预期结果。
+- Reference 说明当前接口语义及无法从字段形状推断的行为；可发现 schema 和源码
+  清单直接链接，避免维护完整副本。
+- Architecture 解释职责、关系、原因与运行后果；当前实现常量和算法留在源码。
+- 同一事实在所属文档完整维护，其他页面按需摘要或链接。任务自包含所需的短例子
+  可以重复；流程与字段清单不必复制。入口见[文档索引](docs/README.md)。
+- 区分当前默认、实现选择和必须遵守的契约。要求应说明触发条件及违反后的影响，
+  不将一次修复、某个客户端或现有目录布局扩成永久禁令。
 
-入口页同样有预算：根 README 约 `60–100` 行，Docs 索引约 `30–50` 行，本文约 `120–180` 行，AGENTS 约 `50–80` 行。预算用于发现职责膨胀，不应通过空话凑行数。
+示例使用占位凭据和文档保留地址；说明公共服务的实际用法时可引用其公开地址。
+不提交真实订阅、私密配置或运行数据，安全报告按 [SECURITY.md](SECURITY.md)。
 
-同一事实只在一个位置完整说明：
-
-- CLI 契约归属 [CLI 参考](docs/reference/cli.md)。
-- HTTP 通用约定和资源接口归属 [HTTP API 参考](docs/reference/http-api/README.md)及其专题页。
-- MCP transport、tools、resources、prompts 和输出边界归属 [MCP 参考](docs/reference/mcp.md)。
-- 文件字段、processor、脚本 API 分别归属 [FileSpec](docs/reference/file-spec.md)、[Processors](docs/reference/processors.md)和[脚本 API](docs/reference/scripting-api.md)。
-- 格式能力、错误诊断分别归属[能力参考](docs/reference/capabilities.md)和[错误参考](docs/reference/errors.md)。
-- 完整 nodes flow 和 file flow 只在各自架构页出现；README、Docs 索引和架构总览只做摘要与导航。
-
-历史名称只应出现在仍有效且集中的安全、协议、迁移或数据保护说明中。普通 fixture 和示例使用当前规范结构。
-
-实施期间可以维护临时 spec 或 plan；交付时清理本任务产生且已失效的执行材料。仍有效的契约和设计决策先归入 canonical 文档，再删除重复材料；用户明确要求保留的交付文档应保留。长期产品文档不保存 agent 执行日志。删除功能时清理专属旧实现、fixture 和说明，保留仍保护当前行为、兼容或数据安全的回归测试；历史由 Git 保存。
-
-示例只能使用 `example.com`、文档保留地址和占位凭据。不得提交本机路径、私有 fixture、真实订阅、节点 URI、token、cookie、私钥或运行时数据。
+删除或重命名时更新本任务相关链接和旧内容。实施材料失效后清理；仍有操作、兼容或
+设计价值的内容归入相应文档，用户要求的交付材料保留。不要把执行日志加入产品文档。
 
 ## Commit 与 Pull Request
 
@@ -171,7 +143,7 @@ normalization/validation 或 shared helper 变化覆盖全部调用者、受影�
 
 PR 使用[模板](.github/pull_request_template.md)，说明具体变化和实际验证结果。
 仅在触发时填写文档、跨格式、兼容性与迁移影响，删除不适用章节；无需为每个无关项写说明。
-可见 Web UI 变化附能说明结果的脱敏截图或录屏。
+界面变化难以用文字说明时，附能展示结果的脱敏截图或录屏。
 
 提交时检查暂存范围、diff 卫生和敏感数据；验证按上文选择，不因本地提交或 PR
 一律追加无关 Go/Web 检查。涉及语义、删除、文档或专项流程时，确认对应证据与清理已完成。

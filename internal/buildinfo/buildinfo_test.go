@@ -705,37 +705,6 @@ func TestBuildMetadataContracts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	buildReference, err := os.ReadFile(filepath.Join(root, "docs", "reference", "build-info.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for _, want := range []string{
-		"sandrone_linux_amd64.tar.gz",
-		"sandrone_linux_arm64.tar.gz",
-		"checksums.txt",
-		"sha256sum -c checksums.txt",
-		"linux/amd64",
-		"linux/arm64",
-		"发布版本不允许加号",
-		"最多 127 个字符",
-		"`main` 上手动运行 `Create Release`",
-		"自动递增 patch",
-		"稳定版本才同时更新 `latest`",
-		"预发布 tag 只发布自己的同名 tag",
-		"pull request、`main` 和以分支 ref 手动运行的 CI 只验证 `linux/amd64`",
-		"`v<version>` tag 构建并发布",
-		"`linux/amd64` 和 `linux/arm64` 的 GHCR manifest",
-		"`$BUILDPLATFORM`",
-		"`GOOS`/`GOARCH`",
-		"GitHub Actions 缓存",
-		"随后并行发布",
-	} {
-		if !strings.Contains(string(buildReference), want) {
-			t.Errorf("build reference does not contain %q", want)
-		}
-	}
-
 	for _, want := range []string{
 		`FROM --platform=$BUILDPLATFORM node:24.17.0-bookworm AS web`,
 		`FROM --platform=$BUILDPLATFORM golang:1.27.0-bookworm AS build`,

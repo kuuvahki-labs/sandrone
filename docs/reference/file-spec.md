@@ -64,15 +64,8 @@ typed 文件的公共 `config` **只有**两个字段：
 | `subscriptions` | string[] | 仅适用于声明了节点 renderer 的 typed kind；按数组顺序解析订阅并拼接节点。Shadowrocket 不允许非空值。 |
 | `settings` | JSON object | typed kind 必填；原样交给当前 kind 的 driver 严格解码。 |
 
-`config` 的其他字段会被拒绝。组、规则集和规则必须放在
-`config.settings`。typed kind 的 `config`、`settings` 以及其中的 `groups`、
-`rule_sets`、`rules` 都不能省略；三个字段必须是数组，但允许显式为空。
-`settings` 不能是数组、标量或 `null`；未知顶层字段以及已知字段上的 `null`
-均报 `invalid_argument`。
-
-在 MCP tool 的 JSON wire 上，`config.settings` 直接是 object；调用方不应把
-它编码成 JSON 字符串。各 canonical kind 的可发现 schema、source rules 与
-examples 见 [MCP resources](mcp.md#resources-与-schema-templates)。
+各 kind 的可发现 schema 与 examples 见
+[MCP resources](mcp.md#resources-与-schema-templates)。
 
 对 Mihomo 和 sing-box，`subscriptions` 省略和显式 `[]` 都产生零个节点；重复的
 订阅名不会去重，解析任一订阅失败会终止整个文件生成。Shadowrocket FileSpec
@@ -81,21 +74,16 @@ examples 见 [MCP resources](mcp.md#resources-与-schema-templates)。
 
 ## typed settings 完整性
 
-三个 driver 都只接受调用方已经完整物化的 settings：
+`config` 只接受上表的两个字段。typed kind 必须提供 object 类型的
+`config.settings`，其中 `groups`、`rule_sets`、`rules` 均为必填数组；缺失、
+`null` 或未知顶层字段返回 `invalid_argument`。显式空数组表示清空该集合，
+不会触发后端默认值。
 
-| kind | `settings` 允许的顶层字段 | 必填字段 | 显式 `[]` |
+| kind | `groups` | `rule_sets` | `rules` |
 | --- | --- | --- | --- |
-| `mihomo` | `groups`、`rule_sets`、`rules` | `groups`、`rule_sets`、`rules` | 对应的 `proxy-groups`、`rule-providers` 或 `rules` 为空 |
-| `sing-box` | `groups`、`rule_sets`、`rules` | `groups`、`rule_sets`、`rules` | 对应的 selector、`route.rule_set` 或 `route.rules` 为空 |
-| `shadowrocket` | `groups`、`rule_sets`、`rules` | `groups`、`rule_sets`、`rules` | 对应的 `[Proxy Group]`、规则集映射或 `[Rule]` 不生成条目 |
-
-省略整个 `config`、省略 `settings`、提交 `settings: {}` 或漏掉任一必填字段都返回
-`invalid_argument`。空数组表示调用方明确选择该输出集合为空，不触发任何后端默认值。
-
-Mihomo 与 sing-box 的 `groups`、`rule_sets`、`rules` 使用客户端结构：
-
-- Mihomo `groups` 和 `rule_sets` 是 object 数组，`rules` 是 string 数组；
-- sing-box 三者都是 object 数组。
+| `mihomo` | 客户端 object 数组 | 客户端 object 数组 | 规则 string 数组 |
+| `sing-box` | 客户端 object 数组 | 客户端 object 数组 | 客户端 object 数组 |
+| `shadowrocket` | 下述分组 object 数组 | `name`、`type`、`url` object 数组 | 规则 string 数组 |
 
 Shadowrocket 的 settings 还执行字段级严格校验：
 
@@ -109,9 +97,6 @@ Shadowrocket 的 settings 还执行字段级严格校验：
 Mihomo 和 sing-box 的客户端 object 内容保持开放，以容纳各自客户端字段。
 sing-box Web 正则组所用的脚本扩展字段与显式处理器要求见
 [出站配置适配](community-config-presets.md#出站配置适配)。
-当前三个 compiler 的组输出都由 `groups` 决定。已移除的 `adaptive_groups`
-按未知字段拒绝，调用方须删除该键。Web 地区组工具的恢复规则见
-[生成地区组](../how-to/render-client-config.md#生成地区组)。
 
 ## 编译与所有权
 
@@ -131,6 +116,8 @@ file-stage `script`。二者都在编译完成后按 `processors` 的声明顺�
 
 ## 最小 typed 示例
 
+以下 YAML 用于展示字段；通过 CLI 或 HTTP 提交 FileSpec 时使用对应 JSON 对象。
+
 ### Mihomo
 
 ```yaml
@@ -145,7 +132,7 @@ config:
         type: select
         proxies: [$nodes, DIRECT]
     rule_sets: []
-    rules: [MATCH,Proxy]
+    rules: ["MATCH,Proxy"]
 ```
 
 ### sing-box
@@ -178,7 +165,7 @@ config:
   settings:
     groups: []
     rule_sets: []
-    rules: [FINAL,PROXY]
+    rules: ["FINAL,PROXY"]
 ```
 
 sing-box 示例通过显式 base 声明默认出口，另外两个示例使用内建 base。

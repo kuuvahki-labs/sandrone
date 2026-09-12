@@ -25,9 +25,8 @@ sandrone
 └── serve
 ```
 
-所有命令都接受 `--help`。根命令的 `--version` 输出
-`sandrone version <version>`；构建包含 revision 时追加 12 位短 SHA。版本与
-revision 的来源和职责见[构建身份](build-info.md)。
+所有命令都接受 `--help`。根命令的 `--version` 显示版本及可用的 revision、
+build time，格式与来源见[构建身份](build-info.md)。
 
 ## 公共 flag 与环境变量
 
@@ -84,18 +83,9 @@ API 保存了其它被覆盖字段时，当前进程继续使用覆盖值。`war
 
 ## 节点格式
 
-需要输入格式的命令接受：
-
-- `uri`：单个分享 URI；
-- `uri-list`：逐行分享 URI；
-- `base64`：Base64 编码的 URI 列表；
-- `mihomo`：带 `proxies` 的 Mihomo YAML/JSON；
-- `sing-box`：带 `outbounds` 或 `endpoints` 的 sing-box JSON；
-- `json-nodes`：Sandrone 规范化节点 JSON。
-
-节点输出格式为 `json-nodes`、`mihomo-proxies`、
-`shadowrocket-proxies`、`sing-box-outbounds` 和 `uri-list`。各格式的协议和
-有损边界见[格式与能力参考](capabilities.md)。
+输入与输出格式见[格式与能力参考](capabilities.md#输入格式)，也可用
+`capability formats` 查询当前构建。输入和输出名称不同，例如 Mihomo 输入用
+`mihomo`，节点输出用 `mihomo-proxies`。
 
 ## `convert`
 
@@ -123,8 +113,8 @@ sandrone convert --to <format> \
 | `--proxy <url>` | 空 | HTTP、HTTPS 或 SOCKS 代理 URL |
 | `--remote-timeout <duration>` | 服务缺省 | 远程抓取超时，使用 Go duration，例如 `5s` |
 
-自动检测只用于远程输入；候选包括 `base64`、`uri-list`、`mihomo` 和
-`sing-box`。`json-nodes` 不在自动检测候选中。
+自动检测只用于远程输入；解包方式、候选格式和 source format 语义见
+[输入格式](capabilities.md#输入格式)。
 
 ## `diagnose`
 
@@ -230,8 +220,6 @@ MCP 的 tool/resource/prompt catalog、管理边界和正文省略规则见
 立即生效。
 Web 开发与嵌入构建见 [Web UI 快速说明](../../web/README.md)，HTTP endpoint
 契约见 [HTTP API 通用约定](http-api/README.md)。
-MCP path 不能是 `/`、`/healthz`、`/version`、`/convert`、`/s` 或 `/s/*`，
-避免 MCP 绕过共享 bearer token 或与公开分享/Web 路由冲突。
 
 选择 S3 只替换持久化 Store；长驻 `serve` 仍运行定时更新，并保留构建中可用的
 probe backend。Vercel serverless profile 的不同能力边界见

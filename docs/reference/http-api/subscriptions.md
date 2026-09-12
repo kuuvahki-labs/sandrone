@@ -7,8 +7,7 @@
 解析或物化节点；需要观察处理结果时使用 preview，需要读取远程服务声明的套餐
 用量时使用 traffic。
 
-本页中的接口都属于受保护的 `/v1/*` 管理 API。服务启用 token 鉴权时，请求须
-携带 `Authorization: Bearer <token>`。
+通用鉴权、资源名和错误响应见 [HTTP API 约定](README.md)。
 
 ## 接口
 
@@ -106,8 +105,7 @@
 节点即使被改名、重排或修改连接字段也仍按同一节点计算，变化表现为 `modified`；
 过滤、排除或去重表现为 `removed`。processor 新建或手工重建且未继承 `RuntimeID` 的
 节点表现为 `added`，对应的原节点表现为 `removed`。`RuntimeID` 不属于 NodeIR JSON，
-不会出现在 `before`、`after` 或资源定义中。执行快照会在私有 sidecar 中保存前后
-节点的 RuntimeID，使缓存命中后的 diff 仍遵守同一关联语义。
+不会出现在 `before`、`after` 或资源定义中。缓存命中后的 diff 仍遵守同一关联语义。
 
 远程订阅按保存的抓取设置读取，正数
 `cache_ttl_seconds` 可以复用该订阅资源自己的 remote-fetch 缓存，不与其它订阅
@@ -222,17 +220,12 @@ curl -sS "$SANDRONE_URL/v1/subscriptions/example/render?arg.environment=test" \
 
 ## 失败与安全边界
 
-- `{name}` 必须非空，URL 解码后只能是一个 path segment；包含 `/`、`\`，
-  或名称为 `.`、`..` 都会被拒绝。创建、读取、删除、preview、traffic 与
-  render 使用同一约束。
 - 远程输入只能经 Sandrone 的受控 fetcher 读取；不要在示例、日志或
   `meta` 中暴露真实订阅 URL、凭据或套餐标识。
 - preview 会返回处理前后的节点对象，其中可能含连接凭据；应把响应按敏感数据
   处理。
 - 保存或删除订阅会清理其拥有的 remote-fetch、probe 与 subscription-snapshot
   缓存；执行快照还会在命中时校验传递依赖 revision。
-- handler 级错误码、状态映射和 warning 字段见[错误与诊断参考](../errors.md)；
-  router 与未知 action 的 plain-text `404`/`405` 边界见[通用约定](README.md#响应与失败)。
 
 ## 最小示例
 

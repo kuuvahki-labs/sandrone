@@ -87,25 +87,8 @@ JSON 响应在发送状态码前完成编码；编码失败返回 `500` 和 `int
 
 ## GET /healthz
 
-### 用途
-
-无需鉴权地确认 HTTP 服务可达；它不检查 store、远程输入或下游客户端状态。
-
-### 请求
-
-没有请求体和查询参数。
-
-### 响应
-
-成功返回 `200`：
-
-```json
-{
-  "ok": true
-}
-```
-
-### 最小示例
+无需鉴权、请求体或查询参数，成功返回 `200` 和 `{"ok":true}`。它只确认 HTTP
+服务可达，不检查 store、远程输入或下游客户端。
 
 ```sh
 curl "$SANDRONE_URL/healthz"
@@ -113,17 +96,7 @@ curl "$SANDRONE_URL/healthz"
 
 ## GET /version
 
-### 用途
-
-无需鉴权地读取当前 Sandrone 构建版本。
-
-### 请求
-
-没有请求体和查询参数，路径必须精确为 `/version`。
-
-### 响应
-
-成功返回 `200`：
+无需鉴权、请求体或查询参数，成功返回 `200`：
 
 ```json
 {
@@ -133,11 +106,8 @@ curl "$SANDRONE_URL/healthz"
 }
 ```
 
-`version` 是当前构建提供的规范版本字符串，`revision` 是完整 Git object ID；
-无法取得 VCS metadata 时 `revision` 为空字符串。上例只是示例值，调用方不应
-写死。字段来源、短 SHA 展示和容器追溯见[构建身份](../build-info.md)。
-
-### 最小示例
+`version` 是构建版本，`revision` 是完整 Git object ID；无 VCS metadata 时为
+空字符串。字段来源与容器追溯见[构建身份](../build-info.md)。
 
 ```sh
 curl "$SANDRONE_URL/version"

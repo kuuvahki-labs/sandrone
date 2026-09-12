@@ -39,10 +39,7 @@ processor 与完整 report。完整转换和能力检查位于 `/v1/*`，启用 
 的 Mihomo 文档，再尝试严格的 Base64 与 URI list。显式给出格式后只调用该
 parser，不做 fallback。
 
-当前输入格式为 `uri`、`uri-list`、`base64`、`mihomo`、`sing-box` 和
-`json-nodes`；输出格式为 `base64`、`mihomo-proxies`、
-`shadowrocket-proxies`、`sing-box-outbounds`、`json-nodes` 和 `uri-list`。
-运行时的权威列表应通过能力检查读取。
+可用格式通过运行时能力检查读取。
 
 ### 响应
 
@@ -242,7 +239,7 @@ catalog 路径按需读取。
   },
   "file_kinds": ["static", "mihomo", "sing-box", "shadowrocket"],
   "probe": {
-    "methods": ["tcp_connect", "udp_ntp", "url_test"],
+    "methods": ["tcp_connect"],
     "backends": [{"method": "tcp_connect", "name": "tcp_connect"}]
   },
   "store": {"configured": true, "subscriptions": 0, "files": 0},

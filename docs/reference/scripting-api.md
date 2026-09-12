@@ -34,12 +34,9 @@ processors:
 | `id` | string | inline 脚本的诊断标识；省略时为 `<inline>` |
 | `permissions` | object | 保留配置；当前不授予原生宿主能力 |
 
-配置结构中虽保留 `permissions` 字段，但它不是授予原生文件系统、子进程、环境变量或通用网络访问的接口。脚本能产生的外部作用仅限本页列出的受控 API。
-在 MCP wire 上，script processor 的 `params` 与其中的 `permissions` 都是
-JSON object，不是字符串。Agent 可通过
-`sandrone://schemas/script-api/v1` 与对应的
-`sandrone://schemas/processors/{stage}/script` resource 读取机器可校验的当前
-契约；resource catalog 见 [MCP 参考](mcp.md#resources-与-schema-templates)。
+脚本 schema 可通过 `sandrone://schemas/script-api/v1` 与
+`sandrone://schemas/processors/{stage}/script` 读取，目录见
+[MCP 参考](mcp.md#resources-与-schema-templates)。
 
 ## 脚本来源
 
@@ -186,9 +183,6 @@ JSON 中带 `omitempty` 的成员在无值时可能不存在。脚本应对 `arg
 const prefix = (input.args && input.args.prefix) || "";
 ```
 
-`params.args` 只参与当前脚本的 `input.args` 合并，不会传给 file-backed source
-的文件渲染流程。
-
 `api.subscription.produce` 与 `api.file.content` 的 `options.args` 只接受字符串
 键值，并作为子调用的完整参数集。省略 `options.args` 表示子调用无参数；父文件
 请求参数和当前脚本 `input.args` 都不会隐式继承。
@@ -309,6 +303,5 @@ header；未知字段同样会使 `api.ini.stringify` 失败。输出统一使�
 API。即使填写保留的 `permissions` object，也不会出现这些能力。远程脚本抓取、
 订阅生成、文件读取和节点探测只能通过 Sandrone 的受控边界进行。
 
-envelope 可能包含代理密码、UUID、token、原始节点字段、请求 metadata 和来源诊断。脚本、`api.log`、`api.warn` 以及错误原因都不得当作脱敏边界；不要把秘密写入 warning、日志或可公开的错误响应。
-
-错误码和 warning/report 的通用语义见 [错误与诊断](errors.md)。
+envelope 含节点凭据与请求信息；脚本日志和 warning 不会自动脱敏。
+错误码、warning/report 和对外分享前的检查见[错误与诊断](errors.md#敏感诊断边界)。

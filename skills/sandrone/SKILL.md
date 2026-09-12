@@ -1,88 +1,37 @@
 ---
 name: sandrone
-description: Use when an Agent must operate Sandrone to convert proxy or subscription data, inspect or manage subscriptions and FileSpecs, render client configurations, author processors or sandbox scripts, or explain Sandrone reports.
+description: Operate Sandrone subscriptions, FileSpecs, conversions and processor scripts, or explain their reports.
 ---
 
 # Sandrone
 
-## Overview
+Use the bundled HTTP script when shell access, `curl`, and `SANDRONE_URL` are
+available; a connected Sandrone MCP server is another execution option. Follow
+the user's chosen interface when specified. MCP client requirements are in the
+[MCP reference](https://github.com/kuuvahki-labs/sandrone/blob/main/docs/reference/mcp.md). If neither interface is available,
+explain how to configure `SANDRONE_URL` (and `SANDRONE_TOKEN` when required) or
+connect MCP. Explaining a supplied report needs no server connection.
 
-Use the bundled HTTP script as the preferred execution plane and a connected
-Sandrone MCP server as the fallback. Use this Skill for workflow and safety
-decisions; obtain capabilities, schemas, defaults, examples, and current
-resource definitions from the selected live plane when the task needs them.
-Explaining an already supplied report does not require a server connection.
+Read [workflows](references/workflows.md) for endpoint mappings and resource
+operations. Discover only the capabilities, schemas and current definitions
+needed for the task; reuse valid results, refreshing after a server change or
+schema mismatch. Live schemas describe supported payloads; this Skill does not
+maintain a second field catalog.
 
-## Select One Execution Plane
+## Writes and verification
 
-1. If shell access, `curl`, `SANDRONE_URL`, and
-   `scripts/sandrone-api.sh` are available, select the HTTP script.
-2. Otherwise, if Sandrone MCP tools are connected, select MCP.
-3. Otherwise, report both supported setup choices: configure `SANDRONE_URL`
-   (and `SANDRONE_TOKEN` when required) for the bundled script, or connect a
-   Sandrone MCP server.
+An explicit request to create, update or delete a resource authorizes that
+operation. Inspection, drafts, preview and rendering alone do not authorize
+persistence. Resolve the target from available context and read its existing
+definition before overwriting or deleting it; ask only if the target remains
+ambiguous. Read [safety](references/safety.md) before writes or sensitive-data
+handling.
 
-Use the MCP plane only through a client that supports MCP `2026-07-28`.
-Sandrone does not support the legacy initialize/initialized session lifecycle
-or older protocol negotiation. If the client cannot establish that connection,
-report the incompatibility and the HTTP setup alternative.
+Complete authorized persistence and verify the affected behavior. Input or
+processor changes usually need preview/render; metadata-only changes can be
+verified by reading the saved definition. Report saved state separately from a
+failed verification, without repeating the write just to retry verification.
 
-For first connection or uncertain capabilities, use the relevant discovery section
-in [references/workflows.md](references/workflows.md#discover). Read only the
-recipe and endpoint mappings needed for the task. Reuse still-valid discovery
-and schema results within the task; refresh after a server change or schema mismatch.
-
-Before a mutation, read the authorization and retry sections of
-[references/safety.md](references/safety.md). Read its external-effects or script
-sections when those operations are involved; already-read unchanged guidance
-need not be reread.
-
-## Treat the Server as Canonical
-
-- Fetch the applicable processor, file-kind, Subscription, FileSpec, or script
-  schema through the selected plane when constructing or validating that payload.
-  Reuse a still-valid live schema from this task. Never reconstruct a dynamic schema
-  from this Skill.
-- Send only fields published by the current schema.
-- Use canonical format, processor stage/type, and FileSpec kind values.
-- Run file-stage processors in declared order.
-- For Mihomo, sing-box, and Shadowrocket, author final `groups`. Never create,
-  modify, or derive behavior from `adaptive_groups`; it is editor compatibility
-  metadata. Preserve an existing value unchanged only for a compatible
-  round-trip, or warn before dropping it.
-- Branch on structured error `code` and context fields. Do not parse
-  human-readable error text.
-
-## Mutation Rule
-
-Treat an explicit user request to create, update, replace, or delete the exact
-named resource as authorization for that action. Do not infer authorization
-from a request to inspect, draft, validate, preview, diagnose, or render.
-
-Before overwriting or deleting, read the exact existing definition. For
-ambiguous names or scopes, first use available read-only context to resolve them;
-ask only if the mutation target remains uncertain. Do not add a redundant confirmation
-when the user's instruction is already explicit and the target is exact.
-
-## Return Useful Results
-
-Complete the requested draft, read, conversion, or authorized mutation and its
-applicable verification before reporting the outcome. Do not stop at a draft
-when persistence was authorized. If verification fails after a successful write,
-report the saved state and the verification gap separately; do not repeat the
-write merely to retry verification.
-
-Lead with the completed outcome. Include the relevant resource name, whether state
-was persisted, any preview/render result, and material warnings. Never
-echo bearer tokens, credentials, subscription URLs, or full node secrets unless
-the user explicitly requests the sensitive value.
-
-## Common Mistakes
-
-- Switching from HTTP to MCP during an ambiguous mutation retry.
-- Using remembered schemas instead of live HTTP endpoints or MCP resources.
-- Treating MCP prompts as actions.
-- Substituting public `GET /convert` for full `POST /v1/convert`.
-- Claiming a new subscription was previewed before it was persisted.
-- Retrying put/delete after an ambiguous failure without rereading the resource.
-- Inventing an artifact URI when a large response reports `body_omitted`.
+Return the resource name, persistence status, relevant output and material
+warnings. Use structured error codes to interpret failures. When MCP reports
+`body_omitted`, report the size limit; it has not created a hidden file or share.

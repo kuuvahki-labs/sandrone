@@ -1,135 +1,55 @@
 # Sandrone Workflows
 
-Use the selected execution plane for the whole operation. HTTP operations below
-use `scripts/sandrone-api.sh METHOD PATH [BODY_FILE|-]`; pass JSON on stdin with
-`-` or from a permission-restricted body file. MCP names are unqualified; a
-client may add a namespace prefix.
-
-## Transport Mapping
-
-| Operation | HTTP | MCP |
-| --- | --- | --- |
-| Inspect | `GET /v1/inspect` | `sandrone_inspect` |
-| List format capabilities | `GET /v1/capabilities/formats` | `sandrone://capabilities/formats` |
-| Exact format capability | `GET /v1/capabilities/formats/{direction}/{format}` | `sandrone://capabilities/formats/{direction}/{format}` |
-| List UI capabilities | `GET /v1/capabilities/ui` | — |
-| Full conversion | `POST /v1/convert` | `sandrone_convert` |
-| List subscriptions | `GET /v1/subscriptions` | `sandrone_list_resources` |
-| Read subscription | `GET /v1/subscriptions/{name}` | `sandrone://subscriptions/{name}` |
-| Put subscription | `POST /v1/subscriptions` | `sandrone_put_subscription` |
-| Delete subscription | `DELETE /v1/subscriptions/{name}` | `sandrone_delete_subscription` |
-| Preview subscription | `POST /v1/subscriptions/{name}/preview` | `sandrone_preview_subscription` |
-| Render subscription | `POST /v1/subscriptions/{name}/render` | `sandrone_render_subscription` |
-| List files | `GET /v1/files` | `sandrone_list_resources` |
-| Read FileSpec | `GET /v1/files/{name}?mode=spec` | `sandrone://files/{name}` |
-| Put FileSpec | `POST /v1/files` | `sandrone_put_file` |
-| Delete FileSpec | `DELETE /v1/files/{name}` | `sandrone_delete_file` |
-| Render file | `GET /v1/files/{name}?mode=render&response=json` | `sandrone_get_file` |
-
-## Schema Mapping
-
-Use live schemas for the payload being authored or validated; reuse still-valid
-results within the task. Do not copy their fields into this reference.
-
-| Schema | HTTP | MCP resource |
-| --- | --- | --- |
-| Schema catalog | `GET /v1/schemas` | `sandrone://schemas` |
-| Processor catalog | `GET /v1/schemas/processors` | `sandrone://schemas/processors` |
-| Exact processor | `GET /v1/schemas/processors/{stage}/{type}` | `sandrone://schemas/processors/{stage}/{type}` |
-| File-kind catalog | `GET /v1/schemas/file-kinds` | `sandrone://schemas/file-kinds` |
-| File kind | `GET /v1/schemas/file-kinds/{kind}` | `sandrone://schemas/file-kinds/{kind}` |
-| Script API | `GET /v1/schemas/script-api/v1` | `sandrone://schemas/script-api/v1` |
-| Subscription | `GET /v1/schemas/subscription` | `sandrone://schemas/subscription` |
-| FileSpec | `GET /v1/schemas/file-spec` | `sandrone://schemas/file-spec` |
+HTTP calls use `scripts/sandrone-api.sh METHOD PATH [BODY_FILE|-]`. Pass JSON on
+stdin with `-` or in a private body file. MCP tool names may have a client namespace
+prefix. Read-only calls may use either interface; keep track of the server identity.
 
 ## Discover
 
-On first connection or when server identity/capabilities are uncertain, use
-`/healthz`, `/version`, and `GET /v1/inspect` for HTTP, or `sandrone_inspect` for MCP.
-Then read only the capability/schema and resource endpoints needed by the request.
-List resources only when discovery is needed; read exact named definitions directly.
-Reuse still-valid discovery within the task, refreshing after server changes or
-schema mismatches. Always reread the current definition before overwrite/delete.
-Explaining a supplied report alone needs no discovery or live requests.
+Use `GET /v1/inspect` or `sandrone_inspect` when capabilities are uncertain.
+`/version` identifies an HTTP build. Read exact named resources directly; list
+when the name is unknown. Follow pagination cursors returned by the selected
+interface without changing its filter.
 
-Follow an opaque `next_cursor` without interpreting or modifying it. Keep the
-same list filter across pages.
+The runtime schema catalog is `GET /v1/schemas` or `sandrone://schemas`. It links
+processor, file-kind, Subscription, FileSpec and script API schemas. Read the
+relevant schemas when constructing unfamiliar payloads. Format capabilities are
+at `/v1/capabilities/formats` or `sandrone://capabilities/formats`.
 
-## Convert Inline or Remote Input
+## Resource operations
 
-1. Read the exact source parse and target render capabilities plus every
-   requested parse/render processor schema.
-2. Use authenticated `POST /v1/convert` for HTTP or `sandrone_convert` for MCP
-   with exactly one supported input source.
-3. Inspect report warnings and loss information.
-4. If MCP prompts are available, use `diagnose_conversion_loss` only to explain
-   loss; prompts do not execute conversion.
+| Operation | HTTP | MCP |
+| --- | --- | --- |
+| Convert temporary input | `POST /v1/convert` | `sandrone_convert` |
+| List subscriptions/files | `GET /v1/subscriptions` / `GET /v1/files` | `sandrone_list_resources` |
+| Read subscription | `GET /v1/subscriptions/{name}` | `sandrone://subscriptions/{name}` |
+| Save subscription | `POST /v1/subscriptions` | `sandrone_put_subscription` |
+| Preview subscription | `POST /v1/subscriptions/{name}/preview` | `sandrone_preview_subscription` |
+| Render subscription | `POST /v1/subscriptions/{name}/render` | `sandrone_render_subscription` |
+| Read FileSpec | `GET /v1/files/{name}?mode=spec` | `sandrone://files/{name}` |
+| Save FileSpec | `POST /v1/files` | `sandrone_put_file` |
+| Render file | `GET /v1/files/{name}?response=json` | `sandrone_get_file` |
+| Delete subscription/file | `DELETE /v1/subscriptions/{name}` / `DELETE /v1/files/{name}` | `sandrone_delete_subscription` / `sandrone_delete_file` |
 
-The public `GET /convert` route is a separate processor-free convenience route.
-It does not replace full `POST /v1/convert`. Conversion creates neither a
-Subscription nor a FileSpec.
+Saving overwrites the complete definition at the same name. Preserve unrelated
+fields and processor order when editing. Preview/render by subscription name
+requires a saved resource; do not claim to have previewed a new unsaved definition.
+A file's `spec`, `source`, and `render` modes return its definition, base content,
+and final content respectively.
 
-## Create or Update a Subscription
+Full conversion accepts temporary input and processors without creating a
+Subscription or FileSpec. Public `GET /convert` is a separate processor-free
+convenience route. Use full conversion when reports or processors are needed.
+HTTP request shapes are in the [HTTP reference](https://github.com/kuuvahki-labs/sandrone/blob/main/docs/reference/http-api/README.md).
 
-1. Read `/v1/schemas/subscription` plus the exact target format capability and
-   each requested nodes-stage processor schema, or the equivalent live MCP
-   resources.
-2. If updating, read the exact existing subscription first.
-3. Build a complete Subscription definition from the live schemas.
-4. Return a draft without mutation when only a draft was requested.
-5. For an authorized persistence request, use `POST /v1/subscriptions` or
-   `sandrone_put_subscription`.
-6. Preview the saved name with
-   `POST /v1/subscriptions/{name}/preview` or
-   `sandrone_preview_subscription`.
-7. When requested, render with authenticated
-   `POST /v1/subscriptions/{name}/render` or
-   `sandrone_render_subscription`.
+## Processor scripts and reports
 
-Preview/render accepts a saved subscription name. Do not claim that a new
-unsaved subscription was previewed.
+Use the processor schema and script API schema for the chosen stage. Scripts run
+as embedded ECMAScript, with the injected Sandrone API, not Node.js. File-stage
+processors run in declaration order. Reusable script examples and registration
+commands are in [the script guide](https://github.com/kuuvahki-labs/sandrone/blob/main/docs/how-to/write-processor-script.md).
 
-## Create or Update a FileSpec
-
-1. Read `/v1/schemas/file-spec`,
-   `/v1/schemas/file-kinds/{kind}`, and every requested file-stage processor
-   schema, or the equivalent live MCP resources.
-2. If updating, read the exact existing FileSpec first.
-3. Build a complete FileSpec using only live schema fields. Preserve declared
-   file-stage processor order.
-4. Write concrete `groups`, `rule_sets`, and `rules` where applicable. Never
-   create or modify `adaptive_groups`; preserve an existing value unchanged
-   only when the accepted write shape permits a compatibility round-trip.
-5. Return a draft without mutation when only a draft was requested.
-6. For an authorized persistence request, use `POST /v1/files` or
-   `sandrone_put_file`.
-7. Render a saved file with
-   `GET /v1/files/{name}?mode=render&response=json` or `sandrone_get_file` in
-   `render` mode. Use `spec` or `source` mode for those representations.
-
-## Delete a Resource
-
-1. Require an explicit delete request and an exact resource kind/name.
-2. Read the exact existing definition through the selected plane.
-3. Call the matching HTTP `DELETE` endpoint or MCP delete tool once.
-4. Report `deleted` exactly as returned. After an ambiguous transport failure,
-   keep the same plane and reread the exact resource before retrying.
-
-## Author a Processor or Script
-
-1. Read the exact `/v1/schemas/processors/{stage}/{type}` endpoint or matching
-   MCP resource.
-2. For scripts, also read `/v1/schemas/script-api/v1` or
-   `sandrone://schemas/script-api/v1`.
-3. Use `write_processor_script` only as an optional MCP drafting aid.
-4. Treat the script as embedded ECMAScript, not Node.js.
-5. Check its containing saved Subscription or FileSpec through the applicable
-   preview or render flow. For local draft diagnosis, use the CLI `diagnose`
-   command; HTTP and MCP do not expose diagnose directly.
-
-## Explain Reports and Errors
-
-Branch on structured `code` and context fields. An MCP `explain_report` prompt
-may help explain results but does not execute an action. When
-`body_omitted: true`, report `body_bytes` and `max_output_bytes`; Sandrone did
-not create a hidden file or share.
+Verify affected saved subscriptions through preview and files through render.
+Local CLI `diagnose` supports draft diagnosis; HTTP and MCP do not expose diagnose
+directly. MCP prompts can assist drafting or explanation but do not execute the
+operation. Report warnings and loss using the structured report fields.

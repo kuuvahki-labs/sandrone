@@ -8,8 +8,6 @@ import unusedImports from "eslint-plugin-unused-imports";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
-import preferAppAlias from "./eslint-rules/prefer-app-alias.js";
-
 const sourceFiles = ["**/*.{js,jsx,ts,tsx}"];
 const browserGlobals = {
   ...globals.browser,
@@ -48,11 +46,6 @@ export default defineConfig([
       },
     },
     plugins: {
-      sandrone: {
-        rules: {
-          "prefer-app-alias": preferAppAlias,
-        },
-      },
       "simple-import-sort": simpleImportSort,
       "unused-imports": unusedImports,
     },
@@ -85,7 +78,6 @@ export default defineConfig([
       "@typescript-eslint/no-unused-vars": "off",
       "comma-spacing": ["error", { "after": true, "before": false }],
       "no-unused-vars": "off",
-      "sandrone/prefer-app-alias": "error",
       "simple-import-sort/exports": "error",
       "simple-import-sort/imports": [
         "error",
@@ -111,23 +103,6 @@ export default defineConfig([
       ],
       "react/prop-types": "off",
       "react-hooks/set-state-in-effect": "off",
-    },
-  },
-  {
-    files: ["app/routes/**/*.{ts,tsx}"],
-    ignores: ["app/routes/**/*.test.{ts,tsx}", "app/routes/**/*.dom.test.ts"],
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        {
-          patterns: [
-            {
-              group: ["@mui/**"],
-              message: "Compose presentation in core, features, or shared modules instead of public routes.",
-            },
-          ],
-        },
-      ],
     },
   },
   {

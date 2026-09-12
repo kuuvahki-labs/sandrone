@@ -1,8 +1,8 @@
 # 客户端路由、DNS 与 IP 兜底
 
 本页是 Sandrone Web 新建 Mihomo、sing-box 和 Shadowrocket 文件时，规则模板、
-DNS 路径与 IP 兜底语义的现行契约。它描述默认生成结果，不承诺自动改写已经保存
-的 source、settings 或 processors。
+DNS 路径与 IP 兜底行为。以下是可编辑的默认方案；改变 source、settings 或
+processors 可以选择其他路由策略，已有文件不会自动回填这些默认值。
 
 ## 隐私边界
 
@@ -20,11 +20,10 @@ DNS 路径与 IP 兜底语义的现行契约。它描述默认生成结果，不
   iOS 兼容例外。系统 resolver 是否使用明文传输由当前网络决定；该例外不扩展成
   全局 system fallback。
 
-因此，“国内 DNS 可见中国域名”在此模型中可接受；“系统 DNS 可见任意未知或境外
-域名”不可作为默认行为。客户端、操作系统或应用绕过 TUN、使用未被规则集识别的
-自定义加密 DNS，仍可能形成契约之外的旁路。
+这些默认保留了国内 CDN 与系统兼容例外。客户端、操作系统或应用绕过 TUN，
+或使用规则集未识别的自定义 DNS 时，实际解析路径仍可能不同。
 
-## canonical 规则顺序
+## 默认规则顺序
 
 生成模板按下列层次匹配：
 
@@ -37,34 +36,20 @@ DNS 路径与 IP 兜底语义的现行契约。它描述默认生成结果，不
 7. 中国 IP 兜底；
 8. 最终策略。
 
-服务策略组完整拥有其命名服务的路由控制权。模板不在服务规则之前加入绕过策略组
-的国内直连例外；需要直连时由对应服务策略组选择 `DIRECT`。Microsoft 和 Apple
-策略组默认以 `DIRECT` 为首选项，因此默认路径仍然直连，但用户切换策略后会作用于
-完整服务。
-除这类明确的直连优先组外，Shadowrocket 服务组直接以客户端内建 `PROXY`
-为第一项；模板不生成自定义主 `Proxy`/“节点选择”组和依赖它的
-`Fallback` 组。DoH、853 端口及默认新规则也直接使用内建 `PROXY`。
-启用自适应地区组时，Web 把生成的地区组插在各策略组的内建 `PROXY` 之后，
-不要求额外的主代理组。
+默认服务规则由对应策略组控制，Microsoft、Apple 组优先直连；具体子服务放在
+宽泛父规则之前，例如 Xbox 在 Microsoft 前，避免被父规则提前匹配。调整顺序或
+增加前置例外会改变实际控制流。Shadowrocket 默认直接使用内建 `PROXY`；可按需
+编辑分组，不要求另外创建主代理组。
 
-同一策略下优先使用上游维护的聚合集合：AI 使用 `category-ai-!cn`，Microsoft 和
-Apple 分别直接使用其父集合，Meta 使用 `meta`，新闻使用 `category-media`。这能
-避免重复下载同义 provider。不同策略间即使存在包含关系，具体子服务仍必须先于
-宽泛父列表，例如 Xbox 先于 Microsoft、Apple TV+ 先于 Apple、Hulu 先于 Disney、
-npm 先于 GitHub；这样各子服务策略组不会被父列表提前截流。
+规则集和默认组定义见 [Web 客户端驱动](../../web/app/features/files/drivers)。
+客户端能力有以下差别：
 
-Shadowrocket 的 AI 聚合规则使用 iab0x00 `AI.txt`，其余模板规则使用
-Blackmatrix 的 DOMAIN-SET/RULE-SET 文本。模板不直接引用 MetaCubeX geosite
-`.list`，因为其中的 `+.` 条目不是本项目已验证的 Shadowrocket
-DOMAIN-SET 语法。
-
-Mihomo 输出原生 `Fallback`，并让主代理组可以选择它；sing-box 没有有序
-fallback outbound，Shadowrocket 模板直接使用内建 `PROXY`，因此两者都不生成
-`Fallback` 替代组。
-Mihomo 的广告组同时提供 `REJECT`、`REJECT-DROP` 和 `DIRECT`；
-Shadowrocket 的广告组使用可作为组成员的 `REJECT` 和 `DIRECT`，
-`REJECT-DROP` 仅保留为规则策略；sing-box 使用其原生 `block` outbound，
-不伪造丢包拒绝策略。
+- Mihomo 提供原生 `fallback`；sing-box 没有等价的有序 fallback outbound。
+- Shadowrocket 的规则策略与分组成员值域不同；`REJECT-DROP` 可作规则策略，
+  不能直接作为这里的固定组成员，广告组默认使用 `REJECT`、`DIRECT`。
+- sing-box 默认广告策略使用 `block` outbound。
+- Shadowrocket 默认使用已验证的 DOMAIN-SET/RULE-SET 来源；不能仅凭文件后缀
+  就把其他客户端的域名列表当作可互换输入。
 
 Mihomo 和 sing-box 分别使用 MetaCubeX 的 `cn-ip` MRS/SRS 规则集；
 Shadowrocket 使用 `GEOIP,CN`。三者都是域名规则之后的**解析型兜底**：它们能
@@ -100,10 +85,6 @@ Shadowrocket 使用 `GEOIP,CN`。三者都是域名规则之后的**解析型兜
   `tun-excluded-routes` 和 `hijack-dns` 只描述启用后的处理方式。其 TUN DNS 支持
   fake IP，也可用 `always-real-ip` 指定真实 IP 例外；当前 base 不默认扩大该列表，
   Apple/iCloud 的系统解析例外仍由 `[Host]` 承担。
-
-所以，“Mihomo 默认不开 TUN”不能机械转换成删除 sing-box TUN inbound，也不能转换
-成删除 Shadowrocket 的 TUN 旁路参数；“Mihomo 有 fake-IP-filter”也不意味着另外两端
-必须生成同名或等长列表。
 
 ## 各客户端 DNS 路径
 
@@ -167,7 +148,7 @@ resolver 最小暴露之间的折中，不应描述为严格的按域名双路 D
 
 ## 验证最终文件
 
-保存后应检查最终渲染结果，而不是只看模板或 base：
+使用这套默认路由目标时，检查最终渲染结果：
 
 - 所有域名规则位于 IP 规则之前；
 - 中国 IP 兜底位于境外域名规则之后，且没有 `no-resolve`；

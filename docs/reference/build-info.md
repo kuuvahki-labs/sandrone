@@ -70,15 +70,14 @@ make image SANDRONE_IMAGE=ghcr.io/kuuvahki-labs/sandrone:v0.1.0
 `main` 上手动运行 `Create Release`。手动流程从最新稳定 `vMAJOR.MINOR.PATCH` tag
 自动递增 patch，更新并提交 `internal/buildinfo/VERSION`，创建 annotated tag，再以
 该 tag 显式运行 CI。例如最新稳定 tag 为 `v0.1.0` 时，下一次手动发布会创建
-`v0.1.1`。普通分支 push、pull request 和以分支 ref 手动运行的 CI 不会创建
-GitHub Release，也不会上传发布附件。
+`v0.1.1`。只有匹配版本文件的 tag 才触发发布；分支 CI 不上传发布附件。
 
 发布版本采用比本地构建身份更严格的规则：只允许 ASCII 字母、数字、点和连字符，
 发布版本不允许加号，并且最多 127 个字符。CI 会添加 `v` 前缀，因此完整 OCI tag
 最多 128 个字符。这个限制只适用于发布；本地构建身份仍可使用加号表达 build
 metadata。
 
-每个 GitHub Release 固定包含以下三个附件：
+每个 GitHub Release 提供以下附件：
 
 - `sandrone_linux_amd64.tar.gz`，用于 `linux/amd64`；
 - `sandrone_linux_arm64.tar.gz`，用于 `linux/arm64`；
@@ -116,8 +115,7 @@ GitHub Release。
 
 ## 容器身份
 
-Docker build context 继续排除 `.git`，避免发送仓库历史、扩大 context 和破坏
-缓存。因此直接运行 `docker build` 不会推测 commit。只覆盖非 `dev` 的
+直接运行 `docker build` 无法从 context 读取 Git revision。只覆盖非 `dev` 的
 `VERSION` 而不同时提供完整 `REVISION` 会直接失败：
 
 ```sh
@@ -139,22 +137,9 @@ Docker pull 或 run 会按宿主机架构自动选择对应镜像：
 - 预发布 tag 只发布自己的同名 tag；
 - CI 不创建或发布 `sha-*` 镜像 tag，需要精确复现时使用镜像 digest。
 
-Dockerfile 的 Web 和 Go builder 固定运行在 `$BUILDPLATFORM`。Web 资产只在 runner
-原生架构构建；最终 Go 二进制通过目标 `GOOS`/`GOARCH` 交叉编译，因此发布 ARM64
-镜像时不会用 QEMU 执行 pnpm 或 Go 编译。最终 Debian runtime 层仍按目标平台组装。
-BuildKit 使用命名的 GitHub Actions 缓存复用依赖和编译层；缓存未命中只会增加
-构建时间，不改变镜像内容或发布规则。
-
-普通 CI 的完整容器构建同时验证 Web 资产生成、Go embed 和最终二进制，因此不再
-单独重复运行嵌入式 Web UI 构建任务。tag 的容器发布与 GitHub Release 均须等待
-Go/Web 检查通过，随后并行发布；`make release-artifacts` 在编译原生二进制前构建
-一次 Web 资产。容器和原生包都从二进制内的同一嵌入式文件系统提供 Web UI，容器
-运行层不再复制第二份 `/app/static`。
-
-容器发布与 GitHub Release 分别使用自己的 FIFO 队列串行执行，最多各保留 100 个
-pending 任务；同一个 tag 的两类发布仍可并行。容器发布前会重新获取远端 tags；
-旧版本 tag 即使晚创建或晚完成，也只会写入自己的版本 tag，不会覆盖较新正式版本
-的 `latest`。
+tag 的容器和原生附件发布都等待 Go/Web 检查通过。旧版本 tag 即使晚创建或
+晚完成，也只写入自己的版本 tag，不覆盖较新正式版本的 `latest`。构建与发布
+实现见 [CI workflow](../../.github/workflows/ci.yml)和 [Dockerfile](../../Dockerfile)。
 
 仓库的 Compose 配置默认运行 `ghcr.io/kuuvahki-labs/sandrone:latest`，不会构建
 当前 worktree。本地镜像需要显式覆盖：

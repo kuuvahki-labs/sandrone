@@ -16,19 +16,24 @@ Sandrone 管理本地与远程订阅，通过统一的 `NodeIR` 执行有序处�
 Mihomo、sing-box、Shadowrocket 配置或分享链接。同一套转换语义同时服务于
 Web UI、CLI、HTTP API、MCP 与可嵌入 Go API。
 
-
 ## 为什么是 Sandrone
 
-- **从订阅到完整配置**：聚合多个来源，处理节点，再生成带代理组、规则和 DNS
-  设置的客户端配置，不止转换分享 URI。
-- **先看清，再交付**：在保存或分享前预览节点变化和最终文件；通过结构化 warning、
-  diagnose 与声明式 Mihomo / sing-box probe processor 发现有损字段和不可用节点。
-- **可视化，也可自动化**：Web UI 适合日常管理；CLI、HTTP API、MCP 与 Go API
-  复用相同的 service 层，脚本和 Agent 不需要另造一套流程。
-- **扩展但不失控**：filter、dedup、rename、sort、probe 等内建 processor 与受限
-  JavaScript 可按声明顺序组合；远程读取、缓存和探测都经过受控边界。
-- **轻量自托管**：默认是一个内嵌 Web UI 的 Go 二进制，不要求数据库或额外常驻
-  runtime；也提供多架构容器、文件系统 / S3 存储和 Vercel 部署路径。
+把多个来源的订阅汇总、整理，再生成适合不同客户端的配置，日常维护集中在一处。
+
+- **聚合多个来源**：远程订阅、本地节点和已有订阅可以自由组合，
+  按用途组织成不同的订阅，供手机、电脑等设备使用。
+- **节点整理省去手工操作**：按需筛选、去重、统一名称和排序，也可以根据
+  探测结果保留或排列节点；保存整理规则后，每次生成都会沿用。
+- **开箱即用的完整配置**：内置客户端模板和常用预设，提供分组、分流规则与
+  DNS 设置，帮助你从订阅生成客户端配置，减少从零编写的工作。
+- **默认好用，也能灵活定制**：在界面中调整分组和规则，按需修改 DNS、组合或
+  移除预设；有更细的需求时，可以编辑原始配置或用脚本扩展节点与文件处理。
+- **结果可检查，配置易交付**：预览节点处理前后的变化和最终配置，查看兼容性
+  提醒、测试节点可用性，再下载或生成分享链接，添加到对应客户端。
+- **日常管理与自动化兼顾**：平时通过网页操作，也可设置定时刷新，或通过
+  命令行、API 和 MCP 接入自己的自动化流程，减少重复维护。
+- **轻量自托管**：一个带 Web UI 的程序或容器即可部署，无需额外数据库，
+  订阅与配置保存在自己管理的存储中，并支持备份和迁移。
 
 ## 60 秒启动
 
@@ -78,7 +83,7 @@ Mihomo / sing-box 完整配置，或 Shadowrocket 无节点配置
 | --- | --- |
 | 输入 | 单条分享 URI、URI 列表、Base64 订阅、Mihomo YAML / JSON、sing-box JSON |
 | 节点处理 | filter、dedup、rename、sort、quick settings、probe、sandboxed JavaScript |
-| 节点输出 | Mihomo proxies、sing-box outbounds / endpoints、Shadowrocket Subscribe（Clash YAML 别名）、URI 列表 |
+| 节点输出 | Mihomo proxies、sing-box outbounds / endpoints、Shadowrocket Subscribe（Clash YAML 别名）、Base64 / URI 列表 |
 | 完整文件 | Mihomo、sing-box typed config、Shadowrocket 无节点 typed config，以及 static / remote file |
 | 文件处理 | YAML / JSON / INI merge、JSON Patch、template 与 sandboxed JavaScript |
 | 运行能力 | preview、CLI diagnose、声明式 TCP / UDP / URL probe、缓存、定时刷新、分享、备份与恢复 |
@@ -102,7 +107,7 @@ warning，不把“成功输出”伪装成“完全无损”；精确范围以
 
 ## 文档
 
-- [文档索引](docs/README.md)：教程、操作指南、契约与架构的唯一导航入口。
+- [文档索引](docs/README.md)：教程、操作指南、契约与架构导航。
 - [架构总览](docs/architecture/overview.md)：理解分层、数据流与扩展边界。
 - [FileSpec 参考](docs/reference/file-spec.md)：完整客户端文件的来源、类型与设置。
 - [社区配置预设](docs/reference/community-config-presets.md)：Web 预设的生成行为、风险与依赖。

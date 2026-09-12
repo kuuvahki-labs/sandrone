@@ -4,17 +4,13 @@
 
 节点管线把不同来源的节点转换为统一 `NodeIR`，在明确的节点阶段应用策略，再生成目标节点片段。parser、processor 和 renderer 各自只拥有一个方向的职责，service 负责顺序、校验和报告汇总。
 
-完整节点数据流只在本页定义：
+节点数据流：
 
 ```text
 source -> parse -> normalize -> process(nodes) -> render -> serve
 ```
 
 `serve` 表示调用方或入口交付本次结果，不表示生成内容会被持久化。完整 Mihomo、sing-box 或 Shadowrocket 配置属于[文件管线](file-pipeline.md)，不是节点 renderer 的输出职责。
-
-已保存 Subscription 可以按资源三态 TTL 缓存处理前后的 canonical `NodeSet`；preview、
-不同 renderer 和 typed file 共用这一执行快照边界。最终目标正文每次从 NodeSet 生成，
-不会持久化。完整缓存层、key、刷新和失效契约见[存储架构](storage.md#cache)。
 
 ## 1. Source：解析输入来源
 
@@ -33,9 +29,7 @@ source -> parse -> normalize -> process(nodes) -> render -> serve
 `NodeSet`。preview、subscription render、typed file、diagnose、定时更新和脚本中的
 订阅子调用复用同一条 normalize、校验和 nodes-stage processor 链；执行同时返回
 处理前与处理后结果，并显式汇总声明式引用、脚本文件和脚本动态订阅依赖。
-已保存 Subscription 可以把这对 target 无关的 `NodeSet` 作为
-`subscription_snapshot` 缓存；输出格式不进入 identity，因此 preview、
-不同 renderer 和 typed file 可以共享同一次 probe、排序、drop 与重排执行。
+处理前后的结果可通过[订阅执行快照](storage.md#cache)复用，输出格式不改变这条处理链。
 
 远程输入的自动识别是 service 的受控策略。显式格式只调用对应 parser；允许自动识别的输入先判断受支持的完整配置结构，再使用严格订阅格式兜底。adapter 不应各自形成不一致的隐式 fallback 链。
 
@@ -56,24 +50,16 @@ parser 不访问 Store、不执行节点探测，也不根据最终客户端策�
 
 ## 3. Normalize 与语义校验
 
-normalize 是 adapter 把外部别名、默认语义和目标结构统一成 `NodeIR` 的边界。service 随后用共享的 node validation 检查协议必填项与结构约束，并为保留的每个节点实例分配仅在本次物化链路内稳定的 `RuntimeID`。连接相等性需要时从规范化节点计算 `ConnectionKey`，不依赖数组位置，也不把该 key 保存进 `NodeIR`。
+adapter 与 service 的规范化步骤统一外部别名和等价默认值；共享 validation 检查协议必填项与结构约束。节点实例和连接身份的区别见[领域模型](domain-model.md#nodeir)。
 
 ### 字段接纳与 warning 处置
 
-warning 是需要分类的诊断，不是新增兼容逻辑或 `NodeIR` 字段的充分理由。来源字段
-只有同时满足以下条件，才能提升为新的 canonical 语义或扩大既有字段值域：
+新增 canonical 字段或扩大值域，应先区分协议语义、来源别名和客户端本地策略，
+用协议规范或上游实现说明其含义，再确定受影响输入、输出及无法等价表达时的行为。
+证据和测试范围按实际语义影响选择，见[影响矩阵](../../CONTRIBUTING.md#跨协议与客户端影响矩阵)。
+warning 本身不证明需要新增兼容逻辑；字段同名或共享前缀也不证明语义等价。
 
-1. 有可引用的协议规范、上游主实现或多个独立实现作为证据，并已区分线上协议语义
-   与单一客户端的本地配置开关、别名和默认策略。
-2. 能给出与来源格式无关的稳定定义，包括值域、默认值、冲突关系以及未知未来值的
-   处理方式；字段同名、共享前缀或单一样本可用都不能证明语义等价。
-3. 已明确所有输入和输出的行为：哪些 parser 能提升、哪些 renderer 能等价表达、
-   哪些目标有损或必须跳过。canonical 字段不要求所有目标都能输出，但不能把目标
-   私有结构直接搬进共享 IR。
-4. 能在共享 validation、capability catalog 和跨格式测试中验证上述契约，而不是只在
-   probe、某个 renderer 或单个 fixture 中形成特判。
-
-字段完成归属和语义判断后，按以下顺序处置：
+根据字段语义选择处理方式：
 
 | 判断 | 处理 | 诊断 |
 | --- | --- | --- |
@@ -83,34 +69,10 @@ warning 是需要分类的诊断，不是新增兼容逻辑或 `NodeIR` 字段�
 | 可选 canonical 字段无法由目标等价表达，且移除不改变连接、安全或路由成立条件 | 保留 IR，目标省略该字段 | `render_lossy_field` |
 | 目标缺失会改变认证、TLS identity、transport、协议变体或其它连接关键语义 | 跳过该节点，不做降级输出 | `render_node_skipped` |
 
-“可清空后保留节点”必须能证明清空只移除无操作默认值或非语义 metadata。无法证明
-时按连接关键字段处理并隔离节点。warning 调查先定位首次异常 stage：解析或字段
-语义问题在未运行 processor 的原始 parse 路径复现，确认协议与来源实现边界后选择
-上表动作；运行时、processor 或目标表达问题从对应阶段取证。只有涉及 canonical
-或共享语义变化时才展开[影响矩阵](../../CONTRIBUTING.md#跨协议与客户端影响矩阵)，
-局部问题验证受影响路径；证据足以回答当前任务后无需追加无关调查。
-probe 只消费已经规范化且验证通过的 `NodeIR`，不承担字段修复。
-
-VMess、VLESS 和 Trojan URI 的 TCP `headerType=http` 规范化为
-`transport.type=tcp` 与 `transport.header_type=http`，不能改写成表示 H2 的
-`transport.type=http`。空 `vmess.vcn`、`headerType=none`、gRPC `mode=gun`、
-AnyTLS `type=tcp` 和默认 TCP `path=/` 作为无语义差异的兼容默认值消费。
-
-URI adapter 会把 WebSocket path 中独占的 `?ed=<正整数>` 约定转换为
-`transport.max_early_data`，同时将
-`transport.early_data_header_name` 设为 `Sec-WebSocket-Protocol`。VMess AEAD、
-VLESS 和 Trojan WebSocket URI 的顶层查询参数 `ed=<正整数>` 与可选非空 `eh`
-也映射到这两个字段；缺少 `eh` 时使用相同默认值。非法、非 WebSocket 或与 path
-语义冲突的查询参数继续保留到 `raw` 并告警，包含其他 query 参数或无效 `ed` 的
-path 保持原样。
-
-canonical VLESS flow 只接受空值和 `xtls-rprx-vision`。其它值不会按前缀或来源
-实现的私有约定转换；共享 validation 会隔离该节点并产生
-`node_validation_dropped`，因此未知 flow 不会进入目标 renderer 或 probe core。
-
-service 还会统一移除非 TCP/raw transport 上的 VLESS Vision flow，并产生
-`node_normalized_incompatible_flow` warning。这个兼容修正与目标 renderer
-无关，不允许在 sing-box 或 Mihomo 输出层静默形成不同语义。
+不能确认省略是否改变连接、安全或路由语义时，应保留诊断并隔离节点，避免生成
+看似可用的错误配置。已确认等价的别名和默认值可以在规范化阶段转换；具体字段和
+值域见[格式与能力参考](../reference/capabilities.md)。probe 消费规范化且验证通过的
+节点，不承担字段修复。
 
 校验会在多个可信边界复用：
 
@@ -145,17 +107,11 @@ nodes-stage processor 接收节点切片、目标、来源上下文和请求 met
   完全没有 probe backend 时，内建 probe processor 按
   [probe 降级契约](../reference/processors.md#probe)返回 warning，不视为失败。
 
-内建处理器覆盖过滤、去重、重命名、排序、常用属性策略和显式探测。JavaScript processor 用于内建策略无法表达的开放式改写，但仍受同步 envelope、超时和注入 API 限制。
+处理器可由内建实现或 JavaScript 提供；脚本受同步 envelope、超时和注入 API 限制。
 
-processor 的包边界同样重要：
-
-- 不 import adapter，不直接调用特定 renderer。
-- 不直接读写 Store 或宿主文件系统。
-- 不持有通用 HTTP 客户端。
-- 需要探测、订阅、文件或远程脚本时，只能使用 service 注入的窄接口。
-- 实现必须把输入视为只读并返回新 output，不依赖跨阶段共享可变状态。
-
-处理器参数错误返回 `processor_config_invalid`，未注册类型返回 `processor_unknown`，执行失败保留处理器身份。脚本的运行时与安全模型见[脚本 API 参考](../reference/scripting-api.md)。
+processor 将输入视为只读并返回新 output；资源、远程读取和探测经 service 注入的
+窄接口完成，包依赖见[架构总览](overview.md#依赖边界)。参数与错误约定见
+[Processor 参考](../reference/processors.md)，脚本边界见[脚本 API](../reference/scripting-api.md)。
 
 `ParseRequest` 可以在解析后声明节点链，`RenderRequest` 可以在渲染前声明节点链；`ConvertRequest` 保持前者先于后者。它们都处于同一个逻辑 nodes stage，并各自保持声明顺序。
 
@@ -165,15 +121,9 @@ renderer 只接收已经校验和处理的节点，生成目标节点片段。�
 
 支持报告的 renderer 同时返回正文与 `RenderReport`。service 把 renderer warnings 与上游解析、校验和 processor warnings 合并为顶层 `Report`。
 
-渲染结果遵守以下兼容边界：
-
-- 目标可表达的稳定字段按 adapter 映射输出。
-- 目标无法表达的可选字段产生 lossy warning，节点仍可保留。
-- 无法安全降级的认证、TLS、transport 或协议变体会产生节点级跳过 warning。
-- 只要还有节点成功输出，renderer 可以返回剩余正文与 warnings。
-- 所有节点都无法输出时返回渲染错误，不返回看似成功的空产物。
-
-`Raw` 不会自动复制到任意目标。只有目标 adapter 明确支持并能保持语义时才可以回填，否则仍按能力边界报告。
+renderer 按[字段处置规则](#字段接纳与-warning-处置)报告损失或跳过节点。
+部分节点成功时返回正文及 warnings；所有节点均无法输出时返回错误。
+`Raw` 只有在目标 adapter 明确支持并能保持语义时才可回填。
 
 ## 能力与有损报告
 
@@ -187,15 +137,13 @@ adapter capability catalog 描述格式方向、节点类型、字段状态、�
 
 调用方应检查 warning code、节点身份、字段和 target，而不是仅判断正文非空或 `LostFields` 数值。
 
-新增或改变有损行为时，adapter capability、warning 和测试 fixture 必须同步。兼容性由这三者共同定义，不由静默的“尽量转换”规则定义。
+新增或改变有损行为时，同步受影响的能力声明与诊断，并验证可输出、跳过和损失的边界。
 
 ## Report、来源与安全
 
-service 把本次调用的 source refs、dependencies、validation warnings、processor warnings 和 render report 合并后随结果返回。report 不写入 subscription 或 Store，也不修改输入 `NodeIR` 的持久化定义。
-
-warning 的 `NodeContext` 允许 parser 附带原始行或结构化来源值。这有助于诊断，但也可能包含认证信息。部署方在日志、缓存、分享或公开 API 中处理 report 时，不能假定它已统一脱敏。
-
-普通 service 完成日志记录格式、目标、节点数、warning 数和耗时，不记录节点 payload。上游 adapter 和错误构造也应避免把凭据放进错误字符串。
+service 汇总本次 source refs、dependencies、validation、processor 和 renderer 的诊断。
+正常日志记录计数和耗时，避免记录节点 payload；report 中的来源上下文可能含凭据，
+其处理边界见[错误与诊断参考](../reference/errors.md)。
 
 ## 与其它管线的关系
 

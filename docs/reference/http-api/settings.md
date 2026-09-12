@@ -4,15 +4,11 @@
 
 本页定义统一项目设置、持久缓存、内置规则集目录和 Store 整体备份的管理接口。除
 `data_dir` 和 bearer token 外，Sandrone 的启动设置、运行默认值、外观语言和
-订阅行为都属于同一个项目设置对象，权威文件是可选的
-`<data_dir>/settings.json`。bearer token 只从启动 flag 或环境变量读取，不进入
+订阅行为都属于同一个项目设置对象，存储位置是所选 Store 的
+`settings.json` key。bearer token 只从启动 flag 或环境变量读取，不进入
 设置 API、设置文件或备份。
 
-这些接口位于受保护的 `/v1/*` 边界。启用 bearer token 后，请求必须携带：
-
-```http
-Authorization: Bearer <token>
-```
+通用鉴权和错误响应见 [HTTP API 约定](README.md)。
 
 ## 项目设置
 
@@ -29,7 +25,7 @@ SettingsEnvelope {
 }
 ```
 
-其中 `SettingsView` 的完整结构如下：
+`SettingsView` 的结构示例：
 
 ```json
 {
@@ -73,7 +69,7 @@ SettingsEnvelope {
 }
 ```
 
-`settings` 和 `effective` 都使用上面的完整结构。`settings` 是持久化目标；
+`settings` 和 `effective` 都使用同一设置结构。`settings` 是持久化目标；
 `effective` 是当前进程实际使用的值。启动 token 不属于这两个对象。
 `remote_defaults.user_agent` 可选；省略或保存为空时不固定版本，执行远程请求时
 动态使用当前二进制的 `sandrone/<version>`。非空值是显式覆盖，并会跨版本保留。
@@ -91,58 +87,15 @@ SettingsEnvelope {
 请求体是完整设置对象，不是 merge patch。未知字段会被忽略，正文上限为
 16 MiB；已知字段仍执行类型、范围和枚举校验。成功返回更新后的同一 envelope。
 
-所有字段必须按完整对象提交。典型请求：
+先读取 `settings`，修改需要的字段，再将完整对象提交。例如只切换主题：
 
-```json
-{
-  "schema_version": 1,
-  "http": {
-    "listen": "127.0.0.1:1137"
-  },
-  "mcp": {
-    "path": "/mcp",
-    "max_output_bytes": 1048576
-  },
-  "log": {"level": "info"},
-  "remote_defaults": {
-    "user_agent": "Sandrone Client",
-    "proxy": "socks5://127.0.0.1:1080",
-    "timeout_ms": 8000
-  },
-  "probe_defaults": {
-    "method": "url_test",
-    "core": "sing-box",
-    "url": "https://connectivity.example/generate_204",
-    "ntp_server": "time.example",
-    "expected_status": "200-299",
-    "timeout_ms": 5000,
-    "attempts": 2,
-    "concurrency": 10
-  },
-  "script_defaults": {
-    "timeout_ms": 2000
-  },
-  "cache_defaults": {
-    "remote_fetch_ttl_seconds": 120,
-    "probe_ttl_seconds": 300,
-    "subscription_snapshot_ttl_seconds": 300
-  },
-  "appearance": {"theme_mode": "system", "locale": "auto"},
-  "subscriptions": {
-    "auto_load_traffic": false,
-    "ignored_warnings": [
-      {"code": "parse_unknown_field", "field": "uri.query.mode", "source": "uri-list"}
-    ]
-  },
-  "scheduled_refresh": {
-    "enabled": true,
-    "schedule": "@every 10m",
-    "targets": [
-      {"kind": "subscription", "name": "provider"},
-      {"kind": "file", "name": "client.yaml"}
-    ]
-  }
-}
+```sh
+curl -fsS "$SANDRONE_URL/v1/settings" \
+  -H "Authorization: Bearer $SANDRONE_TOKEN" |
+jq '.settings | .appearance.theme_mode = "system"' |
+curl -fsS -X PUT "$SANDRONE_URL/v1/settings" \
+  -H "Authorization: Bearer $SANDRONE_TOKEN" \
+  -H "Content-Type: application/json" --data-binary @-
 ```
 
 远程 proxy 只接受带 host 的 `http`、`https` 或 `socks5` URL。probe method
@@ -164,11 +117,11 @@ concurrency 归一化后必须为正数。`script_defaults.timeout_ms` 省略或
 
 远程、probe、script、cache、appearance、subscriptions 和 scheduled-refresh 组保存后立即生效。
 缓存默认值只控制已保存 Subscription/File 作用域；临时输入不创建持久缓存。
-HTTP listen、MCP 三个字段和日志级别属于启动组，保存后列入 `restart_required`；
+HTTP listen、MCP 设置和日志级别属于启动组，保存后列入 `restart_required`；
 当前 listener、MCP 路径与 tool catalog、鉴权边界和其它启动组件不会热切换。
 
-设置文件不存在时使用内建默认值；第一次成功保存才创建文件。文件使用原子替换
-并保持 `0600` 权限。`data_dir` 不属于该文件或 API。
+设置记录不存在时使用内建默认值；第一次成功保存才创建。文件系统后端使用原子替换
+并保持 `0600` 权限；S3 后端写入对象存储。`data_dir` 不属于该记录或 API。
 
 最小读取示例：
 
@@ -273,7 +226,7 @@ manifest 必须恰好包含 `format`、`storage_schema_version`、`created_at` �
 `app_version`。恢复只接受当前 `storage_schema_version=1`。
 
 归档会在任何 Store 修改前完整校验。若包含 `settings.json`，还会严格校验设置
-schema 和字段；恢复写入时该文件使用原子 `0600` 写入。成功替换后，动态设置
+schema 和字段；恢复写入使用对应 Store 的原子写入；文件系统权限为 `0600`。成功替换后，动态设置
 立即刷新，启动设置变化进入 `restart_required`。不含 `settings.json` 的备份
 仍然有效，恢复后使用内建默认值。
 

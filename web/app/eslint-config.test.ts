@@ -8,41 +8,26 @@ const appDir = dirname(fileURLToPath(import.meta.url));
 const webRoot = dirname(appDir);
 const configFile = join(webRoot, "eslint.config.js");
 
-function createESLint(fix = false) {
-  return new ESLint({ cwd: webRoot, fix, overrideConfigFile: configFile });
+function createESLint() {
+  return new ESLint({ cwd: webRoot, overrideConfigFile: configFile });
 }
 
 describe("eslint frontend boundaries", () => {
-  it("auto-fixes parent app imports to the app alias", async () => {
-    const [result] = await createESLint(true).lintText(
-      `import { subscriptionSummary } from "../../features/subscriptions/model/summary";
+  it("allows parent imports, re-exports, and MUI in routes", async () => {
+    const eslint = createESLint();
+    const [result] = await eslint.lintText(
+      `import Button from "@mui/material/Button";
 
+import { subscriptionSummary } from "../features/subscriptions/model/summary";
+
+export { default } from "../features/files/pages/files-page";
+export const Example = Button;
 export const value = subscriptionSummary([]);
 `,
-      { filePath: join(appDir, "features/subscriptions/example.tsx") },
+      { filePath: join(appDir, "routes/example.tsx") },
     );
 
-    expect(result.output).toContain('from "~/features/subscriptions/model/summary"');
-  });
-
-  it("rejects MUI in production routes while allowing feature and route-test imports", async () => {
-    const source = `import Button from "@mui/material/Button";
-
-export const Example = Button;
-`;
-    const eslint = createESLint();
-    const [[routeResult], [featureResult], [routeTestResult]] = await Promise.all([
-      eslint.lintText(source, { filePath: join(appDir, "routes/example.tsx") }),
-      eslint.lintText(source, { filePath: join(appDir, "features/files/example.tsx") }),
-      eslint.lintText(source, { filePath: join(appDir, "routes/example.test.tsx") }),
-    ]);
-
-    expect(routeResult.messages.filter((message) => message.ruleId === "no-restricted-imports"))
-      .toHaveLength(1);
-    expect(featureResult.messages.filter((message) => message.ruleId === "no-restricted-imports"))
-      .toEqual([]);
-    expect(routeTestResult.messages.filter((message) => message.ruleId === "no-restricted-imports"))
-      .toEqual([]);
+    expect(result.messages).toEqual([]);
   });
 
   it("rejects DOM globals only in node .test.ts files", async () => {

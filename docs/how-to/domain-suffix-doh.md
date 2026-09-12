@@ -84,10 +84,6 @@ example.com = server:https://dns.example.org/dns-query
 DOMAIN-SUFFIX,example.com,DIRECT
 ```
 
-在 Sandrone 的 `ini_override` 补丁中，`[Host+]` 表示追加到已有 `[Host]`。
-本脚本直接修改完整文件，生成合并后的 `[Host]`，不用额外添加合并处理器。
-追加语法见 [merge](../reference/processors.md#merge)。
-
 配置生成不代表 DoH 网络可达；应在实际使用客户端的网络中验证查询成功。
 
 语义依据：[Mihomo DNS](https://wiki.metacubex.one/config/dns/)、

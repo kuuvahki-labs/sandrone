@@ -1,48 +1,25 @@
 # Sandrone Safety
 
-## Authorization and Transport
+## Writes and retries
 
-Apply the [Mutation Rule](../SKILL.md#mutation-rule). Transport availability
-alone does not authorize resource writes; explicit authorization persists
-throughout the task and does not require another confirmation.
+Apply the [write rule](../SKILL.md#writes-and-verification). `put` immediately
+saves and replaces the same name; `delete` has no recycle bin. Read the existing
+definition before either operation. Deleting a resource does not cascade to its
+references, which may then fail to resolve.
 
-`put` immediately saves and overwrites the same name. Read an existing
-definition before replacement. `delete` is immediate and has no recycle bin:
+A transport error may hide whether a write succeeded. Verify the server identity
+and reread the exact target before retrying. Switching interfaces is not evidence
+that the first write failed. Report success using the actual response; HTTP
+resource deletion returns `{"ok":true}`.
 
-- Subscription deletion removes its saved definition.
-- File deletion removes the single JSON record containing the complete
-  FileSpec, including inline content.
+## External effects and sensitive data
 
-Read the complete definition before deletion.
+Remote inputs, traffic refresh, render flows and probes may access the network.
+Choose verification that exercises the changed behavior. Scripts have no arbitrary
+filesystem, subprocess, environment-variable or general network access.
 
-## External Effects
-
-Conversion with remote input, remote subscription/file sources, traffic
-refresh, rendering flows, and probes may access the network through Sandrone's
-controlled fetch/probe boundaries. Use them only when required by the request.
-Read-only operations can still access the external world.
-
-## Processor Scripts
-
-Sandrone processor scripts remain embedded ECMAScript in both HTTP and MCP
-flows. They have no arbitrary filesystem, subprocess, environment-variable, or
-general network access. Do not write Node.js-specific code or claim that a
-reserved permissions object grants host access.
-
-## Sensitive Data
-
-Both HTTP and MCP definitions and results may contain subscription URLs, node
-credentials, processor scripts, source references, and warning context.
-Minimize copying them into chat, logs, files, commits, or bug reports.
-
-HTTP bearer configuration comes from `SANDRONE_TOKEN` in the environment only.
-Never put tokens, private URLs, or private resource definitions in tracked Skill
-files or command arguments. Use a trusted network or TLS-terminating reverse
-proxy for cross-host HTTP.
-
-## Retry Safety
-
-Keep one execution plane fixed throughout each mutation. A transport error may
-hide whether the server applied a put or delete. Reread the exact resource
-through the same plane before retrying; idempotence is not confirmation,
-rollback, or recoverability.
+Definitions, outputs, reports and warnings can contain credentials and private
+subscription URLs. Avoid copying them into chat or logs unless needed for the
+user's request; keep request-body files private and out of tracked files.
+The bundled HTTP script reads bearer credentials from `SANDRONE_TOKEN` and avoids
+putting them in curl arguments. Use a trusted network or TLS for cross-host HTTP.

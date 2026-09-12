@@ -46,8 +46,6 @@ Share 把一个现有文件或订阅暴露为公开、只读、按请求实时�
   "target_kind": "subscription",
   "target_name": "default",
   "target_format": "mihomo-proxies",
-  "valid_from": "2026-07-22T00:00:00Z",
-  "valid_until": "2026-08-01T00:00:00Z",
   "meta": {
     "description": "mobile clients"
   }
@@ -62,7 +60,7 @@ Share 把一个现有文件或订阅暴露为公开、只读、按请求实时�
 | `name` | 可选分享名，也是公开文件名的首选来源；必须满足单个 path segment 约束 |
 | `target_kind` | 必填，只能是 `file` 或 `subscription` |
 | `target_name` | 必填，目标必须已存在；HTTP 接口只接受单个 path segment |
-| `target_format` | 仅对订阅生效；省略时默认为 `uri-list`，但不锁定公开请求的格式 |
+| `target_format` | 仅对订阅生效；省略时默认为 `base64`，但不锁定公开请求的格式 |
 | `content_type` | 可选；非空时覆盖未加密公开响应的推导内容类型 |
 | `valid_from` | 可选 RFC 3339 时间，闭区间起点 |
 | `valid_until` | 可选 RFC 3339 时间，开区间终点 |
@@ -85,6 +83,7 @@ GET /s/mobile?arg.profile=travel
 
 | `format` | 响应内容类型 | 建议文件扩展名 |
 | --- | --- | --- |
+| `base64` | `text/plain` | `.txt` |
 | `uri-list` | `text/plain` | `.txt` |
 | `mihomo-proxies` | `application/yaml` | `.yaml` |
 | `sing-box-outbounds` | `application/json` | `.json` |
@@ -112,6 +111,7 @@ file-stage processor 中消费它们，订阅 share 可在订阅的 node-stage p
     "target_format": "mihomo-proxies",
     "public_filename": "mobile.yaml",
     "format_filenames": {
+      "base64": "mobile.txt",
       "uri-list": "mobile.txt",
       "mihomo-proxies": "mobile.yaml",
       "sing-box-outbounds": "mobile.json",
@@ -127,28 +127,8 @@ file-stage processor 中消费它们，订阅 share 可在订阅的 node-stage p
 }
 ```
 
-单项读取使用相同的 `{ "share": ... }` envelope。列表响应为：
-
-```json
-{
-  "shares": [
-    {
-      "id": "mobile",
-      "target_kind": "subscription",
-      "target_name": "default",
-      "target_format": "mihomo-proxies",
-      "public_filename": "mobile.yaml",
-      "format_filenames": {
-        "uri-list": "mobile.txt",
-        "mihomo-proxies": "mobile.yaml",
-        "sing-box-outbounds": "mobile.json",
-        "shadowrocket-proxies": "mobile.yaml",
-        "json-nodes": "mobile.json"
-      }
-    }
-  ]
-}
-```
+单项读取使用相同的 `{ "share": ... }` envelope；列表返回 `{ "shares": [...] }`，
+数组中的每项使用同一管理对象结构。
 
 `public_filename` 是保存的默认格式对应的 canonical 文件名，创建和列表响应都会
 返回。
