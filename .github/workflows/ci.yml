@@ -75,6 +75,14 @@ jobs:
       - name: Test built Web UI in Chromium
         run: pnpm test:e2e
 
+      - name: Upload tested Web UI
+        uses: actions/upload-artifact@v7
+        with:
+          name: web-client
+          path: web/build/client
+          if-no-files-found: error
+          include-hidden-files: true
+
   vercel:
     name: Vercel deployment
     if: github.ref_type == 'tag' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
@@ -100,18 +108,10 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: 11.24.0
-          run_install: false
-
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
-          cache: pnpm
-          cache-dependency-path: web/pnpm-lock.yaml
 
       - name: Install Vercel CLI
         run: npm install --global "vercel@${VERCEL_CLI_VERSION}"
@@ -119,7 +119,16 @@ jobs:
       - name: Pull Vercel project settings
         run: vercel pull --yes --environment="${VERCEL_ENVIRONMENT}" --token="${VERCEL_TOKEN}"
 
+      - name: Download tested Web UI
+        uses: actions/download-artifact@v8
+        with:
+          name: web-client
+          path: web/build/client
+          digest-mismatch: error
+
       - name: Build Vercel assets
+        env:
+          WEBUI_PREBUILT_DIR: ${{ github.workspace }}/web/build/client
         run: ./scripts/vercel-assets.sh build
 
       - name: Build Vercel deployment
@@ -275,20 +284,16 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
+      - name: Download tested Web UI
+        uses: actions/download-artifact@v8
         with:
-          version: 11.24.0
-          run_install: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: .node-version
-          cache: pnpm
-          cache-dependency-path: web/pnpm-lock.yaml
+          name: web-client
+          path: web/build/client
+          digest-mismatch: error
 
       - name: Build release artifacts
+        env:
+          WEBUI_PREBUILT_DIR: ${{ github.workspace }}/web/build/client
         run: make release-artifacts REVISION="${GITHUB_SHA}"
 
       - name: Publish GitHub Release

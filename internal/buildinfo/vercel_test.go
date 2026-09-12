@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -76,47 +77,44 @@ cp "$CATALOG_FIXTURE" internal/service/catalog_builtin/catalog.json.gz
 }
 
 func TestVercelWorkflowUsesPrebuiltAssetPipeline(t *testing.T) {
-	root := filepath.Join("..", "..")
-	workflow, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "ci.yml"))
-	if err != nil {
-		t.Fatal(err)
+	job := jobByName(t, readWorkflow(t, "ci.yml"), "vercel")
+	if job.If != "github.ref_type == 'tag' || (github.event_name == 'push' && github.ref == 'refs/heads/main')" {
+		t.Errorf("Vercel condition = %q", job.If)
 	}
-	content := string(workflow)
-	for _, want := range []string{
-		"  vercel:\n",
-		"name: Vercel deployment",
-		"if: github.ref_type == 'tag' || (github.event_name == 'push' && github.ref == 'refs/heads/main')",
-		"needs:\n      - go\n      - web",
-		"group: vercel-${{ github.ref }}",
-		"VERCEL_ENVIRONMENT: ${{ github.ref_type == 'tag' && 'production' || 'preview' }}",
-		"VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}",
-		"VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}",
-		"VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}",
-		"npm install --global \"vercel@${VERCEL_CLI_VERSION}\"",
-		"./scripts/vercel-assets.sh build",
-		"vercel build --standalone --prod",
-		"vercel build --standalone --token",
-		"vercel deploy --prebuilt --prod",
-		"vercel deploy --prebuilt --archive=tgz",
-	} {
-		if !strings.Contains(content, want) {
-			t.Errorf("Vercel workflow does not contain %q", want)
+	if !slices.Equal(slices.Sorted(slices.Values(job.Needs)), []string{"go", "web"}) {
+		t.Errorf("Vercel needs = %v", job.Needs)
+	}
+	if job.Concurrency.Group != "vercel-${{ github.ref }}" || !job.Concurrency.Cancel {
+		t.Errorf("Vercel concurrency = %+v", job.Concurrency)
+	}
+	requireFields(t, job.Env, map[string]string{
+		"VERCEL_ENVIRONMENT": "${{ github.ref_type == 'tag' && 'production' || 'preview' }}",
+		"VERCEL_ORG_ID":      "${{ secrets.VERCEL_ORG_ID }}",
+		"VERCEL_PROJECT_ID":  "${{ secrets.VERCEL_PROJECT_ID }}",
+		"VERCEL_TOKEN":       "${{ secrets.VERCEL_TOKEN }}",
+	})
+	if job.Env["VERCEL_CLI_VERSION"] == "" || job.Env["VERCEL_CLI_VERSION"] == "latest" {
+		t.Error("Vercel CLI version must be pinned")
+	}
+	stepByRun(t, job, `npm install --global "vercel@${VERCEL_CLI_VERSION}"`)
+	build := stepByRun(t, job, "vercel build --standalone")
+	requireCommands(t, build.Run, "vercel build --standalone --prod", "vercel build --standalone --token")
+	deploy := stepByRun(t, job, "vercel deploy --prebuilt")
+	requireCommands(t, deploy.Run, "vercel deploy --prebuilt --prod --archive=tgz", "vercel deploy --prebuilt --archive=tgz")
+	stage := 0
+	for _, step := range job.Steps {
+		if strings.Contains(step.Run, "./scripts/vercel-assets.sh build") {
+			stage = 1
 		}
-	}
-	buildAssetsAt := strings.Index(content, "./scripts/vercel-assets.sh build")
-	vercelBuildAt := strings.Index(content, "vercel build --standalone --prod")
-	vercelDeployAt := strings.Index(content, "vercel deploy --prebuilt --prod")
-	if buildAssetsAt < 0 || !(buildAssetsAt < vercelBuildAt && vercelBuildAt < vercelDeployAt) {
-		t.Error("Vercel workflow must build assets, build deployment, and deploy in order")
-	}
-	if strings.Contains(content, "vercel@latest") {
-		t.Error("Vercel workflow must pin the CLI version")
-	}
-	if strings.Contains(content, "github.ref == 'refs/heads/main' && 'production'") {
-		t.Error("Vercel workflow must reserve Production deployments for tags")
-	}
-	if strings.Contains(content, "vercel build --prod --token") || strings.Contains(content, "vercel build --token") {
-		t.Error("Vercel workflow must inline Go bootstrap output with standalone builds")
+		if strings.Contains(step.Run, "vercel build --standalone") {
+			if stage != 1 {
+				t.Error("deployment build must follow assets")
+			}
+			stage = 2
+		}
+		if strings.Contains(step.Run, "vercel deploy --prebuilt") && stage != 2 {
+			t.Error("deploy must follow deployment build")
+		}
 	}
 }
 

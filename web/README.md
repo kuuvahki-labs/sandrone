@@ -59,6 +59,11 @@ make build-webui
 Go 构建嵌入。两处产物都不提交；生产二进制不需要 Node server，也不读取外部
 静态目录。
 
+已有测试通过的产物时，可在仓库根目录执行
+`WEBUI_PREBUILT_DIR="$PWD/web/build/client" make build-webui`，直接复制完整目录
+（包括预压缩资源），跳过依赖安装和重新构建。目录必须包含非空 `index.html`。
+CI 中 Vercel 和 Release 使用同一次 workflow 中通过 E2E 的 Web 产物。
+
 ## 运行
 
 本地预览已经构建的 client：

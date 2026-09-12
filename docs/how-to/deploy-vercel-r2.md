@@ -36,7 +36,8 @@ VERCEL_PROJECT_ID=<Vercel project ID>
 执行 `vercel link` 生成的 `.vercel/project.json` 包含 `orgId` 和 `projectId`；不要
 提交 `.vercel/` 或把这些值硬编码进 workflow。
 
-部署 job 先运行 `scripts/vercel-assets.sh build`，生成
+部署 job 先下载同一次 workflow 中通过 E2E 的 Web 产物，再设置
+`WEBUI_PREBUILT_DIR` 并运行 `scripts/vercel-assets.sh build`，准备
 `internal/entry/webui/static/index.html` 和
 `internal/service/catalog_builtin/catalog.json.gz`并完成契约检查，再运行 `vercel build`
 和 `vercel deploy --prebuilt`。`vercel build --standalone` 会将 Go `bootstrap` 和全部

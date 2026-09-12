@@ -425,22 +425,45 @@ func TestMakeBuildWithoutRevisionForcesDevVersion(t *testing.T) {
 }
 
 func TestArtifactTargetsUseCanonicalScript(t *testing.T) {
-	makefile, err := os.ReadFile(filepath.Join("..", "..", "Makefile"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	content := string(makefile)
-	validatedLine := "VALIDATED_TARGETS := help check fmt fmt-check vet test test-webui test-webui-e2e build build-bin build-check build-webui image lint ruleset-catalog release-artifacts snapshot-artifacts"
-	if !strings.Contains(content, validatedLine) {
-		t.Errorf("Makefile does not validate artifact targets")
-	}
-	for target, wantRecipe := range map[string]string{
-		"release-artifacts":  "release-artifacts: build-webui\n\tARTIFACT_KIND=release VERSION=\"$(BUILD_VERSION)\" REVISION=\"$(BUILD_REVISION)\" BUILD_TIME=\"$(BUILD_TIME)\" ./scripts/build-release-artifacts.sh\n",
-		"snapshot-artifacts": "snapshot-artifacts: build-webui\n\tARTIFACT_KIND=snapshot VERSION=dev REVISION=\"\" BUILD_TIME=\"$(BUILD_TIME)\" OUTPUT_DIR=\"$(CURDIR)/dist/snapshot\" ./scripts/build-release-artifacts.sh\n",
-	} {
-		if count := strings.Count(content, wantRecipe); count != 1 {
-			t.Errorf("Makefile contains %d canonical %s recipes, want 1", count, target)
-		}
+	for _, target := range []string{"release-artifacts", "snapshot-artifacts"} {
+		t.Run(target, func(t *testing.T) {
+			repo, revision := newMakeFixtureRepo(t)
+			log := filepath.Join(repo, "calls.log")
+			for name, body := range map[string]string{
+				"build-webui.sh":             "#!/bin/sh\nprintf 'web\\n' >> calls.log\n",
+				"build-release-artifacts.sh": "#!/bin/sh\nprintf '%s|%s|%s|%s|%s\\n' \"$ARTIFACT_KIND\" \"$VERSION\" \"$REVISION\" \"$BUILD_TIME\" \"${OUTPUT_DIR-}\" >> calls.log\n",
+			} {
+				path := filepath.Join(repo, "scripts", name)
+				writeTestFile(t, path, body)
+				if err := os.Chmod(path, 0o700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			args := []string{target, "VERSION=1.2.3", "REVISION=" + revision, "BUILD_TIME=2026-08-30T03:15:42Z"}
+			if output, err := runMakeAt(repo, args...); err != nil {
+				t.Fatalf("make: %v\n%s", err, output)
+			}
+			body, err := os.ReadFile(log)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := "web\nrelease|1.2.3|" + revision + "|2026-08-30T03:15:42Z|\n"
+			if target == "snapshot-artifacts" {
+				want = "web\nsnapshot|dev||2026-08-30T03:15:42Z|" + filepath.Join(repo, "dist", "snapshot") + "\n"
+			}
+			if string(body) != want {
+				t.Fatalf("calls = %q, want %q", body, want)
+			}
+			if err := os.Remove(log); err != nil {
+				t.Fatal(err)
+			}
+			if output, err := runMakeAt(repo, target, "VERSION=unsafe/version", "REVISION="+revision); err == nil {
+				t.Fatalf("unsafe version accepted: %s", output)
+			}
+			if _, err := os.Stat(log); !os.IsNotExist(err) {
+				t.Fatalf("invalid identity must prevent script execution: %v", err)
+			}
+		})
 	}
 }
 
@@ -633,62 +656,6 @@ fi
 	return repo, makeScript, makeLog
 }
 
-func workflowTriggerBlock(t *testing.T, workflow string) string {
-	t.Helper()
-
-	const startMarker = "on:\n"
-	const endMarker = "\npermissions:\n"
-	if count := strings.Count(workflow, startMarker); count != 1 {
-		t.Fatalf("workflow contains %d top-level on blocks, want 1", count)
-	}
-	start := strings.Index(workflow, startMarker)
-	end := strings.Index(workflow[start+len(startMarker):], endMarker)
-	if end < 0 {
-		t.Fatal("workflow on block is not followed by permissions")
-	}
-	return strings.TrimRight(workflow[start:start+len(startMarker)+end], "\n")
-}
-
-func workflowNamedStep(t *testing.T, workflow, name string) string {
-	t.Helper()
-
-	marker := "      - name: " + name + "\n"
-	if count := strings.Count(workflow, marker); count != 1 {
-		t.Fatalf("workflow contains %d %q steps, want 1", count, name)
-	}
-	start := strings.Index(workflow, marker)
-	body := workflow[start+len(marker):]
-	body = workflowIndentedBody(body, 6)
-	return strings.TrimRight(marker+body, "\n")
-}
-
-func workflowIndentedBody(body string, parentIndent int) string {
-	offset := 0
-	for _, line := range strings.Split(body, "\n") {
-		if line != "" {
-			indent := len(line) - len(strings.TrimLeft(line, " "))
-			if indent <= parentIndent {
-				return strings.TrimRight(body[:offset], "\n")
-			}
-		}
-		offset += len(line) + 1
-	}
-	return strings.TrimRight(body, "\n")
-}
-
-func workflowNamedJob(t *testing.T, workflow, name string) string {
-	t.Helper()
-
-	marker := "  " + name + ":\n"
-	if count := strings.Count(workflow, marker); count != 1 {
-		t.Fatalf("workflow contains %d %q jobs, want 1", count, name)
-	}
-	start := strings.Index(workflow, marker)
-	body := workflow[start+len(marker):]
-	body = workflowIndentedBody(body, 2)
-	return strings.TrimRight(marker+body, "\n")
-}
-
 func TestBuildMetadataContracts(t *testing.T) {
 	root := filepath.Join("..", "..")
 	dockerfile, err := os.ReadFile(filepath.Join(root, "Dockerfile"))
@@ -696,10 +663,6 @@ func TestBuildMetadataContracts(t *testing.T) {
 		t.Fatal(err)
 	}
 	dockerignore, err := os.ReadFile(filepath.Join(root, ".dockerignore"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	workflow, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "ci.yml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -730,241 +693,34 @@ func TestBuildMetadataContracts(t *testing.T) {
 		t.Error("Dockerfile OCI labels must follow runtime package and asset layers")
 	}
 
-	workflowText := string(workflow)
-	for _, want := range []string{
-		`uses: actions/checkout@v7`,
-		`uses: actions/setup-go@v7`,
-		`uses: actions/setup-node@v7`,
-		`uses: pnpm/action-setup@v6`,
-		`uses: docker/setup-qemu-action@v4`,
-		`uses: docker/setup-buildx-action@v4`,
-		`uses: docker/login-action@v4`,
-		`uses: docker/build-push-action@v7`,
-	} {
-		if !strings.Contains(workflowText, want) {
-			t.Errorf("workflow does not contain Node.js 24 action %q", want)
-		}
-	}
-	for _, forbidden := range []string{
-		`uses: actions/checkout@v4`,
-		`uses: actions/setup-go@v5`,
-		`uses: actions/setup-node@v4`,
-		`uses: pnpm/action-setup@v4`,
-		`uses: docker/setup-qemu-action@v3`,
-		`uses: docker/setup-buildx-action@v3`,
-		`uses: docker/login-action@v3`,
-		`uses: docker/build-push-action@v6`,
-	} {
-		if strings.Contains(workflowText, forbidden) {
-			t.Errorf("workflow still contains Node.js 20 action %q", forbidden)
-		}
-	}
-	if got, want := workflowTriggerBlock(t, workflowText), `on:
-  pull_request:
-  push:
-    branches:
-      - main
-    tags:
-      - "v*"
-  workflow_dispatch:`; got != want {
-		t.Errorf("workflow trigger block =\n%s\nwant:\n%s", got, want)
-	}
-	if strings.Contains(workflowText, "  build-webui:\n") {
-		t.Error("workflow must not duplicate the embedded Web UI build outside the container and release jobs")
-	}
-	if strings.Contains(workflowText, "  container-image:\n") {
-		t.Error("workflow must split ordinary container validation from release publication")
-	}
-
-	containerCheckJob := workflowNamedJob(t, workflowText, "container-check")
-	if got, want := workflowNamedStep(t, containerCheckJob, "Resolve image version"), `      - name: Resolve image version
-        id: image-metadata
-        shell: bash
-        run: |
-          version="$(tr -d '\r\n' < internal/buildinfo/VERSION)"
-          {
-            echo "version=${version}"
-            echo "build_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          } >> "${GITHUB_OUTPUT}"`; got != want {
-		t.Errorf("Resolve image version step =\n%s\nwant:\n%s", got, want)
-	}
-	if got, want := workflowNamedStep(t, containerCheckJob, "Build container image"), `      - name: Build container image
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          platforms: linux/amd64
-          push: false
-          tags: ${{ env.IMAGE }}:ci
-          cache-from: type=gha,scope=sandrone-container
-          cache-to: type=gha,mode=max,scope=sandrone-container
-          build-args: |
-            VERSION=${{ steps.image-metadata.outputs.version }}
-            REVISION=${{ github.sha }}
-            BUILD_TIME=${{ steps.image-metadata.outputs.build_time }}
-          labels: |
-            org.opencontainers.image.version=${{ steps.image-metadata.outputs.version }}
-            org.opencontainers.image.revision=${{ github.sha }}`; got != want {
-		t.Errorf("container check build step =\n%s\nwant:\n%s", got, want)
-	}
-	for _, want := range []string{
-		`if: github.ref_type != 'tag'`,
-		`uses: docker/setup-buildx-action@v4`,
-	} {
-		if !strings.Contains(containerCheckJob, want) {
-			t.Errorf("container check workflow does not contain %q", want)
-		}
-	}
-	for _, forbidden := range []string{"needs:", "packages: write", "setup-qemu-action", "login-action", "make image", "docker push"} {
-		if strings.Contains(containerCheckJob, forbidden) {
-			t.Errorf("container check workflow must not contain %q", forbidden)
-		}
-	}
-
-	containerPublishJob := workflowNamedJob(t, workflowText, "container-publish")
-	if got, want := workflowNamedStep(t, containerPublishJob, "Resolve image metadata"), `      - name: Resolve image metadata
-        id: image-metadata
-        shell: bash
-        run: |
-          version="$(tr -d '\r\n' < internal/buildinfo/VERSION)"
-          build_time="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          git fetch --force --tags origin
-          tags="$(./scripts/release.sh image-tags)"
-          {
-            echo "version=${version}"
-            echo "build_time=${build_time}"
-            echo 'tags<<EOF'
-            echo "${tags}"
-            echo EOF
-          } >> "${GITHUB_OUTPUT}"`; got != want {
-		t.Errorf("Resolve image metadata step =\n%s\nwant:\n%s", got, want)
-	}
-	if got, want := workflowNamedStep(t, containerPublishJob, "Log in to GHCR"), `      - name: Log in to GHCR
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}`; got != want {
-		t.Errorf("Log in to GHCR step =\n%s\nwant:\n%s", got, want)
-	}
-	if got, want := workflowNamedStep(t, containerPublishJob, "Build and publish container image"), `      - name: Build and publish container image
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.image-metadata.outputs.tags }}
-          cache-from: type=gha,scope=sandrone-container
-          cache-to: type=gha,mode=max,scope=sandrone-container
-          build-args: |
-            VERSION=${{ steps.image-metadata.outputs.version }}
-            REVISION=${{ github.sha }}
-            BUILD_TIME=${{ steps.image-metadata.outputs.build_time }}
-          labels: |
-            org.opencontainers.image.version=${{ steps.image-metadata.outputs.version }}
-            org.opencontainers.image.revision=${{ github.sha }}`; got != want {
-		t.Errorf("container publish build step =\n%s\nwant:\n%s", got, want)
-	}
-	if got, want := workflowNamedStep(t, containerPublishJob, "Set up QEMU"), `      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4`; got != want {
-		t.Errorf("Set up QEMU step =\n%s\nwant:\n%s", got, want)
-	}
-	for _, forbidden := range []string{"make image", "docker tag", "docker push", "sha-"} {
-		if strings.Contains(containerPublishJob, forbidden) {
-			t.Errorf("container workflow must not contain %q", forbidden)
-		}
-	}
-	for _, want := range []string{
-		`if: github.ref_type == 'tag'`,
-		`uses: docker/setup-buildx-action@v4`,
-		`needs:`,
-		`- go`,
-		`- web`,
-		`packages: write`,
-		`fetch-depth: 0`,
-		`group: container-image-publish`,
-		`cancel-in-progress: false`,
-		`queue: max`,
-	} {
-		if !strings.Contains(containerPublishJob, want) {
-			t.Errorf("container workflow does not contain %q", want)
-		}
-	}
-
-	releaseJob := workflowNamedJob(t, workflowText, "release")
-	if got, want := workflowNamedStep(t, releaseJob, "Validate release tag"), `      - name: Validate release tag
-        run: sh ./scripts/release.sh validate-tag`; got != want {
-		t.Errorf("Validate release tag step =\n%s\nwant:\n%s", got, want)
-	}
-	for _, want := range []string{
-		`if: github.ref_type == 'tag'`,
-		"concurrency:\n      group: github-release-publish\n      cancel-in-progress: false\n      queue: max",
-		"needs:\n      - go\n      - web",
-		"permissions:\n      contents: write",
-		`uses: actions/checkout@v7`,
-		`fetch-depth: 0`,
-		`uses: actions/setup-go@v7`,
-		`go-version-file: go.mod`,
-		`uses: pnpm/action-setup@v6`,
-		`version: 11.24.0`,
-		`uses: actions/setup-node@v7`,
-		`node-version-file: .node-version`,
-		`make release-artifacts REVISION="${GITHUB_SHA}"`,
-		`GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}`,
-		`artifacts=(`,
-		`"dist/sandrone_linux_amd64.tar.gz"`,
-		`"dist/sandrone_linux_arm64.tar.gz"`,
-		`"dist/checksums.txt"`,
-		`if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then`,
-		`gh release upload "${GITHUB_REF_NAME}" "${artifacts[@]}" --clobber`,
-		`if [[ ! "${GITHUB_REF_NAME}" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then`,
-		`prerelease_flag="--prerelease"`,
-		`gh release create "${GITHUB_REF_NAME}" "${artifacts[@]}" --verify-tag --generate-notes ${prerelease_flag}`,
-	} {
-		if !strings.Contains(releaseJob, want) {
-			t.Errorf("release job does not contain %q", want)
-		}
-	}
-	if strings.Contains(releaseJob, `run: make build-webui`) {
-		t.Error("release job must let make release-artifacts build the Web UI exactly once")
-	}
-	if strings.Contains(releaseJob, "container-publish") {
-		t.Error("GitHub Release must run in parallel with container publication after the shared Go/Web gates")
-	}
+	testCIContracts(t)
 }
 
 func TestManualReleaseWorkflowIncrementsPatchAndDispatchesTagCI(t *testing.T) {
-	workflow, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "release-tag.yml"))
-	if err != nil {
-		t.Fatal(err)
+	workflow := readWorkflow(t, "release-tag.yml")
+	if len(workflow.On) != 1 {
+		t.Errorf("manual release triggers = %v", workflow.On)
 	}
-	workflowText := string(workflow)
-	for _, want := range []string{
-		"name: Create Release",
-		"workflow_dispatch:",
-		"actions: write",
-		"contents: write",
-		"group: create-release-tag",
-		`if [[ "${GITHUB_REF}" != "refs/heads/main" ]]`,
-		"fetch-depth: 0",
-		`version="$(sh ./scripts/release.sh next-version)"`,
-		`git show-ref --verify --quiet "refs/tags/${tag}"`,
-		`printf '%s\n' "${version}" > internal/buildinfo/VERSION`,
-		`GITHUB_REF_NAME="${tag}" sh ./scripts/release.sh validate-tag`,
-		`git commit -m "chore(release): bump version to ${RELEASE_VERSION}"`,
-		`git tag -a "${RELEASE_TAG}" -m "Release ${RELEASE_TAG}"`,
-		`git push --atomic origin HEAD:refs/heads/main "refs/tags/${RELEASE_TAG}"`,
-		`GH_TOKEN: ${{ github.token }}`,
-		`gh workflow run ci.yml --ref "${RELEASE_TAG}"`,
-	} {
-		if !strings.Contains(workflowText, want) {
-			t.Errorf("manual release workflow does not contain %q", want)
-		}
+	dispatch, ok := workflow.On["workflow_dispatch"]
+	if !ok {
+		t.Fatal("missing manual dispatch")
 	}
-	for _, forbidden := range []string{"inputs:", "PERSONAL_ACCESS_TOKEN", "PAT"} {
-		if strings.Contains(workflowText, forbidden) {
-			t.Errorf("manual release workflow must not contain %q", forbidden)
-		}
+	if len(dispatch.Content) != 0 {
+		t.Error("manual release must not take version inputs")
 	}
+	requireFields(t, workflow.Permissions, map[string]string{"actions": "write", "contents": "write"})
+	if workflow.Concurrency.Group != "create-release-tag" || workflow.Concurrency.Cancel || workflow.Concurrency.Queue != "max" {
+		t.Errorf("manual release concurrency = %+v", workflow.Concurrency)
+	}
+	job := jobByName(t, workflow, "release-tag")
+	requireFields(t, stepByAction(t, job, "actions/checkout").With, map[string]string{"fetch-depth": "0"})
+	stepByRun(t, job, `if [[ "${GITHUB_REF}" != "refs/heads/main" ]]`)
+	resolve := stepByRun(t, job, "./scripts/release.sh next-version")
+	requireCommands(t, resolve.Run, `git show-ref --verify --quiet "refs/tags/${tag}"`, `printf '%s\n' "${version}" > internal/buildinfo/VERSION`, `GITHUB_REF_NAME="${tag}" sh ./scripts/release.sh validate-tag`)
+	commit := stepByRun(t, job, "git push --atomic")
+	requireCommands(t, commit.Run, `git commit -m "chore(release): bump version to ${RELEASE_VERSION}"`, `git tag -a "${RELEASE_TAG}" -m "Release ${RELEASE_TAG}"`, `git push --atomic origin HEAD:refs/heads/main "refs/tags/${RELEASE_TAG}"`)
+	dispatchCI := stepByRun(t, job, `gh workflow run ci.yml --ref "${RELEASE_TAG}"`)
+	requireFields(t, dispatchCI.Env, map[string]string{"GH_TOKEN": "${{ github.token }}", "RELEASE_TAG": "${{ steps.release.outputs.tag }}"})
 }
 
 func TestNextReleaseVersionIncrementsLatestStablePatch(t *testing.T) {
