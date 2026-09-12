@@ -135,9 +135,15 @@ linters:
 
 formatters:
   enable:
+    - gci
     - gofmt
     - goimports
   settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/kuuvahki-labs/sandrone)
     goimports:
       local-prefixes:
         - github.com/kuuvahki-labs/sandrone

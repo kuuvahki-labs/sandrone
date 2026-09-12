@@ -9,14 +9,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/kuuvahki-labs/sandrone/internal/jsonvalue"
-
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/require"
 
 	"github.com/kuuvahki-labs/sandrone/internal/app"
 	"github.com/kuuvahki-labs/sandrone/internal/entry/httpapi"
 	"github.com/kuuvahki-labs/sandrone/internal/entry/mcpapi"
+	"github.com/kuuvahki-labs/sandrone/internal/jsonvalue"
 )
 
 func TestResourceDiscoveryListsFixedResourcesAndDefinitionTemplates(t *testing.T) {

@@ -10,12 +10,11 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/kuuvahki-labs/sandrone/internal/jsonvalue"
-
 	"gopkg.in/yaml.v3"
 
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/shared"
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
+	"github.com/kuuvahki-labs/sandrone/internal/jsonvalue"
 )
 
 type schemeParser func(raw string) (domain.NodeIR, *domain.SourceInfo, error)

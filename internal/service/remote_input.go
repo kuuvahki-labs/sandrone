@@ -11,12 +11,11 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/kuuvahki-labs/sandrone/internal/jsonvalue"
-
 	"gopkg.in/yaml.v3"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/fetcher"
+	"github.com/kuuvahki-labs/sandrone/internal/jsonvalue"
 )
 
 var autoSubscriptionFormats = []string{"uri-list", "mihomo", "sing-box"}

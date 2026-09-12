@@ -95,7 +95,7 @@ validate-build-identity:
 help: ## Show available targets.
 	@printf '%s\n' 'Common targets:'
 	@printf '  %-28s %s\n' 'check' 'Run fmt-check, vet, test, build, and lint.'
-	@printf '  %-28s %s\n' 'fmt' 'Format Go files with go fmt.'
+	@printf '  %-28s %s\n' 'fmt' 'Format Go files and sort imports with golangci-lint.'
 	@printf '  %-28s %s\n' 'fmt-check' 'Check Go formatting without changing files.'
 	@printf '  %-28s %s\n' 'vet' 'Run go vet.'
 	@printf '  %-28s %s\n' 'test' 'Run default Go tests.'
@@ -113,7 +113,7 @@ help: ## Show available targets.
 check: fmt-check vet test build-check lint
 
 fmt:
-	$(GO) fmt $(PKGS)
+	$(GOLANGCI_LINT) fmt $(PKGS)
 
 fmt-check:
 	@unformatted="$$(find . -type f -name '*.go' -not -path './.git/*' -not -path './.claude/*' -exec "$(GOFMT)" -l {} +)" || exit $$?; \

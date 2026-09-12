@@ -74,6 +74,9 @@ Web 依赖方向和 FileDriver 分工见 [Web 模块约定](web/AGENTS.md)。
 [CI](.github/workflows/ci.yml) 另有模块校验与独立 Web job，保留其完整检查。
 迭代时可单独运行 `make test`、`make vet` 或 `make lint`；完整门禁通过后无需重复运行单项。
 
+使用 `make fmt` 自动格式化 Go 文件并排序 import，按标准库、第三方、本项目分组；
+`make lint` 会检查同一套 `gci` / `goimports` 规则。不要手动调整 import 排序。
+
 Playwright 默认启动 built SPA，已包含 `pnpm build`；成功的默认 E2E 可计入同一版本的
 构建验证。使用外部 server 时需确认其产物来自当前修改，否则不能据此声称构建已验证。
 构建并复制 Go 嵌入资源时使用 `make build-webui`。
