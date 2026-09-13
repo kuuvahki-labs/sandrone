@@ -197,6 +197,9 @@ test("Mihomo regions generate directly and restore selection and group type afte
   await controls.getByRole("checkbox", { name: /^Hong Kong/ }).check();
   expect(await page.locator('input[name="config"]').inputValue()).toBe(initialConfig);
   await controls.getByRole("button", { name: "Generate adaptive groups", exact: true }).click();
+  const proxyGroups = page.getByRole("button", { name: "Proxy groups", exact: true });
+  await expect(proxyGroups).toHaveAttribute("aria-expanded", "false");
+  await proxyGroups.click();
   await expect(page.getByRole("button", { name: "Expand proxy group Hong Kong", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Save file", exact: true })).toBeEnabled();
   await page.getByRole("button", { name: "Save file", exact: true }).click();
@@ -233,6 +236,9 @@ test("sing-box generator option changes leave existing regex groups saveable", a
   await expect(page.getByText("Loaded 1 nodes", { exact: true })).toBeVisible();
   const controls = page.getByRole("group", { name: "Adaptive groups", exact: true });
   await controls.getByRole("button", { name: "Generate adaptive groups", exact: true }).click();
+  const proxyGroups = page.getByRole("button", { name: "Proxy groups", exact: true });
+  await expect(proxyGroups).toHaveAttribute("aria-expanded", "false");
+  await proxyGroups.click();
   await expect(page.getByRole("button", { name: "Expand proxy group Hong Kong", exact: true })).toBeVisible();
   const config = await page.locator('input[name="config"]').inputValue();
 
@@ -240,7 +246,7 @@ test("sing-box generator option changes leave existing regex groups saveable", a
   await page.getByRole("option", { name: "selector", exact: true }).click();
   await controls.getByRole("button", { name: /^Groups to generate/ }).click();
   await controls.getByRole("button", { name: "Clear", exact: true }).click();
-  await controls.getByRole("checkbox", { name: /^Japan/ }).check();
+  await controls.getByRole("checkbox", { name: /^South Korea/ }).check();
   expect(await page.locator('input[name="config"]').inputValue()).toBe(config);
   await expect(page.getByRole("button", { name: "Save file", exact: true })).toBeEnabled();
   await page.getByRole("button", { name: "Save file", exact: true }).click();
@@ -251,7 +257,7 @@ test("sing-box generator option changes leave existing regex groups saveable", a
   await expect(controls.getByRole("combobox", { name: "Proxy group type", exact: true })).toHaveText("urltest");
   await controls.getByRole("button", { name: /^Groups to generate/ }).click();
   await expect(controls.getByRole("checkbox", { name: /^Hong Kong/ })).toBeChecked();
-  await expect(controls.getByRole("checkbox", { name: /^Japan/ })).not.toBeChecked();
+  await expect(controls.getByRole("checkbox", { name: /^South Korea/ })).not.toBeChecked();
   await expect(page.getByRole("button", { name: "Save file", exact: true })).toBeEnabled();
   await controls.scrollIntoViewIfNeeded();
   await captureEvidence(page, testInfo, "sing-box-regions-reopened.png", issues, api);

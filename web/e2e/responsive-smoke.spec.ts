@@ -479,7 +479,7 @@ test("large configuration collections start collapsed and remain available", asy
   await page.goto("/files/new?source=mihomo");
   await page.getByRole("radio", { name: "完整", exact: true }).click();
   await expect(page.getByRole("group", { name: "文件处理", exact: true })
-    .locator('[data-slot="count-badge"]')).toHaveText("2");
+    .locator('[data-slot="count-badge"]')).toHaveText("1");
 
   const sectionLabels = ["代理组", "规则集", "规则策略"];
   for (const section of sectionLabels) {
