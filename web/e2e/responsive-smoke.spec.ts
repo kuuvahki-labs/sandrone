@@ -711,19 +711,19 @@ for (const route of routes) {
       await firstDisclosure.click();
       await expect(firstProcessor.getByRole("button", { name: "展开处理器 1" }))
         .toHaveAttribute("aria-expanded", "false");
+      await expect(firstProcessor.getByRole("separator")).toHaveCount(0);
       await expect(secondDisclosure).toHaveAttribute("aria-expanded", "true");
       const enabledButton = secondProcessor.getByRole("button", { name: "启用 处理器 2" });
       for (const [card, disclosure, enabled] of [
         [firstProcessor, firstProcessor.getByRole("button", { name: "展开处理器 1" }), firstProcessor.getByRole("button", { name: "启用 处理器 1" })],
         [secondProcessor, secondDisclosure, enabledButton],
       ] as const) {
-        const [disclosureBounds, enabledBounds] = await Promise.all([
-          disclosure.boundingBox(),
-          enabled.boundingBox(),
-        ]);
-        const disclosureCenter = (disclosureBounds?.y ?? 0) + (disclosureBounds?.height ?? 0) / 2;
-        const enabledCenter = (enabledBounds?.y ?? 0) + (enabledBounds?.height ?? 0) / 2;
-        expect(Math.abs(disclosureCenter - enabledCenter), "processor header icons should be vertically centered")
+        const centers = await disclosure.or(enabled).evaluateAll((buttons) => buttons.map((button) => {
+          const bounds = button.getBoundingClientRect();
+          return bounds.y + bounds.height / 2;
+        }));
+        expect(centers).toHaveLength(2);
+        expect(Math.abs(centers[0] - centers[1]), "processor header icons should be vertically centered")
           .toBeLessThanOrEqual(1);
         await expect(card.locator('[data-slot="disclosure-indicator"]')).toBeVisible();
       }
