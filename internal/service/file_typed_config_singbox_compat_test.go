@@ -3,6 +3,7 @@
 package service_test
 
 import (
+	"encoding/json/v2"
 	"slices"
 	"testing"
 
@@ -37,6 +38,18 @@ func TestServiceSingBoxWebDefaultIsAcceptedByLockedCore(t *testing.T) {
 	require.Empty(t, options.HTTPClients[0].Options().Detour)
 	require.NotNil(t, options.Route)
 	require.Equal(t, "rule-set-direct", options.Route.DefaultHTTPClient)
+	var document map[string]any
+	require.NoError(t, json.Unmarshal(result.Content, &document))
+	routeRules := document["route"].(map[string]any)["rules"].([]any)
+	require.Equal(t, []any{
+		map[string]any{"action": "sniff"},
+		map[string]any{
+			"type": "logical", "mode": "or", "action": "hijack-dns",
+			"rules": []any{map[string]any{"protocol": "dns"}, map[string]any{"port": float64(53)}},
+		},
+		map[string]any{"clash_mode": "direct", "outbound": "direct"},
+		map[string]any{"clash_mode": "global", "outbound": "Proxy"},
+	}, routeRules[:4])
 	instance, err := box.New(box.Options{Context: boxContext, Options: options})
 	require.NoError(t, err)
 	require.NoError(t, instance.Close())
@@ -143,7 +156,21 @@ func singBoxWebDefaultSpec(t *testing.T, autoMembers []any) *domain.FileSpec {
     "strategy": "prefer_ipv4"
   },
   "inbounds": [
-    { "type": "mixed", "tag": "mixed-in", "listen": "127.0.0.1", "listen_port": 2080 }
+    { "type": "mixed", "tag": "mixed-in", "listen": "127.0.0.1", "listen_port": 2080 },
+    {
+      "type": "tun",
+      "tag": "tun-in",
+      "address": ["172.19.0.1/30", "fdfe:dcba:9876::1/126"],
+      "auto_route": true,
+      "strict_route": true,
+      "platform": {
+        "http_proxy": { "enabled": true, "server": "127.0.0.1", "server_port": 2080 }
+      },
+      "route_exclude_address": [
+        "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16",
+        "fe80::/10", "fc00::/7", "224.0.0.251/32", "ff02::fb/128"
+      ]
+    }
   ],
   "outbounds": [],
   "route": {
@@ -151,7 +178,17 @@ func singBoxWebDefaultSpec(t *testing.T, autoMembers []any) *domain.FileSpec {
     "default_domain_resolver": "dns-cn",
     "default_http_client": "rule-set-direct",
     "rule_set": [],
-    "rules": []
+    "rules": [
+      { "action": "sniff" },
+      {
+        "type": "logical",
+        "mode": "or",
+        "rules": [{ "protocol": "dns" }, { "port": 53 }],
+        "action": "hijack-dns"
+      },
+      { "clash_mode": "direct", "outbound": "direct" },
+      { "clash_mode": "global", "outbound": "Proxy" }
+    ]
   },
   "experimental": { "cache_file": { "enabled": true, "store_fakeip": true } }
 }`},
@@ -193,15 +230,9 @@ func singBoxWebDefaultSpec(t *testing.T, autoMembers []any) *domain.FileSpec {
 				},
 			}),
 		},
-		Processors: []domain.ProcessorSpec{singBoxOutboundAdapterProcessor(t, map[string]any{"default_outbound": "Proxy"}), {
-			Name:  "Sniff & DNS Hijack",
-			Type:  "merge",
-			Stage: domain.StageFile,
-			Params: params(t, map[string]any{
-				"mode":    "json_override",
-				"content": `{"route":{"+rules":[{"action":"sniff"},{"type":"logical","mode":"or","rules":[{"protocol":"dns"},{"port":53}],"action":"hijack-dns"}]}}`,
-			}),
-		}},
+		Processors: []domain.ProcessorSpec{
+			singBoxOutboundAdapterProcessor(t, map[string]any{"default_outbound": "Proxy"}),
+		},
 	}
 }
 

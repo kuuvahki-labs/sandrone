@@ -10,6 +10,7 @@ describe("file driver default bases", () => {
 
     expect(parsed).toMatchObject({
       "mixed-port": 7890,
+      "external-controller": "127.0.0.1:9090",
       "geo-auto-update": true,
       "geo-update-interval": 24,
       "allow-lan": true,
@@ -22,6 +23,28 @@ describe("file driver default bases", () => {
       "tcp-concurrent": true,
       "disable-keep-alive": true,
       profile: { "store-selected": true, "store-fake-ip": true },
+      sniffer: {
+        enable: true,
+        "override-destination": false,
+        "skip-domain": ["Mijia Cloud", "dlg.io.mi.com", "+.push.apple.com"],
+        sniff: {
+          HTTP: { ports: [80, 8080, 8880] },
+          TLS: { ports: [443, 8443] },
+          QUIC: { ports: [443, 8443] },
+        },
+      },
+      tun: {
+        enable: true,
+        stack: "mixed",
+        "auto-route": true,
+        "strict-route": true,
+        "auto-detect-interface": true,
+        "dns-hijack": ["any:53", "tcp://any:53"],
+        "route-exclude-address": [
+          "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16",
+          "fe80::/10", "fc00::/7", "224.0.0.251/32", "ff02::fb/128",
+        ],
+      },
       dns: {
         enable: true,
         ipv6: false,
@@ -75,11 +98,8 @@ describe("file driver default bases", () => {
       "rule-providers": {},
       rules: [],
     });
-    expect(parsed).not.toHaveProperty("external-controller");
     expect(parsed).not.toHaveProperty("secret");
     expect(parsed).not.toHaveProperty("auto-redirect");
-    expect(parsed).not.toHaveProperty("sniffer");
-    expect(parsed).not.toHaveProperty("tun");
     expect(parsed).not.toHaveProperty("geox-url");
     expect(parsed).not.toHaveProperty("dns.fake-ip-range");
     expect(parsed).not.toHaveProperty("dns.fake-ip-filter-mode");
@@ -142,18 +162,47 @@ describe("file driver default bases", () => {
         final: "dns-remote",
         strategy: "prefer_ipv4",
       },
-      inbounds: [{ type: "mixed", tag: "mixed-in", listen: "127.0.0.1", listen_port: 2080 }],
+      inbounds: [
+        { type: "mixed", tag: "mixed-in", listen: "127.0.0.1", listen_port: 2080 },
+        {
+          type: "tun",
+          tag: "tun-in",
+          address: ["172.19.0.1/30", "fdfe:dcba:9876::1/126"],
+          auto_route: true,
+          strict_route: true,
+          platform: {
+            http_proxy: { enabled: true, server: "127.0.0.1", server_port: 2080 },
+          },
+          route_exclude_address: [
+            "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16",
+            "fe80::/10", "fc00::/7", "224.0.0.251/32", "ff02::fb/128",
+          ],
+        },
+      ],
       outbounds: [],
       route: {
         auto_detect_interface: true,
         default_domain_resolver: "dns-cn",
         default_http_client: "rule-set-direct",
         rule_set: [],
-        rules: [],
+        rules: [
+          { action: "sniff" },
+          {
+            type: "logical",
+            mode: "or",
+            rules: [{ protocol: "dns" }, { port: 53 }],
+            action: "hijack-dns",
+          },
+          { clash_mode: "direct", outbound: "direct" },
+          { clash_mode: "global", outbound: "Proxy" },
+        ],
       },
-      experimental: { cache_file: { enabled: true, store_fakeip: true } },
+      experimental: {
+        cache_file: { enabled: true, store_fakeip: true },
+        clash_api: { external_controller: "127.0.0.1:9090" },
+      },
     });
-    expect(base).not.toMatch(/auto_redirect|"stack"|"path"|cache_id|clash_api/);
+    expect(base).not.toMatch(/auto_redirect|"stack"|"path"|cache_id/);
     expect(JSON.parse(base).dns.rules.findIndex((rule: Record<string, unknown>) =>
       rule.server === "dns-fakeip")).toBeLessThan(
       JSON.parse(base).dns.rules.findIndex((rule: Record<string, unknown>) =>
@@ -164,10 +213,11 @@ describe("file driver default bases", () => {
   it("keeps localized base references on the registered sing-box driver", () => {
     const base = JSON.parse(driverBase("sing-box", "zh-CN")) as {
       dns: { servers: Array<{ detour?: string }> };
-      route: { final?: string };
+      route: { final?: string; rules: Array<Record<string, unknown>> };
     };
 
     expect(base.dns.servers[2]?.detour).toBe("🚀 节点选择");
+    expect(base.route.rules[3]).toEqual({ clash_mode: "global", outbound: "🚀 节点选择" });
     expect(base.route).not.toHaveProperty("final");
   });
 

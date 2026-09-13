@@ -449,7 +449,17 @@ func TestServiceCommunityPresetSingBoxTailnetShareRunsExactProcessorChain(t *tes
 				"rules": [{"query_type":["A","AAAA"],"action":"route","server":"dns-fakeip"}],
 				"final": "dns-remote"
 			},
-			"inbounds": [{"type":"mixed","tag":"mixed-in","listen":"127.0.0.1","listen_port":2080}],
+			"inbounds": [
+				{"type":"mixed","tag":"mixed-in","listen":"127.0.0.1","listen_port":2080},
+				{
+					"type":"tun","tag":"tun-in","address":["172.19.0.1/30","fdfe:dcba:9876::1/126"],
+					"auto_route":true,"strict_route":true,
+					"route_exclude_address":[
+						"10.0.0.0/8","172.16.0.0/12","192.168.0.0/16","169.254.0.0/16",
+						"fe80::/10","fc00::/7","224.0.0.251/32","ff02::fb/128"
+					]
+				}
+			],
 			"outbounds": [],
 			"endpoints": [],
 			"route": {"rule_set":[],"rules":[]}
@@ -461,7 +471,6 @@ func TestServiceCommunityPresetSingBoxTailnetShareRunsExactProcessorChain(t *tes
 			},
 		})},
 		Processors: []domain.ProcessorSpec{
-			singBoxManagedScriptProcessor(t, "tun", "TUN 模式", "sing-box-tun.js", nil),
 			singBoxManagedScriptProcessor(t, "tailscale-external", "Tailscale 共存", "sing-box-tailscale-external.js", nil),
 			singBoxManagedScriptProcessor(t, "tailnet-share", "共享到 Tailnet", "sing-box-tailnet-share.js", map[string]any{
 				"listen_addresses": []string{"100.64.0.7", "fd7a:115c:a1e0::7"},
@@ -563,7 +572,7 @@ func TestServiceCommunityPresetSingBoxManagedRequestOverrideFailsWithoutResult(t
 			"rules": []map[string]any{{"outbound": "Proxy"}},
 		})},
 		Processors: []domain.ProcessorSpec{
-			singBoxManagedScriptProcessor(t, "tun", "TUN 模式", "sing-box-tun.js", nil),
+			singBoxManagedScriptProcessor(t, "tailscale-external", "Tailscale 共存", "sing-box-tailscale-external.js", nil),
 		},
 	}
 

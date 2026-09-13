@@ -229,9 +229,12 @@ func TestServiceSingBoxFileUsesExplicitGroupsRuleSetsAndRules(t *testing.T) {
 		Content: "ss://aes-128-gcm:secret@example.com:8388#sg-node",
 	}))
 	spec := domain.FileSpec{
-		Name:   "custom.json",
-		Kind:   domain.FileKindSingBox,
-		Source: domain.FileSource{},
+		Name: "custom.json",
+		Kind: domain.FileKindSingBox,
+		Source: domain.FileSource{
+			Type:    "inline",
+			Content: `{"route":{"rules":[{"action":"sniff"},{"clash_mode":"global","outbound":"Manual"}]}}`,
+		},
 		Config: &domain.FileConfig{
 			Subscriptions: []string{"default"},
 			Settings: completeTypedSettings(t, map[string]any{
@@ -272,6 +275,8 @@ func TestServiceSingBoxFileUsesExplicitGroupsRuleSetsAndRules(t *testing.T) {
 		"rules": []any{map[string]any{"domain_suffix": []any{"example.com"}}},
 	}}, route["rule_set"])
 	require.Equal(t, []any{
+		map[string]any{"action": "sniff"},
+		map[string]any{"clash_mode": "global", "outbound": "Manual"},
 		map[string]any{"rule_set": []any{"manual"}, "outbound": "Manual"},
 		map[string]any{"outbound": "direct"},
 	}, route["rules"])

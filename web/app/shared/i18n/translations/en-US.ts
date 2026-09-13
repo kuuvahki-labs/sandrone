@@ -376,8 +376,6 @@ export const enUS: Record<TranslationKey, string> = {
   "processor.merge.overrideDescription": "Supports +key prepend, key+ append, key! replacement, <key> literal keys, and null deletion.",
   "processor.merge.syntaxHelp": "Override syntax help",
   "processor.moreActions": "More processor actions: {label}",
-  "processor.mihomoPreset.sniffer": "Sniffer",
-  "processor.mihomoPreset.tun": "TUN",
   "processor.mihomoPreset.fakeIpCompat": "Fake-IP compatibility extension",
   "processor.mihomoPreset.tailscale": "Tailscale coexistence",
   "processor.mihomoPreset.tailnetShare": "Tailnet proxy sharing",

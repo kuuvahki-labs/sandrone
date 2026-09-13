@@ -18,38 +18,20 @@ import singBoxOutboundAdapterScript from "~/features/files/processors/scripts/si
 import singBoxTailnetShareScript from "~/features/files/processors/scripts/sing-box-tailnet-share.js?raw";
 import singBoxTailscaleExternalScript from "~/features/files/processors/scripts/sing-box-tailscale-external.js?raw";
 import singBoxTailscaleNativeScript from "~/features/files/processors/scripts/sing-box-tailscale-native.js?raw";
-import singBoxTunScript from "~/features/files/processors/scripts/sing-box-tun.js?raw";
 import type { Translator } from "~/shared/i18n/context";
 import type { ProcessorDetail } from "~/shared/resources/types";
 
 export type SingBoxProcessorPresetID =
   | "outbound-adapter"
-  | "sniff"
   | "quic-fallback"
-  | "tun"
   | "tailscale-native"
   | "tailscale-external"
   | "tailnet-share"
   | "fakeip-compat";
 type SingBoxOrderedRuleProcessorPresetID = "quic-fallback";
-type SingBoxScriptProcessorPresetID = "tun" | "tailscale-native" | "tailscale-external" | "tailnet-share" | "fakeip-compat";
-
-const SNIFF_AND_DNS_HIJACK_CONTENT = JSON.stringify({
-  route: {
-    "+rules": [
-      { action: "sniff" },
-      {
-        type: "logical",
-        mode: "or",
-        rules: [{ protocol: "dns" }, { port: 53 }],
-        action: "hijack-dns",
-      },
-    ],
-  },
-}, null, 2);
+type SingBoxScriptProcessorPresetID = "tailscale-native" | "tailscale-external" | "tailnet-share" | "fakeip-compat";
 
 const MANAGED_SCRIPTS: Readonly<Record<SingBoxScriptProcessorPresetID, string>> = {
-  tun: singBoxTunScript,
   "tailscale-native": singBoxTailscaleNativeScript,
   "tailscale-external": singBoxTailscaleExternalScript,
   "tailnet-share": singBoxTailnetShareScript,
@@ -117,7 +99,6 @@ const ORDERED_RULE_PRESETS: Record<
 
 export function singBoxProcessorPreset(id: SingBoxProcessorPresetID, name: string): ProcessorDetail {
   if (id === "outbound-adapter") return outboundAdapterProcessor(name);
-  if (id === "sniff") return sniffAndDNSHijackProcessor(name);
   if (isOrderedRulePresetID(id)) return orderedRuleProcessorPreset(ORDERED_RULE_PRESETS[id], name);
   return managedScriptProcessor(id, name);
 }
@@ -166,31 +147,15 @@ export const singBoxProcessorPresets: readonly FileProcessorPreset[] = [
       return [{ messageKey: "files.config.defaultOutboundReferenceMissing", params: { target } }];
     },
   },
-  {
-    id: "sniff",
-    category: "network",
-    labelKey: "processors.filePreset.singBox.sniff.label",
-    defaultOn: true,
-    dependencies: [],
-    conflicts: [],
-    build: (t) => singBoxProcessorPreset("sniff", t("processors.filePreset.singBox.sniff.label")),
-    recognize: (processor) => (
-      processor.type === "merge"
-      && processor.params?.mode === "json_override"
-      && processor.params.content === SNIFF_AND_DNS_HIJACK_CONTENT
-    ),
-  },
   githubRuleSourceMirrorPreset,
   orderedRuleDescriptor(
     ORDERED_RULE_PRESETS["quic-fallback"],
     "network",
     "processors.filePreset.singBox.quicFallback.label",
-    ["sniff"],
   ),
-  managedScriptDescriptor("tun", "network", "processors.filePreset.singBox.tun.label"),
-  managedScriptDescriptor("tailscale-native", "tailscale", "processors.filePreset.singBox.tailscaleNative.label", ["tun"], ["tailscale-external"]),
-  managedScriptDescriptor("tailscale-external", "tailscale", "processors.filePreset.singBox.tailscaleExternal.label", ["tun"], ["tailscale-native"]),
-  managedScriptDescriptor("tailnet-share", "tailscale", "processors.filePreset.singBox.tailnetShare.label", ["tun", "tailscale-external"]),
+  managedScriptDescriptor("tailscale-native", "tailscale", "processors.filePreset.singBox.tailscaleNative.label", [], ["tailscale-external"]),
+  managedScriptDescriptor("tailscale-external", "tailscale", "processors.filePreset.singBox.tailscaleExternal.label", [], ["tailscale-native"]),
+  managedScriptDescriptor("tailnet-share", "tailscale", "processors.filePreset.singBox.tailnetShare.label", ["tailscale-external"]),
   managedScriptDescriptor("fakeip-compat", "network", "processors.filePreset.singBox.fakeIPCompat.label"),
 ];
 
@@ -203,18 +168,6 @@ export function defaultSingBoxProcessors(t: Translator, { namingLocale }: { nami
         ? { ...processor, params: { ...processor.params, args: { default_outbound: configAnchorName(namingLocale) } } }
         : processor;
     });
-}
-
-function sniffAndDNSHijackProcessor(name: string): ProcessorDetail {
-  return {
-    name,
-    type: "merge",
-    stage: "file",
-    params: {
-      mode: "json_override",
-      content: SNIFF_AND_DNS_HIJACK_CONTENT,
-    },
-  };
 }
 
 function outboundAdapterProcessor(name: string): ProcessorDetail {

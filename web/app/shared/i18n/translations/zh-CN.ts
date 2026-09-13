@@ -375,8 +375,6 @@ export const zhCN = {
   "processor.merge.overrideDescription": "支持 +key 前插、key+ 后追加、key! 强制替换、<key> 字面键和 null 删除。",
   "processor.merge.syntaxHelp": "覆写语法说明",
   "processor.moreActions": "更多处理器操作：{label}",
-  "processor.mihomoPreset.sniffer": "Sniffer",
-  "processor.mihomoPreset.tun": "TUN",
   "processor.mihomoPreset.fakeIpCompat": "Fake-IP 兼容扩展",
   "processor.mihomoPreset.tailscale": "Tailscale 共存",
   "processor.mihomoPreset.tailnetShare": "Tailnet 代理共享",

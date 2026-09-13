@@ -74,13 +74,13 @@ Shadowrocket 使用 `GEOIP,CN`。三者都是域名规则之后的**解析型兜
 
 三种产物只对齐路由和 DNS 的结果语义，不强求客户端字段相同：
 
-- Mihomo base 不含 `tun`；用户显式选择 TUN processor 后才生成并开启完整 TUN
-  块。base 默认使用 fake-IP，并由基础 `fake-ip-filter` 和三个互斥的可选扩展控制
+- Mihomo base 直接包含并开启完整 TUN 块；需要关闭时可修改 base、添加后置
+  processor，或在目标客户端关闭。base 默认使用 fake-IP，并由基础 `fake-ip-filter` 和三个互斥的可选扩展控制
   哪些域名返回真实 IP。
-- sing-box base 不含 TUN，只保留仅监听本机的 mixed inbound。用户显式选择 TUN
-  processor 后才生成双栈 `tun-in`。base 默认配置 1.14 FakeIP server，普通 A/AAAA
+- sing-box base 直接包含双栈 `tun-in`，并用仅监听本机的 mixed inbound 提供系统
+  HTTP proxy；需要关闭时可修改 base 或添加后置 processor。base 默认配置 1.14 FakeIP server，普通 A/AAAA
   返回 FakeIP；本地、连接检测、校时/NTP/STUN、iCloud 和 Xiaomi 等兼容域名走真实
-  resolver。FakeIP 已配置不等于系统流量已接管，流量仍须经系统代理或显式 TUN
+  resolver。FakeIP 已配置不等于系统流量已接管，流量仍须经系统代理或已启用的 TUN
   进入 sing-box DNS。
 - Shadowrocket 是否以 TUN 接管流量由 App 的代理类型或 `compatibility-mode` 决定；
   `tun-excluded-routes` 和 `hijack-dns` 只描述启用后的处理方式。其 TUN DNS 支持
@@ -95,7 +95,7 @@ Shadowrocket 使用 `GEOIP,CN`。三者都是域名规则之后的**解析型兜
 - `rule-set:cn` 使用同一组中国 DoH，`geosite:private` 是唯一常规 system 例外；
 - 默认 resolver 是不绑定路由规则的 Cloudflare/Google DoH；
 - `category-doh` 与端口 `853` 先进入主代理策略；
-- 显式选择 TUN processor 后，它开启 `strict-route` 并劫持 TCP/UDP 53，同时把 mDNS 目标
+- base TUN 开启 `strict-route` 并劫持 TCP/UDP 53，同时把 mDNS 目标
   `224.0.0.251/32`、`ff02::fb/128` 排除在 TUN 自动路由之外。
 
 这里的 `#DIRECT` 明确固定中国 DNS 请求自身的出站路径。默认境外 DoH URL 不携带
@@ -116,7 +116,9 @@ Shadowrocket 使用 `GEOIP,CN`。三者都是域名规则之后的**解析型兜
   resolver；
 - 远程规则集通过显式的 `rule-set-direct` HTTP client 直连下载，不依赖
   `route.final` 或尚未完成选优的 `urltest`；
-- 显式 TUN processor 启用 `strict_route`，默认 sniff/DNS processor 以逻辑规则劫持 protocol DNS 或目标
+- base 依次声明 sniff、DNS 劫持与 `direct`、`global` Clash mode 规则；typed driver
+  把 structured settings 规则追加在它们之后，因此 base 规则始终先于普通路由规则；
+- base TUN 启用 `strict_route`，base sniff/DNS 规则以逻辑规则劫持 protocol DNS 或目标
   端口 53；`224.0.0.251/32`、`ff02::fb/128` 则在进入该识别规则前绕开 TUN，
   让 mDNS 留在本地链路，同时保留对其他非标准端口明文 DNS 的协议识别。
 
@@ -164,7 +166,7 @@ resolver 最小暴露之间的折中，不应描述为严格的按域名双路 D
 - 中国 IP 兜底位于境外域名规则之后，且没有 `no-resolve`；
 - 没有明文公网 nameserver 或全局 system fallback；
 - 应用 DoH/DoT 规则位于普通服务规则之前；
-- 若选择了 TUN，其 DNS hijack 与路由配置仍存在且顺序正确。
+- base TUN 的 DNS hijack 与路由配置仍存在且顺序正确。
 
 自定义 source、手动删除模板 rule set、改变 processor 顺序或使用全局路由模式，
 都可能改变上述结果。

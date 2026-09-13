@@ -77,7 +77,12 @@ func (singBoxFileDriver) Compile(_ context.Context, in CompileInput) ([]byte, er
 	}
 	route := mapValue(doc["route"])
 	route["rule_set"] = configMapList(settings.RuleSets)
-	route["rules"] = configMapList(settings.Rules)
+	baseRules := anyList(route["rules"])
+	settingsRules := configMapList(settings.Rules)
+	rules := make([]any, 0, len(baseRules)+len(settingsRules))
+	rules = append(rules, baseRules...)
+	rules = append(rules, settingsRules...)
+	route["rules"] = rules
 	doc["route"] = route
 	out, err := json.Marshal(doc, jsontext.WithIndent("  "))
 	if err != nil {

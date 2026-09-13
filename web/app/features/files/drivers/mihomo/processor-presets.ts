@@ -12,14 +12,10 @@ import type { ProcessorDetail } from "~/shared/resources/types";
 import fakeIPCompatContent from "./preset-content/fake-ip-compat.yaml?raw";
 import fakeIPOpenClashContent from "./preset-content/fake-ip-openclash.yaml?raw";
 import fakeIPShellCrashContent from "./preset-content/fake-ip-shellcrash.yaml?raw";
-import snifferContent from "./preset-content/sniffer.yaml?raw";
 import tailnetShareContent from "./preset-content/tailnet-share.yaml?raw";
 import tailscaleExternalContent from "./preset-content/tailscale-external.yaml?raw";
-import tunContent from "./preset-content/tun.yaml?raw";
 
 export type MihomoProcessorPresetID =
-  | "sniffer"
-  | "tun"
   | "fake-ip-compat"
   | "fake-ip-openclash"
   | "fake-ip-shellcrash"
@@ -35,8 +31,6 @@ type MihomoMergeProcessorPresetID = Exclude<
 >;
 
 const PRESET_CONTENT: Record<MihomoMergeProcessorPresetID, string> = {
-  sniffer: withoutTrailingNewline(snifferContent),
-  tun: withoutTrailingNewline(tunContent),
   "fake-ip-compat": withoutTrailingNewline(fakeIPCompatContent),
   "fake-ip-openclash": withoutTrailingNewline(fakeIPOpenClashContent),
   "fake-ip-shellcrash": withoutTrailingNewline(fakeIPShellCrashContent),
@@ -67,17 +61,6 @@ export function mihomoProcessorPreset(id: MihomoProcessorPresetID, name: string)
 }
 
 export const mihomoProcessorPresets: readonly FileProcessorPreset[] = [
-  descriptor(
-    "sniffer",
-    "network",
-    "processor.mihomoPreset.sniffer",
-    true,
-  ),
-  descriptor(
-    "tun",
-    "network",
-    "processor.mihomoPreset.tun",
-  ),
   githubRuleSourceMirrorPreset,
   versionedDescriptor(
     "fake-ip-compat",
@@ -114,7 +97,7 @@ export const mihomoProcessorPresets: readonly FileProcessorPreset[] = [
     "tailscale",
     "processor.mihomoPreset.tailscale",
     false,
-    ["tun"],
+    [],
     ["tailscale-native"],
   ),
   descriptor(
@@ -122,7 +105,7 @@ export const mihomoProcessorPresets: readonly FileProcessorPreset[] = [
     "tailscale",
     "processor.mihomoPreset.tailnetShare",
     false,
-    ["tun", "tailscale-external"],
+    ["tailscale-external"],
   ),
 ];
 
@@ -231,7 +214,7 @@ function mihomoTailscaleNativeDescriptor(): FileProcessorPreset {
     category: "tailscale",
     labelKey: "processors.filePreset.mihomo.tailscaleNative.label",
     defaultOn: false,
-    dependencies: ["tun"],
+    dependencies: [],
     conflicts: ["tailscale-external"],
     build: (t) => mihomoTailscaleNativeProcessor(t("processors.filePreset.mihomo.tailscaleNative.label")),
     recognize: (processor) => {

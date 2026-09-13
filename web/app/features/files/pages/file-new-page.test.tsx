@@ -80,7 +80,17 @@ describe("FileNewPage", () => {
         final: "dns-remote",
         servers: expect.arrayContaining([expect.objectContaining({ tag: "dns-remote", detour: "🚀 节点选择" })]),
       },
-      inbounds: expect.arrayContaining([{ type: "mixed", tag: "mixed-in", listen: "127.0.0.1", listen_port: 2080 }]),
+      inbounds: expect.arrayContaining([
+        { type: "mixed", tag: "mixed-in", listen: "127.0.0.1", listen_port: 2080 },
+        expect.objectContaining({ type: "tun", tag: "tun-in", auto_route: true, strict_route: true }),
+      ]),
+      route: {
+        rules: expect.arrayContaining([
+          { action: "sniff" },
+          { clash_mode: "direct", outbound: "direct" },
+          { clash_mode: "global", outbound: "🚀 节点选择" },
+        ]),
+      },
     });
     expect(JSON.parse(originalBaseContent).route).not.toHaveProperty("final");
     expect(baseContent.closest("[data-highlighted-textarea]")).toHaveAttribute("data-highlighted-textarea", "json");
@@ -111,17 +121,11 @@ describe("FileNewPage", () => {
       },
     });
     const processors = JSON.parse(String(saved.get("processors")));
-    expect(processors).toHaveLength(3);
+    expect(processors).toHaveLength(2);
     expect(processors).toMatchObject([
       {
         name: "出站配置适配", type: "script", stage: "file",
         params: { args: { default_outbound: "🚀 节点选择" }, source: { type: "inline", content: expect.any(String) } },
-      },
-      {
-        name: "流量嗅探与 DNS 劫持",
-        type: "merge",
-        stage: "file",
-        params: { mode: "json_override" },
       },
       {
         name: "GitHub 加速",
@@ -133,18 +137,5 @@ describe("FileNewPage", () => {
         },
       },
     ]);
-    expect(JSON.parse(processors[1].params.content)).toEqual({
-      route: {
-        "+rules": [
-          { action: "sniff" },
-          {
-            type: "logical",
-            mode: "or",
-            rules: [{ protocol: "dns" }, { port: 53 }],
-            action: "hijack-dns",
-          },
-        ],
-      },
-    });
   });
 });

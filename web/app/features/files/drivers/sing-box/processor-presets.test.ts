@@ -27,31 +27,11 @@ describe("sing-box file processor defaults", () => {
 
     expect(processors.map((processor) => processor.name)).toEqual([
       "Outbound configuration adaptation",
-      "Sniff & DNS Hijack",
       "GitHub acceleration",
     ]);
     expect(processors[0]).toMatchObject({ params: { args: { default_outbound: "Proxy" } } });
     expect(defaultSingBoxProcessors(en, { namingLocale: "zh-CN" })[0])
       .toMatchObject({ params: { args: { default_outbound: "🚀 节点选择" } } });
-    expect(processors[1]).toMatchObject({
-      name: "Sniff & DNS Hijack",
-      type: "merge",
-      stage: "file",
-      params: { mode: "json_override" },
-    });
-    expect(JSON.parse(String(processors[1].params?.content))).toEqual({
-      route: {
-        "+rules": [
-          { action: "sniff" },
-          {
-            type: "logical",
-            mode: "or",
-            rules: [{ protocol: "dns" }, { port: 53 }],
-            action: "hijack-dns",
-          },
-        ],
-      },
-    });
     expect(defaultSingBoxProcessors(en, { namingLocale: "en-US" })[0]).not.toBe(processors[0]);
   });
 
@@ -59,19 +39,6 @@ describe("sing-box file processor defaults", () => {
     for (const preset of singBoxProcessorPresets) {
       expect(preset.build(t).name).toBe(t(preset.labelKey));
     }
-  });
-
-  it("recognizes only the exact managed JSON override", () => {
-    const preset = defaultSingBoxProcessors(en, { namingLocale: "en-US" })[1]!;
-    expect(recognizedFileProcessorPresetID(singBoxProcessorPresets, preset)).toBe("sniff");
-    expect(recognizedFileProcessorPresetID(singBoxProcessorPresets, {
-      ...preset,
-      params: { ...preset.params, content: `${String(preset.params?.content)}\n` },
-    })).toBeNull();
-    expect(recognizedFileProcessorPresetID(singBoxProcessorPresets, {
-      ...preset,
-      params: { ...preset.params, mode: "json_overlay" },
-    })).toBeNull();
   });
 
   it("builds the exact QUIC ordered-rule processor", () => {
@@ -170,10 +137,8 @@ describe("sing-box file processor defaults", () => {
   it("declares the complete dependency, conflict, and default matrix", () => {
     expect(singBoxProcessorPresets.map((preset) => preset.id)).toEqual([
       "outbound-adapter",
-      "sniff",
       "github-rule-source-mirror",
       "quic-fallback",
-      "tun",
       "tailscale-native",
       "tailscale-external",
       "tailnet-share",
@@ -191,11 +156,11 @@ describe("sing-box file processor defaults", () => {
         conflicts: preset.conflicts,
       };
     })).toEqual([
-      { id: "quic-fallback", defaultOn: false, dependencies: ["sniff"], conflicts: [] },
+      { id: "quic-fallback", defaultOn: false, dependencies: [], conflicts: [] },
     ]);
 
     expect(planFileProcessorPresetAddition(singBoxProcessorPresets, "quic-fallback", [], en).addedPresetIDs)
-      .toEqual(["sniff", "quic-fallback"]);
+      .toEqual(["quic-fallback"]);
   });
 
   it("builds Tailscale processors with stable preset markers", () => {
@@ -218,13 +183,13 @@ describe("sing-box file processor defaults", () => {
     expect(presetDescriptor("tailscale-native" as SingBoxProcessorPresetID)).toMatchObject({
       category: "tailscale",
       defaultOn: false,
-      dependencies: ["tun"],
+      dependencies: [],
       conflicts: ["tailscale-external"],
     });
     expect(presetDescriptor("tailscale-external" as SingBoxProcessorPresetID)).toMatchObject({
       category: "tailscale",
       defaultOn: false,
-      dependencies: ["tun"],
+      dependencies: [],
       conflicts: ["tailscale-native"],
     });
   });
@@ -645,7 +610,6 @@ describe("sing-box file processor defaults", () => {
     expect(applyPlan(current, native)).toEqual([
       customBefore,
       customAfter,
-      singBoxProcessorPreset("tun"),
       singBoxProcessorPreset("tailscale-native" as SingBoxProcessorPresetID),
     ]);
 
@@ -667,14 +631,11 @@ describe("sing-box file processor defaults", () => {
       en,
     );
     expect(external.removedPresetIDs).toEqual(["tailscale-native"]);
-    expect(external.addedPresetIDs).toEqual(["tun", "tailscale-external"]);
+    expect(external.addedPresetIDs).toEqual(["tailscale-external"]);
 
   });
 
-  it("builds the new managed presets with editable typed arguments", () => {
-    expect(singBoxProcessorPreset("tun")).toMatchObject({
-      params: { args: { preset_id: "tun" } },
-    });
+  it("builds the managed presets with editable typed arguments", () => {
     expect(singBoxProcessorPreset("tailnet-share")).toMatchObject({
       params: { args: {
         preset_id: "tailnet-share",
@@ -709,37 +670,6 @@ describe("sing-box file processor defaults", () => {
       ],
     });
     expect((fakeIPArgs.domain_regex as string[]).some((value) => value.includes("*"))).toBe(false);
-  });
-
-  it("adds the canonical TUN once and rejects unmanaged TUN shapes", () => {
-    const first = runManaged("tun", { inbounds: [{ type: "mixed", tag: "mixed-in" }] });
-    expect(first.document.inbounds).toEqual([
-      { type: "mixed", tag: "mixed-in" },
-      {
-        type: "tun",
-        tag: "tun-in",
-        address: ["172.19.0.1/30", "fdfe:dcba:9876::1/126"],
-        auto_route: true,
-        strict_route: true,
-        route_exclude_address: [
-          "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16",
-          "fe80::/10", "fc00::/7", "224.0.0.251/32", "ff02::fb/128",
-        ],
-      },
-    ]);
-    const repeated = runManaged("tun", first.document);
-    expect(repeated.document).toEqual(first.document);
-    expect(repeated.stringifyCalls).toBe(0);
-    const existing = { inbounds: [{ type: "tun", tag: "tun-in", custom: true }] };
-    expect(runManaged("tun", existing)).toEqual({ document: existing, stringifyCalls: 0 });
-    expect(() => runManaged("tun", { inbounds: [{ type: "tun", tag: "custom" }] }))
-      .toThrowError("found an unmanaged TUN inbound");
-    expect(() => runManaged("tun", { inbounds: [{ type: "mixed", tag: "tun-in" }] }))
-      .toThrowError("tag tun-in is not a TUN inbound");
-    expect(() => runManaged("tun", { inbounds: [{ type: "tun", tag: "tun-in" }, { type: "tun", tag: "second" }] }))
-      .toThrowError("found ambiguous TUN inbounds");
-    expect(() => runManaged("tun", { inbounds: [{ type: "tun", tag: "tun-in" }, { type: "mixed", tag: "tun-in" }] }))
-      .toThrowError("found ambiguous TUN inbounds");
   });
 
   it("shares exact Tailnet IPs with optional authentication and replaces owned listeners", () => {
@@ -931,23 +861,23 @@ describe("sing-box file processor defaults", () => {
   });
 
   it("declares the full Tailscale dependency chain and cascades dependents", () => {
-    expect(presetDescriptor("tailnet-share")).toMatchObject({ dependencies: ["tun", "tailscale-external"], conflicts: [] });
+    expect(presetDescriptor("tailnet-share")).toMatchObject({ dependencies: ["tailscale-external"], conflicts: [] });
     expect(planFileProcessorPresetAddition(singBoxProcessorPresets, "tailnet-share", [], en).addedPresetIDs)
-      .toEqual(["tun", "tailscale-external", "tailnet-share"]);
-    const current = [singBoxProcessorPreset("tun"), singBoxProcessorPreset("tailscale-external"), singBoxProcessorPreset("tailnet-share")];
+      .toEqual(["tailscale-external", "tailnet-share"]);
+    const current = [singBoxProcessorPreset("tailscale-external"), singBoxProcessorPreset("tailnet-share")];
     const native = planFileProcessorPresetAddition(singBoxProcessorPresets, "tailscale-native", current, en);
     expect(native.removedPresetIDs).toEqual(["tailscale-external", "tailnet-share"]);
     expect(native.addedPresetIDs).toEqual(["tailscale-native"]);
   });
 
   it("recognizes managed scripts with common execution params but not edited sources or invalid business args", () => {
-    for (const id of ["tun", "tailscale-native", "tailscale-external", "tailnet-share", "fakeip-compat"] as const) {
+    for (const id of ["tailscale-native", "tailscale-external", "tailnet-share", "fakeip-compat"] as const) {
       const preset = singBoxProcessorPreset(id);
       const descriptor = presetDescriptor(id);
       expect(descriptor.recognize({ ...preset, params: { ...preset.params, timeout_ms: 5000 } })).toBe(true);
       const source = preset.params?.source as Record<string, unknown>;
       expect(descriptor.recognize({ ...preset, params: { ...preset.params, source: { ...source, content: `${String(source.content)}\n// edited` } } })).toBe(false);
-      expect(descriptor.recognize({ ...preset, params: { ...preset.params, args: { preset_id: id } } })).toBe(id === "tun" || id === "tailscale-external");
+      expect(descriptor.recognize({ ...preset, params: { ...preset.params, args: { preset_id: id } } })).toBe(id === "tailscale-external");
     }
   });
 
@@ -971,7 +901,7 @@ describe("sing-box file processor defaults", () => {
 
     const nativePlan = planFileProcessorPresetAddition(singBoxProcessorPresets, "tailscale-native", [legacyNative], en);
     expect(nativePlan.updatedPresetIDs).toEqual(["tailscale-native"]);
-    expect(nativePlan.addedPresetIDs).toEqual(["tun", "tailscale-native"]);
+    expect(nativePlan.addedPresetIDs).toEqual(["tailscale-native"]);
     expect((nativePlan.additions.at(-1)?.processor.params?.source as Record<string, unknown>).content)
       .not.toBe(legacyTailscaleNativeScript);
     expect(planFileProcessorPresetAddition(singBoxProcessorPresets, "tailnet-share", [legacyExternal], en).updatedPresetIDs)
@@ -985,7 +915,6 @@ describe("sing-box file processor defaults", () => {
 
   it("rejects managed request overrides and wrong execution envelopes before parsing content", () => {
     const managed = [
-      ["tun", "preset_id"],
       ["tailscale-native", "auth_key"],
       ["tailscale-external", "preset_id"],
       ["tailnet-share", "listen_port"],
@@ -1077,7 +1006,7 @@ function prepareTailscale(
   };
 }
 
-type ManagedScriptPresetID = "tun" | "tailscale-native" | "tailscale-external" | "tailnet-share" | "fakeip-compat";
+type ManagedScriptPresetID = "tailscale-native" | "tailscale-external" | "tailnet-share" | "fakeip-compat";
 
 function runManaged(
   id: ManagedScriptPresetID,

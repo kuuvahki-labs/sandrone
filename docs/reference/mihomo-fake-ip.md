@@ -6,7 +6,7 @@
 ## 适用范围
 
 Web 新建表单会把 [Mihomo base](../../web/app/features/files/drivers/mihomo/base.ts)
-复制到 `FileSpec.source`，并添加默认 Sniffer processor；TUN 需另行选择。
+复制到 `FileSpec.source`；Sniffer 与 TUN 已直接包含在 base 中。
 编辑已有文件不会回填这些默认值。API/CLI 省略 source 时使用服务端内建 base，
 与 Web base 不同，因此应查看保存的 source 和最终产物，不能只依据 `kind: mihomo`。
 
@@ -47,8 +47,8 @@ YAML 通配符应加引号。完整规则见
 [Mihomo 域名通配符语法](https://wiki.metacubex.one/en/handbook/syntax/)。
 
 Sniffer 的 `skip-domain` 控制嗅探排除项，不是 fake-IP 过滤；当前
-[Sniffer 预设](../../web/app/features/files/drivers/mihomo/preset-content/sniffer.yaml)
-设置 `override-destination: false`，不替换实际连接目标。TUN、Tailscale 的影响见
+[Mihomo base](../../web/app/features/files/drivers/mihomo/base.ts)设置
+`override-destination: false`，不替换实际连接目标。TUN、Tailscale 的影响见
 [社区配置预设](community-config-presets.md)。
 
 ## Fake-IP 规则分层

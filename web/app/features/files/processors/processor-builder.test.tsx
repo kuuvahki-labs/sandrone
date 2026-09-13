@@ -20,12 +20,11 @@ describe("FileProcessorBuilder", () => {
     } };
     render(<FileProcessorBuilder ref={ref} kind="sing-box" defaultValue={[custom]} />);
     act(() => ref.current!.prependPresets(["quic-fallback"]));
-    expect(currentProcessors()).toHaveLength(3);
-    expect(currentProcessors()[0].type).toBe("merge");
-    expect(currentProcessors()[1].params?.args).toMatchObject({ preset_id: "quic-fallback" });
-    expect(currentProcessors()[2]).toEqual(custom);
+    expect(currentProcessors()).toHaveLength(2);
+    expect(currentProcessors()[0].params?.args).toMatchObject({ preset_id: "quic-fallback" });
+    expect(currentProcessors()[1]).toEqual(custom);
     act(() => ref.current!.prependPresets(["quic-fallback"]));
-    expect(currentProcessors()).toHaveLength(3);
+    expect(currentProcessors()).toHaveLength(2);
   });
 
   it("adds the complete Tailnet share chain and cascades it when native Tailscale is selected", () => {
@@ -35,11 +34,10 @@ describe("FileProcessorBuilder", () => {
 
     act(() => ref.current!.prependPresets(["tailnet-share"]));
     expect(currentProcessors().map((processor) => processor.name)).toEqual([
-      "TUN mode",
       "Tailscale coexistence",
       "Share to Tailnet",
     ]);
-    expect(currentProcessors()[2]).toMatchObject({
+    expect(currentProcessors()[1]).toMatchObject({
       params: { args: {
         preset_id: "tailnet-share",
         listen_addresses: [],
@@ -51,7 +49,6 @@ describe("FileProcessorBuilder", () => {
 
     act(() => ref.current!.prependPresets(["tailscale-native"]));
     expect(currentProcessors().map((processor) => processor.name)).toEqual([
-      "TUN mode",
       "Native Tailscale",
     ]);
     expect(screen.getByRole("alert")).toHaveTextContent("Removed conflicts: Tailscale coexistence, Share to Tailnet");
@@ -75,9 +72,9 @@ describe("FileProcessorBuilder", () => {
     await selectMuiOption(user, screen.getByRole("combobox", { name: "Type" }), "Tailscale coexistence");
     await user.click(screen.getByRole("button", { name: "Add processor" }));
 
-    expect(currentProcessors().map((processor) => processor.name)).toEqual(["TUN mode", "Tailscale coexistence"]);
-    expect(currentProcessors()[1]).toMatchObject({ params: { args: { preset_id: "tailscale-external" } } });
-    expect((currentProcessors()[1].params?.source as { content: string }).content).not.toBe(legacyTailscaleExternalScript);
+    expect(currentProcessors().map((processor) => processor.name)).toEqual(["Tailscale coexistence"]);
+    expect(currentProcessors()[0]).toMatchObject({ params: { args: { preset_id: "tailscale-external" } } });
+    expect((currentProcessors()[0].params?.source as { content: string }).content).not.toBe(legacyTailscaleExternalScript);
     expect(screen.getByRole("alert")).toHaveTextContent("Updated presets: Tailscale coexistence");
   });
 
@@ -193,7 +190,7 @@ describe("FileProcessorBuilder", () => {
     expect(currentProcessors()).toEqual([legacy]);
   });
 
-  it("shows only dependency changes when adding a preset", async () => {
+  it("keeps the active editor stable when reselecting a dependency-free preset", async () => {
     localStorage.setItem("sandrone.locale", "en-US");
     const user = userEvent.setup();
     const before: ProcessorDetail = {
@@ -229,13 +226,11 @@ describe("FileProcessorBuilder", () => {
 
     expect(currentProcessors().map((processor) => processor.name)).toEqual([
       "Before",
-      "Sniff & DNS Hijack",
       "Force QUIC fallback",
       "After",
     ]);
     expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue("Before");
-    expect(screen.getByRole("alert")).toHaveTextContent("Added dependencies: Sniff & DNS Hijack");
-    expect(screen.getByRole("alert")).not.toHaveTextContent("Description");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("preserves unsupported processors in their original order and allows toggling them", async () => {

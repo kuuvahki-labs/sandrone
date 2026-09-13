@@ -22,9 +22,8 @@ const en = createTranslator("en-US");
 const zh = createTranslator("zh-CN");
 
 describe("Mihomo processor presets", () => {
-  it("uses Sniffer and the rule source mirror as the new-file default chain", () => {
+  it("keeps baseline Sniffer and TUN out of the new-file processor chain", () => {
     expect(defaultMihomoProcessors(en).map((processor) => processor.name)).toEqual([
-      "Sniffer",
       "GitHub acceleration",
     ]);
   });
@@ -36,30 +35,6 @@ describe("Mihomo processor presets", () => {
   });
 
   it("defines the complete editable YAML override contents", () => {
-    const sniffer = presetYAML("sniffer");
-    expect(sniffer["sniffer!"]).toMatchObject({
-      enable: true,
-      "override-destination": false,
-      "skip-domain": ["Mijia Cloud", "dlg.io.mi.com", "+.push.apple.com"],
-      sniff: {
-        HTTP: { ports: [80, 8080, 8880] },
-      },
-    });
-    expect(sniffer["sniffer!"]).not.toHaveProperty("force-dns-mapping");
-    expect(sniffer["sniffer!"]).not.toHaveProperty("parse-pure-ip");
-
-    const tun = presetYAML("tun")["tun!"] as Record<string, unknown>;
-    expect(tun).toMatchObject({
-      enable: true,
-      stack: "mixed",
-      "auto-route": true,
-      "strict-route": true,
-      "auto-detect-interface": true,
-      "dns-hijack": ["any:53", "tcp://any:53"],
-      "route-exclude-address": ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16", "fe80::/10", "fc00::/7", "224.0.0.251/32", "ff02::fb/128"],
-    });
-    expect(tun).not.toHaveProperty("device");
-
     const tailscale = presetYAML("tailscale-external");
     expect(tailscale).toEqual({
       dns: {
@@ -358,8 +333,6 @@ describe("Mihomo processor presets", () => {
 
   it("declares the complete dependency, conflict, and default matrix", () => {
     expect(mihomoProcessorPresets.map((preset) => preset.id)).toEqual([
-      "sniffer",
-      "tun",
       "github-rule-source-mirror",
       "fake-ip-compat",
       "fake-ip-openclash",
@@ -371,7 +344,7 @@ describe("Mihomo processor presets", () => {
     ]);
     expect(presetDescriptor("tailscale-native")).toMatchObject({
       defaultOn: false,
-      dependencies: ["tun"],
+      dependencies: [],
       conflicts: ["tailscale-external"],
     });
     expect(presetDescriptor("github-rule-source-mirror")).toMatchObject({
@@ -381,11 +354,10 @@ describe("Mihomo processor presets", () => {
     });
     expect(presetDescriptor("tailscale-external")).toMatchObject({
       defaultOn: false,
-      dependencies: ["tun"],
+      dependencies: [],
       conflicts: ["tailscale-native"],
     });
-    expect(presetDescriptor("tailscale-external").dependencies).toEqual(["tun"]);
-    expect(presetDescriptor("tailnet-share").dependencies).toEqual(["tun", "tailscale-external"]);
+    expect(presetDescriptor("tailnet-share").dependencies).toEqual(["tailscale-external"]);
     expect([
       "fake-ip-compat",
       "fake-ip-openclash",
@@ -497,9 +469,9 @@ describe("Mihomo processor presets", () => {
   });
 
   it("switches Fake-IP sources atomically while preserving unrelated processors", () => {
-    const before = mihomoProcessorPreset("sniffer");
+    const before = mihomoProcessorPreset("quic-fallback");
     const stable = mihomoProcessorPreset("fake-ip-compat");
-    const after = mihomoProcessorPreset("tun");
+    const after = mihomoProcessorPreset("tailnet-share");
     const plan = planFileProcessorPresetAddition(
       mihomoProcessorPresets,
       "fake-ip-shellcrash",

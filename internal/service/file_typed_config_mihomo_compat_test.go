@@ -24,6 +24,38 @@ func TestServiceMihomoWebDNSIsAcceptedByLockedCore(t *testing.T) {
 		Kind: domain.FileKindMihomo,
 		Source: domain.FileSource{Type: "inline", Content: `mixed-port: 7890
 mode: rule
+sniffer:
+  enable: true
+  override-destination: false
+  skip-domain:
+    - "Mijia Cloud"
+    - "dlg.io.mi.com"
+    - "+.push.apple.com"
+  sniff:
+    HTTP:
+      ports: [80, 8080, 8880]
+    TLS:
+      ports: [443, 8443]
+    QUIC:
+      ports: [443, 8443]
+tun:
+  enable: true
+  stack: mixed
+  auto-route: true
+  strict-route: true
+  auto-detect-interface: true
+  dns-hijack:
+    - any:53
+    - tcp://any:53
+  route-exclude-address:
+    - 10.0.0.0/8
+    - 172.16.0.0/12
+    - 192.168.0.0/16
+    - 169.254.0.0/16
+    - fe80::/10
+    - fc00::/7
+    - 224.0.0.251/32
+    - ff02::fb/128
 dns:
   enable: true
   ipv6: false
@@ -70,33 +102,6 @@ rules: []
 				"MATCH,Proxy",
 			},
 		})},
-		Processors: []domain.ProcessorSpec{{
-			Name:  "TUN",
-			Type:  "merge",
-			Stage: domain.StageFile,
-			Params: params(t, map[string]any{
-				"mode": "yaml_override",
-				"content": `tun!:
-  enable: true
-  stack: mixed
-  auto-route: true
-  strict-route: true
-  auto-detect-interface: true
-  dns-hijack:
-    - any:53
-    - tcp://any:53
-  route-exclude-address:
-    - 10.0.0.0/8
-    - 172.16.0.0/12
-    - 192.168.0.0/16
-    - 169.254.0.0/16
-    - fe80::/10
-    - fc00::/7
-    - 224.0.0.251/32
-    - ff02::fb/128
-`,
-			}),
-		}},
 	}
 
 	result, err := service.New().GetFile(context.Background(), domain.FileRequest{Spec: &spec})

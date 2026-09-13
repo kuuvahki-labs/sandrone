@@ -106,8 +106,9 @@ typed 文件的完整生成顺序只在[文件管线](../architecture/file-pipel
 driver 会重建其拥有的节点和策略位置，而不是简单把节点附加到 base：
 
 - Mihomo 重建 `proxies`、`proxy-groups`、`rule-providers`、`rules`；
-- sing-box 重建 `outbounds`、`route.rule_set`、`route.rules`，保留 base 中的
-  `route.final` 值或缺失状态；渲染到 endpoint 的节点写入 `endpoints`；
+- sing-box 重建 `outbounds`、`route.rule_set`，并把 structured settings 的规则追加到
+  base `route.rules` 之后；保留 base 中的 `route.final` 值或缺失状态；渲染到
+  endpoint 的节点写入 `endpoints`；
 - Shadowrocket 清空 `[Proxy]`，重建 `[Proxy Group]`、`[Rule]`，保留其他 section；
   它不会把 Sandrone 订阅节点写进 `.conf`。
 

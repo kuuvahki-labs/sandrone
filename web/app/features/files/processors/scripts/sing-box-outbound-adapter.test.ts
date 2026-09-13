@@ -217,21 +217,34 @@ describe("sing-box explicit default outbound", () => {
   ])("selects an exact unique outbound or endpoint and creates route: %j", (document) => {
     const input = inputFor(document, { default_outbound: "Manual" });
     expect(run(input)).toBe(input);
-    expect(JSON.parse(input.file.content)).toEqual({ ...document, route: { final: "Manual" } });
+    expect(JSON.parse(input.file.content)).toEqual({
+      ...document,
+      route: { final: "Manual" },
+    });
     const processed = input.file.content;
     run(input);
     expect(input.file.content).toBe(processed);
   });
 
-  it("overrides final without changing other route options or node definitions", () => {
-    const document = { outbounds: [{ type: "direct", tag: "Manual" }], route: { final: "Previous", rules: [] } };
+  it("overrides final without changing ordinary rules", () => {
+    const ordinaryRule = { domain_suffix: ["example.com"], outbound: "direct" };
+    const document = {
+      outbounds: [{ type: "direct", tag: "Manual" }],
+      route: { final: "Previous", rules: [ordinaryRule] },
+    };
     const input = inputFor(document, { default_outbound: "Manual" });
     run(input);
-    expect(JSON.parse(input.file.content)).toEqual({ ...document, route: { final: "Manual", rules: [] } });
+    expect(JSON.parse(input.file.content)).toEqual({
+      ...document,
+      route: { final: "Manual", rules: [ordinaryRule] },
+    });
   });
 
   it("preserves bytes when the requested final is already selected", () => {
-    const input = inputFor({ outbounds: [{ tag: "Manual" }], route: { final: "Manual" } }, { default_outbound: "Manual" });
+    const input = inputFor({
+      outbounds: [{ tag: "Manual" }],
+      route: { final: "Manual" },
+    }, { default_outbound: "Manual" });
     const before = input.file.content;
     run(input);
     expect(input.file.content).toBe(before);
@@ -292,7 +305,10 @@ describe("sing-box explicit default outbound", () => {
   it("adapts regex groups and final together and repeats without further changes", () => {
     const input = inputFor({ outbounds: [{ type: "selector", tag: "Manual", filter: "HK", outbounds: ["HK-1", "JP-1"] }] }, { default_outbound: "Manual" });
     run(input);
-    expect(JSON.parse(input.file.content)).toEqual({ outbounds: [{ type: "selector", tag: "Manual", outbounds: ["HK-1"] }], route: { final: "Manual" } });
+    expect(JSON.parse(input.file.content)).toEqual({
+      outbounds: [{ type: "selector", tag: "Manual", outbounds: ["HK-1"] }],
+      route: { final: "Manual" },
+    });
     const processed = input.file.content;
     run(input);
     expect(input.file.content).toBe(processed);
