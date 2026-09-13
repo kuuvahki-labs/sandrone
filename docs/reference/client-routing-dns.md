@@ -114,6 +114,8 @@ Shadowrocket 使用 `GEOIP,CN`。三者都是域名规则之后的**解析型兜
   主代理 detour 的境外 HTTPS DNS；
 - `default_domain_resolver` 使用中国加密 DNS，避免 detour 建立前依赖全局 system
   resolver；
+- 远程规则集通过显式的 `rule-set-direct` HTTP client 直连下载，不依赖
+  `route.final` 或尚未完成选优的 `urltest`；
 - 显式 TUN processor 启用 `strict_route`，默认 sniff/DNS processor 以逻辑规则劫持 protocol DNS 或目标
   端口 53；`224.0.0.251/32`、`ff02::fb/128` 则在进入该识别规则前绕开 TUN，
   让 mDNS 留在本地链路，同时保留对其他非标准端口明文 DNS 的协议识别。

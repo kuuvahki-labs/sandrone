@@ -3,7 +3,7 @@
 package service_test
 
 import (
-	"context"
+	"slices"
 	"testing"
 
 	box "github.com/sagernet/sing-box"
@@ -17,7 +17,7 @@ import (
 )
 
 func TestServiceSingBoxWebDefaultIsAcceptedByLockedCore(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
 	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
 		Name:    "default",
@@ -32,8 +32,40 @@ func TestServiceSingBoxWebDefaultIsAcceptedByLockedCore(t *testing.T) {
 	boxContext := include.Context(ctx)
 	var options option.Options
 	require.NoError(t, options.UnmarshalJSONContext(boxContext, result.Content))
+	require.Len(t, options.HTTPClients, 1)
+	require.Equal(t, "rule-set-direct", options.HTTPClients[0].Tag)
+	require.Empty(t, options.HTTPClients[0].Options().Detour)
+	require.NotNil(t, options.Route)
+	require.Equal(t, "rule-set-direct", options.Route.DefaultHTTPClient)
 	instance, err := box.New(box.Options{Context: boxContext, Options: options})
 	require.NoError(t, err)
+	require.NoError(t, instance.Close())
+
+	require.NotNil(t, options.DNS)
+	dnsCNIndex := slices.IndexFunc(options.DNS.Servers, func(server option.DNSServerOptions) bool {
+		return server.Tag == "dns-cn"
+	})
+	require.NotEqual(t, -1, dnsCNIndex)
+	directIndex := slices.IndexFunc(options.Outbounds, func(outbound option.Outbound) bool {
+		return outbound.Tag == "direct"
+	})
+	require.NotEqual(t, -1, directIndex)
+
+	// Start only the generated DNS/direct pair so the test exercises dialer
+	// initialization without downloading remote rule sets.
+	startOptions := option.Options{
+		DNS: new(option.DNSOptions{
+			Servers: []option.DNSServerOptions{options.DNS.Servers[dnsCNIndex]},
+		}),
+		HTTPClients: options.HTTPClients,
+		Outbounds:   []option.Outbound{options.Outbounds[directIndex]},
+		Route: new(option.RouteOptions{
+			DefaultHTTPClient: options.Route.DefaultHTTPClient,
+		}),
+	}
+	instance, err = box.New(box.Options{Context: boxContext, Options: startOptions})
+	require.NoError(t, err)
+	require.NoError(t, instance.Start())
 	require.NoError(t, instance.Close())
 }
 
@@ -41,10 +73,10 @@ func TestServiceSingBoxWebDefaultRejectsEmptyURLTest(t *testing.T) {
 	spec := singBoxWebDefaultSpec(t, []any{})
 	spec.Config.Subscriptions = nil
 
-	result, err := service.New().GetFile(context.Background(), domain.FileRequest{Spec: spec})
+	result, err := service.New().GetFile(t.Context(), domain.FileRequest{Spec: spec})
 	require.NoError(t, err)
 
-	boxContext := include.Context(context.Background())
+	boxContext := include.Context(t.Context())
 	var options option.Options
 	require.NoError(t, options.UnmarshalJSONContext(boxContext, result.Content))
 	_, err = box.New(box.Options{Context: boxContext, Options: options})
@@ -58,10 +90,13 @@ func singBoxWebDefaultSpec(t *testing.T, autoMembers []any) *domain.FileSpec {
 		Kind: domain.FileKindSingBox,
 		Source: domain.FileSource{Type: "inline", Content: `{
   "log": { "level": "info" },
+  "http_clients": [
+    { "tag": "rule-set-direct" }
+  ],
   "dns": {
     "servers": [
       { "type": "local", "tag": "dns-local" },
-      { "type": "https", "tag": "dns-cn", "server": "223.5.5.5", "detour": "direct" },
+      { "type": "https", "tag": "dns-cn", "server": "223.5.5.5" },
       { "type": "https", "tag": "dns-remote", "server": "1.1.1.1", "detour": "Proxy" },
       {
         "type": "fakeip",
@@ -114,6 +149,7 @@ func singBoxWebDefaultSpec(t *testing.T, autoMembers []any) *domain.FileSpec {
   "route": {
     "auto_detect_interface": true,
     "default_domain_resolver": "dns-cn",
+    "default_http_client": "rule-set-direct",
     "rule_set": [],
     "rules": []
   },

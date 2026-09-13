@@ -4,10 +4,13 @@ export function singBoxDefaultBase(namingLocale: ConfigNamingLocale): string {
   const anchor = configAnchorName(namingLocale);
   return `{
   "log": { "level": "info" },
+  "http_clients": [
+    { "tag": "rule-set-direct" }
+  ],
   "dns": {
     "servers": [
       { "type": "local", "tag": "dns-local" },
-      { "type": "https", "tag": "dns-cn", "server": "223.5.5.5", "detour": "direct" },
+      { "type": "https", "tag": "dns-cn", "server": "223.5.5.5" },
       { "type": "https", "tag": "dns-remote", "server": "1.1.1.1", "detour": "${anchor}" },
       {
         "type": "fakeip",
@@ -60,6 +63,7 @@ export function singBoxDefaultBase(namingLocale: ConfigNamingLocale): string {
   "route": {
     "auto_detect_interface": true,
     "default_domain_resolver": "dns-cn",
+    "default_http_client": "rule-set-direct",
     "rule_set": [],
     "rules": []
   },
