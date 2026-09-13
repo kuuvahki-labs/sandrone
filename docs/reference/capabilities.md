@@ -60,8 +60,8 @@ processor 按[处理器契约](processors.md#probe)降级为 warning 并继续�
 | `reversible` | 是否声明可逆 |
 
 字段项还带 `protocol`、`ir_field`、`status`、`source_ref`，必要时有
-`notes`。Mihomo 字段依据固定到 v1.19.25，sing-box 字段依据固定到
-v1.13.14；Shadowrocket 字段引用固定的上游 revision。调用方需要精确、可审计
+`notes`。Mihomo 字段依据固定到 v1.19.30，sing-box 字段依据固定到
+v1.14.0；Shadowrocket 字段引用固定的上游 revision。调用方需要精确、可审计
 的字段清单时，应读取对应的单条详情，而不是根据目标名称猜测。
 
 ## 输入格式
@@ -193,7 +193,8 @@ parser 识别到字段但没有稳定 IR 抽象时，将原始值保存在 `Node
 
 - Mihomo VLESS xHTTP padding，以及 VMess/VLESS/Trojan 的部分 gRPC
   私有字段；
-- sing-box Hysteria2 的 `realm`、`bbr_profile`、`initial_packet_size`；
+- sing-box Hysteria2 Realm HTTP client 中尚未提升的 headers、版本、fallback 与
+  Dialer 子字段；
 - sing-box WireGuard 的部分旧式扁平 endpoint 字段。
 
 `raw` 不是跨目标透传通道。除非目标 renderer 明确消费某个 raw key，未输出的
@@ -315,6 +316,38 @@ renderer 会把能被 8 整除的值无损转换为 `Bps`（例如 `56 bps` 变�
 Mbps 界限或其它无效 canonical 速率时只跳过该节点，不会使仍可渲染的同批节点
 失败。
 
+### Hysteria2 跨核心语义
+
+Hysteria2 使用一个 typed compatibility union 保存两端已经审计的字段，而不是把
+Mihomo YAML 或 sing-box JSON 当作互相透传的配置：
+
+- `server_ports` 与 `hop_interval`/`hop_interval_max` 表达端口跳跃。Mihomo 的正整数
+  秒或 `min-max` 秒区间可无损映射到 sing-box duration；只有正整数秒能反向无损
+  映射。有端口跳跃而目标不能表达 hop duration 时跳过节点，没有端口跳跃时可省略
+  该调优并报告 `render_lossy_field`。
+- Salamander 与 Gecko 共用 canonical obfs 入口。Gecko 未显式填写 packet size 时
+  使用两端共同默认 `512/1200`；显式值必须满足 `0 < min <= max <= 2048`，其它 obfs
+  不接受 Gecko 参数。
+- `hysteria.quic` 是有兼容 JSON 往返的 typed 对象。sing-box 单一 stream/connection
+  receive window 输出到 Mihomo 时同时写 initial/max；Mihomo 的 initial/max 只有相等
+  时能无损回到 sing-box。idle、keepalive、max streams、initial packet 与 path-MTU
+  discovery 等单端调优按字段报告损失；未知键只由 `json-nodes` 保存，不透传给核心。
+- BBR profile、CWND、UDP-MTU、handshake timeout、`brutal_debug` 与
+  `disable_chrome_parrot` 保留为明确字段；renderer 只输出目标核心有等价语义的部分，
+  其余报告损失。
+- Realm 保存共同的 server URL、token、Realm ID、STUN servers，以及 sing-box 的
+  IP version、port mapping 和 Realm HTTP TLS。sing-box Realm 可以不带普通 endpoint，
+  但不能与 `server_ports` 并用；Mihomo Realm 仍要求普通 server/port。Realm-only、
+  IP-version/port-mapping 或未建模且会影响连接的 HTTP client 选项不能跨目标降级，
+  renderer 会跳过节点。
+- 主连接和 Realm HTTP 连接各有 Hysteria2 专用 TLS identity：certificate verify
+  name、Mihomo DER fingerprint、sing-box public-key pin、client certificate/key 不与
+  通用 uTLS fingerprint 混用。分离的 SNI 与 verify name、或不可等价的两种 pin
+  不跨目标转换。
+
+完整字段状态、目标差异和每个子字段的固定上游依据以
+`capability format <parse|render> <format>` 返回值为准。
+
 ## 各 renderer 的关键边界
 
 ### `mihomo-proxies`
@@ -325,7 +358,7 @@ Mbps 界限或其它无效 canonical 速率时只跳过该节点，不会使仍�
 - `ss`、`vmess`、`vless`、`trojan`、`mieru`、`socks` 和 WireGuard
   可表达 `dialer.udp_relay`；其它协议不能据此推断有等价开关。
 - 已声明的典型有损项包括 ECH force-query 扩展、multiplex、
-  Hysteria/Hysteria2 QUIC 调优、Hysteria2 Mbps 字段、
+  Hysteria v1 QUIC 调优、Hysteria2 的 sing-box-only QUIC/调试字段和 Mbps 字段、
   TUIC zero-RTT/heartbeat，以及 HTTP path。
 - ECH 自定义 DNS transport 是连接关键语义；Mihomo schema 无法表达时会跳过节点，
   不删除 `tls.ech.dns` 后继续转换或 Probe。
@@ -343,8 +376,10 @@ Mbps 界限或其它无效 canonical 速率时只跳过该节点，不会使仍�
   UDP-over-TCP 等协议适用字段。
 - 没有通用 `dialer.udp_relay` 等价项；该字段不能用 `network` 代替。
 - 已声明的典型有损项包括证书 fingerprint、ECH force-query 扩展、
-  Hysteria `protocol` 与 QUIC 调优、Hysteria2 字符串速率及 `bbr_profile`/`realm`/`cwnd`/
-  `udp_mtu`、TUIC token/reduce-RTT/UDP-over-stream version、SOCKS TLS。
+  Hysteria `protocol` 与 QUIC 调优、Hysteria2 字符串速率及 Mihomo-only
+  `cwnd`/`udp_mtu`/`handshake_timeout`、TUIC token/reduce-RTT/UDP-over-stream
+  version、SOCKS TLS。Hysteria2 Realm、BBR、Gecko 与相容的 receive window 已按
+  上一节逐字段处理，不再作为笼统 raw 字段丢弃。
 - ECH 自定义 DNS transport 是连接关键语义；sing-box schema 无法表达时会跳过节点，
   不删除 `tls.ech.dns` 后继续转换或 Probe。
 - VMess、VLESS 和 Trojan 的非默认 transport 若无法由 sing-box 等价表达（包括
@@ -352,8 +387,8 @@ Mbps 界限或其它无效 canonical 速率时只跳过该节点，不会使仍�
   节点并产生 `render_node_skipped`，不会删除连接关键字段后输出或进入 probe。
 - SS `v2ray-plugin` 的结构化 Mihomo options 会把布尔 `mux` 映射为 SIP003 整数；
   `skip-cert-verify: false` 作为无操作默认值消费，`true` 因目标插件无法表达而跳过节点。
-- Hysteria/Hysteria2 `hop_interval` 只有在目标 sing-box duration schema 能接受时
-  才会输出；端口跳跃区间等不能由该字段表达的值会跳过节点。
+- Hysteria v1 `hop_interval` 只有在目标 sing-box duration schema 能接受时才输出；
+  Hysteria2 的秒区间则拆成 `hop_interval`/`hop_interval_max`。
 
 ### `uri-list`
 

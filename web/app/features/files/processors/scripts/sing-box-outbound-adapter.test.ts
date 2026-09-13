@@ -52,6 +52,80 @@ describe("sing-box outbound adaptation script", () => {
     });
   });
 
+  it("removes empty regex groups, prunes parent members, and never inserts a direct fallback", () => {
+    const result = filter({
+      outbounds: [
+        { type: "direct", tag: "direct" },
+        { type: "shadowsocks", tag: "JP-1", server: "192.0.2.1" },
+        { type: "selector", tag: "Proxy", outbounds: ["Taiwan", "Japan", "JP-1", "direct"], default: "Taiwan" },
+        { type: "urltest", tag: "Taiwan", filter: "TW", outbounds: ["JP-1"], interval: "5m" },
+        { type: "urltest", tag: "Japan", filter: "JP", outbounds: ["JP-1"], interval: "5m" },
+      ],
+      route: { final: "Proxy", rules: [{ domain_suffix: ["example.com"], outbound: "Proxy" }] },
+    });
+
+    expect(result.outbounds).toEqual([
+      { type: "direct", tag: "direct" },
+      { type: "shadowsocks", tag: "JP-1", server: "192.0.2.1" },
+      { type: "selector", tag: "Proxy", outbounds: ["Japan", "JP-1", "direct"] },
+      { type: "urltest", tag: "Japan", outbounds: ["JP-1"], interval: "5m" },
+    ]);
+    expect(result.outbounds.some((outbound: { tag?: string }) => outbound.tag === "Taiwan")).toBe(false);
+  });
+
+  it("removes filtered groups transitively when they only reference another empty filtered group", () => {
+    const result = filter({ outbounds: [
+      { type: "direct", tag: "direct" },
+      { type: "selector", tag: "Proxy", outbounds: ["Asia", "Taiwan", "direct"] },
+      { type: "selector", tag: "Asia", filter: "^Taiwan$", outbounds: ["Taiwan"] },
+      { type: "selector", tag: "Taiwan", filter: "TW", outbounds: ["JP-1"] },
+    ] });
+
+    expect(result.outbounds).toEqual([
+      { type: "direct", tag: "direct" },
+      { type: "selector", tag: "Proxy", outbounds: ["direct"] },
+    ]);
+  });
+
+  it.each([
+    [
+      { outbounds: [
+        { type: "selector", tag: "Proxy", outbounds: ["Taiwan"] },
+        { type: "selector", tag: "Taiwan", filter: "TW", outbounds: ["JP-1"] },
+      ] },
+      "all members were removed",
+    ],
+    [
+      { outbounds: [
+        { type: "direct", tag: "direct" },
+        { type: "selector", tag: "Proxy", outbounds: ["direct"] },
+        { type: "selector", tag: "Taiwan", filter: "TW", outbounds: ["JP-1"] },
+      ], route: { final: "Taiwan" } },
+      "route.final",
+    ],
+    [
+      { outbounds: [
+        { type: "direct", tag: "direct" },
+        { type: "selector", tag: "Proxy", outbounds: ["direct"] },
+        { type: "selector", tag: "Taiwan", filter: "TW", outbounds: ["JP-1"] },
+      ], route: { rules: [{ domain_suffix: ["tw"], outbound: "Taiwan" }] } },
+      "$.route.rules[0].outbound",
+    ],
+    [
+      { dns: { servers: [{ type: "https", tag: "dns-remote", server: "1.1.1.1", detour: "Taiwan" }] }, outbounds: [
+        { type: "direct", tag: "direct" },
+        { type: "selector", tag: "Proxy", outbounds: ["direct"] },
+        { type: "selector", tag: "Taiwan", filter: "TW", outbounds: ["JP-1"] },
+      ] },
+      "$.dns.servers[0].detour",
+    ],
+  ])("rejects unsafe references to a removed regex group: %j", (document, message) => {
+    const input = { file: { name: "config.json", content: JSON.stringify(document) } };
+    const before = input.file.content;
+    expect(() => run(input)).toThrow(message);
+    expect(input.file.content).toBe(before);
+  });
+
   it.each([
     ["^HK", undefined, ["HK-1", "HK-old"]],
     ["(?i)^HK", "(?i)OLD", ["hk-2", "HK-1"]],
@@ -69,9 +143,6 @@ describe("sing-box outbound adaptation script", () => {
   it.each([
     [{ filter: "[" }, "invalid filter"],
     [{ "exclude-filter": "[" }, "invalid exclude-filter"],
-    [{ filter: "JP" }, "matched no nodes"],
-    [{ "exclude-filter": ".*" }, "matched no nodes"],
-    [{ outbounds: [] }, "matched no nodes"],
     [{ default: "JP-1" }, "default is not a member"],
     [{ default: "" }, "default is not a member"],
     [{ default: null }, "default is not a member"],

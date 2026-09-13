@@ -476,18 +476,21 @@ describe("adaptive Mihomo group generation", () => {
 });
 
 describe("adaptive sing-box group generation", () => {
-  it("skips selected regions without matching nodes and reports them", () => {
+  it("persists selected regex regions even when the current preview has no matching nodes", () => {
     const result = generateAdaptiveGroups(
       ["HK-01"],
       defaultAdaptiveGroupOptions("sing-box"),
       "sing-box",
     );
 
-    expect(result.groups.map((group) => group.tag)).toEqual(["Hong Kong"]);
-    expect(result.warnings).toContainEqual({
-      code: "empty_regions_skipped",
-      groupNames: ["Taiwan", "Singapore", "Japan", "United States"],
-   });
+    expect(result.groups.map((group) => group.tag)).toEqual([
+      "Hong Kong",
+      "Taiwan",
+      "Singapore",
+      "Japan",
+      "United States",
+    ]);
+    expect(result.warnings).toEqual([]);
  });
 
   it("persists selector regexes that match current and refreshed subscription nodes", () => {

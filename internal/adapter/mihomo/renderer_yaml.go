@@ -69,7 +69,7 @@ func proxyOrder(proxy map[string]any) []string {
 	case "hysteria":
 		return []string{"name", "type", "server", "port", "ports", "up", "up-speed", "down", "down-speed", "auth", "auth-str", "obfs", "hop-interval", "fast-open", "sni", "skip-cert-verify", "client-fingerprint", "fingerprint", "alpn", "ech-opts"}
 	case "hysteria2":
-		return []string{"name", "type", "server", "port", "ports", "password", "up", "down", "obfs", "obfs-password", "hop-interval", "tfo", "sni", "skip-cert-verify", "client-fingerprint", "fingerprint", "alpn", "bbr-profile", "cwnd", "udp-mtu", "realm-opts"}
+		return []string{"name", "type", "server", "port", "ports", "password", "up", "down", "obfs", "obfs-password", "obfs-min-packet-size", "obfs-max-packet-size", "hop-interval", "tfo", "sni", "skip-cert-verify", "name-cert-verify", "client-fingerprint", "fingerprint", "certificate", "private-key", "alpn", "bbr-profile", "cwnd", "udp-mtu", "handshake-timeout", "initial-stream-receive-window", "max-stream-receive-window", "initial-connection-receive-window", "max-connection-receive-window", "realm-opts"}
 	case "tuic":
 		return []string{"name", "type", "server", "port", "token", "uuid", "password", "congestion-controller", "udp-relay-mode", "reduce-rtt", "udp-over-stream", "udp-over-stream-version", "fast-open", "sni", "skip-cert-verify", "client-fingerprint", "fingerprint", "alpn", "ech-opts"}
 	case "mieru":

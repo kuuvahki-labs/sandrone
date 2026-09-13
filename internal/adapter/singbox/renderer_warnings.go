@@ -47,7 +47,7 @@ func singBoxStructuredLossWarnings(node domain.NodeIR) []domain.Warning {
 		warnings = append(warnings, lossyWarning(node, "multiplex", "sing-box http outbound schema has no multiplex field"))
 	}
 	if node.Type == domain.NodeTypeHysteria && node.Hysteria != nil && node.Hysteria.Protocol != "" {
-		warnings = append(warnings, lossyWarning(node, "hysteria.protocol", "sing-box v1.13.14 hysteria outbound schema has no protocol selector"))
+		warnings = append(warnings, lossyWarning(node, "hysteria.protocol", "sing-box v1.14.0 hysteria outbound schema has no protocol selector"))
 	}
 	return warnings
 }

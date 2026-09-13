@@ -47,7 +47,7 @@ func TestFormatCapabilitiesExposeStableSummaryAndDetail(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "mihomo-proxies", detail.Format)
 	require.NotEmpty(t, detail.Fields)
-	require.Equal(t, []string{"v1.19.25"}, seen["mihomo-proxies\x00render"].Revisions)
+	require.Equal(t, []string{"v1.19.30"}, seen["mihomo-proxies\x00render"].Revisions)
 	shadowrocketDetail, err := svc.GetFormatCapability(context.Background(), domain.FormatCapabilityRequest{
 		Direction: domain.CapabilityDirectionRender,
 		Format:    "shadowrocket-proxies",
@@ -63,7 +63,7 @@ func TestFormatCapabilitiesExposeStableSummaryAndDetail(t *testing.T) {
 		require.Equal(t, detail.Lossy[index].SourceRef, shadowrocketDetail.Lossy[index].SourceRef)
 		require.Contains(t, shadowrocketDetail.Lossy[index].Notes, "shadowrocket-proxies")
 	}
-	require.Equal(t, []string{"v1.19.25"}, seen["shadowrocket-proxies\x00render"].Revisions)
+	require.Equal(t, []string{"v1.19.30"}, seen["shadowrocket-proxies\x00render"].Revisions)
 }
 
 func TestGetFormatCapabilityRejectsUnknownKeys(t *testing.T) {

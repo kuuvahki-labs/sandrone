@@ -621,7 +621,7 @@ func TestParseSingBoxHysteria2RealmAndQUIC(t *testing.T) {
     "up_mbps": 20,
     "down_mbps": 100,
     "obfs": { "type": "salamander", "password": "obfs-pass" },
-    "bbr_profile": "desktop",
+    "bbr_profile": "aggressive",
     "realm": {
       "server_url": "https://realm.example.com",
       "token": "token",
@@ -642,14 +642,83 @@ func TestParseSingBoxHysteria2RealmAndQUIC(t *testing.T) {
 	require.Equal(t, 100, hy.DownMbps)
 	require.Equal(t, "salamander", hy.Obfs)
 	require.Equal(t, "obfs-pass", hy.ObfsPassword)
-	require.Empty(t, hy.BBRProfile)
-	require.Nil(t, hy.Realm)
-	require.Nil(t, hy.QUIC)
-	require.Contains(t, nodes[0].Raw, "sing-box.bbr_profile")
-	require.Contains(t, nodes[0].Raw, "sing-box.realm")
-	require.Contains(t, nodes[0].Raw, "sing-box.initial_packet_size")
-	require.Contains(t, nodes[0].Raw, "sing-box.idle_timeout")
+	require.Equal(t, "aggressive", hy.BBRProfile)
+	require.NotNil(t, hy.Realm)
+	require.True(t, hy.Realm.Enabled)
+	require.Equal(t, "realm-id", hy.Realm.RealmID)
+	require.NotNil(t, hy.QUIC)
+	require.Equal(t, 1200, hy.QUIC.InitialPacketSize)
+	require.Equal(t, "30s", hy.QUIC.IdleTimeout)
+	require.Empty(t, nodes[0].Raw)
+	require.Empty(t, source.Warnings)
+}
+
+func TestParseSingBoxHysteria2InvalidTypedScalarsStayRaw(t *testing.T) {
+	parser := singbox.NewParser()
+	nodes, source, err := parser.Parse(context.Background(), []byte(`{
+  "type": "hysteria2",
+  "tag": "hy2-invalid",
+  "server": "example.com",
+  "server_port": 443,
+  "up_mbps": "fast",
+  "brutal_debug": "yes",
+  "stream_receive_window": "not-memory",
+  "obfs": {"type":"gecko", "password":"secret", "min_packet_size":"small"}
+}`))
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	for _, key := range []string{
+		"sing-box.up_mbps", "sing-box.brutal_debug", "sing-box.stream_receive_window", "sing-box.obfs.min_packet_size",
+	} {
+		require.Contains(t, nodes[0].Raw, key)
+	}
 	require.Len(t, source.Warnings, 4)
+}
+
+func TestParseSingBoxHysteria2AdvancedFields(t *testing.T) {
+	parser := singbox.NewParser()
+	nodes, source, err := parser.Parse(context.Background(), []byte(`{
+  "type":"hysteria2",
+  "tag":"hy2",
+  "server":"example.com",
+  "server_port":443,
+  "password":"secret",
+  "server_ports":["443:443","8443:8444"],
+  "hop_interval":"5s",
+  "hop_interval_max":"9s",
+  "obfs":{"type":"gecko","password":"obfs","min_packet_size":512,"max_packet_size":1200},
+  "bbr_profile":"aggressive",
+  "brutal_debug":true,
+  "disable_chrome_parrot":true,
+  "stream_receive_window":"1MB",
+  "connection_receive_window":2097152,
+  "max_concurrent_streams":64,
+  "initial_packet_size":1200,
+  "disable_path_mtu_discovery":true,
+  "tls":{
+    "enabled":true,
+    "server_name":"example.com",
+    "client_certificate":"cert",
+    "client_key":"key",
+    "certificate_public_key_sha256":["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="]
+  }
+}`))
+	require.NoError(t, err)
+	require.Empty(t, source.Warnings)
+	require.Len(t, nodes, 1)
+	hy := nodes[0].Hysteria
+	require.Equal(t, "9s", hy.HopIntervalMax)
+	require.Equal(t, "gecko", hy.Obfs)
+	require.Equal(t, 512, hy.GeckoMinPacketSize)
+	require.True(t, hy.BrutalDebug)
+	require.True(t, hy.DisableChromeParrot)
+	require.Equal(t, uint64(1<<20), hy.QUIC.StreamReceiveWindow)
+	require.Equal(t, uint64(2<<20), hy.QUIC.ConnectionReceiveWindow)
+	require.Equal(t, 64, hy.QUIC.MaxConcurrentStreams)
+	require.NotNil(t, hy.TLSIdentity)
+	require.Equal(t, "cert", hy.TLSIdentity.Certificate)
+	require.Equal(t, "key", hy.TLSIdentity.PrivateKey)
+	require.Equal(t, []string{"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="}, hy.TLSIdentity.CertificatePublicKeySHA256)
 }
 
 func TestParseSingBoxTUICAndBoolUDPOverTCP(t *testing.T) {

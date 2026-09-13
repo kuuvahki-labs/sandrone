@@ -51,19 +51,20 @@ func mihomoStructuredLossWarnings(node domain.NodeIR, target string) []domain.Wa
 			add("multiplex", "mihomo proxy schema has no general multiplex field; only selected grpc options can be emitted")
 		}
 	case domain.NodeTypeHysteria:
-		if node.Hysteria != nil && len(node.Hysteria.QUIC) > 0 {
+		if node.Hysteria != nil && node.Hysteria.QUIC != nil && !node.Hysteria.QUIC.IsZero() {
 			add("hysteria.quic", "mihomo hysteria proxy schema has no stable QUIC tuning fields represented by NodeIR")
 		}
 	case domain.NodeTypeHysteria2:
 		if node.Hysteria != nil {
-			if node.Hysteria.UpMbps != 0 {
-				add("hysteria.up_mbps", "mihomo hysteria2 proxy schema uses string up/down fields, not up_mbps")
+			if node.Hysteria.BrutalDebug {
+				add("hysteria.brutal_debug", "mihomo hysteria2 proxy schema has no brutal_debug field")
 			}
-			if node.Hysteria.DownMbps != 0 {
-				add("hysteria.down_mbps", "mihomo hysteria2 proxy schema uses string up/down fields, not down_mbps")
+			if node.Hysteria.DisableChromeParrot {
+				add("hysteria.disable_chrome_parrot", "mihomo hysteria2 proxy schema has no disable_chrome_parrot field")
 			}
-			if len(node.Hysteria.QUIC) > 0 {
-				add("hysteria.quic", "mihomo hysteria2 proxy schema has no stable QUIC tuning fields represented by NodeIR")
+			quic := node.Hysteria.QUIC
+			if quic != nil && (quic.IdleTimeout != "" || quic.KeepAlivePeriod != "" || quic.MaxConcurrentStreams != 0 || quic.InitialPacketSize != 0 || quic.DisablePathMTUDiscovery || len(quic.Unknown) > 0) {
+				add("hysteria.quic", "mihomo hysteria2 proxy schema cannot represent all sing-box QUIC tuning fields")
 			}
 		}
 	case domain.NodeTypeTUIC:

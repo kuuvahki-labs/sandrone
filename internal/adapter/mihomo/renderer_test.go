@@ -1026,6 +1026,85 @@ func TestRenderMihomoHysteria2Realm(t *testing.T) {
 	}
 }
 
+func TestRenderMihomoHysteria2AdvancedOptions(t *testing.T) {
+	node := domain.NodeIR{
+		Name: "hy2", Type: domain.NodeTypeHysteria2, Server: "example.com", Port: 443, Password: "secret",
+		TLS: &domain.TLSOptions{Enabled: true, ServerName: "example.com"},
+		Hysteria: &domain.HysteriaOptions{
+			ServerPorts: []string{"443", "8443-8444"}, HopInterval: "5s", HopIntervalMax: "9s",
+			UpMbps: 20, DownMbps: 100, Obfs: "gecko", ObfsPassword: "obfs", GeckoMinPacketSize: 512, GeckoMaxPacketSize: 1200,
+			BBRProfile: "aggressive", CWND: 32, UDPMTU: 1197, HandshakeTimeout: "10s",
+			TLSIdentity: &domain.Hysteria2TLSIdentity{
+				CertificateName: "example.com", Certificate: "cert", PrivateKey: "key",
+				MihomoFingerprint: "0000000000000000000000000000000000000000000000000000000000000000",
+			},
+			QUIC: &domain.HysteriaQUICOptions{
+				InitialStreamReceiveWindow: 1 << 20, MaxStreamReceiveWindow: 2 << 20,
+				InitialConnectionReceiveWindow: 3 << 20, MaxConnectionReceiveWindow: 4 << 20,
+			},
+		},
+	}
+	out, report, err := mihomo.NewRenderer().RenderWithReport(context.Background(), []domain.NodeIR{node}, domain.RenderOptions{})
+	require.NoError(t, err)
+	require.Empty(t, report.Warnings)
+	var doc struct {
+		Proxies []map[string]any `yaml:"proxies"`
+	}
+	require.NoError(t, yaml.Unmarshal(out, &doc))
+	require.Len(t, doc.Proxies, 1)
+	got := doc.Proxies[0]
+	require.Equal(t, "443,8443-8444", got["ports"])
+	require.Equal(t, "5-9", got["hop-interval"])
+	require.Equal(t, "20 Mbps", got["up"])
+	require.Equal(t, 512, got["obfs-min-packet-size"])
+	require.Equal(t, 10, got["handshake-timeout"])
+	require.Equal(t, 1<<20, got["initial-stream-receive-window"])
+	require.Equal(t, "example.com", got["name-cert-verify"])
+	require.Equal(t, "0000000000000000000000000000000000000000000000000000000000000000", got["fingerprint"])
+}
+
+func TestRenderMihomoHysteria2HopIntervalWithoutPortsIsLossyNotFatal(t *testing.T) {
+	node := domain.NodeIR{
+		Name: "hy2", Type: domain.NodeTypeHysteria2, Server: "example.com", Port: 443, Password: "secret",
+		TLS: &domain.TLSOptions{Enabled: true}, Hysteria: &domain.HysteriaOptions{HopInterval: "1500ms"},
+	}
+	out, report, err := mihomo.NewRenderer().RenderWithReport(context.Background(), []domain.NodeIR{node}, domain.RenderOptions{})
+	require.NoError(t, err)
+	require.Equal(t, 1, report.SuccessCount)
+	require.Len(t, report.Warnings, 1)
+	require.Equal(t, "hysteria.hop_interval", report.Warnings[0].Field)
+	require.NotContains(t, string(out), "hop-interval")
+
+	node.Hysteria.ServerPorts = []string{"443", "8443"}
+	_, report, err = mihomo.NewRenderer().RenderWithReport(context.Background(), []domain.NodeIR{node}, domain.RenderOptions{})
+	require.Error(t, err)
+	require.Equal(t, "render_node_skipped", report.Warnings[0].Code)
+}
+
+func TestRenderMihomoHysteria2RealmOnlyAndSingBoxPinAreSkipped(t *testing.T) {
+	nodes := []domain.NodeIR{
+		{
+			Name: "realm-only", Type: domain.NodeTypeHysteria2, TLS: &domain.TLSOptions{Enabled: true},
+			Hysteria: &domain.HysteriaOptions{Realm: &domain.HysteriaRealmOptions{
+				Enabled: true, ServerURL: "https://realm.example.com", RealmID: "realm", STUNServers: []string{"stun.example.com"},
+			}},
+		},
+		{
+			Name: "pin", Type: domain.NodeTypeHysteria2, Server: "example.com", Port: 443, TLS: &domain.TLSOptions{Enabled: true},
+			Hysteria: &domain.HysteriaOptions{TLSIdentity: &domain.Hysteria2TLSIdentity{
+				CertificatePublicKeySHA256: []string{"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},
+			}},
+		},
+	}
+	_, report, err := mihomo.NewRenderer().RenderWithReport(context.Background(), nodes, domain.RenderOptions{})
+	require.Error(t, err)
+	require.Equal(t, 0, report.SuccessCount)
+	require.Len(t, report.Warnings, 2)
+	for _, warning := range report.Warnings {
+		require.Equal(t, "render_node_skipped", warning.Code)
+	}
+}
+
 func TestRenderMihomoHTTPTransport(t *testing.T) {
 	r := mihomo.NewRenderer()
 	nodes := []domain.NodeIR{{

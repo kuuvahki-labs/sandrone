@@ -273,6 +273,9 @@ func addHysteriaLossWarnings(node domain.NodeIR, target string, hysteria2 bool, 
 	if hy.HopInterval != "" {
 		add("hysteria.hop_interval")
 	}
+	if hy.HopIntervalMax != "" {
+		add("hysteria.hop_interval_max")
+	}
 	if hysteria2 {
 		if hy.Up != "" {
 			add("hysteria.up")
@@ -291,6 +294,24 @@ func addHysteriaLossWarnings(node domain.NodeIR, target string, hysteria2 bool, 
 		}
 		if hy.AuthString != "" {
 			add("hysteria.auth_str")
+		}
+		if hy.GeckoMinPacketSize != 0 {
+			add("hysteria.gecko_min_packet_size")
+		}
+		if hy.GeckoMaxPacketSize != 0 {
+			add("hysteria.gecko_max_packet_size")
+		}
+		if hy.HandshakeTimeout != "" {
+			add("hysteria.handshake_timeout")
+		}
+		if hy.BrutalDebug {
+			add("hysteria.brutal_debug")
+		}
+		if hy.DisableChromeParrot {
+			add("hysteria.disable_chrome_parrot")
+		}
+		if hy.TLSIdentity != nil {
+			add("hysteria.tls_identity")
 		}
 	} else {
 		if _, exact := shared.ExactHysteriaMbps(hy.Up); hy.Up != "" && !exact {
@@ -312,7 +333,7 @@ func addHysteriaLossWarnings(node domain.NodeIR, target string, hysteria2 bool, 
 	if hy.UDPMTU != 0 {
 		add("hysteria.udp_mtu")
 	}
-	if len(hy.QUIC) > 0 {
+	if hy.QUIC != nil && !hy.QUIC.IsZero() {
 		add("hysteria.quic")
 	}
 }

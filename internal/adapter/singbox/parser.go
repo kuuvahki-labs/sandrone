@@ -2,7 +2,6 @@ package singbox
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"fmt"
@@ -301,75 +300,6 @@ func parseSingBoxUDPOverTCP(node *domain.NodeIR, outbound map[string]any) {
 	}
 }
 
-func parseSingBoxHysteria(node *domain.NodeIR, outbound map[string]any) {
-	node.Hysteria = &domain.HysteriaOptions{
-		ServerPorts:  shared.StringSliceValue(outbound["server_ports"]),
-		HopInterval:  shared.StringValue(outbound["hop_interval"]),
-		ObfsPassword: shared.StringValue(outbound["obfs"]),
-		AuthString:   shared.StringValue(outbound["auth_str"]),
-		Auth:         singBoxHysteriaAuth(node, outbound["auth"]),
-	}
-	up := singBoxHysteriaRate(node, outbound["up"], outbound["up_mbps"], "up", "up_mbps")
-	node.Hysteria.Up, node.Hysteria.UpMbps = up.Text, up.Mbps
-	down := singBoxHysteriaRate(node, outbound["down"], outbound["down_mbps"], "down", "down_mbps")
-	node.Hysteria.Down, node.Hysteria.DownMbps = down.Text, down.Mbps
-}
-
-func singBoxHysteriaAuth(node *domain.NodeIR, value any) string {
-	encoded := shared.StringValue(value)
-	if encoded == "" {
-		return ""
-	}
-	auth, err := base64.StdEncoding.DecodeString(encoded)
-	if err != nil {
-		shared.AddRaw(node.Raw, "sing-box.auth", value)
-		return ""
-	}
-	return string(auth)
-}
-
-func singBoxHysteriaRate(node *domain.NodeIR, value, fallbackValue any, rawKey, fallbackKey string) shared.HysteriaRate {
-	if value == nil || strings.TrimSpace(shared.StringValue(value)) == "" {
-		if fallbackValue == nil {
-			return shared.HysteriaRate{}
-		}
-		fallbackMbps, err := shared.NormalizeHysteriaMbps(fallbackValue)
-		if err != nil {
-			shared.AddRaw(node.Raw, "sing-box."+fallbackKey, fallbackValue)
-			return shared.HysteriaRate{}
-		}
-		return shared.HysteriaRate{Mbps: fallbackMbps}
-	}
-	implicit := shared.HysteriaImplicitNone
-	if _, ok := value.(jsontext.Value); ok {
-		implicit = shared.HysteriaImplicitBps
-	}
-	rate, err := shared.NormalizeHysteriaRate(shared.StringValue(value), implicit)
-	if err != nil {
-		shared.AddRaw(node.Raw, "sing-box."+rawKey, value)
-		return shared.HysteriaRate{}
-	}
-	if fallbackValue != nil {
-		if _, err := shared.NormalizeHysteriaMbps(fallbackValue); err != nil {
-			shared.AddRaw(node.Raw, "sing-box."+fallbackKey, fallbackValue)
-		}
-	}
-	return rate
-}
-
-func parseSingBoxHysteria2(node *domain.NodeIR, outbound map[string]any) {
-	node.Hysteria = &domain.HysteriaOptions{
-		ServerPorts: shared.StringSliceValue(outbound["server_ports"]),
-		HopInterval: shared.StringValue(outbound["hop_interval"]),
-		UpMbps:      intValueZero(outbound["up_mbps"]),
-		DownMbps:    intValueZero(outbound["down_mbps"]),
-	}
-	if obfs := shared.AnyMapValue(outbound["obfs"]); obfs != nil {
-		node.Hysteria.Obfs = shared.StringValue(obfs["type"])
-		node.Hysteria.ObfsPassword = shared.StringValue(obfs["password"])
-	}
-}
-
 func parseSingBoxTUIC(node *domain.NodeIR, outbound map[string]any) {
 	node.TUIC = &domain.TUICOptions{
 		CongestionControl: shared.StringValue(outbound["congestion_control"]),
@@ -436,7 +366,10 @@ func singBoxKnownFields(nodeType domain.NodeType) map[string]bool {
 		add("server_ports", "hop_interval", "up", "down", "up_mbps", "down_mbps", "obfs", "auth", "auth_str",
 			"recv_window_conn", "recv_window", "disable_mtu_discovery")
 	case domain.NodeTypeHysteria2:
-		add("server_ports", "hop_interval", "up_mbps", "down_mbps", "obfs", "brutal_debug")
+		add("server_ports", "hop_interval", "hop_interval_max", "up_mbps", "down_mbps", "obfs", "bbr_profile",
+			"brutal_debug", "disable_chrome_parrot", "realm", "idle_timeout", "keep_alive_period",
+			"stream_receive_window", "connection_receive_window", "max_concurrent_streams", "initial_packet_size",
+			"disable_path_mtu_discovery")
 	case domain.NodeTypeTUIC:
 		add("congestion_control", "udp_relay_mode", "udp_over_stream", "zero_rtt_handshake", "heartbeat",
 			"initial_packet_size", "disable_path_mtu_discovery")

@@ -36,7 +36,10 @@ func mihomoKnownFields(nodeType domain.NodeType) map[string]bool {
 	case domain.NodeTypeHysteria:
 		add("ports", "server-ports", "protocol", "obfs-protocol", "up", "up-speed", "down", "down-speed", "auth", "auth-str", "obfs", "hop-interval", "fast-open")
 	case domain.NodeTypeHysteria2:
-		add("ports", "server-ports", "hop-interval", "up", "down", "obfs", "obfs-password", "auth", "realm-opts", "bbr-profile", "udp-mtu", "cwnd", "masquerade")
+		add("ports", "server-ports", "hop-interval", "up", "down", "obfs", "obfs-password", "obfs-min-packet-size",
+			"obfs-max-packet-size", "auth", "realm-opts", "bbr-profile", "udp-mtu", "cwnd", "handshake-timeout",
+			"initial-stream-receive-window", "max-stream-receive-window", "initial-connection-receive-window",
+			"max-connection-receive-window", "name-cert-verify", "certificate", "private-key", "masquerade")
 	case domain.NodeTypeTUIC:
 		add("token", "congestion-controller", "udp-relay-mode", "reduce-rtt", "heartbeat-interval", "udp-over-stream", "udp-over-stream-version", "fast-open")
 	case domain.NodeTypeMieru:

@@ -419,6 +419,65 @@ func TestValidateXHTTPReuseRangesAndECHForceQuery(t *testing.T) {
 	}, issueFields(result.Issues))
 }
 
+func TestValidateHysteria2AdvancedOptions(t *testing.T) {
+	t.Parallel()
+
+	validPin := base64.StdEncoding.EncodeToString(make([]byte, 32))
+	valid := domain.NodeIR{
+		Name: "hy2", Type: domain.NodeTypeHysteria2, Server: "example.com", Port: 443,
+		Password: "secret", TLS: &domain.TLSOptions{Enabled: true},
+		Hysteria: &domain.HysteriaOptions{
+			HopInterval: "1500ms", Obfs: "gecko", ObfsPassword: "obfs", GeckoMinPacketSize: 512, GeckoMaxPacketSize: 1200,
+			BBRProfile: "aggressive", CWND: 32, UDPMTU: 1197, HandshakeTimeout: "10s",
+			TLSIdentity: &domain.Hysteria2TLSIdentity{
+				CertificateName:            "example.com",
+				MihomoFingerprint:          "00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00",
+				CertificatePublicKeySHA256: []string{validPin},
+			},
+			QUIC: &domain.HysteriaQUICOptions{IdleTimeout: "30s", StreamReceiveWindow: 1 << 20},
+		},
+	}
+	require.Equal(t, 1, nodevalidation.Validate([]domain.NodeIR{valid}, nodevalidation.StageNormalized, "").Counts.Valid)
+
+	realm := valid
+	realm.Hysteria = &domain.HysteriaOptions{Realm: &domain.HysteriaRealmOptions{
+		Enabled: true, ServerURL: "https://realm.example.com", RealmID: "realm", STUNServers: []string{"stun.example.com"},
+	}}
+	require.Equal(t, 1, nodevalidation.Validate([]domain.NodeIR{realm}, nodevalidation.StageNormalized, "").Counts.Valid,
+		"Mihomo Realm dummy endpoint must remain representable in canonical NodeIR")
+}
+
+func TestValidateHysteria2RejectsInvalidAdvancedOptions(t *testing.T) {
+	t.Parallel()
+
+	node := domain.NodeIR{
+		Name: "hy2", Type: domain.NodeTypeHysteria2, Server: "example.com", Port: 443,
+		Password: "secret", TLS: &domain.TLSOptions{Enabled: true},
+		Hysteria: &domain.HysteriaOptions{
+			ServerPorts: []string{"8443-9443"}, HopInterval: "4s", ObfsPassword: "orphan",
+			CWND: -1, UDPMTU: -1,
+			TLSIdentity: &domain.Hysteria2TLSIdentity{
+				MihomoFingerprint:          "chrome",
+				CertificatePublicKeySHA256: []string{base64.StdEncoding.EncodeToString([]byte("short"))},
+			},
+			QUIC: &domain.HysteriaQUICOptions{InitialPacketSize: 65536},
+			Realm: &domain.HysteriaRealmOptions{
+				Enabled: true, ServerURL: "https://realm.example.com", RealmID: "realm", STUNServers: []string{""},
+			},
+		},
+	}
+	result := nodevalidation.Validate([]domain.NodeIR{node}, nodevalidation.StageNormalized, "")
+	require.Equal(t, 1, result.Counts.Invalid)
+	for _, field := range []string{
+		"hysteria.obfs_password", "hysteria.hop_interval", "hysteria.cwnd", "hysteria.udp_mtu",
+		"hysteria.tls_identity.mihomo_fingerprint", "hysteria.tls_identity.certificate_public_key_sha256",
+		"hysteria.quic.initial_packet_size",
+		"hysteria.server_ports", "hysteria.realm.stun_servers",
+	} {
+		require.Contains(t, issueFields(result.Issues), field)
+	}
+}
+
 func issueFields(issues []domain.ValidationIssue) []string {
 	fields := make([]string, 0, len(issues))
 	for _, issue := range issues {

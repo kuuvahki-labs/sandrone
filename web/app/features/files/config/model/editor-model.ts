@@ -12,6 +12,7 @@ export interface GroupDraft {
   excludeFilter: string;
   filter: string;
   healthCheckInterval: string;
+  healthCheckIdleTimeout?: string;
   healthCheckTimeout?: number;
   healthCheckTolerance?: number;
   healthCheckURL: string;

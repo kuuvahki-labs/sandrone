@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
+import legacyTailscaleExternalScript from "~/features/files/drivers/sing-box/legacy/sing-box-tailscale-external.js?raw";
 import { singBoxProcessorPreset } from "~/features/files/drivers/sing-box/processor-presets";
 import type { ProcessorDetail } from "~/shared/resources/types";
 
@@ -25,6 +26,59 @@ describe("FileProcessorBuilder", () => {
     expect(currentProcessors()[2]).toEqual(custom);
     act(() => ref.current!.prependPresets(["quic-fallback"]));
     expect(currentProcessors()).toHaveLength(3);
+  });
+
+  it("adds the complete Tailnet share chain and cascades it when native Tailscale is selected", () => {
+    localStorage.setItem("sandrone.locale", "en-US");
+    const ref = createRef<FileProcessorBuilderHandle>();
+    render(<FileProcessorBuilder ref={ref} kind="sing-box" />);
+
+    act(() => ref.current!.prependPresets(["tailnet-share"]));
+    expect(currentProcessors().map((processor) => processor.name)).toEqual([
+      "TUN mode",
+      "Tailscale coexistence",
+      "Share to Tailnet",
+    ]);
+    expect(currentProcessors()[2]).toMatchObject({
+      params: { args: {
+        preset_id: "tailnet-share",
+        listen_addresses: [],
+        listen_port: 2080,
+        username: "",
+        password: "",
+      } },
+    });
+
+    act(() => ref.current!.prependPresets(["tailscale-native"]));
+    expect(currentProcessors().map((processor) => processor.name)).toEqual([
+      "TUN mode",
+      "Native Tailscale",
+    ]);
+    expect(screen.getByRole("alert")).toHaveTextContent("Removed conflicts: Tailscale coexistence, Share to Tailnet");
+  });
+
+  it("preserves a legacy managed script until the user reselects its preset", async () => {
+    localStorage.setItem("sandrone.locale", "en-US");
+    const user = userEvent.setup();
+    const legacy: ProcessorDetail = {
+      name: "My Tailscale coexistence",
+      type: "script",
+      stage: "file",
+      params: {
+        source: { type: "inline", content: legacyTailscaleExternalScript },
+        timeout_ms: 5000,
+      },
+    };
+    render(<FileProcessorBuilder kind="sing-box" defaultValue={[legacy]} />);
+
+    expect(currentProcessors()).toEqual([legacy]);
+    await selectMuiOption(user, screen.getByRole("combobox", { name: "Type" }), "Tailscale coexistence");
+    await user.click(screen.getByRole("button", { name: "Add processor" }));
+
+    expect(currentProcessors().map((processor) => processor.name)).toEqual(["TUN mode", "Tailscale coexistence"]);
+    expect(currentProcessors()[1]).toMatchObject({ params: { args: { preset_id: "tailscale-external" } } });
+    expect((currentProcessors()[1].params?.source as { content: string }).content).not.toBe(legacyTailscaleExternalScript);
+    expect(screen.getByRole("alert")).toHaveTextContent("Updated presets: Tailscale coexistence");
   });
 
   it("serializes script and merge processors through the hidden form contract", () => {

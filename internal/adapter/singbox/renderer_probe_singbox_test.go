@@ -6,7 +6,9 @@ import (
 	"context"
 	"encoding/json/v2"
 	"testing"
+	"time"
 
+	box "github.com/sagernet/sing-box"
 	"github.com/sagernet/sing-box/include"
 	"github.com/sagernet/sing-box/option"
 	"github.com/stretchr/testify/require"
@@ -32,6 +34,114 @@ func TestRenderSingBoxHysteriaMbpsBandwidthIsAcceptedByLockedCore(t *testing.T) 
 	require.NotContains(t, outbound, "up")
 	require.NotContains(t, outbound, "down")
 	requireLockedSingBoxOptions(t, out)
+}
+
+func TestRenderSingBoxHysteria2RealmWireStartsWithLockedCore(t *testing.T) {
+	out, report, err := singbox.NewRenderer().RenderWithReport(context.Background(), []domain.NodeIR{{
+		Name: "hy2-realm", Type: domain.NodeTypeHysteria2, Server: "dummy.example.com", Port: 443,
+		TLS: &domain.TLSOptions{Enabled: true},
+		Hysteria: &domain.HysteriaOptions{Realm: &domain.HysteriaRealmOptions{
+			Enabled: true, ServerURL: "https://realm.example.com", RealmID: "realm", STUNServers: []string{"stun.example.com"},
+		}},
+	}}, domain.RenderOptions{})
+	require.NoError(t, err)
+	require.Empty(t, report.Warnings)
+
+	ctx := include.Context(t.Context())
+	var options option.Options
+	require.NoError(t, options.UnmarshalJSONContext(ctx, out))
+	require.Len(t, options.Outbounds, 1)
+	hy2, ok := options.Outbounds[0].Options.(*option.Hysteria2OutboundOptions)
+	require.True(t, ok)
+	require.Empty(t, hy2.Server)
+	require.Zero(t, hy2.ServerPort)
+	require.Empty(t, hy2.ServerPorts)
+	require.NotNil(t, hy2.Realm)
+	require.Equal(t, "dummy.example.com", hy2.TLS.ServerName)
+
+	instance, err := box.New(box.Options{Context: ctx, Options: options})
+	require.NoError(t, err)
+	require.NoError(t, instance.Close())
+}
+
+func TestLockedSingBoxRejectsRealmWithOuterEndpoint(t *testing.T) {
+	ctx := include.Context(t.Context())
+	var options option.Options
+	require.NoError(t, options.UnmarshalJSONContext(ctx, []byte(`{
+  "outbounds":[{
+    "type":"hysteria2",
+    "tag":"invalid",
+    "server":"dummy.example.com",
+    "server_port":443,
+    "tls":{"enabled":true},
+    "realm":{"server_url":"https://realm.example.com","realm_id":"realm","stun_servers":["stun.example.com"]}
+  }]
+}`)))
+	_, err := box.New(box.Options{Context: ctx, Options: options})
+	require.ErrorContains(t, err, "realm conflicts with server, server_port, and server_ports")
+}
+
+func TestSingBoxHysteria2SubsecondDurationRoundTripsLockedOptions(t *testing.T) {
+	nodes, source, err := singbox.NewParser().Parse(context.Background(), []byte(`{
+  "type":"hysteria2",
+  "tag":"hy2",
+  "server":"example.com",
+  "server_port":443,
+  "password":"secret",
+  "tls":{"enabled":true},
+  "hop_interval":"5500ms"
+}`))
+	require.NoError(t, err)
+	require.Empty(t, source.Warnings)
+	require.Equal(t, "5500ms", nodes[0].Hysteria.HopInterval)
+
+	out, report, err := singbox.NewRenderer().RenderWithReport(context.Background(), nodes, domain.RenderOptions{})
+	require.NoError(t, err)
+	require.Empty(t, report.Warnings)
+	options := decodeLockedSingBoxOptions(t, out)
+	hy2 := options.Outbounds[0].Options.(*option.Hysteria2OutboundOptions)
+	require.Equal(t, 5500*time.Millisecond, time.Duration(hy2.HopInterval))
+}
+
+func TestSingBoxHysteria2PublicKeyPinMatchesLockedCoreValidation(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		pin     string
+		wantErr bool
+	}{
+		{name: "valid SHA256", pin: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},
+		// The locked core decodes any valid base64 value here and only compares it
+		// with the peer certificate at handshake time. Sandrone deliberately adds
+		// the stricter SHA-256 length check in nodevalidation.
+		{name: "wrong length", pin: "c2hvcnQ="},
+		{name: "invalid base64", pin: "not-base64", wantErr: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			out, _, err := singbox.NewRenderer().RenderWithReport(context.Background(), []domain.NodeIR{{
+				Name: "hy2", Type: domain.NodeTypeHysteria2, Server: "example.com", Port: 443, Password: "secret",
+				TLS: &domain.TLSOptions{Enabled: true},
+				Hysteria: &domain.HysteriaOptions{TLSIdentity: &domain.Hysteria2TLSIdentity{
+					CertificatePublicKeySHA256: []string{test.pin},
+				}},
+			}}, domain.RenderOptions{})
+			require.NoError(t, err)
+			ctx := include.Context(t.Context())
+			var options option.Options
+			err = options.UnmarshalJSONContext(ctx, out)
+			if err == nil {
+				var instance *box.Box
+				instance, err = box.New(box.Options{Context: ctx, Options: options})
+				if instance != nil {
+					require.NoError(t, instance.Close())
+				}
+			}
+			if test.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }
 
 func TestRenderSingBoxHysteriaExplicitBandwidthIsAcceptedByLockedCore(t *testing.T) {

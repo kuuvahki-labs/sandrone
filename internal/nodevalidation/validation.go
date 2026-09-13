@@ -3,7 +3,9 @@ package nodevalidation
 
 import (
 	"encoding/base64"
+	"encoding/hex"
 	"net"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -83,11 +85,13 @@ func validateNode(node domain.NodeIR, index int, stage Stage, target string) []d
 	if !endpointOnlyProbe && !knownNodeType(node.Type) {
 		add("node_validation_invalid", "type", "node type is not supported")
 	}
-	outerEndpointOptional := node.Type == domain.NodeTypeWireGuard && node.WireGuard != nil && len(node.WireGuard.Peers) > 0
+	hysteria2RealmOnly := node.Type == domain.NodeTypeHysteria2 && hysteria2RealmEnabled(node.Hysteria) && node.Server == "" && node.Port == 0
+	outerEndpointOptional := node.Type == domain.NodeTypeWireGuard && node.WireGuard != nil && len(node.WireGuard.Peers) > 0 || hysteria2RealmOnly
 	if !outerEndpointOptional && !validServer(node.Server) {
 		add("node_validation_invalid", "server", "server must be a host or IP address without a scheme or path")
 	}
-	portRangeConfigured := node.Type == domain.NodeTypeMieru && node.Mieru != nil && strings.TrimSpace(node.Mieru.PortRange) != ""
+	portRangeConfigured := node.Type == domain.NodeTypeMieru && node.Mieru != nil && strings.TrimSpace(node.Mieru.PortRange) != "" ||
+		node.Type == domain.NodeTypeHysteria2 && node.Hysteria != nil && len(node.Hysteria.ServerPorts) > 0
 	if !outerEndpointOptional && !portRangeConfigured && node.Port == 0 {
 		add("node_validation_invalid", "port", "port must be between 1 and 65535")
 	}
@@ -118,8 +122,8 @@ func validateNode(node domain.NodeIR, index int, stage Stage, target string) []d
 		if node.TLS == nil || !node.TLS.Enabled {
 			add("node_validation_required", "tls", "TLS must be enabled")
 		}
-		if node.Type == domain.NodeTypeHysteria2 && node.Hysteria != nil && node.Hysteria.Obfs != "" && strings.TrimSpace(node.Hysteria.ObfsPassword) == "" {
-			add("node_validation_required", "hysteria.obfs_password", "obfuscation password is required when obfuscation is enabled")
+		if node.Type == domain.NodeTypeHysteria2 {
+			validateHysteria2(node, add)
 		}
 	case domain.NodeTypeTUIC:
 		validateTUIC(node, add)
@@ -170,6 +174,201 @@ func validateNode(node domain.NodeIR, index int, stage Stage, target string) []d
 	validateTLS(node.TLS, "tls", add)
 	validateTransport(node.Transport, add)
 	return issues
+}
+
+func hysteria2RealmEnabled(options *domain.HysteriaOptions) bool {
+	return options != nil && options.Realm != nil && options.Realm.Enabled
+}
+
+func validateHysteria2(node domain.NodeIR, add func(string, string, string)) {
+	options := node.Hysteria
+	if options == nil {
+		return
+	}
+	if options.Obfs != "" && strings.TrimSpace(options.ObfsPassword) == "" {
+		add("node_validation_required", "hysteria.obfs_password", "obfuscation password is required when obfuscation is enabled")
+	}
+	if options.Obfs == "" && options.ObfsPassword != "" {
+		add("node_validation_conflict", "hysteria.obfs_password", "obfuscation password requires an obfuscation type")
+	}
+	switch options.Obfs {
+	case "", "salamander", "gecko":
+	default:
+		add("node_validation_invalid", "hysteria.obfs", "Hysteria2 obfuscation must be salamander or gecko")
+	}
+	if options.Obfs == "gecko" {
+		minimum := options.GeckoMinPacketSize
+		if minimum == 0 {
+			minimum = 512
+		}
+		maximum := options.GeckoMaxPacketSize
+		if maximum == 0 {
+			maximum = 1200
+		}
+		if minimum <= 0 || minimum > maximum || maximum > 2048 {
+			add("node_validation_invalid", "hysteria.gecko_packet_size", "Gecko packet size must satisfy 0 < min <= max <= 2048")
+		}
+	} else if options.GeckoMinPacketSize != 0 || options.GeckoMaxPacketSize != 0 {
+		add("node_validation_conflict", "hysteria.gecko_packet_size", "Gecko packet sizes require gecko obfuscation")
+	}
+	switch options.BBRProfile {
+	case "", "standard", "conservative", "aggressive":
+	default:
+		add("node_validation_invalid", "hysteria.bbr_profile", "BBR profile must be standard, conservative, or aggressive")
+	}
+	validateOptionalPositiveDuration(options.HopInterval, "hysteria.hop_interval", add)
+	validateOptionalPositiveDuration(options.HopIntervalMax, "hysteria.hop_interval_max", add)
+	if options.HopInterval == "" && options.HopIntervalMax != "" {
+		add("node_validation_conflict", "hysteria.hop_interval_max", "maximum hop interval requires a minimum hop interval")
+	}
+	if options.HopInterval != "" && options.HopIntervalMax != "" {
+		minimum, minimumErr := time.ParseDuration(options.HopInterval)
+		maximum, maximumErr := time.ParseDuration(options.HopIntervalMax)
+		if minimumErr == nil && maximumErr == nil && maximum < minimum {
+			add("node_validation_invalid", "hysteria.hop_interval_max", "maximum hop interval must not be smaller than the minimum")
+		}
+	}
+	if len(options.ServerPorts) > 0 && options.HopInterval != "" {
+		minimum, err := time.ParseDuration(options.HopInterval)
+		if err == nil && minimum < 5*time.Second {
+			add("node_validation_invalid", "hysteria.hop_interval", "port hopping interval must be at least 5 seconds")
+		}
+	}
+	for _, value := range options.ServerPorts {
+		if !validHysteria2PortRange(value) {
+			add("node_validation_invalid", "hysteria.server_ports", "server ports must contain ports or ascending port ranges")
+			break
+		}
+	}
+	if options.HandshakeTimeout != "" {
+		validatePositiveWholeSeconds(options.HandshakeTimeout, "hysteria.handshake_timeout", add)
+	}
+	if options.CWND < 0 {
+		add("node_validation_invalid", "hysteria.cwnd", "congestion window must be positive")
+	}
+	if options.UDPMTU < 0 {
+		add("node_validation_invalid", "hysteria.udp_mtu", "UDP MTU must be positive")
+	}
+	validateHysteria2QUIC(options.QUIC, add)
+	validateHysteria2Identity(options.TLSIdentity, "hysteria.tls_identity", add)
+	validateHysteria2Realm(node, options.Realm, add)
+}
+
+func validateHysteria2Realm(node domain.NodeIR, realm *domain.HysteriaRealmOptions, add func(string, string, string)) {
+	if realm == nil || !realm.Enabled {
+		return
+	}
+	if strings.TrimSpace(realm.ServerURL) == "" {
+		add("node_validation_required", "hysteria.realm.server_url", "Realm server URL is required")
+	} else if parsed, err := url.Parse(realm.ServerURL); err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Hostname() == "" {
+		add("node_validation_invalid", "hysteria.realm.server_url", "Realm server URL must be an HTTP or HTTPS URL with a host")
+	}
+	if strings.TrimSpace(realm.RealmID) == "" {
+		add("node_validation_required", "hysteria.realm.realm_id", "Realm ID is required")
+	}
+	if len(realm.STUNServers) == 0 {
+		add("node_validation_required", "hysteria.realm.stun_servers", "at least one Realm STUN server is required")
+	} else {
+		for _, server := range realm.STUNServers {
+			if strings.TrimSpace(server) == "" {
+				add("node_validation_invalid", "hysteria.realm.stun_servers", "Realm STUN servers must not contain empty entries")
+				break
+			}
+		}
+	}
+	if len(node.Hysteria.ServerPorts) > 0 {
+		add("node_validation_conflict", "hysteria.server_ports", "Realm and port hopping are mutually exclusive")
+	}
+	switch realm.IPVersion {
+	case 0, 4, 6:
+	default:
+		add("node_validation_invalid", "hysteria.realm.ip_version", "Realm IP version must be 4 or 6")
+	}
+	if mapping := realm.PortMapping; mapping != nil && mapping.Enabled {
+		if realm.IPVersion == 6 {
+			add("node_validation_conflict", "hysteria.realm.port_mapping", "Realm port mapping requires IPv4")
+		}
+		validateOptionalPositiveDuration(mapping.Timeout, "hysteria.realm.port_mapping.timeout", add)
+		validateOptionalPositiveDuration(mapping.Lifetime, "hysteria.realm.port_mapping.lifetime", add)
+	}
+	validateHysteria2Identity(realm.TLSIdentity, "hysteria.realm.tls_identity", add)
+	validateTLS(realm.TLS, "hysteria.realm.tls", add)
+}
+
+func validateHysteria2QUIC(options *domain.HysteriaQUICOptions, add func(string, string, string)) {
+	if options == nil {
+		return
+	}
+	validateOptionalPositiveDuration(options.IdleTimeout, "hysteria.quic.idle_timeout", add)
+	validateOptionalPositiveDuration(options.KeepAlivePeriod, "hysteria.quic.keep_alive_period", add)
+	if options.MaxConcurrentStreams < 0 {
+		add("node_validation_invalid", "hysteria.quic.max_concurrent_streams", "maximum concurrent streams must not be negative")
+	}
+	if options.InitialPacketSize < 0 || options.InitialPacketSize > 65535 {
+		add("node_validation_invalid", "hysteria.quic.initial_packet_size", "initial packet size must be between 0 and 65535")
+	}
+}
+
+func validateHysteria2Identity(identity *domain.Hysteria2TLSIdentity, prefix string, add func(string, string, string)) {
+	if identity == nil {
+		return
+	}
+	if (identity.Certificate == "") != (identity.PrivateKey == "") {
+		add("node_validation_conflict", prefix+".certificate", "TLS client certificate and private key must be configured together")
+	}
+	if identity.CertificateName != "" && !validServer(identity.CertificateName) {
+		add("node_validation_invalid", prefix+".certificate_name", "certificate verification name must be a host or IP address")
+	}
+	if identity.MihomoFingerprint != "" {
+		fingerprint := strings.ReplaceAll(strings.TrimSpace(identity.MihomoFingerprint), ":", "")
+		decoded, err := hex.DecodeString(fingerprint)
+		if err != nil || len(decoded) != 32 {
+			add("node_validation_invalid", prefix+".mihomo_fingerprint", "Mihomo certificate fingerprint must be a SHA-256 hex digest")
+		}
+	}
+	for _, pin := range identity.CertificatePublicKeySHA256 {
+		decoded, err := base64.StdEncoding.DecodeString(pin)
+		if err != nil || len(decoded) != 32 {
+			add("node_validation_invalid", prefix+".certificate_public_key_sha256", "sing-box public-key pins must be base64-encoded SHA-256 digests")
+			break
+		}
+	}
+}
+
+func validatePositiveWholeSeconds(value, field string, add func(string, string, string)) {
+	if strings.TrimSpace(value) == "" {
+		return
+	}
+	duration, err := time.ParseDuration(value)
+	if err != nil || duration <= 0 || duration%time.Second != 0 {
+		add("node_validation_invalid", field, "duration must be a positive whole number of seconds")
+	}
+}
+
+func validateOptionalPositiveDuration(value, field string, add func(string, string, string)) {
+	if strings.TrimSpace(value) == "" {
+		return
+	}
+	duration, err := time.ParseDuration(value)
+	if err != nil || duration <= 0 {
+		add("node_validation_invalid", field, "duration must be positive")
+	}
+}
+
+func validHysteria2PortRange(value string) bool {
+	parts := strings.FieldsFunc(strings.TrimSpace(value), func(r rune) bool { return r == '-' || r == ':' })
+	if len(parts) < 1 || len(parts) > 2 {
+		return false
+	}
+	ports := make([]uint64, len(parts))
+	for index, part := range parts {
+		port, err := strconv.ParseUint(strings.TrimSpace(part), 10, 16)
+		if err != nil || port == 0 {
+			return false
+		}
+		ports[index] = port
+	}
+	return len(ports) == 1 || ports[0] <= ports[1]
 }
 
 func validateVLESS(node domain.NodeIR, add func(string, string, string)) {

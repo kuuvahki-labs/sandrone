@@ -195,7 +195,6 @@ export const enUS: Record<TranslationKey, string> = {
   "files.config.adaptiveNameConflict": "Kept custom group “{name}” and skipped generating the same name.",
   "files.config.adaptiveNodeNameConflict": "A proxy name conflicts with group “{name}”, so the group was skipped.",
   "files.config.adaptiveReferencedPreserved": "Group “{name}” is still referenced elsewhere and was preserved.",
-  "files.config.adaptiveEmptyRegionsSkipped": "Skipped regions without matching nodes: {names}.",
   "files.config.adaptiveSelectSubscription": "Select a subscription first.",
   "files.config.adaptivePreviewLoading": "Loading the node preview.",
   "files.config.adaptivePreviewUnavailable": "The node preview is unavailable; retry it.",

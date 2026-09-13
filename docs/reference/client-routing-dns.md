@@ -77,10 +77,11 @@ Shadowrocket 使用 `GEOIP,CN`。三者都是域名规则之后的**解析型兜
 - Mihomo base 不含 `tun`；用户显式选择 TUN processor 后才生成并开启完整 TUN
   块。base 默认使用 fake-IP，并由基础 `fake-ip-filter` 和三个互斥的可选扩展控制
   哪些域名返回真实 IP。
-- sing-box base 直接包含 TUN inbound 和仅监听本机的 mixed inbound。sing-box 没有
-  Mihomo 式的 `tun.enable` 开关；删除这个 inbound 会把产物改成仅供显式设置系统
-  代理的本地端口配置。当前 DNS 没有配置 FakeIP server，所有查询都返回上游真实
-  IP，因此不需要再生成 fake-IP 例外列表。
+- sing-box base 不含 TUN，只保留仅监听本机的 mixed inbound。用户显式选择 TUN
+  processor 后才生成双栈 `tun-in`。base 默认配置 1.14 FakeIP server，普通 A/AAAA
+  返回 FakeIP；本地、连接检测、校时/NTP/STUN、iCloud 和 Xiaomi 等兼容域名走真实
+  resolver。FakeIP 已配置不等于系统流量已接管，流量仍须经系统代理或显式 TUN
+  进入 sing-box DNS。
 - Shadowrocket 是否以 TUN 接管流量由 App 的代理类型或 `compatibility-mode` 决定；
   `tun-excluded-routes` 和 `hijack-dns` 只描述启用后的处理方式。其 TUN DNS 支持
   fake IP，也可用 `always-real-ip` 指定真实 IP 例外；当前 base 不默认扩大该列表，
@@ -106,14 +107,21 @@ Shadowrocket 使用 `GEOIP,CN`。三者都是域名规则之后的**解析型兜
 
 ### sing-box
 
-- `private` 交给 `dns-local`；
-- `cn` 交给直连的中国 HTTPS DNS；
-- 其余查询交给通过主代理 detour 的境外 HTTPS DNS；
+- 单标签、`.lan`、`.local` 与 private 域名交给 `dns-local`；
+- 内置连接检测和稳定兼容例外交给真实 resolver；
+- 其余 A/AAAA 查询交给 `dns-fakeip`，包含普通中国域名；
+- FakeIP catch-all 未接管的 `cn` 查询交给直连的中国 HTTPS DNS，其余查询交给通过
+  主代理 detour 的境外 HTTPS DNS；
 - `default_domain_resolver` 使用中国加密 DNS，避免 detour 建立前依赖全局 system
   resolver；
-- TUN 启用 `strict_route`，默认 processor 以逻辑规则劫持 protocol DNS 或目标
+- 显式 TUN processor 启用 `strict_route`，默认 sniff/DNS processor 以逻辑规则劫持 protocol DNS 或目标
   端口 53；`224.0.0.251/32`、`ff02::fb/128` 则在进入该识别规则前绕开 TUN，
   让 mDNS 留在本地链路，同时保留对其他非标准端口明文 DNS 的协议识别。
+
+真实解析例外都直接内联在 base 的 DNS rules，不依赖用户可删除的 structured
+rule-set；默认 `private` inline rule-set 只包含域名，私网 IP 路由仍由
+`ip_is_private` 或模板中的 `private-ip` 负责。可选 Fake-IP 兼容扩展也只接受域名
+匹配，并把所选真实 resolver 规则插到所有 FakeIP 规则之前。
 
 `strict_route` 是配置层的跨平台默认；sing-box for Android 的 VpnService 当前不实现
 该选项，不能把桌面端的 fail-closed 行为直接视为 Android 保证。

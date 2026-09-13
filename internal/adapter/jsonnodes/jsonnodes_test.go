@@ -238,3 +238,31 @@ func TestRendererRenderJSONNodes(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rendered, &decoded))
 	require.Equal(t, nodes[0].Name, decoded[0].Name)
 }
+
+func TestJSONNodesRoundTripsHysteria2ExtensionsAndUnknownQUIC(t *testing.T) {
+	input := []byte(`[{
+  "name":"hy2","type":"hysteria2","server":"example.com","port":443,"password":"secret",
+  "tls":{"enabled":true},
+  "hysteria":{
+    "hop_interval":"5500ms","hop_interval_max":"9s","obfs":"gecko","obfs_password":"obfs",
+    "gecko_min_packet_size":512,"gecko_max_packet_size":1200,"bbr_profile":"aggressive","brutal_debug":true,
+    "quic":{"initial_packet_size":1200,"future_quic":42}
+  }
+}]`)
+	nodes, source, err := jsonnodes.NewParser().Parse(context.Background(), input)
+	require.NoError(t, err)
+	require.Empty(t, source.Warnings)
+	require.Len(t, nodes, 1)
+	require.Equal(t, "5500ms", nodes[0].Hysteria.HopInterval)
+	require.JSONEq(t, `42`, string(nodes[0].Hysteria.QUIC.Unknown["future_quic"]))
+
+	out, report, err := jsonnodes.NewRenderer().RenderWithReport(context.Background(), nodes, domain.RenderOptions{})
+	require.NoError(t, err)
+	require.Equal(t, 1, report.SuccessCount)
+	var rendered []domain.NodeIR
+	require.NoError(t, json.Unmarshal(out, &rendered))
+	require.Len(t, rendered, 1)
+	require.Equal(t, nodes[0].Hysteria.HopInterval, rendered[0].Hysteria.HopInterval)
+	require.Equal(t, nodes[0].Hysteria.BBRProfile, rendered[0].Hysteria.BBRProfile)
+	require.JSONEq(t, `42`, string(rendered[0].Hysteria.QUIC.Unknown["future_quic"]))
+}

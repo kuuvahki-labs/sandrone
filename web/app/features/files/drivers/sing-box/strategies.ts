@@ -52,6 +52,9 @@ export const singBoxConfigurationStrategies = Object.freeze({
     projectNodes: (preview) => preview.options,
     relationNodeNames: (nodes) => nodes?.map((node) => node.name),
     validate: ({ formMode, preview, selected }) => ({
+      issueKey: formMode === "create" && !selected
+        ? "files.config.subscriptionRequired"
+        : undefined,
       valid: formMode !== "create" || Boolean(
         selected
         && preview
@@ -224,14 +227,12 @@ function singBoxEmptyGroupIssues(
   const issues = [];
   for (const [index, group] of groups.entries()) {
     const type = trimmedString(group.type);
-    const filteredSelector = type === "selector" && ("filter" in group || "exclude-filter" in group);
-    if (type !== "urltest" && !filteredSelector) continue;
+    if ("filter" in group || "exclude-filter" in group) continue;
+    if (type !== "urltest") continue;
     const expanded = previewGroupMembers(group, nodeNames)
       .flatMap((target) => target === "$nodes" ? nodeNames : [target]);
     if (expanded.some((target) => target.trim())) continue;
-    issues.push(type === "urltest"
-      ? relationIssue("error", "singbox_urltest_empty", "groups", `group-${index}`, "URLTest must contain at least one outbound after expanding subscription nodes.")
-      : relationIssue("error", "group_members_empty", "groups", `group-${index}`, "Group filter must match at least one outbound."));
+    issues.push(relationIssue("error", "singbox_urltest_empty", "groups", `group-${index}`, "URLTest must contain at least one outbound after expanding subscription nodes."));
   }
   return issues;
 }
@@ -316,7 +317,7 @@ function materializeSingBoxTemplate(
     const outbounds = templateGroupTargets(item, selectName, autoName, "direct", "block")
       .filter((target) => target !== tag);
     return item.groupMode === "url-test"
-      ? { type: "urltest", tag, outbounds, url: DEFAULT_PROBE_URL, interval: "5m" }
+      ? { type: "urltest", tag, outbounds, url: DEFAULT_PROBE_URL, interval: "5m", tolerance: 50 }
       : { type: "selector", tag, outbounds };
   });
   const ruleSets = blueprint.ruleEntries.map(({ ruleID }) => {

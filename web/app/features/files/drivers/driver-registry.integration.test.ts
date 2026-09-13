@@ -295,6 +295,153 @@ describe("file driver codecs", () => {
     expect(adapter.groups.serialize([urltest])[0]).not.toHaveProperty("interrupt_exist_connections");
   });
 
+  it("defaults only newly created sing-box URLTest groups to tolerance 50", () => {
+    const adapter = structuredAdapter("sing-box");
+    const transitioned = adapter.groups.transitionType(adapter.groups.create("en-US"), "url-test");
+    const generated = adapter.groups.serialize(adapter.groups.defaults("standard", "en-US"));
+
+    expect(adapter.groups.serialize([transitioned])).toEqual([
+      expect.objectContaining({ type: "urltest", tolerance: 50 }),
+    ]);
+    expect(adapter.groups.serialize([transitioned])[0]).not.toHaveProperty("idle_timeout");
+    expect(generated.find((group) => group.type === "urltest"))
+      .toEqual(expect.objectContaining({ tolerance: 50 }));
+  });
+
+  it("keeps the default sing-box private rule set domain-only", () => {
+    const adapter = structuredAdapter("sing-box");
+    const defaults = adapter.toNativeDraft(adapter.initialize());
+    const privateRuleSet = defaults.rule_sets?.find((ruleSet) => ruleSet.tag === "private");
+
+    expect(privateRuleSet).toEqual({
+      type: "inline",
+      tag: "private",
+      rules: [{ domain_suffix: ["local"] }],
+    });
+    expect(JSON.stringify(privateRuleSet)).not.toContain("ip_cidr");
+    expect(defaults.rules).toContainEqual({ ip_is_private: true, outbound: "direct" });
+  });
+
+  it("round-trips omitted and explicit sing-box URLTest tuning fields", () => {
+    const adapter = structuredAdapter("sing-box");
+    const base = {
+      type: "urltest",
+      tag: "Auto",
+      outbounds: ["$nodes"],
+      url: "https://cp.cloudflare.com",
+      interval: "5m",
+    };
+    const omitted = adapter.groups.project([base]);
+    const explicit = adapter.groups.project([{ ...base, tolerance: 0, idle_timeout: "1d" }]);
+
+    expect(omitted).not.toBeNull();
+    expect(omitted?.[0]).toMatchObject({
+      healthCheckIdleTimeout: undefined,
+      healthCheckTolerance: undefined,
+    });
+    expect(adapter.groups.serialize(omitted!)).toEqual([base]);
+    expect(explicit).not.toBeNull();
+    expect(explicit?.[0]).toMatchObject({
+      healthCheckIdleTimeout: "1d",
+      healthCheckTolerance: 0,
+    });
+    expect(explicit?.[0].adapterState).not.toHaveProperty("tolerance");
+    expect(explicit?.[0].adapterState).not.toHaveProperty("idle_timeout");
+    expect(adapter.groups.serialize(explicit!)).toEqual([
+      { ...base, tolerance: 0, idle_timeout: "1d" },
+    ]);
+  });
+
+  it("clears sing-box URLTest tuning fields when changing to selector", () => {
+    const adapter = structuredAdapter("sing-box");
+    const [urltest] = adapter.groups.project([{
+      type: "urltest",
+      tag: "Auto",
+      outbounds: ["$nodes"],
+      url: "https://cp.cloudflare.com",
+      interval: "5m",
+      tolerance: 75,
+      idle_timeout: "1h",
+    }])!;
+    urltest.healthCheckTimeout = 10;
+
+    const selector = adapter.groups.transitionType(urltest, "select");
+    expect(selector).toMatchObject({
+      type: "select",
+      healthCheckURL: "",
+      healthCheckInterval: "",
+      healthCheckIdleTimeout: undefined,
+      healthCheckTimeout: undefined,
+      healthCheckTolerance: undefined,
+    });
+    expect(adapter.groups.serialize([selector])).toEqual([{
+      type: "selector",
+      tag: "Auto",
+      outbounds: ["$nodes"],
+    }]);
+    expect(adapter.groups.serialize([
+      adapter.groups.transitionType(selector, "url-test"),
+    ])[0]).toMatchObject({ tolerance: 50 });
+  });
+
+  it("rejects non-numeric native sing-box URLTest tolerance without dropping it", () => {
+    const adapter = structuredAdapter("sing-box");
+    const source = [{
+      type: "urltest",
+      tag: "Auto",
+      outbounds: ["$nodes"],
+      url: "https://cp.cloudflare.com",
+      interval: "5m",
+      tolerance: "50",
+    }];
+
+    expect(adapter.groups.project(source)).toBeNull();
+  });
+
+  it.each([
+    ["fractional tolerance", { tolerance: 1.5 }, "singbox_group_tolerance_invalid"],
+    ["oversized tolerance", { tolerance: 65536 }, "singbox_group_tolerance_invalid"],
+    ["zero idle timeout", { idle_timeout: "0" }, "singbox_group_idle_timeout_invalid"],
+    ["negative idle timeout", { idle_timeout: "-1m" }, "singbox_group_idle_timeout_invalid"],
+    ["interval above explicit idle timeout", { interval: "31m", idle_timeout: "30m" }, "singbox_group_interval_exceeds_idle_timeout"],
+    ["interval above default idle timeout", { interval: "31m" }, "singbox_group_interval_exceeds_idle_timeout"],
+  ] as const)("rejects sing-box URLTest %s", (_label, patch, issueCode) => {
+    const adapter = structuredAdapter("sing-box");
+    const draft = adapter.initialize({
+      groups: [{
+        type: "urltest",
+        tag: "Auto",
+        outbounds: ["direct"],
+        url: "https://cp.cloudflare.com",
+        interval: "5m",
+        ...patch,
+      }],
+      rule_sets: [],
+      rules: [],
+    });
+
+    expect(adapter.validate(draft)).toContainEqual(expect.objectContaining({ code: issueCode }));
+  });
+
+  it("accepts sing-box URLTest interval equal to a day-based idle timeout", () => {
+    const adapter = structuredAdapter("sing-box");
+    const draft = adapter.initialize({
+      groups: [{
+        type: "urltest",
+        tag: "Auto",
+        outbounds: ["direct"],
+        url: "https://cp.cloudflare.com",
+        interval: "24h",
+        idle_timeout: "1d",
+        tolerance: 65535,
+      }],
+      rule_sets: [],
+      rules: [],
+    });
+
+    expect(adapter.validate(draft).filter((item) => item.section === "groups")).toEqual([]);
+  });
+
   it("accepts trimmed Shadowrocket rule-set types and URLs", () => {
     const adapter = structuredAdapter("shadowrocket");
     const settings = {

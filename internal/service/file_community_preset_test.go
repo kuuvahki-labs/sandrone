@@ -272,7 +272,7 @@ func TestServiceCommunityPresetSingBoxTailscaleNativeGeneratesFullFile(t *testin
 		Content: "ss://aes-128-gcm:example-password@example.com:8388#Native-Node",
 	}))
 	script := communityPresetRawScript(t, "sing-box-tailscale-native.js")
-	processor := singBoxTailscaleProcessor(t, "Tailscale 原生接管", script, "tskey-auth-test")
+	processor := singBoxTailscaleProcessor(t, "tailscale-native", "Tailscale 原生接管", script, "tskey-auth-test")
 	spec := domain.FileSpec{
 		Name: "sing-box-tailscale-native.json",
 		Kind: domain.FileKindSingBox,
@@ -335,7 +335,7 @@ func TestServiceCommunityPresetSingBoxTailscaleNativeGeneratesFullFile(t *testin
 	}, dns["servers"])
 	require.Equal(t, []any{
 		map[string]any{"domain_suffix": []any{"user-dns.example"}, "server": "dns-local"},
-		map[string]any{"ip_accept_any": true, "server": "ts-dns"},
+		map[string]any{"preferred_by": "ts-dns", "action": "route", "server": "ts-dns"},
 	}, dns["rules"])
 	inbounds := requireAnySlice(t, doc["inbounds"])
 	require.Equal(t, []any{"192.0.2.0/24"}, requireStringMap(t, inbounds[0])["route_exclude_address"])
@@ -364,7 +364,7 @@ func TestServiceCommunityPresetSingBoxTailscaleExternalGeneratesDistinctFullFile
 		Content: "ss://aes-128-gcm:example-password@example.com:8388#External-Node",
 	}))
 	script := communityPresetRawScript(t, "sing-box-tailscale-external.js")
-	processor := singBoxTailscaleProcessor(t, "Tailscale 共存", script)
+	processor := singBoxTailscaleProcessor(t, "tailscale-external", "Tailscale 共存", script)
 	spec := domain.FileSpec{
 		Name: "sing-box-tailscale-external.json",
 		Kind: domain.FileKindSingBox,
@@ -434,6 +434,148 @@ func TestServiceCommunityPresetSingBoxTailscaleExternalGeneratesDistinctFullFile
 		map[string]any{"outbound": "LockedFinal"},
 	}, route["rules"])
 	assertNoTailscaleSecretsOrExitNode(t, doc, result.Content)
+}
+
+func TestServiceCommunityPresetSingBoxTailnetShareRunsExactProcessorChain(t *testing.T) {
+	spec := domain.FileSpec{
+		Name: "sing-box-tailnet-share.json",
+		Kind: domain.FileKindSingBox,
+		Source: domain.FileSource{Type: "inline", Content: `{
+			"dns": {
+				"servers": [
+					{"type":"https","tag":"dns-remote","server":"1.1.1.1"},
+					{"type":"fakeip","tag":"dns-fakeip"}
+				],
+				"rules": [{"query_type":["A","AAAA"],"action":"route","server":"dns-fakeip"}],
+				"final": "dns-remote"
+			},
+			"inbounds": [{"type":"mixed","tag":"mixed-in","listen":"127.0.0.1","listen_port":2080}],
+			"outbounds": [],
+			"endpoints": [],
+			"route": {"rule_set":[],"rules":[]}
+		}`},
+		Config: &domain.FileConfig{Settings: completeTypedSettings(t, map[string]any{
+			"rules": []map[string]any{
+				{"rule_set": []string{"private"}, "outbound": "direct"},
+				{"outbound": "Proxy"},
+			},
+		})},
+		Processors: []domain.ProcessorSpec{
+			singBoxManagedScriptProcessor(t, "tun", "TUN 模式", "sing-box-tun.js", nil),
+			singBoxManagedScriptProcessor(t, "tailscale-external", "Tailscale 共存", "sing-box-tailscale-external.js", nil),
+			singBoxManagedScriptProcessor(t, "tailnet-share", "共享到 Tailnet", "sing-box-tailnet-share.js", map[string]any{
+				"listen_addresses": []string{"100.64.0.7", "fd7a:115c:a1e0::7"},
+				"listen_port":      2443,
+				"username":         "alice",
+				"password":         "secret",
+			}),
+		},
+	}
+
+	result, err := service.New().GetFile(t.Context(), domain.FileRequest{Spec: &spec})
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	doc := decodeSingBoxCommunityPresetResult(t, result.Content)
+	inbounds := requireAnySlice(t, doc["inbounds"])
+	tun := requireStringMapWithField(t, inbounds, "tag", "tun-in")
+	require.Equal(t, true, tun["auto_route"])
+	require.Equal(t, []any{
+		"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16",
+		"fe80::/10", "fc00::/7", "224.0.0.251/32", "ff02::fb/128",
+		"100.64.0.0/10", "fd7a:115c:a1e0::/48",
+	}, tun["route_exclude_address"])
+	for tag, address := range map[string]string{
+		"tailnet-share-v4": "100.64.0.7",
+		"tailnet-share-v6": "fd7a:115c:a1e0::7",
+	} {
+		inbound := requireStringMapWithField(t, inbounds, "tag", tag)
+		require.Equal(t, "mixed", inbound["type"])
+		require.Equal(t, address, inbound["listen"])
+		require.Equal(t, float64(2443), inbound["listen_port"])
+		require.Equal(t, []any{map[string]any{"username": "alice", "password": "secret"}}, inbound["users"])
+	}
+	dns := requireStringMap(t, doc["dns"])
+	requireStringMapWithField(t, requireAnySlice(t, dns["servers"]), "tag", "ts-dns")
+}
+
+func TestServiceCommunityPresetSingBoxFakeIPCompatUsesExactRawAsset(t *testing.T) {
+	spec := domain.FileSpec{
+		Name: "sing-box-fakeip-compat.json",
+		Kind: domain.FileKindSingBox,
+		Source: domain.FileSource{Type: "inline", Content: `{
+			"dns": {
+				"servers": [
+					{"type":"https","tag":"dns-remote","server":"1.1.1.1"},
+					{"type":"fakeip","tag":"dns-fakeip"}
+				],
+				"rules": [
+					{"domain_suffix":["before.example"],"server":"dns-remote"},
+					{"query_type":["A","AAAA"],"action":"route","server":"dns-fakeip"}
+				],
+				"final": "dns-remote"
+			},
+			"inbounds": [],
+			"outbounds": [],
+			"route": {"rule_set":[],"rules":[]}
+		}`},
+		Config: &domain.FileConfig{Settings: completeTypedSettings(t, map[string]any{
+			"rules": []map[string]any{{"outbound": "Proxy"}},
+		})},
+		Processors: []domain.ProcessorSpec{
+			singBoxManagedScriptProcessor(t, "fakeip-compat", "Fake-IP 兼容规则", "sing-box-fakeip-compat.js", map[string]any{
+				"domain":        []string{"exact.example"},
+				"domain_suffix": []string{"suffix.example"},
+				"domain_regex":  []string{"^[^.]+\\.wild\\.example$"},
+				"server":        "",
+			}),
+		},
+	}
+
+	result, err := service.New().GetFile(t.Context(), domain.FileRequest{Spec: &spec})
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	doc := decodeSingBoxCommunityPresetResult(t, result.Content)
+	dnsRules := requireAnySlice(t, requireStringMap(t, doc["dns"])["rules"])
+	require.Len(t, dnsRules, 3)
+	require.Equal(t, map[string]any{
+		"rule_set": []any{"sandrone-fakeip-compat"},
+		"action":   "route",
+		"server":   "dns-remote",
+	}, requireStringMap(t, dnsRules[1]))
+	ruleSets := requireAnySlice(t, requireStringMap(t, doc["route"])["rule_set"])
+	compat := requireStringMapWithField(t, ruleSets, "tag", "sandrone-fakeip-compat")
+	require.Equal(t, "inline", compat["type"])
+	require.Equal(t, []any{map[string]any{
+		"domain":        []any{"exact.example"},
+		"domain_suffix": []any{"suffix.example"},
+		"domain_regex":  []any{"^[^.]+\\.wild\\.example$"},
+	}}, compat["rules"])
+}
+
+func TestServiceCommunityPresetSingBoxManagedRequestOverrideFailsWithoutResult(t *testing.T) {
+	spec := domain.FileSpec{
+		Name:   "sing-box-managed-override.json",
+		Kind:   domain.FileKindSingBox,
+		Source: domain.FileSource{Type: "inline", Content: `{"inbounds":[],"outbounds":[],"route":{"rule_set":[],"rules":[]}}`},
+		Config: &domain.FileConfig{Settings: completeTypedSettings(t, map[string]any{
+			"rules": []map[string]any{{"outbound": "Proxy"}},
+		})},
+		Processors: []domain.ProcessorSpec{
+			singBoxManagedScriptProcessor(t, "tun", "TUN 模式", "sing-box-tun.js", nil),
+		},
+	}
+
+	result, err := service.New().GetFile(t.Context(), domain.FileRequest{
+		Spec:    &spec,
+		Request: domain.RequestInfo{Args: map[string]string{"preset_id": "request-controlled"}},
+	})
+
+	require.Nil(t, result)
+	require.Error(t, err)
+	require.True(t, domain.IsCode(err, domain.CodeScriptRuntime), "got %v", err)
+	require.Contains(t, err.Error(), "Sandrone preset arguments cannot be overridden by request args")
 }
 
 func TestServiceCommunityPresetShadowrocketTailscaleNativeGeneratesConfigOnlyFile(t *testing.T) {
@@ -750,17 +892,43 @@ func mihomoTailscaleNativeProcessor(t *testing.T, script string, authKeys ...str
 	}
 }
 
-func singBoxTailscaleProcessor(t *testing.T, name, script string, authKeys ...string) domain.ProcessorSpec {
+func singBoxTailscaleProcessor(t *testing.T, presetID, name, script string, authKeys ...string) domain.ProcessorSpec {
 	t.Helper()
-	paramsValue := map[string]any{"source": inlineScriptSource(script)}
+	args := map[string]any{"preset_id": presetID}
 	if len(authKeys) > 0 {
-		paramsValue["args"] = map[string]any{"auth_key": authKeys[0]}
+		args["auth_key"] = authKeys[0]
 	}
 	return domain.ProcessorSpec{
-		Name:   name,
-		Type:   "script",
-		Stage:  domain.StageFile,
-		Params: params(t, paramsValue),
+		Name:  name,
+		Type:  "script",
+		Stage: domain.StageFile,
+		Params: params(t, map[string]any{
+			"source": inlineScriptSource(script),
+			"args":   args,
+		}),
+	}
+}
+
+func singBoxManagedScriptProcessor(
+	t *testing.T,
+	presetID string,
+	name string,
+	asset string,
+	managedArgs map[string]any,
+) domain.ProcessorSpec {
+	t.Helper()
+	args := map[string]any{"preset_id": presetID}
+	for key, value := range managedArgs {
+		args[key] = value
+	}
+	return domain.ProcessorSpec{
+		Name:  name,
+		Type:  "script",
+		Stage: domain.StageFile,
+		Params: params(t, map[string]any{
+			"source": inlineScriptSource(communityPresetRawScript(t, asset)),
+			"args":   args,
+		}),
 	}
 }
 

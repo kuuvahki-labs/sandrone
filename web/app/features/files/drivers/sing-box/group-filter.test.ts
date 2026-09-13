@@ -48,18 +48,18 @@ describe("sing-box group regex", () => {
     expect(populated.events).not.toContainEqual({ type: "reference", reference: expect.objectContaining({ target: "JP-01" }) });
     expect(populated.events).not.toContainEqual({ type: "reference", reference: expect.objectContaining({ target: "$nodes" }) });
     const empty = adapter.relations.project(groups, [], [], ["HK-home", "hk-02", "JP-01"]);
-    expect(empty.events).toContainEqual({ type: "issue", issue: expect.objectContaining({ code: "singbox_urltest_empty" }) });
+    expect(empty.events).not.toContainEqual({ type: "issue", issue: expect.objectContaining({ code: "singbox_urltest_empty" }) });
     const draft = adapter.initialize({ groups: [{ ...groups[1], filter: "[" }], rule_sets: [], rules: [] });
     expect(adapter.validate(draft)).toContainEqual(expect.objectContaining({ code: "group_filter_invalid" }));
   });
 
-  it("blocks an empty filtered selector only after a subscription preview is available", () => {
+  it("allows an empty filtered selector because the file-stage adapter removes it per render", () => {
     const groups = [{ type: "selector", tag: "Proxy", outbounds: ["$nodes"], filter: "^HK" }];
     const project = singBoxConfigurationAdapter.relations.project;
     const noPreview = project(groups, [], []);
     expect(noPreview.events).toEqual([]);
     const empty = project(groups, [], [], ["JP-01"]);
-    expect(empty.events).toContainEqual({ type: "issue", issue: expect.objectContaining({ code: "group_members_empty" }) });
+    expect(empty.events).not.toContainEqual({ type: "issue", issue: expect.objectContaining({ code: "group_members_empty" }) });
     const fixed = project([{ type: "selector", tag: "Proxy", outbounds: [] }], [], [], []);
     expect(fixed.events).toEqual([]);
   });

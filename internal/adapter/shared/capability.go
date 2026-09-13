@@ -200,10 +200,7 @@ func rawOnlyFieldNames(format string, nodeType domain.NodeType) []string {
 			return []string{"mihomo.grpc-opts.grpc-user-agent", "mihomo.grpc-opts.ping-interval"}
 		}
 	case "sing-box":
-		switch nodeType {
-		case domain.NodeTypeHysteria2:
-			return []string{"sing-box.realm", "sing-box.bbr_profile", "sing-box.initial_packet_size"}
-		case domain.NodeTypeWireGuard:
+		if nodeType == domain.NodeTypeWireGuard {
 			return []string{"sing-box.local_address", "sing-box.peer_public_key", "sing-box.allowed_ips"}
 		}
 	}
@@ -229,7 +226,10 @@ func mihomoSupportedFieldNames(nodeType domain.NodeType) []string {
 	case domain.NodeTypeHysteria:
 		return fields(commonNodeFields(), "tls", "hysteria.protocol", "hysteria.server_ports", "hysteria.hop_interval", "hysteria.up", "hysteria.down", "hysteria.up_mbps", "hysteria.down_mbps", "hysteria.auth", "hysteria.auth_str", "hysteria.obfs", "hysteria.obfs_password", "dialer.tfo")
 	case domain.NodeTypeHysteria2:
-		return fields(commonNodeFields(), "password", "tls", "hysteria.server_ports", "hysteria.hop_interval", "hysteria.up", "hysteria.down", "hysteria.obfs", "hysteria.obfs_password", "hysteria.realm", "hysteria.bbr_profile", "hysteria.cwnd", "hysteria.udp_mtu", "dialer.tfo")
+		return fields(commonNodeFields(), "password", "tls", "hysteria.server_ports", "hysteria.hop_interval", "hysteria.hop_interval_max",
+			"hysteria.up", "hysteria.down", "hysteria.up_mbps", "hysteria.down_mbps", "hysteria.obfs", "hysteria.obfs_password",
+			"hysteria.gecko_min_packet_size", "hysteria.gecko_max_packet_size", "hysteria.realm", "hysteria.bbr_profile",
+			"hysteria.cwnd", "hysteria.udp_mtu", "hysteria.handshake_timeout", "hysteria.tls_identity", "hysteria.quic", "dialer.tfo")
 	case domain.NodeTypeTUIC:
 		return fields(commonNodeFields(), "uuid", "password", "token", "tls", "tuic.congestion_control", "tuic.udp_relay_mode", "tuic.reduce_rtt", "tuic.udp_over_stream", "tuic.udp_over_stream_version", "dialer.tfo")
 	case domain.NodeTypeMieru:
@@ -258,7 +258,10 @@ func singBoxSupportedFieldNames(nodeType domain.NodeType) []string {
 	case domain.NodeTypeHysteria:
 		return fields(commonNodeFields(), "tls", "hysteria.server_ports", "hysteria.hop_interval", "hysteria.up", "hysteria.down", "hysteria.up_mbps", "hysteria.down_mbps", "hysteria.auth", "hysteria.auth_str", "hysteria.obfs", "hysteria.obfs_password", "network", "dialer.tfo")
 	case domain.NodeTypeHysteria2:
-		return fields(commonNodeFields(), "password", "tls", "hysteria.server_ports", "hysteria.hop_interval", "hysteria.up_mbps", "hysteria.down_mbps", "hysteria.obfs", "hysteria.obfs_password", "network", "dialer.tfo")
+		return fields(commonNodeFields(), "password", "tls", "hysteria.server_ports", "hysteria.hop_interval", "hysteria.hop_interval_max",
+			"hysteria.up_mbps", "hysteria.down_mbps", "hysteria.obfs", "hysteria.obfs_password", "hysteria.gecko_min_packet_size",
+			"hysteria.gecko_max_packet_size", "hysteria.bbr_profile", "hysteria.brutal_debug", "hysteria.disable_chrome_parrot",
+			"hysteria.realm", "hysteria.tls_identity", "hysteria.quic", "network", "dialer.tfo")
 	case domain.NodeTypeTUIC:
 		return fields(commonNodeFields(), "uuid", "password", "tls", "tuic.congestion_control", "tuic.udp_relay_mode", "tuic.zero_rtt_handshake", "tuic.heartbeat", "tuic.udp_over_stream", "network", "dialer.tfo")
 	case domain.NodeTypeSOCKS:
@@ -320,7 +323,9 @@ func mihomoLossyFieldNames(nodeType domain.NodeType) []string {
 	case domain.NodeTypeHysteria:
 		return fields(common, "dialer.udp_relay", "hysteria.quic", "transport.type")
 	case domain.NodeTypeHysteria2:
-		return fields(common, "dialer.udp_relay", "hysteria.up_mbps", "hysteria.down_mbps", "hysteria.quic", "transport.type")
+		return fields(common, "dialer.udp_relay", "hysteria.brutal_debug", "hysteria.disable_chrome_parrot",
+			"hysteria.realm.ip_version", "hysteria.realm.port_mapping", "hysteria.tls_identity.certificate_public_key_sha256",
+			"hysteria.quic", "transport.type")
 	case domain.NodeTypeTUIC:
 		return fields(common, "dialer.udp_relay", "tuic.zero_rtt_handshake", "tuic.heartbeat", "transport.type")
 	case domain.NodeTypeSOCKS:
@@ -347,7 +352,8 @@ func singBoxLossyFieldNames(nodeType domain.NodeType) []string {
 	case domain.NodeTypeHysteria:
 		return fields(tlsFingerprint, "tls.client_fingerprint", "hysteria.protocol", "hysteria.quic")
 	case domain.NodeTypeHysteria2:
-		return fields(tlsFingerprint, "tls.client_fingerprint", "hysteria.up", "hysteria.down", "hysteria.bbr_profile", "hysteria.realm", "hysteria.cwnd", "hysteria.udp_mtu", "hysteria.quic")
+		return fields(tlsFingerprint, "tls.client_fingerprint", "hysteria.up", "hysteria.down", "hysteria.cwnd", "hysteria.udp_mtu",
+			"hysteria.handshake_timeout", "hysteria.tls_identity.mihomo_fingerprint", "hysteria.quic")
 	case domain.NodeTypeTUIC:
 		return fields(tlsFingerprint, "tls.client_fingerprint", "token", "tuic.reduce_rtt", "tuic.udp_over_stream_version")
 	case domain.NodeTypeSOCKS:
@@ -380,7 +386,10 @@ func uriLossyFieldNames(nodeType domain.NodeType) []string {
 		)
 	case domain.NodeTypeHysteria2:
 		return fieldGroups(common,
-			[]string{"hysteria.hop_interval", "hysteria.up", "hysteria.down", "hysteria.up_mbps", "hysteria.down_mbps", "hysteria.auth", "hysteria.auth_str", "hysteria.realm", "hysteria.bbr_profile", "hysteria.cwnd", "hysteria.udp_mtu", "hysteria.quic"},
+			[]string{"hysteria.hop_interval", "hysteria.hop_interval_max", "hysteria.up", "hysteria.down", "hysteria.up_mbps", "hysteria.down_mbps",
+				"hysteria.auth", "hysteria.auth_str", "hysteria.realm", "hysteria.bbr_profile", "hysteria.cwnd", "hysteria.udp_mtu",
+				"hysteria.handshake_timeout", "hysteria.brutal_debug", "hysteria.disable_chrome_parrot", "hysteria.gecko_min_packet_size",
+				"hysteria.gecko_max_packet_size", "hysteria.tls_identity", "hysteria.quic"},
 			uriTLSLossFields("hysteria2"),
 			uriTransportLossFields(false),
 		)
@@ -452,7 +461,9 @@ func legacyProtocolFieldNames(nodeType domain.NodeType) []string {
 	case domain.NodeTypeHysteria:
 		names = append(names, "protocol", "auth", "auth_str", "obfs", "up", "down", "server_ports", "tls", "quic", "hop_interval")
 	case domain.NodeTypeHysteria2:
-		names = append(names, "password", "obfs", "up_mbps", "down_mbps", "server_ports", "tls", "quic", "realm", "bbr_profile")
+		names = append(names, "password", "obfs", "obfs_password", "gecko_min_packet_size", "gecko_max_packet_size",
+			"up", "down", "up_mbps", "down_mbps", "server_ports", "hop_interval", "hop_interval_max", "tls", "tls_identity",
+			"quic", "realm", "bbr_profile", "cwnd", "udp_mtu", "handshake_timeout", "brutal_debug", "disable_chrome_parrot")
 	case domain.NodeTypeTUIC:
 		names = append(names, "uuid", "password", "token", "congestion_control", "udp_relay_mode", "zero_rtt", "tls", "quic")
 	case domain.NodeTypeMieru:

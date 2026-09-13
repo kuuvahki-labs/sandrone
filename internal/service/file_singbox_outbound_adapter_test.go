@@ -61,6 +61,57 @@ func TestServiceSingBoxOutboundAdapterRefreshesMembersWithoutChangingSpec(t *tes
 	}
 }
 
+func TestServiceSingBoxOutboundAdapterRemovesEmptyRegionGroupsPerRender(t *testing.T) {
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	spec := &domain.FileSpec{
+		Name: "dynamic-regions.json", Kind: domain.FileKindSingBox,
+		Config: &domain.FileConfig{
+			Subscriptions: []string{"regex-nodes"},
+			Settings: completeTypedSettings(t, map[string]any{"groups": []map[string]any{
+				{"type": "selector", "tag": "Proxy", "outbounds": []string{"Taiwan", "Japan", "$nodes", "direct"}, "default": "Taiwan"},
+				{"type": "urltest", "tag": "Taiwan", "outbounds": []string{"$nodes"}, "filter": "^TW-", "url": "https://example.com/check", "interval": "5m"},
+				{"type": "urltest", "tag": "Japan", "outbounds": []string{"$nodes"}, "filter": "^JP-", "url": "https://example.com/check", "interval": "5m"},
+			}}),
+		},
+		Processors: []domain.ProcessorSpec{singBoxOutboundAdapterScriptProcessor(t, "sing-box 出站配置适配", communityPresetRawScript(t, "sing-box-outbound-adapter.js"))},
+	}
+	saved, err := json.Marshal(spec)
+	require.NoError(t, err)
+
+	for _, test := range []struct {
+		name          string
+		node          string
+		keptRegion    string
+		removedRegion string
+		members       []any
+		defaultValue  any
+	}{
+		{name: "japan only", node: "JP-1", keptRegion: "Japan", removedRegion: "Taiwan", members: []any{"Japan", "JP-1", "direct"}},
+		{name: "taiwan only", node: "TW-1", keptRegion: "Taiwan", removedRegion: "Japan", members: []any{"Taiwan", "TW-1", "direct"}, defaultValue: "Taiwan"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			putSingBoxOutboundAdapterNodes(t, svc, []domain.NodeIR{singBoxOutboundAdapterNode(test.node)})
+			result, err := svc.GetFile(t.Context(), domain.FileRequest{Spec: spec})
+			require.NoError(t, err)
+			doc := decodeSingBoxCommunityPresetResult(t, result.Content)
+			outbounds := requireAnySlice(t, doc["outbounds"])
+			proxy := requireStringMapWithField(t, outbounds, "tag", "Proxy")
+			require.Equal(t, test.members, proxy["outbounds"])
+			if test.defaultValue == nil {
+				require.NotContains(t, proxy, "default")
+			} else {
+				require.Equal(t, test.defaultValue, proxy["default"])
+			}
+			requireStringMapWithField(t, outbounds, "tag", test.keptRegion)
+			require.NotContains(t, singBoxOutboundAdapterTags(outbounds), test.removedRegion)
+			assertSingBoxOutboundAdapterCoreAccepts(t, result.Content)
+			after, err := json.Marshal(spec)
+			require.NoError(t, err)
+			require.JSONEq(t, string(saved), string(after))
+		})
+	}
+}
+
 func TestServiceSingBoxOutboundAdapterUsesRenderedOutboundsAndEndpoints(t *testing.T) {
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
 	putSingBoxOutboundAdapterNodes(t, svc, []domain.NodeIR{
@@ -153,9 +204,6 @@ func TestServiceSingBoxOutboundAdapterRejectsInvalidGroupsWithoutPartialResult(t
 	}{
 		{"invalid include", map[string]any{"filter": "["}},
 		{"invalid exclude", map[string]any{"filter": ".*", "exclude-filter": "["}},
-		{"empty match", map[string]any{"filter": "^US"}},
-		{"case sensitive by default", map[string]any{"filter": "^hk"}},
-		{"exclude all", map[string]any{"filter": ".*", "exclude-filter": ".*"}},
 		{"invalid default", map[string]any{"filter": "^HK", "default": "JP-node"}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -168,6 +216,18 @@ func TestServiceSingBoxOutboundAdapterRejectsInvalidGroupsWithoutPartialResult(t
 			require.True(t, domain.IsCode(err, domain.CodeScriptRuntime), "got %v", err)
 		})
 	}
+}
+
+func singBoxOutboundAdapterTags(values []any) []string {
+	tags := make([]string, 0, len(values))
+	for _, value := range values {
+		if item, ok := value.(map[string]any); ok {
+			if tag, ok := item["tag"].(string); ok {
+				tags = append(tags, tag)
+			}
+		}
+	}
+	return tags
 }
 
 func singBoxOutboundAdapterSpec(t *testing.T, group map[string]any) *domain.FileSpec {

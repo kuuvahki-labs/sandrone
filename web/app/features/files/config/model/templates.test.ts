@@ -115,6 +115,8 @@ describe("config templates", () => {
       group.type === (kind === "mihomo" ? "url-test" : "urltest"));
 
     expect(autoGroup?.url).toBe("https://cp.cloudflare.com");
+    expect(autoGroup?.tolerance).toBe(50);
+    if (kind === "sing-box") expect(autoGroup).not.toHaveProperty("idle_timeout");
   });
 
   it.each(["standard", "full"] satisfies ConfigTemplateID[])("adds Mihomo fallback routing to the %s template", (templateID) => {

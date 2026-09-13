@@ -91,7 +91,6 @@ describe("ConfigAdaptiveGroupControls", () => {
           { code: "group_name_conflict", groupName: "香港节点" },
           { code: "node_name_conflict", groupName: "日本节点" },
           { code: "referenced_stale_group", groupName: "美国节点" },
-          { code: "empty_regions_skipped", groupNames: ["台湾", "新加坡"] },
         ]}
         onGenerate={vi.fn()}
       />,
@@ -101,7 +100,6 @@ describe("ConfigAdaptiveGroupControls", () => {
     expect(screen.getByText(/同名自定义组.*香港节点/)).toBeInTheDocument();
     expect(screen.getByText(/节点名.*日本节点.*冲突/)).toBeInTheDocument();
     expect(screen.getByText(/美国节点.*仍被其他配置引用/)).toBeInTheDocument();
-    expect(screen.getByText(/没有匹配节点.*台湾, 新加坡/)).toBeInTheDocument();
   });
 
   it("stops transient input changes from reaching the parent dirty handler", async () => {

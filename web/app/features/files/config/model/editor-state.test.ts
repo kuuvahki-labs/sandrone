@@ -517,6 +517,22 @@ describe("config editor adaptive and catalog transitions", () => {
 });
 
 describe("config editor derived validity", () => {
+  it("explains that a subscription is required when creating sing-box files", () => {
+    const adapter = structuredAdapter("sing-box");
+    const state = initializeConfigEditorState(adapter, {
+      formMode: "create",
+    });
+
+    expect(validity(adapter, state)).toMatchObject({
+      previewValidation: {
+        issueKey: "files.config.subscriptionRequired",
+        valid: false,
+      },
+      structureValid: true,
+      valid: false,
+    });
+  });
+
   it("uses raw object parsing instead of structured issues while raw settings are active", () => {
     const adapter = structuredAdapter("mihomo");
     const initial = initializeConfigEditorState(adapter, {

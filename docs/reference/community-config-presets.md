@@ -15,6 +15,12 @@
   Fake-IP 规则源是例外：它们通过内容首行的 Sandrone marker 保留预设身份；用户再次
   选择同一来源时会显式刷新为当前版本，选择另一来源时会替换旧来源。删除 marker
   后，该副本恢复为普通用户 processor，不再被自动刷新或冲突移除。
+- sing-box 的 TUN、Tailscale、Tailnet 分享与 Fake-IP 脚本用当前 source、
+  `preset_id` 和合法业务参数识别，同时允许 `timeout_ms` 等通用执行参数留在
+  processor params。升级前的 Tailscale native/external 精确 source 快照仍可识别；
+  只有用户再次选择同一预设时才刷新脚本和参数，普通打开或保存不迁移。
+- sing-box 出站适配器同样精确识别上一版“空组即失败”source；再次选择预设会启用
+  当前脚本，并保留已保存的名称、`default_outbound`、超时和其它 processor 参数。
 - 依赖补齐和冲突移除在一次明确的添加操作中完成，并保留所有非冲突 processor 的
   相对顺序。界面只列出新增依赖和被移除的冲突项。
 - 有序规则预设按自己的插入模式放置规则，并保留最终策略。选择通用规则前插入的
@@ -30,7 +36,7 @@
 | 客户端 | 只对新对象生效的默认 | 风险/边界 | 来源 |
 | --- | --- | --- | --- |
 | Mihomo | `allow-lan: true`；`lan-allowed-ips` 只含 RFC1918 IPv4 与 `fc00::/7`；Geo 数据自动更新且间隔 24 小时；显式设置 `disable-keep-alive: true`；不输出 TUN；新建 `url-test` 分组写入 `tolerance: 50`。 | LAN 监听仍需配合端口和访问控制；只有显式添加 TUN 预设才生成并开启 TUN；不会给已有分组补写 tolerance。 | [Mihomo 全局配置](https://wiki.metacubex.one/en/config/general/)、[Mihomo TUN](https://wiki.metacubex.one/en/config/inbound/tun/) |
-| sing-box | 新建 selector/urltest 分组可表达 `interrupt_exist_connections`；默认关闭且 false 在序列化时省略，已有值原样保留。 | urltest 开启后，自动切换出站会中断现有连接。 | [sing-box Selector](https://sing-box.sagernet.org/configuration/outbound/selector/)、[sing-box URLTest](https://sing-box.sagernet.org/configuration/outbound/urltest/) |
+| sing-box | base 只保留 localhost mixed inbound，不默认输出 TUN；DNS 使用 1.14 FakeIP server，普通 A/AAAA 返回 FakeIP，内置连接检测、本地、校时/NTP/STUN、iCloud 与 Xiaomi 兼容域名走真实 DNS；新建 `urltest` 写入 `tolerance: 50`，`idle_timeout` 省略并使用核心默认 30m；selector/urltest 可表达 `interrupt_exist_connections`。 | FakeIP 配置只有在流量进入 sing-box DNS 后才生效；只有显式添加 TUN 并把系统流量接入后才承担系统级劫持。默认值不回填已有文件或分组。 | [sing-box FakeIP](https://sing-box.sagernet.org/configuration/dns/server/fakeip/)、[sing-box TUN](https://sing-box.sagernet.org/configuration/inbound/tun/)、[sing-box URLTest](https://sing-box.sagernet.org/configuration/outbound/urltest/) |
 | Shadowrocket | `close-if-proxy-chain-missing=true`、`dns-direct-fallback-proxy=false`、`udp-policy-not-supported-behaviour=REJECT`、`block-quic=all-proxy`、`ipv6=true`、`prefer-ipv6=false`。 | 可编辑 source 或通过后置处理器调整。 | [Shadowrocket 社区配置](https://github.com/LOWERTOP/Shadowrocket/blob/5f1916b5897fc59fb7172aca59ae52050a3532fe/lazy.conf) |
 
 ## 通用与 Mihomo 预设
@@ -77,21 +83,28 @@ file-stage processor。
 
 组定义保存 `filter`、可选 `exclude-filter` 和 `outbounds: ["$nodes"]`。
 driver 先展开成功渲染的订阅节点名（包括 endpoint），JS 再筛选组成员、保序去重，
-并删除两个扩展字段；不删除节点定义。JS 只处理执行到该步时的 selector/urltest
-成员名单，因此调整处理器顺序会改变它看到的输入。重复执行已展开结果保持不变。
+并删除两个扩展字段；不删除节点定义。当次没有成员的正则组会从产物删除，其 tag
+也会从其它 selector/urltest 成员中移除；不会插入 `direct` 冒充地区节点。若这会让
+父组为空，或 route/outbound detour 仍直接引用被删除 tag，则生成失败，避免发布悬空
+配置。JS 只处理执行到该步时的成员名单，因此调整处理器顺序会改变它看到的输入。
+重复执行已展开结果保持不变。
 这两个正则字段属于此脚本的输入，不是 sing-box 原生字段；API/CLI 调用也必须
 显式携带[脚本](../../web/app/features/files/processors/scripts/sing-box-outbound-adapter.js)
 或等价处理器，后端不会自动添加。仅需固定默认出口时，也可以在显式 base 中配置。
 
 表达式采用 JavaScript 正则语法，默认区分大小写，支持开头的 `(?i)` 标记。
 例如 `(?i)HK|香港` 可匹配香港节点，排除正则 `Home` 仅排除大小写一致的名称。
-正则为空、语法错误、筛选后无成员，或显式 `default` 不在筛选结果中时，生成失败
-并指出组名；不会自动回退到全部节点或直连。失败不会发布部分配置。
+正则为空、语法错误，或非动态引用使清理后的配置不完整时，生成失败并指出组名；
+不会自动回退到全部节点或直连。正则组自己的显式 `default` 若随空组引用一起消失，
+只在当次产物省略，保存的 FileSpec 不变。其它不属于动态删除的无效 `default` 仍失败。
+失败不会发布部分配置。
 
-新生成的自适应地区组使用相同正则与处理器，已有固定成员组保持原样。
-每次 Sandrone 生成文件都会重新筛选当次订阅结果，订阅快照缓存仍遵守原有策略；
+新生成的自适应地区组会保存所有明确选择的正则定义，不因当前预览匹配数为零而跳过
+或显示警告；已有固定成员组保持原样。每次 Sandrone 生成文件都会重新筛选当次订阅
+结果，所以暂时消失的地区组在节点再次出现时会恢复。订阅快照缓存仍遵守原有策略；
 客户端已经下载的文件不会自行重新匹配。Mihomo、Shadowrocket 继续使用各自原生
-正则字段，统一编辑入口不代表三种正则引擎支持所有相同语法。
+正则字段，统一编辑入口不代表三种正则引擎支持所有相同语法。保存了旧版“空组即失败”
+脚本的文件不会被动改写；重新选择内置出站适配预设会刷新为当前脚本。
 
 ### 其他预设
 
@@ -99,8 +112,18 @@ driver 先展开成功渲染的订阅节点名（包括 endpoint），JS 再筛�
 | --- | --- | --- | --- | --- | --- | --- |
 | Sniff & DNS Hijack | 在路由前识别协议并接管 DNS。 | 开 | 通过 JSON override 前插 `{action:"sniff"}`，再前插匹配 DNS 协议或端口 53 的 `hijack-dns` logical rule。 | 检查连接元数据并改变 resolver 路径。 | QUIC 预设依赖它。 | [sing-box Sniff](https://sing-box.sagernet.org/configuration/route/rule_action/#sniff)、[DNS Hijack](https://sing-box.sagernet.org/configuration/route/rule_action/#hijack-dns) |
 | QUIC 强制回退 | 迫使兼容流量回退至 TCP。 | 关 | 依赖 sniff，在通用规则前插入 `{protocol:"quic",action:"reject"}`。 | 失去 HTTP/3 优势，必须使用 QUIC 的应用可能失败。 | 依赖 Sniff & DNS Hijack。 | [RFC 9000](https://www.rfc-editor.org/rfc/rfc9000)、[sing-box Protocol](https://sing-box.sagernet.org/configuration/route/rule/#protocol) |
-| Tailscale 原生接管 | 由 sing-box 自身建立 Tailnet endpoint。 | 关 | 创建 Tailscale endpoint 与 MagicDNS server，移除标准共存 exclusions，并在通用规则前加入 endpoint 路由；保留 DNS/路由最终策略。完整内容见[脚本](../../web/app/features/files/processors/scripts/sing-box-tailscale-native.js)。 | 未填写 Auth Key 时由目标核心在日志打印交互式登录 URL；端点启动时首次访问可能超时。 | 需要当前配置已有唯一 TUN；与外部共存。 | [sing-box Tailscale endpoint](https://sing-box.sagernet.org/configuration/endpoint/tailscale/)、[Tailscale DNS server](https://sing-box.sagernet.org/configuration/dns/server/tailscale/)、[preferred_by](https://sing-box.sagernet.org/configuration/route/rule/#preferred_by) |
-| Tailscale 共存 | 让系统 Tailscale 与 sing-box TUN 共存。 | 关 | 标准 Tailnet 地址绕开 TUN，`ts.net` 使用 MagicDNS；FakeIP 下让 `tailscale.com` 走原默认真实 DNS（条件见下文）。不创建 endpoint，不改最终策略；完整内容见[脚本](../../web/app/features/files/processors/scripts/sing-box-tailscale-external.js)。 | 系统 Tailscale 必须已运行并正确配置；FakeIP 配置的默认 DNS 不符合复用条件时处理器报错。 | 需要当前配置已有唯一 TUN；与原生接管。 | [Tailscale MagicDNS](https://tailscale.com/docs/features/magicdns)、[Tailscale DNS](https://tailscale.com/docs/reference/dns-in-tailscale) |
+| TUN | 接管 sing-box 系统路由和 DNS。 | 关 | 添加固定 tag `tun-in` 的双栈 TUN，开启 `auto_route`、`strict_route` 并保留 private、link-local、ULA 与 mDNS exclusions；唯一、合法的既有 `tun-in` 原样保留。 | 平台路由或 DNS 不匹配会中断连接；旧 base 自带 TUN 的文件不会自动迁移。 | Tailscale 与 Tailnet 分享预设可依赖它。 | [sing-box TUN](https://sing-box.sagernet.org/configuration/inbound/tun/) |
+| Fake-IP 兼容扩展（稳定） | 让额外的兼容域名返回真实 IP。 | 关 | 从 `domain`、`domain_suffix`、`domain_regex` 参数建立一个受管的纯域名 inline rule-set，并把真实 resolver 规则插在所有 FakeIP 规则之前；可显式指定 resolver。 | 例外只改变 DNS 答案，不自动改变路由策略；列表或 resolver 非法时生成失败。 | 需要现有 FakeIP server；与 base 内置例外叠加。 | [sing-box DNS rule](https://sing-box.sagernet.org/configuration/dns/rule/)、[sing-box FakeIP](https://sing-box.sagernet.org/configuration/dns/server/fakeip/) |
+| Tailscale 原生接管 | 由 sing-box 自身建立 Tailnet endpoint。 | 关 | 创建 Tailscale endpoint 与 MagicDNS server，移除标准共存 exclusions，并在通用规则前加入 endpoint 路由；保留 DNS/路由最终策略。完整内容见[脚本](../../web/app/features/files/processors/scripts/sing-box-tailscale-native.js)。 | 未填写 Auth Key 时由目标核心在日志打印交互式登录 URL；端点启动时首次访问可能超时。 | 依赖 TUN，添加时自动补齐；与外部共存互斥。 | [sing-box Tailscale endpoint](https://sing-box.sagernet.org/configuration/endpoint/tailscale/)、[Tailscale DNS server](https://sing-box.sagernet.org/configuration/dns/server/tailscale/)、[preferred_by](https://sing-box.sagernet.org/configuration/route/rule/#preferred_by) |
+| Tailscale 共存 | 让系统 Tailscale 与 sing-box TUN 共存。 | 关 | 标准 Tailnet 地址绕开 TUN，`ts.net` 使用 MagicDNS；FakeIP 下让 `tailscale.com` 走原默认真实 DNS（条件见下文）。不创建 endpoint，不改最终策略；完整内容见[脚本](../../web/app/features/files/processors/scripts/sing-box-tailscale-external.js)。 | 系统 Tailscale 必须已运行并正确配置；FakeIP 配置的默认 DNS 不符合复用条件时处理器报错。 | 依赖 TUN，添加时自动补齐；与原生接管互斥。 | [Tailscale MagicDNS](https://tailscale.com/docs/features/magicdns)、[Tailscale DNS](https://tailscale.com/docs/reference/dns-in-tailscale) |
+| Tailnet 代理共享 | 让 Tailnet 设备连接 sing-box mixed listener。 | 关 | 为用户填写的精确 Tailnet IPv4/IPv6 地址分别生成 `tailnet-share-v4`/`tailnet-share-v6` inbound；默认端口 2080，可选成对用户名和密码。 | 地址默认为空，首次生成前必须填写；只接受各一个 `100.64.0.0/10` IPv4 和 `fd7a:115c:a1e0::/48` IPv6，并检查 wildcard 与既有监听冲突。 | 依赖 TUN 与 Tailscale 外部共存。 | [sing-box Mixed](https://sing-box.sagernet.org/configuration/inbound/mixed/)、[Tailscale CGNAT](https://tailscale.com/kb/1015/100.x-addresses) |
+
+Fake-IP 扩展的保存参数是 `preset_id:"fakeip-compat"`、三个字符串数组
+`domain`/`domain_suffix`/`domain_regex` 和可选 `server` tag；三个数组合计至少一项。
+Tailnet 分享的保存参数是 `preset_id:"tailnet-share"`、`listen_addresses:[]`、
+`listen_port:2080`、`username:""`、`password:""`。新增后的空地址是待配置状态，
+执行会明确失败，不会退化成 wildcard listener。脚本拥有的业务参数都不接受请求级
+args 临时覆盖。
 
 ## Shadowrocket 预设
 
@@ -125,14 +148,14 @@ Mihomo 与 sing-box 原生预设都在 processor `args` 中提供可编辑 `auth
 为 false。标准 `100.64.0.0/10` 与 `fd7a:115c:a1e0::/48` 不代表用户发布的
 subnet routes；额外子网、Exit Node 或其他高级选项可按目标客户端语义编辑副本。
 
-sing-box 的固定目标 v1.13.14 在 route rule 使用 `preferred_by` 匹配 endpoint
-提供的 MagicDNS 域名和 allowed IP；该版本的 MagicDNS-only DNS rule 使用 legacy
-`ip_accept_any`，不是 v1.14 才支持的 DNS-rule `preferred_by`，并明确关闭
+sing-box 的固定目标 v1.14.0 在 route 与 DNS rule 都使用 `preferred_by` 匹配
+endpoint 提供的 MagicDNS 域名和 allowed IP。MagicDNS server 明确关闭
 `accept_default_resolvers`，因此普通查询不会把 Tailscale resolver 当作全局
-fallback。
+fallback。原生与共存脚本都把 `ts.net`、`tailscale.com` 的规则放在任何指向
+FakeIP server 的规则之前。
 
-sing-box 共存预设识别 `type:"fakeip"` 和 legacy `address:"fakeip"` server；
-仅在存在 FakeIP server 时添加 `domain_suffix:["tailscale.com"]` 真实 DNS 规则。
+sing-box 共存预设按 v1.14 识别带 tag 的 `type:"fakeip"` server；仅在存在
+FakeIP server 时添加 `domain_suffix:["tailscale.com"]` 真实 DNS 规则。
 该规则复用原 `dns.final` 指向的 server；未指定 `dns.final` 时按核心语义取原首个
 server。所选 server 必须有非空 tag 且为通用真实 DNS；默认引用无效、指向 FakeIP、
 MagicDNS 或其他非通用 resolver 时明确报错，不另选上游。两条域名规则均优先于原有

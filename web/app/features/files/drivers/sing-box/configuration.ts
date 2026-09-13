@@ -8,6 +8,7 @@ import {
   type ConfigNamingLocale,
   configRegionName,
 } from "~/features/files/config/model/naming";
+import type { ConfigValidationIssue } from "~/features/files/config/model/relations";
 import {
   catalogResult,
   draftID,
@@ -41,6 +42,7 @@ const GROUP_TYPE_OPTIONS = [
   { value: "url-test", label: "urltest" },
 ] as const;
 const INTERRUPT_EXPLICIT_SENTINEL = "__sandroneInterruptExistingConnectionsExplicit";
+const DEFAULT_URLTEST_IDLE_TIMEOUT_SECONDS = 30 * 60;
 
 const groups = singBoxGroups();
 const ruleSets = singBoxRuleSets();
@@ -64,8 +66,9 @@ export const singBoxConfigurationAdapter = createStructuredConfigurationAdapter(
       requireHealthCheckInterval: true,
       requireHealthCheckURL: true,
       supportsExcludeFilter: true,
+      validate: validateSingBoxGroup,
       validateFilter: groups.validateFilter,
-      validInterval: validDuration,
+      validInterval: validPositiveDuration,
     },
     ruleSets: { validInterval: validDuration },
     rules: {
@@ -100,11 +103,16 @@ function singBoxGroups(): StructuredFileConfigurationAdapter["groups"] {
     excludeFilter: stringField(value["exclude-filter"]),
     healthCheckURL: stringField(value.url),
     healthCheckInterval: scalarString(value.interval),
+    healthCheckIdleTimeout: stringField(value.idle_timeout) || undefined,
+    healthCheckTolerance: typeof value.tolerance === "number" ? value.tolerance : undefined,
     interruptExistingConnections: typeof value.interrupt_exist_connections === "boolean"
       ? value.interrupt_exist_connections
       : undefined,
     adapterState: {
-      ...omitKeys(value, ["type", "tag", "outbounds", "filter", "exclude-filter", "url", "interval", "interrupt_exist_connections"]),
+      ...omitKeys(value, [
+        "type", "tag", "outbounds", "filter", "exclude-filter", "url", "interval",
+        "tolerance", "idle_timeout", "interrupt_exist_connections",
+      ]),
       ...(Object.hasOwn(value, "interrupt_exist_connections")
         ? { [INTERRUPT_EXPLICIT_SENTINEL]: true }
         : {}),
@@ -125,6 +133,8 @@ function singBoxGroups(): StructuredFileConfigurationAdapter["groups"] {
     if (draft.type === "url-test") {
       value.url = draft.healthCheckURL;
       value.interval = draft.healthCheckInterval;
+      if (draft.healthCheckTolerance !== undefined) value.tolerance = draft.healthCheckTolerance;
+      if (draft.healthCheckIdleTimeout) value.idle_timeout = draft.healthCheckIdleTimeout;
     }
     if (draft.interruptExistingConnections === true || interruptWasExplicit(draft.adapterState)) {
       value.interrupt_exist_connections = Boolean(draft.interruptExistingConnections);
@@ -158,7 +168,16 @@ function singBoxGroups(): StructuredFileConfigurationAdapter["groups"] {
     transitionType: (group, type) => {
       const adapterState = { ...stateRecord(group.adapterState) };
       if (type === "select") {
-        return { ...group, adapterState, type, healthCheckURL: "", healthCheckInterval: "" };
+        return {
+          ...group,
+          adapterState,
+          type,
+          healthCheckURL: "",
+          healthCheckInterval: "",
+          healthCheckIdleTimeout: undefined,
+          healthCheckTimeout: undefined,
+          healthCheckTolerance: undefined,
+        };
       }
       delete adapterState.default;
       return {
@@ -167,6 +186,8 @@ function singBoxGroups(): StructuredFileConfigurationAdapter["groups"] {
         type,
         healthCheckURL: group.healthCheckURL || DEFAULT_PROBE_URL,
         healthCheckInterval: group.healthCheckInterval || "5m",
+        healthCheckIdleTimeout: group.healthCheckIdleTimeout,
+        healthCheckTolerance: group.healthCheckTolerance ?? 50,
       };
     },
     typeOptions: GROUP_TYPE_OPTIONS,
@@ -355,12 +376,12 @@ function defaultGroups(preset: string, locale: ConfigNamingLocale): ConfigMap[] 
       { type: "selector", tag: anchor, outbounds: [auto, ...(["hk", "tw", "jp", "sg", "us"] as const).map((id) => configRegionName(id, locale)), other, "$nodes", "direct"], default: auto },
       ...(["hk", "tw", "jp", "sg", "us"] as const).map((id) => ({ type: "selector", tag: configRegionName(id, locale), outbounds: ["$nodes"] })),
       { type: "selector", tag: other, outbounds: ["$nodes"] },
-      { type: "urltest", tag: auto, outbounds: ["$nodes"], url: DEFAULT_PROBE_URL, interval: "5m" },
+      { type: "urltest", tag: auto, outbounds: ["$nodes"], url: DEFAULT_PROBE_URL, interval: "5m", tolerance: 50 },
     ];
   }
   return [
     { type: "selector", tag: anchor, outbounds: [auto, fallback, "$nodes", "direct"], default: auto },
-    { type: "urltest", tag: auto, outbounds: ["$nodes"], url: DEFAULT_PROBE_URL, interval: "5m" },
+    { type: "urltest", tag: auto, outbounds: ["$nodes"], url: DEFAULT_PROBE_URL, interval: "5m", tolerance: 50 },
     { type: "selector", tag: fallback, outbounds: ["$nodes"] },
   ];
 }
@@ -370,10 +391,7 @@ function defaultRuleSets(): ConfigMap[] {
     {
       type: "inline",
       tag: "private",
-      rules: [
-        { domain_suffix: ["local"] },
-        { ip_cidr: ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"] },
-      ],
+      rules: [{ domain_suffix: ["local"] }],
     },
     { type: "inline", tag: "reject", rules: [{ domain_suffix: ["invalid"] }] },
   ];
@@ -420,7 +438,89 @@ function remoteFormat(url: string): string {
 }
 
 function validDuration(value: string): boolean {
-  return /^[+-]?(?:0|(?:(?:\d+(?:\.\d*)?|\.\d+)(?:ns|us|µs|μs|ms|s|m|h|d))+)$/.test(value.trim());
+  return singBoxDurationSeconds(value) !== null;
+}
+
+function validPositiveDuration(value: string): boolean {
+  const seconds = singBoxDurationSeconds(value);
+  return seconds !== null && seconds > 0;
+}
+
+function singBoxDurationSeconds(value: string): number | null {
+  const source = value.trim();
+  if (!source) return null;
+  if (source === "0" || source === "+0" || source === "-0") return 0;
+  const sign = source.startsWith("-") ? -1 : 1;
+  const unsigned = source.startsWith("+") || source.startsWith("-") ? source.slice(1) : source;
+  if (!unsigned) return null;
+  const unitSeconds: Readonly<Record<string, number>> = {
+    ns: 1e-9,
+    us: 1e-6,
+    "µs": 1e-6,
+    "μs": 1e-6,
+    ms: 1e-3,
+    s: 1,
+    m: 60,
+    h: 60 * 60,
+    d: 24 * 60 * 60,
+  };
+  const partPattern = /(\d+(?:\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h|d)/gy;
+  let offset = 0;
+  let total = 0;
+  while (offset < unsigned.length) {
+    partPattern.lastIndex = offset;
+    const match = partPattern.exec(unsigned);
+    if (!match || match.index !== offset) return null;
+    total += Number(match[1]) * unitSeconds[match[2]];
+    offset = partPattern.lastIndex;
+  }
+  return Number.isFinite(total) ? sign * total : null;
+}
+
+function validateSingBoxGroup(group: GroupDraft, index: number): ConfigValidationIssue[] {
+  if (group.type !== "url-test") return [];
+  const itemId = "group-" + index;
+  const issues: ConfigValidationIssue[] = [];
+  if (group.healthCheckTolerance !== undefined && (
+    !Number.isInteger(group.healthCheckTolerance)
+    || group.healthCheckTolerance < 0
+    || group.healthCheckTolerance > 65535
+  )) {
+    issues.push({
+      severity: "error",
+      code: "singbox_group_tolerance_invalid",
+      section: "groups",
+      itemId,
+      message: "URLTest tolerance must be an integer from 0 to 65535.",
+      messageKey: "files.config.issueGroupToleranceInvalid",
+    });
+  }
+  const idleTimeout = group.healthCheckIdleTimeout
+    ? singBoxDurationSeconds(group.healthCheckIdleTimeout)
+    : DEFAULT_URLTEST_IDLE_TIMEOUT_SECONDS;
+  if (group.healthCheckIdleTimeout && (idleTimeout === null || idleTimeout <= 0)) {
+    issues.push({
+      severity: "error",
+      code: "singbox_group_idle_timeout_invalid",
+      section: "groups",
+      itemId,
+      message: "URLTest idle timeout must be a positive sing-box duration.",
+      messageKey: "files.config.issueGroupIdleTimeoutInvalid",
+    });
+    return issues;
+  }
+  const interval = singBoxDurationSeconds(group.healthCheckInterval);
+  if (interval !== null && interval > 0 && idleTimeout !== null && interval > idleTimeout) {
+    issues.push({
+      severity: "error",
+      code: "singbox_group_interval_exceeds_idle_timeout",
+      section: "groups",
+      itemId,
+      message: "URLTest check interval must not exceed its idle timeout.",
+      messageKey: "files.config.issueGroupIntervalExceedsIdleTimeout",
+    });
+  }
+  return issues;
 }
 
 function classicalBehaviorOptions(t: Translator) {

@@ -307,6 +307,47 @@ describe("ProxyGroupEditor sing-box schema", () => {
       interrupt_exist_connections: true,
     }]);
   });
+
+  it("edits sing-box URLTest tolerance and idle timeout without losing explicit zero", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <ControlledEditor
+        initialGroups={[{
+          type: "urltest",
+          tag: "Auto",
+          outbounds: ["$nodes"],
+          url: "https://cp.cloudflare.com",
+          interval: "5m",
+          tolerance: 0,
+          idle_timeout: "1d",
+        }]}
+        kind="sing-box"
+        onChange={onChange}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "展开代理组 Auto" }));
+    const tolerance = screen.getByRole("spinbutton", { name: /容差|Tolerance/i });
+    const idleTimeout = screen.getByRole("textbox", { name: /空闲超时|Idle timeout/i });
+    expect(tolerance).toHaveValue(0);
+    expect(idleTimeout).toHaveValue("1d");
+
+    await user.clear(tolerance);
+    await user.type(tolerance, "75");
+    await user.clear(idleTimeout);
+    await user.type(idleTimeout, "2h");
+
+    expect(onChange).toHaveBeenLastCalledWith([{
+      type: "urltest",
+      tag: "Auto",
+      outbounds: ["$nodes"],
+      url: "https://cp.cloudflare.com",
+      interval: "5m",
+      tolerance: 75,
+      idle_timeout: "2h",
+    }]);
+  });
 });
 
 function ControlledEditor({ initialGroups, kind = "mihomo", nodes = [], onChange }: {

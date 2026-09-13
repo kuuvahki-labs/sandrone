@@ -2,6 +2,7 @@ package singbox_test
 
 import (
 	"context"
+	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"strings"
 	"testing"
@@ -9,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/jsonnodes"
+	"github.com/kuuvahki-labs/sandrone/internal/adapter/mihomo"
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/shared"
 	"github.com/kuuvahki-labs/sandrone/internal/adapter/singbox"
 	uriadapter "github.com/kuuvahki-labs/sandrone/internal/adapter/uri"
@@ -569,7 +571,7 @@ func TestRenderSingBoxHysteriaQUIC(t *testing.T) {
 		TLS:    &domain.TLSOptions{Enabled: true},
 		Hysteria: &domain.HysteriaOptions{
 			AuthString: "secret",
-			QUIC:       map[string]any{"init_stream_receive_window": 8388608},
+			QUIC:       &domain.HysteriaQUICOptions{Unknown: map[string]jsontext.Value{"init_stream_receive_window": jsontext.Value("8388608")}},
 			UpMbps:     20,
 			DownMbps:   100,
 		},
@@ -1221,6 +1223,7 @@ func TestRenderSingBoxHysteria2RealmAndLossyRates(t *testing.T) {
 			Up:   "20 Mbps",
 			Down: "100 Mbps",
 			Realm: &domain.HysteriaRealmOptions{
+				Enabled:     true,
 				ServerURL:   "https://realm.example.com",
 				Token:       "token",
 				RealmID:     "realm-id",
@@ -1232,16 +1235,87 @@ func TestRenderSingBoxHysteria2RealmAndLossyRates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("render: %v", err)
 	}
-	if len(report.Warnings) != 3 {
-		t.Fatalf("expected lossy rate and realm warnings: %#v", report.Warnings)
+	if len(report.Warnings) != 0 {
+		t.Fatalf("unexpected warnings: %#v", report.Warnings)
 	}
 	var doc map[string]any
 	if err := json.Unmarshal(out, &doc); err != nil {
 		t.Fatalf("json: %v", err)
 	}
-	if doc["outbounds"].([]any)[0].(map[string]any)["realm"] != nil {
-		t.Fatalf("unexpected realm render: %#v", doc["outbounds"])
+	outbound := doc["outbounds"].([]any)[0].(map[string]any)
+	if outbound["realm"] == nil || outbound["server"] != nil || outbound["server_port"] != nil {
+		t.Fatalf("unexpected realm render: %#v", outbound)
 	}
+	if outbound["up_mbps"] != float64(20) || outbound["down_mbps"] != float64(100) {
+		t.Fatalf("unexpected rates: %#v", outbound)
+	}
+	tls := outbound["tls"].(map[string]any)
+	if tls["server_name"] != "example.com" {
+		t.Fatalf("Mihomo Realm effective SNI was not preserved: %#v", tls)
+	}
+}
+
+func TestRenderSingBoxHysteria2AdvancedOptions(t *testing.T) {
+	node := domain.NodeIR{
+		Name: "hy2", Type: domain.NodeTypeHysteria2, Server: "example.com", Port: 443, Password: "secret",
+		TLS: &domain.TLSOptions{Enabled: true, ServerName: "example.com"},
+		Hysteria: &domain.HysteriaOptions{
+			ServerPorts: []string{"443", "8443-8444"}, HopInterval: "5s", HopIntervalMax: "9s",
+			UpMbps: 20, DownMbps: 100, Obfs: "gecko", ObfsPassword: "obfs", GeckoMinPacketSize: 512, GeckoMaxPacketSize: 1200,
+			BBRProfile: "aggressive", BrutalDebug: true, DisableChromeParrot: true,
+			TLSIdentity: &domain.Hysteria2TLSIdentity{
+				CertificateName: "example.com", Certificate: "cert", PrivateKey: "key",
+				CertificatePublicKeySHA256: []string{"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},
+			},
+			QUIC: &domain.HysteriaQUICOptions{
+				IdleTimeout: "30s", KeepAlivePeriod: "10s", StreamReceiveWindow: 1 << 20,
+				ConnectionReceiveWindow: 2 << 20, MaxConcurrentStreams: 64, InitialPacketSize: 1200, DisablePathMTUDiscovery: true,
+			},
+		},
+	}
+	out, report, err := singbox.NewRenderer().RenderWithReport(context.Background(), []domain.NodeIR{node}, domain.RenderOptions{})
+	require.NoError(t, err)
+	require.Empty(t, report.Warnings)
+	var doc struct {
+		Outbounds []map[string]any `json:"outbounds"`
+	}
+	require.NoError(t, json.Unmarshal(out, &doc))
+	require.Len(t, doc.Outbounds, 1)
+	got := doc.Outbounds[0]
+	require.Equal(t, []any{"443:443", "8443:8444"}, got["server_ports"])
+	require.Equal(t, "5s", got["hop_interval"])
+	require.Equal(t, "9s", got["hop_interval_max"])
+	require.Equal(t, "aggressive", got["bbr_profile"])
+	require.Equal(t, true, got["brutal_debug"])
+	require.Equal(t, true, got["disable_chrome_parrot"])
+	require.Equal(t, float64(1<<20), got["stream_receive_window"])
+	obfs := got["obfs"].(map[string]any)
+	require.Equal(t, "gecko", obfs["type"])
+	require.Equal(t, float64(512), obfs["min_packet_size"])
+	tls := got["tls"].(map[string]any)
+	require.Equal(t, "cert", tls["client_certificate"])
+	require.Equal(t, []any{"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="}, tls["certificate_public_key_sha256"])
+}
+
+func TestRenderSingBoxHysteria2RestoresCriticalSameTargetRawAndMihomoSkips(t *testing.T) {
+	node := domain.NodeIR{
+		Name: "hy2", Type: domain.NodeTypeHysteria2, TLS: &domain.TLSOptions{Enabled: true},
+		Hysteria: &domain.HysteriaOptions{Realm: &domain.HysteriaRealmOptions{
+			Enabled: true, ServerURL: "https://realm.example.com", RealmID: "realm", STUNServers: []string{"stun.example.com"},
+		}},
+		Raw: map[string]jsontext.Value{
+			"sing-box.realm.http_client": jsontext.Value(`{"engine":"apple","tls":{"enabled":true}}`),
+		},
+	}
+	out, report, err := singbox.NewRenderer().RenderWithReport(context.Background(), []domain.NodeIR{node}, domain.RenderOptions{})
+	require.NoError(t, err)
+	require.Empty(t, report.Warnings)
+	require.Contains(t, string(out), `"engine": "apple"`)
+
+	_, mihomoReport, err := mihomo.NewRenderer().RenderWithReport(context.Background(), []domain.NodeIR{node}, domain.RenderOptions{})
+	require.Error(t, err)
+	require.Len(t, mihomoReport.Warnings, 1)
+	require.Equal(t, "render_node_skipped", mihomoReport.Warnings[0].Code)
 }
 
 func capabilityLossyFields(capability shared.Capability) map[string]bool {

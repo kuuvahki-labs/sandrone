@@ -67,6 +67,38 @@ afterEach(() => {
 });
 
 describe("config file workbench integration", { timeout: 20_000 }, () => {
+  it("shows why a new sing-box file cannot be saved before choosing a subscription", async () => {
+    localStorage.setItem("sandrone.locale", "en-US");
+    const user = userEvent.setup();
+    const onValidityChange = vi.fn();
+    renderEditor({
+      adapter: structuredAdapter("sing-box"),
+      defaultValue: undefined,
+      loadSubscriptionPreview: vi.fn().mockResolvedValue(
+        subscriptionPreview("provider", ["HK Node"]),
+      ),
+      mode: "create",
+      onValidityChange,
+    });
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Select a subscription before saving a new sing-box file.",
+    );
+    await waitFor(() => {
+      expect(onValidityChange).toHaveBeenLastCalledWith(false);
+    });
+
+    await user.click(screen.getByRole("combobox", { name: "Subscription" }));
+    await user.click(await screen.findByRole("option", { name: "provider" }));
+    expect(await screen.findByText("Loaded 1 nodes")).toBeInTheDocument();
+    expect(screen.queryByText(
+      "Select a subscription before saving a new sing-box file.",
+    )).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(onValidityChange).toHaveBeenLastCalledWith(true);
+    });
+  });
+
   it("projects subscription preview nodes into a nested editor", async () => {
     localStorage.setItem("sandrone.locale", "en-US");
     const user = userEvent.setup();

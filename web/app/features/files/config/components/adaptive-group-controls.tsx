@@ -194,8 +194,6 @@ function adaptiveWarningMessage(warning: AdaptiveGroupWarning, t: Translator): s
       return t("files.config.adaptiveNodeNameConflict", { name: warning.groupName });
     case "referenced_stale_group":
       return t("files.config.adaptiveReferencedPreserved", { name: warning.groupName });
-    case "empty_regions_skipped":
-      return t("files.config.adaptiveEmptyRegionsSkipped", { names: warning.groupNames.join(", ") });
     default:
       return null;
   }

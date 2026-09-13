@@ -749,6 +749,35 @@ func TestRenderURIHysteria2OfficialFields(t *testing.T) {
 	require.Empty(t, query.Get("fp"))
 }
 
+func TestRenderURIHysteria2AdvancedLossWarningsMatchCapabilities(t *testing.T) {
+	node := domain.NodeIR{
+		Name: "hy2", Type: domain.NodeTypeHysteria2, Server: "example.com", Port: 443, Password: "secret",
+		TLS: &domain.TLSOptions{Enabled: true},
+		Hysteria: &domain.HysteriaOptions{
+			HopInterval: "5s", HopIntervalMax: "9s", UpMbps: 20, DownMbps: 100,
+			Obfs: "gecko", ObfsPassword: "obfs", GeckoMinPacketSize: 512, GeckoMaxPacketSize: 1200,
+			BBRProfile: "aggressive", CWND: 32, UDPMTU: 1197, HandshakeTimeout: "10s",
+			BrutalDebug: true, DisableChromeParrot: true,
+			TLSIdentity: &domain.Hysteria2TLSIdentity{MihomoFingerprint: "0000000000000000000000000000000000000000000000000000000000000000"},
+			QUIC:        &domain.HysteriaQUICOptions{InitialPacketSize: 1200},
+		},
+	}
+	_, report, err := uri.NewRenderer().RenderWithReport(context.Background(), []domain.NodeIR{node}, domain.RenderOptions{})
+	require.NoError(t, err)
+	for _, field := range []string{
+		"hysteria.hop_interval", "hysteria.hop_interval_max", "hysteria.up_mbps", "hysteria.down_mbps",
+		"hysteria.gecko_min_packet_size", "hysteria.gecko_max_packet_size", "hysteria.bbr_profile", "hysteria.cwnd",
+		"hysteria.udp_mtu", "hysteria.handshake_timeout", "hysteria.brutal_debug", "hysteria.disable_chrome_parrot",
+		"hysteria.tls_identity", "hysteria.quic",
+	} {
+		require.Contains(t, warningFields(report.Warnings), field)
+	}
+	lossy := capabilityLossyFields(uri.NewRenderer().RenderCapabilities()[0])
+	for _, warning := range report.Warnings {
+		require.True(t, lossy[warning.Field], "warning field %q not declared in capability lossy list", warning.Field)
+	}
+}
+
 func TestRenderURIVLESSQueryTLSAndTransportDetails(t *testing.T) {
 	r := uri.NewRenderer()
 	out, report, err := r.RenderWithReport(context.Background(), []domain.NodeIR{{

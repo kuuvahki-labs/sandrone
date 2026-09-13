@@ -455,46 +455,6 @@ func mihomoDurationString(value any) string {
 	return text
 }
 
-func parseMihomoHysteria(node *domain.NodeIR, proxy map[string]any) {
-	node.Hysteria = &domain.HysteriaOptions{
-		ServerPorts:  firstStringSlice(proxy["ports"], proxy["server-ports"]),
-		Protocol:     firstNonEmpty(shared.StringValue(proxy["protocol"]), shared.StringValue(proxy["obfs-protocol"])),
-		Auth:         shared.StringValue(proxy["auth"]),
-		AuthString:   shared.StringValue(proxy["auth-str"]),
-		ObfsPassword: shared.StringValue(proxy["obfs"]),
-		HopInterval:  intString(proxy["hop-interval"]),
-	}
-	applyMihomoHysteriaRate(node, proxy["up"], proxy["up-speed"], "up", "up-speed", &node.Hysteria.Up, &node.Hysteria.UpMbps)
-	applyMihomoHysteriaRate(node, proxy["down"], proxy["down-speed"], "down", "down-speed", &node.Hysteria.Down, &node.Hysteria.DownMbps)
-}
-
-func parseMihomoHysteria2(node *domain.NodeIR, proxy map[string]any) {
-	node.Hysteria = &domain.HysteriaOptions{
-		ServerPorts:  firstStringSlice(proxy["ports"], proxy["server-ports"]),
-		HopInterval:  shared.StringValue(proxy["hop-interval"]),
-		Up:           shared.StringValue(proxy["up"]),
-		Down:         shared.StringValue(proxy["down"]),
-		Obfs:         shared.StringValue(proxy["obfs"]),
-		ObfsPassword: shared.StringValue(proxy["obfs-password"]),
-		BBRProfile:   shared.StringValue(proxy["bbr-profile"]),
-		UDPMTU:       intValueZero(proxy["udp-mtu"]),
-		CWND:         intValueZero(proxy["cwnd"]),
-	}
-	realm := shared.AnyMapValue(proxy["realm-opts"])
-	if realm != nil {
-		node.Hysteria.Realm = &domain.HysteriaRealmOptions{
-			Enabled:     shared.BoolValue(realm["enable"]),
-			ServerURL:   shared.StringValue(realm["server-url"]),
-			Token:       shared.StringValue(realm["token"]),
-			RealmID:     shared.StringValue(realm["realm-id"]),
-			STUNServers: shared.StringSliceValue(realm["stun-servers"]),
-		}
-		preserveNestedMihomoRaw(node, "realm-opts", realm, map[string]bool{
-			"enable": true, "server-url": true, "token": true, "realm-id": true, "stun-servers": true,
-		})
-	}
-}
-
 func parseMihomoTUIC(node *domain.NodeIR, proxy map[string]any) {
 	node.Token = shared.StringValue(proxy["token"])
 	node.TUIC = &domain.TUICOptions{

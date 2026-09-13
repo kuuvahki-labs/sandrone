@@ -11,6 +11,7 @@ export interface FileProcessorPreset {
   readonly dependencies: readonly string[];
   readonly conflicts: readonly string[];
   build(t: Translator): ProcessorDetail;
+  refresh?(processor: ProcessorDetail, t: Translator): ProcessorDetail;
   recognize(processor: Pick<ProcessorDetail, "type" | "params">): boolean;
   isCurrent?(processor: Pick<ProcessorDetail, "type" | "params">): boolean;
   configurationNotices?(processor: ProcessorDetail, settings: unknown): readonly FileProcessorConfigurationNotice[];
@@ -119,7 +120,8 @@ export function planFileProcessorPresetAddition(
     : firstIndex(refreshIndices);
   for (const preset of ordered) {
     if (survivingPresetIDs.has(preset.id)) continue;
-    let beforeIndex = firstRefreshIndex(preset.id, recognizedCurrent, refreshIndices)
+    const refreshIndex = firstRefreshIndex(preset.id, recognizedCurrent, refreshIndices);
+    let beforeIndex = refreshIndex
       ?? earliestSurvivingConsumerIndex(preset.id, byID, recognizedCurrent, removedIndices)
       ?? replacementBeforeIndex
       ?? (options.position === "prepend" ? prependIndex(preset, byID, recognizedCurrent, removedIndices) : null);
@@ -133,7 +135,9 @@ export function planFileProcessorPresetAddition(
     }
     additions.push({
       presetID: preset.id,
-      processor: preset.build(t),
+      processor: refreshIndex !== null && preset.refresh
+        ? preset.refresh(current[refreshIndex], t)
+        : preset.build(t),
       beforeIndex,
     });
     addedPresetIDs.push(preset.id);

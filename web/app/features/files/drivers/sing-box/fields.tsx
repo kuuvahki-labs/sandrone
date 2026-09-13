@@ -16,29 +16,57 @@ function SingBoxGroupFields({ draft, healthCheck, index, onUpdate }: GroupFields
   return (
     <>
       {healthCheck ? (
-        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_11rem]">
-          <TextField
-            error={invalidURL}
-            fullWidth
-            required
-            helperText={invalidURL ? t("files.config.invalidHttpUrl") : undefined}
-            label={t("files.config.groupUrlWithIndex", { index: index + 1 })}
-            size="small"
-            slotProps={{ htmlInput: { pattern: "https?://.+" } }}
-            type="url"
-            value={draft.healthCheckURL}
-            onChange={(event) => onUpdate({ ...draft, healthCheckURL: event.target.value })}
-          />
-          <TextField
-            fullWidth
-            required
-            label={t("files.config.groupIntervalWithIndex", { index: index + 1 })}
-            size="small"
-            type="text"
-            value={draft.healthCheckInterval}
-            onChange={(event) => onUpdate({ ...draft, healthCheckInterval: event.target.value })}
-          />
-        </div>
+        <>
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_11rem]">
+            <TextField
+              error={invalidURL}
+              fullWidth
+              required
+              helperText={invalidURL ? t("files.config.invalidHttpUrl") : undefined}
+              label={t("files.config.groupUrlWithIndex", { index: index + 1 })}
+              size="small"
+              slotProps={{ htmlInput: { pattern: "https?://.+" } }}
+              type="url"
+              value={draft.healthCheckURL}
+              onChange={(event) => onUpdate({ ...draft, healthCheckURL: event.target.value })}
+            />
+            <TextField
+              fullWidth
+              required
+              label={t("files.config.groupIntervalWithIndex", { index: index + 1 })}
+              size="small"
+              type="text"
+              value={draft.healthCheckInterval}
+              onChange={(event) => onUpdate({ ...draft, healthCheckInterval: event.target.value })}
+            />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <TextField
+              fullWidth
+              label={t("files.config.groupTolerance")}
+              size="small"
+              slotProps={{ htmlInput: { max: 65535, min: 0, step: 1 } }}
+              type="number"
+              value={optionalNumberValue(draft.healthCheckTolerance)}
+              onChange={(event) => onUpdate({
+                ...draft,
+                healthCheckTolerance: optionalNumber(event.target.value),
+              })}
+            />
+            <TextField
+              fullWidth
+              helperText={t("files.config.groupIdleTimeoutHint")}
+              label={t("files.config.groupIdleTimeout")}
+              size="small"
+              type="text"
+              value={draft.healthCheckIdleTimeout ?? ""}
+              onChange={(event) => onUpdate({
+                ...draft,
+                healthCheckIdleTimeout: event.target.value || undefined,
+              })}
+            />
+          </div>
+        </>
       ) : null}
       <FormControlLabel
         className="m-0 w-fit"
@@ -56,6 +84,14 @@ function SingBoxGroupFields({ draft, healthCheck, index, onUpdate }: GroupFields
       ) : null}
     </>
   );
+}
+
+function optionalNumber(value: string): number | undefined {
+  return value === "" ? undefined : Number(value);
+}
+
+function optionalNumberValue(value: number | undefined): string {
+  return value === undefined ? "" : String(value);
 }
 
 function SingBoxRuleSetFields() {

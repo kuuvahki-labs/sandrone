@@ -69,6 +69,35 @@ func TestMihomoCapabilitiesExposeAdvancedSnellAndAnyTLSFields(t *testing.T) {
 	}
 }
 
+func TestHysteria2CapabilitiesExposeLockedSchemaExtensions(t *testing.T) {
+	t.Parallel()
+
+	mihomo := shared.CapabilityFor("mihomo-proxies", shared.DirectionRender, []domain.NodeType{domain.NodeTypeHysteria2}, false)
+	for _, field := range []string{
+		"hysteria.hop_interval_max", "hysteria.up_mbps", "hysteria.gecko_min_packet_size", "hysteria.handshake_timeout",
+		"hysteria.tls_identity", "hysteria.quic", "hysteria.realm",
+	} {
+		require.Contains(t, irFields(mihomo.Fields), field)
+	}
+	for _, field := range []string{
+		"hysteria.brutal_debug", "hysteria.disable_chrome_parrot", "hysteria.realm.ip_version", "hysteria.realm.port_mapping",
+	} {
+		require.Contains(t, irFields(mihomo.Lossy), field)
+	}
+
+	singBox := shared.CapabilityFor("sing-box-outbounds", shared.DirectionRender, []domain.NodeType{domain.NodeTypeHysteria2}, false)
+	for _, field := range []string{
+		"hysteria.hop_interval_max", "hysteria.gecko_max_packet_size", "hysteria.bbr_profile", "hysteria.brutal_debug",
+		"hysteria.disable_chrome_parrot", "hysteria.realm", "hysteria.tls_identity", "hysteria.quic",
+	} {
+		require.Contains(t, irFields(singBox.Fields), field)
+	}
+	require.NotContains(t, irFields(singBox.RawOnly), "sing-box.realm")
+	for _, field := range []string{"hysteria.cwnd", "hysteria.udp_mtu", "hysteria.handshake_timeout"} {
+		require.Contains(t, irFields(singBox.Lossy), field)
+	}
+}
+
 func TestCapabilityUsesTargetSchemaSourcesAndLossyCatalog(t *testing.T) {
 	capability := shared.CapabilityFor("sing-box-outbounds", shared.DirectionRender, []domain.NodeType{
 		domain.NodeTypeVLESS,
@@ -84,7 +113,10 @@ func TestCapabilityUsesTargetSchemaSourcesAndLossyCatalog(t *testing.T) {
 	require.NotContains(t, irFields(capability.Lossy), "encryption")
 	require.NotContains(t, irFields(capability.Lossy), "transport.type")
 	require.NotContains(t, irFields(capability.Lossy), "transport.header_type")
-	require.Contains(t, irFields(capability.Lossy), "hysteria.realm")
+	require.Contains(t, gotFields, "hysteria.realm")
+	require.Contains(t, gotFields, "hysteria.bbr_profile")
+	require.Contains(t, gotFields, "hysteria.brutal_debug")
+	require.Contains(t, gotFields, "hysteria.quic")
 	require.Contains(t, irFields(capability.Lossy), "tuic.reduce_rtt")
 
 	for _, field := range capability.Fields {

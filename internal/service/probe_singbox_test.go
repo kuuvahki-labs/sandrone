@@ -440,24 +440,34 @@ func TestServiceSingBoxProbeDoesNotStartSemanticallyDowngradedOutbounds(t *testi
 	})
 
 	require.NoError(t, err)
-	require.Len(t, result.Results, 7)
-	for i, name := range []string{"vless-xhttp", "vless-encryption", "hysteria2-range", "hysteria-range", "vless-missing-transport-type", "vless-ech-dns"} {
+	// Hysteria2 hop intervals are canonicalized and rejected before rendering;
+	// the remaining target-specific incompatibilities are isolated by the
+	// sing-box renderer.
+	require.Len(t, result.Results, 6)
+	for i, name := range []string{"vless-xhttp", "vless-encryption", "hysteria-range", "vless-missing-transport-type", "vless-ech-dns"} {
 		require.Equal(t, name, result.Results[i].NodeName)
 		require.False(t, result.Results[i].Alive)
 		require.Equal(t, string(domain.CodeProbeNodeUnsupported), result.Results[i].ErrorCode)
 	}
-	require.Equal(t, "valid-http", result.Results[6].NodeName)
-	require.True(t, result.Results[6].Alive)
+	require.Equal(t, "valid-http", result.Results[5].NodeName)
+	require.True(t, result.Results[5].Alive)
 	require.Equal(t, 1, result.Report.Probe.SuccessCount)
-	require.Equal(t, 6, result.Report.Probe.UnsupportedCount)
+	require.Equal(t, 5, result.Report.Probe.UnsupportedCount)
 	require.Zero(t, result.Report.Probe.FailureCount)
 	renderSkips := 0
+	validationDrops := 0
 	for _, warning := range result.Report.Warnings {
 		if warning.Code == "render_node_skipped" {
 			renderSkips++
 		}
+		if warning.Code == "node_validation_dropped" {
+			validationDrops++
+			require.Equal(t, "hysteria2-range", warning.Node)
+			require.Equal(t, "hysteria.hop_interval", warning.Field)
+		}
 	}
-	require.Equal(t, 6, renderSkips)
+	require.Equal(t, 5, renderSkips)
+	require.Equal(t, 1, validationDrops)
 	select {
 	case <-targetHit:
 	case <-time.After(time.Second):

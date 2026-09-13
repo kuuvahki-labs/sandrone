@@ -1,7 +1,6 @@
 /* eslint-disable unused-imports/no-unused-vars */
 
 // Adapt outbound configuration after the driver expands $nodes.
-// Empty regex groups are removed from this render together with group-member references.
 // Optional saved argument default_outbound explicitly selects route.final.
 // Patterns use JavaScript syntax; a leading (?i) enables case-insensitive matching.
 function main(input, api) {
@@ -16,9 +15,6 @@ function main(input, api) {
   }
 
   let changed = false;
-  const filteredGroups = [];
-  const removedGroups = new Set();
-  const removedTags = new Set();
   for (const group of document.outbounds || []) {
     if (!group || (group.type !== "selector" && group.type !== "urltest")) continue;
     if (!("filter" in group) && !("exclude-filter" in group)) continue;
@@ -34,58 +30,14 @@ function main(input, api) {
     const members = [...new Set(group.outbounds.filter((name) => (
       include.test(name) && (!exclude || !exclude.test(name))
     )))];
-    const tag = groupTag(group);
-    filteredGroups.push({ group, members, tag });
-    if (members.length === 0) {
-      removedGroups.add(group);
-      removedTags.add(tag);
+    if (members.length === 0) throw groupError(group.tag, "filter matched no nodes");
+    if ("default" in group && !members.includes(group.default)) {
+      throw groupError(group.tag, "default is not a member after filtering");
     }
-  }
-
-  // A filtered group can itself refer to another filtered group. Resolve empty
-  // groups to a fixed point before pruning references from the retained graph.
-  let removedAnotherGroup = true;
-  while (removedAnotherGroup) {
-    removedAnotherGroup = false;
-    for (const entry of filteredGroups) {
-      if (removedGroups.has(entry.group)) continue;
-      entry.members = entry.members.filter((name) => !removedTags.has(name));
-      if (entry.members.length > 0) continue;
-      removedGroups.add(entry.group);
-      removedTags.add(entry.tag);
-      removedAnotherGroup = true;
-    }
-  }
-
-  if (removedGroups.size > 0) {
-    document.outbounds = (document.outbounds || []).filter((outbound) => !removedGroups.has(outbound));
+    group.outbounds = members;
+    delete group.filter;
+    delete group["exclude-filter"];
     changed = true;
-  }
-
-  for (const entry of filteredGroups) {
-    if (removedGroups.has(entry.group)) continue;
-    if ("default" in entry.group && !entry.members.includes(entry.group.default)) {
-      if (!removedTags.has(entry.group.default)) {
-        throw groupError(entry.group.tag, "default is not a member after filtering");
-      }
-      delete entry.group.default;
-    }
-    entry.group.outbounds = entry.members;
-    delete entry.group.filter;
-    delete entry.group["exclude-filter"];
-    changed = true;
-  }
-
-  if (removedTags.size > 0) {
-    for (const group of document.outbounds || []) {
-      if (!group || (group.type !== "selector" && group.type !== "urltest") || !Array.isArray(group.outbounds)) continue;
-      const members = group.outbounds.filter((name) => !removedTags.has(name));
-      if (members.length === group.outbounds.length) continue;
-      if (members.length === 0) throw groupError(group.tag, "all members were removed with empty regex groups");
-      group.outbounds = members;
-      if ("default" in group && removedTags.has(group.default)) delete group.default;
-      changed = true;
-    }
   }
 
   if (defaultOutbound !== undefined) {
@@ -107,47 +59,8 @@ function main(input, api) {
     }
   }
 
-  const danglingReference = findRemovedOutboundReference(document, removedTags);
-  if (danglingReference) {
-    throw adaptationError(`removed empty regex group [${danglingReference.tag}] is still referenced by ${danglingReference.path}`);
-  }
-
   if (changed) input.file.content = api.json.stringify(document);
   return input;
-}
-
-function groupTag(group) {
-  if (typeof group.tag !== "string" || !group.tag) {
-    throw groupError(group.tag, "tag must be a non-empty string");
-  }
-  return group.tag;
-}
-
-function findRemovedOutboundReference(document, removedTags) {
-  if (removedTags.size === 0) return null;
-  if (isObject(document.route) && removedTags.has(document.route.final)) {
-    return { path: "route.final", tag: document.route.final };
-  }
-  return findReferenceValue(document, removedTags, "$", new Set(["outbound", "detour", "download_detour"]));
-}
-
-function findReferenceValue(value, removedTags, path, referenceKeys) {
-  if (Array.isArray(value)) {
-    for (let index = 0; index < value.length; index += 1) {
-      const found = findReferenceValue(value[index], removedTags, `${path}[${index}]`, referenceKeys);
-      if (found) return found;
-    }
-    return null;
-  }
-  if (!isObject(value)) return null;
-  for (const [key, child] of Object.entries(value)) {
-    if (referenceKeys.has(key) && typeof child === "string" && removedTags.has(child)) {
-      return { path: `${path}.${key}`, tag: child };
-    }
-    const found = findReferenceValue(child, removedTags, `${path}.${key}`, referenceKeys);
-    if (found) return found;
-  }
-  return null;
 }
 
 function compilePattern(value, field, tag) {

@@ -34,8 +34,7 @@ export type AdaptiveGroupWarning =
   | { code: "anchor_type_invalid" }
   | { code: "anchor_members_invalid" }
   | { code: "group_name_conflict"; groupName: string }
-  | { code: "referenced_stale_group"; groupName: string }
-  | { code: "empty_regions_skipped"; groupNames: string[] };
+  | { code: "referenced_stale_group"; groupName: string };
 
 export interface AdaptiveGroupGeneration {
   candidates: AdaptiveGroupCandidate[];
@@ -208,7 +207,6 @@ export function generateAdaptiveGroups(
   ));
   const warnings: AdaptiveGroupWarning[] = [];
   const groups: ConfigMap[] = [];
-  const emptyRegionNames: string[] = [];
   const enabledRegionIds = new Set(
     options.enabledRegionIds ?? candidates.filter((item) => item.active).map((item) => item.id),
   );
@@ -219,18 +217,11 @@ export function generateAdaptiveGroups(
       warnings.push({ code: "node_name_conflict", groupName: item.name });
       continue;
     }
-    if (dialect.requiresNodePreview && !item.active) {
-      emptyRegionNames.push(item.name);
-      continue;
-    }
     groups.push(dialect.materialize(
       item,
       options.type,
       adaptiveMatchingNodeNames(item, uniqueNodeNames),
     ));
-  }
-  if (emptyRegionNames.length > 0) {
-    warnings.push({ code: "empty_regions_skipped", groupNames: emptyRegionNames });
   }
   return { candidates, groups, namingLocale, uniqueNodeCount: uniqueNodeNames.length, warnings };
 }

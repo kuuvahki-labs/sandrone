@@ -431,6 +431,44 @@ test("sing-box regex groups add a visible processor and allow its removal", asyn
   expect(errors).toEqual([]);
 });
 
+test("sing-box URLTest tuning is editable and stays in the saved configuration", async ({ page }, testInfo) => {
+  const errors: string[] = [];
+  const consoleIssues: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error" || message.type() === "warning") {
+      consoleIssues.push(`${message.type()}: ${message.text()}`);
+    }
+  });
+  await page.goto("/files/new?source=sing-box");
+
+  const groupsSection = page.getByRole("button", { name: "代理组", exact: true });
+  if (await groupsSection.getAttribute("aria-expanded") === "false") await groupsSection.click();
+  const configInput = page.locator('input[name="config"]');
+  const initial = JSON.parse(await configInput.inputValue());
+  const urlTest = initial.settings.groups.find((group: Record<string, unknown>) => group.type === "urltest");
+  expect(urlTest).toBeTruthy();
+
+  await page.getByRole("button", { name: `展开代理组 ${String(urlTest.tag)}`, exact: true }).click();
+  const tolerance = page.getByRole("spinbutton", { name: "容差", exact: true });
+  const idleTimeout = page.getByRole("textbox", { name: "空闲超时", exact: true });
+  await expect(tolerance).toHaveValue("50");
+  await expect(idleTimeout).toHaveValue("");
+
+  await tolerance.fill("0");
+  await idleTimeout.fill("1m");
+  await expect(page.getByText("检查间隔不能大于空闲超时（留空时为 30m）。", { exact: true })).toBeVisible();
+  await idleTimeout.fill("20m");
+  await expect(page.getByText("检查间隔不能大于空闲超时（留空时为 30m）。", { exact: true })).toHaveCount(0);
+  await expect.poll(async () => {
+    const current = JSON.parse(await configInput.inputValue());
+    return current.settings.groups.find((group: Record<string, unknown>) => group.tag === urlTest.tag);
+  }).toMatchObject({ tolerance: 0, idle_timeout: "20m" });
+  await page.screenshot({ path: testInfo.outputPath("urltest-tuning.png"), fullPage: false });
+  expect(errors).toEqual([]);
+  expect(consoleIssues).toEqual([]);
+});
+
 test("large configuration collections start collapsed and remain available", async ({ page }) => {
   const consoleIssues: string[] = [];
   page.on("console", (message) => {

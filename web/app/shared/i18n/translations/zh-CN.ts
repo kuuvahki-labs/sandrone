@@ -194,7 +194,6 @@ export const zhCN = {
   "files.config.adaptiveNameConflict": "保留了同名自定义组“{name}”，未生成该分组。",
   "files.config.adaptiveNodeNameConflict": "节点名与分组“{name}”冲突，未生成该分组。",
   "files.config.adaptiveReferencedPreserved": "分组“{name}”仍被其他配置引用，已保留。",
-  "files.config.adaptiveEmptyRegionsSkipped": "以下地区没有匹配节点，已跳过：{names}。",
   "files.config.adaptiveSelectSubscription": "请先选择订阅。",
   "files.config.adaptivePreviewLoading": "正在加载节点预览。",
   "files.config.adaptivePreviewUnavailable": "节点预览不可用，请重试。",

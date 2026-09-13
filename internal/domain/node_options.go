@@ -1,5 +1,7 @@
 package domain
 
+import "encoding/json/jsontext"
+
 const VLESSFlowVision = "xtls-rprx-vision"
 
 type TLSOptions struct {
@@ -127,30 +129,70 @@ type AnyTLSOptions struct {
 }
 
 type HysteriaOptions struct {
-	Protocol     string                `json:"protocol,omitempty" yaml:"protocol,omitempty"`
-	ServerPorts  []string              `json:"server_ports,omitempty" yaml:"server_ports,omitempty"`
-	HopInterval  string                `json:"hop_interval,omitempty" yaml:"hop_interval,omitempty"`
-	Up           string                `json:"up,omitempty" yaml:"up,omitempty"`
-	Down         string                `json:"down,omitempty" yaml:"down,omitempty"`
-	UpMbps       int                   `json:"up_mbps,omitzero" yaml:"up_mbps,omitempty"`
-	DownMbps     int                   `json:"down_mbps,omitzero" yaml:"down_mbps,omitempty"`
-	Auth         string                `json:"auth,omitempty" yaml:"auth,omitempty"`
-	AuthString   string                `json:"auth_str,omitempty" yaml:"auth_str,omitempty"`
-	Obfs         string                `json:"obfs,omitempty" yaml:"obfs,omitempty"`
-	ObfsPassword string                `json:"obfs_password,omitempty" yaml:"obfs_password,omitempty"`
-	Realm        *HysteriaRealmOptions `json:"realm,omitzero" yaml:"realm,omitempty"`
-	BBRProfile   string                `json:"bbr_profile,omitempty" yaml:"bbr_profile,omitempty"`
-	CWND         int                   `json:"cwnd,omitzero" yaml:"cwnd,omitempty"`
-	UDPMTU       int                   `json:"udp_mtu,omitzero" yaml:"udp_mtu,omitempty"`
-	QUIC         map[string]any        `json:"quic,omitempty" yaml:"quic,omitempty"`
+	Protocol            string                `json:"protocol,omitempty" yaml:"protocol,omitempty"`
+	ServerPorts         []string              `json:"server_ports,omitempty" yaml:"server_ports,omitempty"`
+	HopInterval         string                `json:"hop_interval,omitempty" yaml:"hop_interval,omitempty"`
+	HopIntervalMax      string                `json:"hop_interval_max,omitempty" yaml:"hop_interval_max,omitempty"`
+	Up                  string                `json:"up,omitempty" yaml:"up,omitempty"`
+	Down                string                `json:"down,omitempty" yaml:"down,omitempty"`
+	UpMbps              int                   `json:"up_mbps,omitzero" yaml:"up_mbps,omitempty"`
+	DownMbps            int                   `json:"down_mbps,omitzero" yaml:"down_mbps,omitempty"`
+	Auth                string                `json:"auth,omitempty" yaml:"auth,omitempty"`
+	AuthString          string                `json:"auth_str,omitempty" yaml:"auth_str,omitempty"`
+	Obfs                string                `json:"obfs,omitempty" yaml:"obfs,omitempty"`
+	ObfsPassword        string                `json:"obfs_password,omitempty" yaml:"obfs_password,omitempty"`
+	GeckoMinPacketSize  int                   `json:"gecko_min_packet_size,omitzero" yaml:"gecko_min_packet_size,omitempty"`
+	GeckoMaxPacketSize  int                   `json:"gecko_max_packet_size,omitzero" yaml:"gecko_max_packet_size,omitempty"`
+	Realm               *HysteriaRealmOptions `json:"realm,omitzero" yaml:"realm,omitempty"`
+	TLSIdentity         *Hysteria2TLSIdentity `json:"tls_identity,omitzero" yaml:"tls_identity,omitempty"`
+	BBRProfile          string                `json:"bbr_profile,omitempty" yaml:"bbr_profile,omitempty"`
+	CWND                int                   `json:"cwnd,omitzero" yaml:"cwnd,omitempty"`
+	UDPMTU              int                   `json:"udp_mtu,omitzero" yaml:"udp_mtu,omitempty"`
+	HandshakeTimeout    string                `json:"handshake_timeout,omitempty" yaml:"handshake_timeout,omitempty"`
+	BrutalDebug         bool                  `json:"brutal_debug,omitzero" yaml:"brutal_debug,omitempty"`
+	DisableChromeParrot bool                  `json:"disable_chrome_parrot,omitzero" yaml:"disable_chrome_parrot,omitempty"`
+	QUIC                *HysteriaQUICOptions  `json:"quic,omitzero" yaml:"quic,omitempty"`
 }
 
 type HysteriaRealmOptions struct {
-	Enabled     bool     `json:"enabled,omitzero" yaml:"enabled,omitempty"`
-	ServerURL   string   `json:"server_url,omitempty" yaml:"server_url,omitempty"`
-	Token       string   `json:"token,omitempty" yaml:"token,omitempty"`
-	RealmID     string   `json:"realm_id,omitempty" yaml:"realm_id,omitempty"`
-	STUNServers []string `json:"stun_servers,omitempty" yaml:"stun_servers,omitempty"`
+	Enabled     bool                      `json:"enabled,omitzero" yaml:"enabled,omitempty"`
+	ServerURL   string                    `json:"server_url,omitempty" yaml:"server_url,omitempty"`
+	Token       string                    `json:"token,omitempty" yaml:"token,omitempty"`
+	RealmID     string                    `json:"realm_id,omitempty" yaml:"realm_id,omitempty"`
+	STUNServers []string                  `json:"stun_servers,omitempty" yaml:"stun_servers,omitempty"`
+	IPVersion   int                       `json:"ip_version,omitzero" yaml:"ip_version,omitempty"`
+	PortMapping *HysteriaRealmPortMapping `json:"port_mapping,omitzero" yaml:"port_mapping,omitempty"`
+	TLS         *TLSOptions               `json:"tls,omitzero" yaml:"tls,omitempty"`
+	TLSIdentity *Hysteria2TLSIdentity     `json:"tls_identity,omitzero" yaml:"tls_identity,omitempty"`
+}
+
+type HysteriaRealmPortMapping struct {
+	Enabled  bool   `json:"enabled,omitzero" yaml:"enabled,omitempty"`
+	Timeout  string `json:"timeout,omitempty" yaml:"timeout,omitempty"`
+	Lifetime string `json:"lifetime,omitempty" yaml:"lifetime,omitempty"`
+}
+
+type Hysteria2TLSIdentity struct {
+	CertificateName            string   `json:"certificate_name,omitempty" yaml:"certificate_name,omitempty"`
+	Certificate                string   `json:"certificate,omitempty" yaml:"certificate,omitempty"`
+	PrivateKey                 string   `json:"private_key,omitempty" yaml:"private_key,omitempty"`
+	MihomoFingerprint          string   `json:"mihomo_fingerprint,omitempty" yaml:"mihomo_fingerprint,omitempty"`
+	CertificatePublicKeySHA256 []string `json:"certificate_public_key_sha256,omitempty" yaml:"certificate_public_key_sha256,omitempty"`
+}
+
+type HysteriaQUICOptions struct {
+	IdleTimeout                    string                    `json:"idle_timeout,omitempty" yaml:"idle_timeout,omitempty"`
+	KeepAlivePeriod                string                    `json:"keep_alive_period,omitempty" yaml:"keep_alive_period,omitempty"`
+	StreamReceiveWindow            uint64                    `json:"stream_receive_window,omitzero" yaml:"stream_receive_window,omitempty"`
+	ConnectionReceiveWindow        uint64                    `json:"connection_receive_window,omitzero" yaml:"connection_receive_window,omitempty"`
+	MaxConcurrentStreams           int                       `json:"max_concurrent_streams,omitzero" yaml:"max_concurrent_streams,omitempty"`
+	InitialPacketSize              int                       `json:"initial_packet_size,omitzero" yaml:"initial_packet_size,omitempty"`
+	DisablePathMTUDiscovery        bool                      `json:"disable_path_mtu_discovery,omitzero" yaml:"disable_path_mtu_discovery,omitempty"`
+	InitialStreamReceiveWindow     uint64                    `json:"initial_stream_receive_window,omitzero" yaml:"initial_stream_receive_window,omitempty"`
+	MaxStreamReceiveWindow         uint64                    `json:"max_stream_receive_window,omitzero" yaml:"max_stream_receive_window,omitempty"`
+	InitialConnectionReceiveWindow uint64                    `json:"initial_connection_receive_window,omitzero" yaml:"initial_connection_receive_window,omitempty"`
+	MaxConnectionReceiveWindow     uint64                    `json:"max_connection_receive_window,omitzero" yaml:"max_connection_receive_window,omitempty"`
+	Unknown                        map[string]jsontext.Value `json:"-" yaml:"-"`
 }
 
 type TUICOptions struct {

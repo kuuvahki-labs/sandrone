@@ -74,6 +74,13 @@ warning 本身不证明需要新增兼容逻辑；字段同名或共享前缀也
 值域见[格式与能力参考](../reference/capabilities.md)。probe 消费规范化且验证通过的
 节点，不承担字段修复。
 
+当两个客户端对同一协议提供不同的字段集合时，NodeIR 可以用 typed compatibility
+union 保存已知语义，并在同目标或跨目标 renderer 中逐字段决定 supported、lossy
+或 skipped；不能把未识别 JSON 键当作目标配置透传。保留未知键只保证
+`json-nodes` 的存储往返，目标 renderer 必须报告它们，且未知内容可能影响连接、
+认证、TLS identity 或路由时跳过节点。Hysteria2 的 QUIC、Realm 和专用 TLS
+identity 使用这一边界。
+
 校验会在多个可信边界复用：
 
 - parser 输出完成规范化后。

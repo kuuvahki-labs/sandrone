@@ -4,6 +4,7 @@ import (
 	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"fmt"
+	"math"
 	"net"
 	"net/netip"
 	"net/url"
@@ -108,6 +109,37 @@ func Uint16Value(v any) (uint16, error) {
 		return 0, fmt.Errorf("port out of range: %d", n)
 	}
 	return uint16(n), nil
+}
+
+func Uint64Value(v any) (uint64, error) {
+	switch value := v.(type) {
+	case uint64:
+		return value, nil
+	case int:
+		if value < 0 {
+			return 0, fmt.Errorf("unsigned integer must not be negative")
+		}
+		return uint64(value), nil
+	case int64:
+		if value < 0 {
+			return 0, fmt.Errorf("unsigned integer must not be negative")
+		}
+		return uint64(value), nil
+	case float64:
+		if value < 0 || value > math.MaxUint64 || math.Trunc(value) != value {
+			return 0, fmt.Errorf("invalid unsigned integer: %v", value)
+		}
+		return uint64(value), nil
+	case jsontext.Value:
+		return strconv.ParseUint(string(value), 10, 64)
+	case string:
+		if value == "" {
+			return 0, nil
+		}
+		return strconv.ParseUint(value, 10, 64)
+	default:
+		return 0, fmt.Errorf("unsupported unsigned number type %T", v)
+	}
 }
 
 func BoolValue(v any) bool {

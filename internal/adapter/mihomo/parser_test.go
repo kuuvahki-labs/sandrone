@@ -1100,8 +1100,8 @@ proxies:
 	require.Empty(t, hy.Auth)
 	require.Equal(t, []string{"8443", "9443"}, hy.ServerPorts)
 	require.Equal(t, "30s", hy.HopInterval)
-	require.Equal(t, "20 Mbps", hy.Up)
-	require.Equal(t, "100 Mbps", hy.Down)
+	require.Equal(t, 20, hy.UpMbps)
+	require.Equal(t, 100, hy.DownMbps)
 	require.Equal(t, "salamander", hy.Obfs)
 	require.Equal(t, "obfs-pass", hy.ObfsPassword)
 	require.Equal(t, "desktop", hy.BBRProfile)
@@ -1111,6 +1111,90 @@ proxies:
 	require.True(t, hy.Realm.Enabled)
 	require.Equal(t, "realm-id", hy.Realm.RealmID)
 	require.Equal(t, []string{"stun.example.com"}, hy.Realm.STUNServers)
+	require.NotNil(t, nodes[0].TLS)
+	require.True(t, nodes[0].TLS.Enabled)
+}
+
+func TestParseMihomoHysteria2InvalidTypedScalarsStayRaw(t *testing.T) {
+	parser := mihomo.NewParser()
+	nodes, source, err := parser.Parse(context.Background(), []byte(`
+name: hy2-invalid
+type: hysteria2
+server: example.com
+port: 443
+obfs-min-packet-size: small
+handshake-timeout: later
+initial-stream-receive-window: wide
+`))
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	require.NotNil(t, nodes[0].TLS)
+	require.True(t, nodes[0].TLS.Enabled)
+	for _, key := range []string{
+		"mihomo.obfs-min-packet-size", "mihomo.handshake-timeout", "mihomo.initial-stream-receive-window",
+	} {
+		require.Contains(t, nodes[0].Raw, key)
+	}
+	require.Len(t, source.Warnings, 3)
+}
+
+func TestParseMihomoHysteria2AdvancedFieldsAndDedicatedIdentity(t *testing.T) {
+	parser := mihomo.NewParser()
+	nodes, source, err := parser.Parse(context.Background(), []byte(`
+name: hy2
+type: hysteria2
+server: example.com
+port: 443
+password: secret
+ports: 443,8443-8444
+hop-interval: 1-9
+up: 20 Mbps
+down: 100 Mbps
+obfs: gecko
+obfs-password: obfs
+obfs-min-packet-size: 512
+obfs-max-packet-size: 1200
+bbr-profile: aggressive
+cwnd: 32
+udp-mtu: 1197
+handshake-timeout: 10
+name-cert-verify: example.com
+fingerprint: "0000000000000000000000000000000000000000000000000000000000000000"
+certificate: cert
+private-key: key
+initial-stream-receive-window: 1048576
+max-stream-receive-window: 2097152
+initial-connection-receive-window: 3145728
+max-connection-receive-window: 4194304
+realm-opts:
+  enable: true
+  server-url: https://realm.example.com
+  realm-id: realm
+  stun-servers: [stun.example.com]
+  fingerprint: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+`))
+	require.NoError(t, err)
+	require.Empty(t, source.Warnings)
+	require.Len(t, nodes, 1)
+	node := nodes[0]
+	require.NotNil(t, node.TLS)
+	require.True(t, node.TLS.Enabled)
+	require.Empty(t, node.TLS.Fingerprint)
+	hy := node.Hysteria
+	require.Equal(t, "5s", hy.HopInterval, "Mihomo runtime clamps a sub-five-second hop interval")
+	require.Equal(t, "9s", hy.HopIntervalMax)
+	require.Equal(t, 20, hy.UpMbps)
+	require.Equal(t, 100, hy.DownMbps)
+	require.Equal(t, "10s", hy.HandshakeTimeout)
+	require.Equal(t, uint64(1<<20), hy.QUIC.InitialStreamReceiveWindow)
+	require.Equal(t, uint64(4<<20), hy.QUIC.MaxConnectionReceiveWindow)
+	require.Equal(t, "example.com", hy.TLSIdentity.CertificateName)
+	require.Len(t, hy.TLSIdentity.MihomoFingerprint, 64)
+	require.NotNil(t, hy.Realm)
+	require.NotNil(t, hy.Realm.TLSIdentity)
+	require.Len(t, hy.Realm.TLSIdentity.MihomoFingerprint, 64)
+	require.NotNil(t, hy.Realm.TLS)
+	require.Empty(t, hy.Realm.TLS.Fingerprint)
 }
 
 func TestParseMihomoTUICAndUDPOverStreamAlias(t *testing.T) {
