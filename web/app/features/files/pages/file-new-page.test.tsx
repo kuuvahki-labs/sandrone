@@ -81,7 +81,7 @@ describe("FileNewPage", () => {
         servers: expect.arrayContaining([expect.objectContaining({ tag: "dns-remote", detour: "🚀 节点选择" })]),
       },
       inbounds: expect.arrayContaining([
-        { type: "mixed", tag: "mixed-in", listen: "127.0.0.1", listen_port: 2080 },
+        { type: "mixed", tag: "mixed-in", listen: "0.0.0.0", listen_port: 2080 },
         expect.objectContaining({ type: "tun", tag: "tun-in", auto_route: true, strict_route: true }),
       ]),
       route: {

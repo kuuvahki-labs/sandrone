@@ -42,19 +42,39 @@ func TestServiceSingBoxWebDefaultIsAcceptedByLockedCore(t *testing.T) {
 	require.NoError(t, json.Unmarshal(result.Content, &document))
 	routeRules := document["route"].(map[string]any)["rules"].([]any)
 	require.Equal(t, []any{
+		map[string]any{
+			"type": "logical", "mode": "and", "action": "reject",
+			"rules": []any{
+				map[string]any{"inbound": []any{"mixed-in"}},
+				map[string]any{
+					"source_ip_cidr": []any{"127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"},
+					"invert":         true,
+				},
+			},
+		},
 		map[string]any{"action": "sniff"},
+		map[string]any{
+			"type": "logical", "mode": "or", "action": "resolve", "server": "dns-local", "strategy": "ipv4_only",
+			"rules": []any{
+				map[string]any{"domain_regex": []any{"^[^.]+$"}},
+				map[string]any{"domain_suffix": []any{
+					"lan", "localdomain", "localhost", "local", "home.arpa", "internal", "example", "invalid", "test",
+				}},
+			},
+		},
 		map[string]any{
 			"type": "logical", "mode": "or", "action": "hijack-dns",
 			"rules": []any{map[string]any{"protocol": "dns"}, map[string]any{"port": float64(53)}},
 		},
 		map[string]any{"clash_mode": "direct", "outbound": "direct"},
 		map[string]any{"clash_mode": "global", "outbound": "Proxy"},
-	}, routeRules[:4])
+	}, routeRules[:6])
 	instance, err := box.New(box.Options{Context: boxContext, Options: options})
 	require.NoError(t, err)
 	require.NoError(t, instance.Close())
 
 	require.NotNil(t, options.DNS)
+	require.Equal(t, "ipv4_only", options.DNS.Strategy.String())
 	dnsCNIndex := slices.IndexFunc(options.DNS.Servers, func(server option.DNSServerOptions) bool {
 		return server.Tag == "dns-cn"
 	})
@@ -108,7 +128,7 @@ func singBoxWebDefaultSpec(t *testing.T, autoMembers []any) *domain.FileSpec {
   ],
   "dns": {
     "servers": [
-      { "type": "local", "tag": "dns-local" },
+      { "type": "local", "tag": "dns-local", "neighbor_domain": [".", ".lan"] },
       { "type": "https", "tag": "dns-cn", "server": "223.5.5.5" },
       { "type": "https", "tag": "dns-remote", "server": "1.1.1.1", "detour": "Proxy" },
       {
@@ -120,20 +140,30 @@ func singBoxWebDefaultSpec(t *testing.T, autoMembers []any) *domain.FileSpec {
     ],
     "rules": [
       {
+        "preferred_by": ["dns-local"],
+        "action": "route",
+        "server": "dns-local"
+      },
+      {
         "domain_regex": ["^[^.]+$"],
-        "domain_suffix": ["lan", "local"],
+        "domain_suffix": [
+          "lan",
+          "localdomain",
+          "localhost",
+          "local",
+          "home.arpa",
+          "internal",
+          "example",
+          "invalid",
+          "test"
+        ],
         "action": "route",
         "server": "dns-local"
       },
       {
         "domain": [
-          "www.gstatic.com",
-          "captive.apple.com",
-          "cp.cloudflare.com",
-          "www.msftconnecttest.com",
-          "connectivitycheck.platform.hicloud.com",
           "Mijia Cloud",
-          "dig.io.mi.com",
+          "dlg.io.mi.com",
           "localhost.ptlogin2.qq.com",
           "localhost.sec.qq.com"
         ],
@@ -153,19 +183,16 @@ func singBoxWebDefaultSpec(t *testing.T, autoMembers []any) *domain.FileSpec {
       { "rule_set": ["cn"], "action": "route", "server": "dns-cn" }
     ],
     "final": "dns-remote",
-    "strategy": "prefer_ipv4"
+    "strategy": "ipv4_only"
   },
   "inbounds": [
-    { "type": "mixed", "tag": "mixed-in", "listen": "127.0.0.1", "listen_port": 2080 },
+    { "type": "mixed", "tag": "mixed-in", "listen": "0.0.0.0", "listen_port": 2080 },
     {
       "type": "tun",
       "tag": "tun-in",
       "address": ["172.19.0.1/30", "fdfe:dcba:9876::1/126"],
       "auto_route": true,
       "strict_route": true,
-      "platform": {
-        "http_proxy": { "enabled": true, "server": "127.0.0.1", "server_port": 2080 }
-      },
       "route_exclude_address": [
         "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16",
         "fe80::/10", "fc00::/7", "224.0.0.251/32", "ff02::fb/128"
@@ -179,7 +206,42 @@ func singBoxWebDefaultSpec(t *testing.T, autoMembers []any) *domain.FileSpec {
     "default_http_client": "rule-set-direct",
     "rule_set": [],
     "rules": [
+      {
+        "type": "logical",
+        "mode": "and",
+        "rules": [
+          { "inbound": ["mixed-in"] },
+          {
+            "source_ip_cidr": ["127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"],
+            "invert": true
+          }
+        ],
+        "action": "reject"
+      },
       { "action": "sniff" },
+      {
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          { "domain_regex": ["^[^.]+$"] },
+          {
+            "domain_suffix": [
+              "lan",
+              "localdomain",
+              "localhost",
+              "local",
+              "home.arpa",
+              "internal",
+              "example",
+              "invalid",
+              "test"
+            ]
+          }
+        ],
+        "action": "resolve",
+        "server": "dns-local",
+        "strategy": "ipv4_only"
+      },
       {
         "type": "logical",
         "mode": "or",

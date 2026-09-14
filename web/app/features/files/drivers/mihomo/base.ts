@@ -74,7 +74,7 @@ dns:
     - "+.local"
     - "+.market.xiaomi.com"
     - "Mijia Cloud"
-    - "dig.io.mi.com"
+    - "dlg.io.mi.com"
     - "localhost.ptlogin2.qq.com"
     - "localhost.sec.qq.com"
     - "localhost.*.weixin.qq.com"

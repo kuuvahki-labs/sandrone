@@ -1,7 +1,20 @@
 import { load } from "js-yaml";
 import { describe, expect, it } from "vitest";
 
+import type { FileConfigDraft } from "~/features/files/model/types";
+
+import type { ConfigTemplateID } from "../config/model/templates";
 import { requireFileDriver } from "./registry";
+
+const TEMPLATE_IDS = ["minimal", "standard", "full"] as const satisfies readonly ConfigTemplateID[];
+const MIHOMO_ONLY_TEMPLATE_GROUPS = new Set(["Fallback"]);
+const MIHOMO_ONLY_GROUP_MEMBERS = new Set(["REJECT-DROP"]);
+
+interface NormalizedTemplateRule {
+  type: string;
+  value?: string;
+  policy?: string;
+}
 
 describe("file driver default bases", () => {
   it("enables the approved Mihomo base for Web creation", () => {
@@ -58,7 +71,7 @@ describe("file driver default bases", () => {
           "+.local",
           "+.market.xiaomi.com",
           "Mijia Cloud",
-          "dig.io.mi.com",
+          "dlg.io.mi.com",
           "localhost.ptlogin2.qq.com",
           "localhost.sec.qq.com",
           "localhost.*.weixin.qq.com",
@@ -115,7 +128,7 @@ describe("file driver default bases", () => {
       http_clients: [{ tag: "rule-set-direct" }],
       dns: {
         servers: [
-          { type: "local", tag: "dns-local" },
+          { type: "local", tag: "dns-local", neighbor_domain: [".", ".lan"] },
           { type: "https", tag: "dns-cn", server: "223.5.5.5" },
           { type: "https", tag: "dns-remote", server: "1.1.1.1", detour: "Proxy" },
           {
@@ -127,20 +140,30 @@ describe("file driver default bases", () => {
         ],
         rules: [
           {
+            preferred_by: ["dns-local"],
+            action: "route",
+            server: "dns-local",
+          },
+          {
             domain_regex: ["^[^.]+$"],
-            domain_suffix: ["lan", "local"],
+            domain_suffix: [
+              "lan",
+              "localdomain",
+              "localhost",
+              "local",
+              "home.arpa",
+              "internal",
+              "example",
+              "invalid",
+              "test",
+            ],
             action: "route",
             server: "dns-local",
           },
           {
             domain: [
-              "www.gstatic.com",
-              "captive.apple.com",
-              "cp.cloudflare.com",
-              "www.msftconnecttest.com",
-              "connectivitycheck.platform.hicloud.com",
               "Mijia Cloud",
-              "dig.io.mi.com",
+              "dlg.io.mi.com",
               "localhost.ptlogin2.qq.com",
               "localhost.sec.qq.com",
             ],
@@ -160,19 +183,16 @@ describe("file driver default bases", () => {
           { rule_set: ["cn"], action: "route", server: "dns-cn" },
         ],
         final: "dns-remote",
-        strategy: "prefer_ipv4",
+        strategy: "ipv4_only",
       },
       inbounds: [
-        { type: "mixed", tag: "mixed-in", listen: "127.0.0.1", listen_port: 2080 },
+        { type: "mixed", tag: "mixed-in", listen: "0.0.0.0", listen_port: 2080 },
         {
           type: "tun",
           tag: "tun-in",
           address: ["172.19.0.1/30", "fdfe:dcba:9876::1/126"],
           auto_route: true,
           strict_route: true,
-          platform: {
-            http_proxy: { enabled: true, server: "127.0.0.1", server_port: 2080 },
-          },
           route_exclude_address: [
             "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16",
             "fe80::/10", "fc00::/7", "224.0.0.251/32", "ff02::fb/128",
@@ -186,7 +206,42 @@ describe("file driver default bases", () => {
         default_http_client: "rule-set-direct",
         rule_set: [],
         rules: [
+          {
+            type: "logical",
+            mode: "and",
+            rules: [
+              { inbound: ["mixed-in"] },
+              {
+                source_ip_cidr: ["127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"],
+                invert: true,
+              },
+            ],
+            action: "reject",
+          },
           { action: "sniff" },
+          {
+            type: "logical",
+            mode: "or",
+            rules: [
+              { domain_regex: ["^[^.]+$"] },
+              {
+                domain_suffix: [
+                  "lan",
+                  "localdomain",
+                  "localhost",
+                  "local",
+                  "home.arpa",
+                  "internal",
+                  "example",
+                  "invalid",
+                  "test",
+                ],
+              },
+            ],
+            action: "resolve",
+            server: "dns-local",
+            strategy: "ipv4_only",
+          },
           {
             type: "logical",
             mode: "or",
@@ -217,8 +272,30 @@ describe("file driver default bases", () => {
     };
 
     expect(base.dns.servers[2]?.detour).toBe("🚀 节点选择");
-    expect(base.route.rules[3]).toEqual({ clash_mode: "global", outbound: "🚀 节点选择" });
+    expect(base.route.rules.at(-1)).toEqual({ clash_mode: "global", outbound: "🚀 节点选择" });
     expect(base.route).not.toHaveProperty("final");
+  });
+
+  it("keeps Mihomo and sing-box default capabilities aligned", () => {
+    const mihomo = asRecord(load(driverBase("mihomo")));
+    const singBox = asRecord(JSON.parse(driverBase("sing-box")));
+
+    expect(mihomoDefaultCapabilities(mihomo)).toEqual(singBoxDefaultCapabilities(singBox));
+    expect(singBoxDefaultCapabilities(singBox)).toEqual({
+      cacheFakeIP: true,
+      controlAPI: true,
+      dnsHijack: true,
+      fakeIPv4: true,
+      ipv4OnlyByDefault: true,
+      lanMixedProxy: true,
+      localDNS: true,
+      modeRules: true,
+      tun: true,
+    });
+  });
+
+  it.each(TEMPLATE_IDS)("keeps the %s Mihomo and sing-box template semantics aligned", (templateID) => {
+    expect(normalizeTemplate("mihomo", templateID)).toEqual(normalizeTemplate("sing-box", templateID));
   });
 
   it("uses the approved portable Shadowrocket Web base", () => {
@@ -250,4 +327,109 @@ describe("file driver default bases", () => {
 
 function driverBase(kind: string, locale: "en-US" | "zh-CN" = "en-US"): string {
   return requireFileDriver(kind).source.defaultBase(locale);
+}
+
+function mihomoDefaultCapabilities(base: Record<string, unknown>) {
+  const dns = asRecord(base.dns);
+  const tun = asRecord(base.tun);
+  return {
+    cacheFakeIP: asRecord(base.profile)["store-fake-ip"] === true,
+    controlAPI: base["external-controller"] === "127.0.0.1:9090",
+    dnsHijack: stringList(tun["dns-hijack"]).includes("any:53"),
+    fakeIPv4: dns["enhanced-mode"] === "fake-ip",
+    ipv4OnlyByDefault: base.ipv6 === false && dns.ipv6 === false,
+    lanMixedProxy: base["allow-lan"] === true
+      && stringList(base["lan-allowed-ips"]).slice(0, 3).join(",") === "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16",
+    localDNS: stringList(dns["fake-ip-filter"]).includes("geosite:private"),
+    modeRules: base.mode === "rule",
+    tun: tun.enable === true,
+  };
+}
+
+function singBoxDefaultCapabilities(base: Record<string, unknown>) {
+  const dns = asRecord(base.dns);
+  const dnsServers = recordList(dns.servers);
+  const inbounds = recordList(base.inbounds);
+  const route = asRecord(base.route);
+  const routeRules = recordList(route.rules);
+  const mixed = inbounds.find((inbound) => inbound.tag === "mixed-in") ?? {};
+  const tun = inbounds.find((inbound) => inbound.tag === "tun-in") ?? {};
+  const local = dnsServers.find((server) => server.tag === "dns-local") ?? {};
+  const fakeIP = dnsServers.find((server) => server.tag === "dns-fakeip") ?? {};
+  return {
+    cacheFakeIP: asRecord(asRecord(base.experimental).cache_file).store_fakeip === true,
+    controlAPI: asRecord(asRecord(base.experimental).clash_api).external_controller === "127.0.0.1:9090",
+    dnsHijack: routeRules.some((rule) => rule.action === "hijack-dns"),
+    fakeIPv4: fakeIP.type === "fakeip" && fakeIP.inet4_range === "198.18.0.0/15",
+    ipv4OnlyByDefault: dns.strategy === "ipv4_only",
+    lanMixedProxy: mixed.listen === "0.0.0.0" && routeRules.some((rule) => rule.action === "reject"),
+    localDNS: stringList(local.neighbor_domain).join(",") === ".,.lan"
+      && recordList(dns.rules).some((rule) => stringList(rule.preferred_by).includes("dns-local")),
+    modeRules: routeRules.some((rule) => rule.clash_mode === "direct")
+      && routeRules.some((rule) => rule.clash_mode === "global"),
+    tun: tun.auto_route === true && tun.strict_route === true,
+  };
+}
+
+function normalizeTemplate(kind: "mihomo" | "sing-box", templateID: ConfigTemplateID) {
+  const config = createTemplate(kind, templateID);
+  const groups = recordList(config.groups)
+    .filter((group) => !MIHOMO_ONLY_TEMPLATE_GROUPS.has(String(group.name ?? group.tag)))
+    .map((group) => ({
+      id: String(group.name ?? group.tag),
+      intervalSeconds: group.interval === "5m" ? 300 : group.interval,
+      members: stringList(group.proxies ?? group.outbounds)
+        .filter((member) => !MIHOMO_ONLY_TEMPLATE_GROUPS.has(member) && !MIHOMO_ONLY_GROUP_MEMBERS.has(member))
+        .map(normalizePolicy),
+      probeURL: group.url,
+      tolerance: group.tolerance,
+      type: group.type === "urltest" ? "url-test" : group.type === "selector" ? "select" : group.type,
+    }));
+  const ruleSets = recordList(config.rule_sets).map((ruleSet) => ({
+    family: String(ruleSet.url).includes("/geoip/") ? "ip" : "domain",
+    id: String(ruleSet.name ?? ruleSet.tag),
+  }));
+  const rules = (config.rules ?? []).flatMap((rule) => normalizeTemplateRule(kind, rule));
+  return { groups, ruleSets, rules };
+}
+
+function normalizeTemplateRule(kind: "mihomo" | "sing-box", rule: unknown): NormalizedTemplateRule[] {
+  if (kind === "mihomo") {
+    const [type, value, policy] = String(rule).split(",");
+    return type === "MATCH"
+      ? [{ type: "final", value: undefined, policy: normalizePolicy(value) }]
+      : [{ type: type.toLowerCase(), value, policy: normalizePolicy(policy) }];
+  }
+  const value = asRecord(rule);
+  if (value.action === "resolve" && Object.keys(value).length === 1) return [];
+  const ruleSet = stringList(value.rule_set)[0];
+  return [{
+    type: ruleSet ? "rule-set" : value.port === 853 ? "dst-port" : "final",
+    value: ruleSet ?? (value.port === 853 ? "853" : undefined),
+    policy: normalizePolicy(String(value.outbound)),
+  }];
+}
+
+function normalizePolicy(value: string | undefined): string | undefined {
+  if (value === "DIRECT") return "direct";
+  if (value === "REJECT") return "block";
+  return value;
+}
+
+function createTemplate(kind: "mihomo" | "sing-box", templateID: ConfigTemplateID): FileConfigDraft {
+  const driver = requireFileDriver(kind);
+  if (driver.configuration.mode !== "structured") throw new Error(`${kind} is not structured`);
+  return driver.configuration.adapter.templates.create(templateID);
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function recordList(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value) ? value.map(asRecord) : [];
+}
+
+function stringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }

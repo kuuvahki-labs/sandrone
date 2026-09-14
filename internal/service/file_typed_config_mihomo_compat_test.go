@@ -24,6 +24,7 @@ func TestServiceMihomoWebDNSIsAcceptedByLockedCore(t *testing.T) {
 		Kind: domain.FileKindMihomo,
 		Source: domain.FileSource{Type: "inline", Content: `mixed-port: 7890
 mode: rule
+ipv6: false
 sniffer:
   enable: true
   override-destination: false
@@ -59,8 +60,26 @@ tun:
 dns:
   enable: true
   ipv6: false
+  prefer-h3: true
   enhanced-mode: fake-ip
-  fake-ip-range: 198.18.0.1/16
+  fake-ip-filter:
+    - "*"
+    - geosite:private
+    - geosite:connectivity-check
+    - "+.lan"
+    - "+.local"
+    - "+.market.xiaomi.com"
+    - "Mijia Cloud"
+    - "dlg.io.mi.com"
+    - "localhost.ptlogin2.qq.com"
+    - "localhost.sec.qq.com"
+    - "localhost.*.weixin.qq.com"
+    - "*.icloud.com"
+    - "time.*.com"
+    - "ntp.*.com"
+    - "+.pool.ntp.org"
+    - "stun.*.*"
+    - "stun.*.*.*"
   default-nameserver:
     - "https://223.5.5.5/dns-query#DIRECT"
     - "https://223.6.6.6/dns-query#DIRECT"
@@ -71,16 +90,14 @@ dns:
       - "https://223.5.5.5/dns-query#DIRECT"
       - "https://223.6.6.6/dns-query#DIRECT"
   nameserver:
-    - "https://cloudflare-dns.com/dns-query#RULES"
-    - "https://dns.google/dns-query#RULES"
+    - "https://cloudflare-dns.com/dns-query"
+    - "https://dns.google/dns-query"
   proxy-server-nameserver:
     - "https://223.5.5.5/dns-query#DIRECT"
     - "https://223.6.6.6/dns-query#DIRECT"
   direct-nameserver:
     - "https://223.5.5.5/dns-query#DIRECT"
     - "https://223.6.6.6/dns-query#DIRECT"
-  direct-nameserver-follow-policy: false
-  respect-rules: true
 proxies: []
 proxy-groups: []
 rule-providers: {}
@@ -109,6 +126,9 @@ rules: []
 
 	parsed, err := mihomoconfig.Parse(result.Content)
 	require.NoError(t, err)
+	require.False(t, parsed.General.IPv6)
+	require.False(t, parsed.DNS.IPv6)
+	require.Contains(t, string(result.Content), "dlg.io.mi.com")
 	for _, proxy := range parsed.Proxies {
 		proxy := proxy
 		t.Cleanup(func() { require.NoError(t, proxy.Close()) })

@@ -77,11 +77,11 @@ Shadowrocket 使用 `GEOIP,CN`。三者都是域名规则之后的**解析型兜
 - Mihomo base 直接包含并开启完整 TUN 块；需要关闭时可修改 base、添加后置
   processor，或在目标客户端关闭。base 默认使用 fake-IP，并由基础 `fake-ip-filter` 和三个互斥的可选扩展控制
   哪些域名返回真实 IP。
-- sing-box base 直接包含双栈 `tun-in`，并用仅监听本机的 mixed inbound 提供系统
-  HTTP proxy；需要关闭时可修改 base 或添加后置 processor。base 默认配置 1.14 FakeIP server，普通 A/AAAA
-  返回 FakeIP；本地、连接检测、校时/NTP/STUN、iCloud 和 Xiaomi 等兼容域名走真实
-  resolver。FakeIP 已配置不等于系统流量已接管，流量仍须经系统代理或已启用的 TUN
-  进入 sing-box DNS。
+- sing-box base 直接包含双栈 `tun-in`，默认以 TUN 接管系统流量，不额外设置平台
+  HTTP proxy；需要关闭时可修改 base 或添加后置 processor。mixed inbound 监听 IPv4
+  wildcard 供 loopback/RFC1918 LAN 使用，首条路由规则拒绝其他来源。base 默认配置
+  1.14 FakeIP server，普通 A 查询返回 IPv4 FakeIP，AAAA 返回空结果；本地、校时/NTP、
+  STUN、iCloud 和 Xiaomi 等兼容域名走真实 resolver。
 - Shadowrocket 是否以 TUN 接管流量由 App 的代理类型或 `compatibility-mode` 决定；
   `tun-excluded-routes` 和 `hijack-dns` 只描述启用后的处理方式。其 TUN DNS 支持
   fake IP，也可用 `always-real-ip` 指定真实 IP 例外；当前 base 不默认扩大该列表，
@@ -107,8 +107,12 @@ Shadowrocket 使用 `GEOIP,CN`。三者都是域名规则之后的**解析型兜
 
 ### sing-box
 
-- 单标签、`.lan`、`.local` 与 private 域名交给 `dns-local`；
-- 内置连接检测和稳定兼容例外交给真实 resolver；
+- `dns-local` 通过 `preferred_by` 优先接管系统 hosts、邻居主机和原生 `.local` mDNS；
+  单标签以及 `.lan`、`.localdomain`、`.localhost`、`.local`、`.home.arpa`、
+  `.internal`、`.example`、`.invalid`、`.test` 作为稳定兜底；
+- mixed inbound 收到上述域名时先用 `dns-local` 和 `ipv4_only` 显式解析，避免
+  `default_domain_resolver` 把本地域名交给中国公网 DNS；
+- 校时/NTP/STUN、iCloud 和 Xiaomi 等稳定兼容例外交给真实 resolver；
 - 其余 A/AAAA 查询交给 `dns-fakeip`，包含普通中国域名；
 - FakeIP catch-all 未接管的 `cn` 查询交给直连的中国 HTTPS DNS，其余查询交给通过
   主代理 detour 的境外 HTTPS DNS；
@@ -116,11 +120,16 @@ Shadowrocket 使用 `GEOIP,CN`。三者都是域名规则之后的**解析型兜
   resolver；
 - 远程规则集通过显式的 `rule-set-direct` HTTP client 直连下载，不依赖
   `route.final` 或尚未完成选优的 `urltest`；
-- base 依次声明 sniff、DNS 劫持与 `direct`、`global` Clash mode 规则；typed driver
-  把 structured settings 规则追加在它们之后，因此 base 规则始终先于普通路由规则；
+- base 依次声明 LAN 来源守卫、sniff、本地域名解析、DNS 劫持与 `direct`、`global`
+  Clash mode 规则；typed driver 把 structured settings 规则追加在它们之后，因此
+  base 规则始终先于普通路由规则；
 - base TUN 启用 `strict_route`，base sniff/DNS 规则以逻辑规则劫持 protocol DNS 或目标
   端口 53；`224.0.0.251/32`、`ff02::fb/128` 则在进入该识别规则前绕开 TUN，
   让 mDNS 留在本地链路，同时保留对其他非标准端口明文 DNS 的协议识别。
+
+base 不再维护不完整的 connectivity-check 域名摘录。Android captive portal 包排除、
+Apple 网络检测等由相应图形客户端或平台集成负责；Mihomo 继续保留其原生
+`geosite:connectivity-check`，这项差异不视为跨核心缺失。
 
 真实解析例外都直接内联在 base 的 DNS rules，不依赖用户可删除的 structured
 rule-set；默认 `private` inline rule-set 只包含域名，私网 IP 路由仍由
@@ -129,6 +138,9 @@ rule-set；默认 `private` inline rule-set 只包含域名，私网 IP 路由�
 
 `strict_route` 是配置层的跨平台默认；sing-box for Android 的 VpnService 当前不实现
 该选项，不能把桌面端的 fail-closed 行为直接视为 Android 保证。
+
+默认 `dns.strategy: ipv4_only` 使新文件不请求或返回 AAAA/FakeIP IPv6；FakeIP 的
+`inet6_range` 与 TUN IPv6 地址仍完整保留，用户启用 IPv6 时无需重新补齐这些参数。
 
 sing-box 新版不依赖已弃用的 legacy GeoIP 数据库；中国 IP 兜底由远程 IP-CIDR
 SRS 规则集完成。
@@ -166,7 +178,10 @@ resolver 最小暴露之间的折中，不应描述为严格的按域名双路 D
 - 中国 IP 兜底位于境外域名规则之后，且没有 `no-resolve`；
 - 没有明文公网 nameserver 或全局 system fallback；
 - 应用 DoH/DoT 规则位于普通服务规则之前；
-- base TUN 的 DNS hijack 与路由配置仍存在且顺序正确。
+- base TUN 的 DNS hijack 与路由配置仍存在且顺序正确；
+- sing-box 本地域名解析位于 FakeIP 与公网 resolver 之前，LAN 来源守卫位于 sniff
+  和普通路由规则之前；
+- sing-box 默认 DNS、FakeIP 与 TUN 地址保持 IPv4-only。
 
 自定义 source、手动删除模板 rule set、改变 processor 顺序或使用全局路由模式，
 都可能改变上述结果。

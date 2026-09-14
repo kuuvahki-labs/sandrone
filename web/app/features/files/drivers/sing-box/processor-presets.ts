@@ -239,7 +239,7 @@ function managedScriptDefaultArgs(id: SingBoxScriptProcessorPresetID): Record<st
     case "tailnet-share": return {
       preset_id: id,
       listen_addresses: [],
-      listen_port: 2080,
+      listen_port: 2081,
       username: "",
       password: "",
     };
