@@ -66,9 +66,13 @@ func TestServiceSingBoxWebDefaultIsAcceptedByLockedCore(t *testing.T) {
 			"type": "logical", "mode": "or", "action": "hijack-dns",
 			"rules": []any{map[string]any{"protocol": "dns"}, map[string]any{"port": float64(53)}},
 		},
+		map[string]any{
+			"domain_suffix": []any{"push.apple.com", "akadns.net"},
+			"outbound":      "direct",
+		},
 		map[string]any{"clash_mode": "direct", "outbound": "direct"},
 		map[string]any{"clash_mode": "global", "outbound": "Proxy"},
-	}, routeRules[:6])
+	}, routeRules[:7])
 	instance, err := box.New(box.Options{Context: boxContext, Options: options})
 	require.NoError(t, err)
 	require.NoError(t, instance.Close())
@@ -161,6 +165,11 @@ func singBoxWebDefaultSpec(t *testing.T, autoMembers []any) *domain.FileSpec {
         "server": "dns-local"
       },
       {
+        "domain_suffix": ["push.apple.com", "akadns.net"],
+        "action": "route",
+        "server": "dns-local"
+      },
+      {
         "domain": [
           "Mijia Cloud",
           "dlg.io.mi.com",
@@ -195,7 +204,10 @@ func singBoxWebDefaultSpec(t *testing.T, autoMembers []any) *domain.FileSpec {
       "strict_route": true,
       "route_exclude_address": [
         "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16",
-        "fe80::/10", "fc00::/7", "224.0.0.251/32", "ff02::fb/128"
+        "17.249.0.0/16", "17.252.0.0/16", "17.57.144.0/22", "17.188.128.0/18",
+        "17.188.20.0/23", "fe80::/10", "fc00::/7", "2620:149:a44::/48",
+        "2403:300:a42::/48", "2403:300:a51::/48", "2a01:b740:a42::/48",
+        "224.0.0.251/32", "ff02::fb/128"
       ]
     }
   ],
@@ -247,6 +259,10 @@ func singBoxWebDefaultSpec(t *testing.T, autoMembers []any) *domain.FileSpec {
         "mode": "or",
         "rules": [{ "protocol": "dns" }, { "port": 53 }],
         "action": "hijack-dns"
+      },
+      {
+        "domain_suffix": ["push.apple.com", "akadns.net"],
+        "outbound": "direct"
       },
       { "clash_mode": "direct", "outbound": "direct" },
       { "clash_mode": "global", "outbound": "Proxy" }

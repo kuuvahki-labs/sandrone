@@ -15,7 +15,8 @@ processors 可以选择其他路由策略，已有文件不会自动回填这些
 - 未知域名在 Mihomo 中使用不绑定路由规则的境外加密 DNS，sing-box 使用经代理
   转发的境外加密 DNS；Shadowrocket 为执行中国 IP 兜底，可能先使用中国加密 DNS，
   具体限制见下文。
-- LAN、私有域名可以使用本地/系统 resolver。
+- LAN、私有域名可以使用本地/系统 resolver；Mihomo、sing-box 中 APNs 域名也使用系统
+  resolver，以便取得可直接连接的真实地址。
 - Shadowrocket 的 `*.apple.com`、`*.icloud.com = server:system` 是有意保留的
   iOS 兼容例外。系统 resolver 是否使用明文传输由当前网络决定；该例外不扩展成
   全局 system fallback。
@@ -76,12 +77,16 @@ Shadowrocket 使用 `GEOIP,CN`。三者都是域名规则之后的**解析型兜
 
 - Mihomo base 直接包含并开启完整 TUN 块；需要关闭时可修改 base、添加后置
   processor，或在目标客户端关闭。base 默认使用 fake-IP，并由基础 `fake-ip-filter` 和三个互斥的可选扩展控制
-  哪些域名返回真实 IP。
+  哪些域名返回真实 IP。APNs 域名固定使用系统 resolver 返回真实 IP，Apple 公布的
+  推送专用 IPv4/IPv6 网段绕过 TUN。
 - sing-box base 直接包含双栈 `tun-in`，默认以 TUN 接管系统流量，不额外设置平台
   HTTP proxy；需要关闭时可修改 base 或添加后置 processor。mixed inbound 监听 IPv4
   wildcard 供 loopback/RFC1918 LAN 使用，首条路由规则拒绝其他来源。base 默认配置
   1.14 FakeIP server，普通 A 查询返回 IPv4 FakeIP，AAAA 返回空结果；本地、校时/NTP、
-  STUN、iCloud 和 Xiaomi 等兼容域名走真实 resolver。
+  STUN、iCloud、Xiaomi 和 APNs 等兼容域名走真实 resolver。APNs 使用系统 resolver，
+  并将 Apple 公布的推送专用 IPv4/IPv6 网段排除在 TUN 自动路由之外；这避免锁屏后的
+  长连接因 FakeIP、sniff 或代理重连而延迟恢复，同时不把整个 Apple `17.0.0.0/8`
+  都排除，保留其他 Apple 服务的策略组控制。
 - Shadowrocket 是否以 TUN 接管流量由 App 的代理类型或 `compatibility-mode` 决定；
   `tun-excluded-routes` 和 `hijack-dns` 只描述启用后的处理方式。其 TUN DNS 支持
   fake IP，也可用 `always-real-ip` 指定真实 IP 例外；当前 base 不默认扩大该列表，
@@ -92,16 +97,19 @@ Shadowrocket 使用 `GEOIP,CN`。三者都是域名规则之后的**解析型兜
 ### Mihomo
 
 - bootstrap、节点域名和直连域名使用直连的阿里 IP DoH；不配置明文 bootstrap；
-- `rule-set:cn` 使用同一组中国 DoH，`geosite:private` 是唯一常规 system 例外；
+- `rule-set:cn` 使用同一组中国 DoH，`geosite:private` 与 APNs 是限定范围的 system 例外；
+- `push.apple.com`、`akadns.net` 同时进入 `fake-ip-filter` 与 `nameserver-policy: system`，
+  避免只跳过 sniff、却仍向设备返回 FakeIP；
 - 默认 resolver 是不绑定路由规则的 Cloudflare/Google DoH；
 - `category-doh` 与端口 `853` 先进入主代理策略；
 - base TUN 开启 `strict-route` 并劫持 TCP/UDP 53，同时把 mDNS 目标
-  `224.0.0.251/32`、`ff02::fb/128` 排除在 TUN 自动路由之外。
+  `224.0.0.251/32`、`ff02::fb/128` 以及 Apple 公布的 APNs IPv4/IPv6 网段排除在
+  TUN 自动路由之外。
 
 这里的 `#DIRECT` 明确固定中国 DNS 请求自身的出站路径。默认境外 DoH URL 不携带
 `#RULES`，base 也不启用 `respect-rules`；这避免与 `prefer-h3: true` 组成上游不建议的
-组合，但不保证境外 DoH 连接本身经过代理。查询内容仍由 HTTPS 加密，不会交给中国
-或系统 resolver。`fake-ip-filter` 只决定返回真实 IP
+组合，但不保证境外 DoH 连接本身经过代理。除上述私有域名与 APNs 的限定例外外，
+查询内容仍由 HTTPS 加密，不会交给系统 resolver。`fake-ip-filter` 只决定返回真实 IP
 还是 fake IP，不决定查询应交给哪个 resolver。fake-IP 的独立边界见
 [Mihomo fake-IP 默认与边界](mihomo-fake-ip.md)。
 
@@ -112,6 +120,8 @@ Shadowrocket 使用 `GEOIP,CN`。三者都是域名规则之后的**解析型兜
   `.internal`、`.example`、`.invalid`、`.test` 作为稳定兜底；
 - mixed inbound 收到上述域名时先用 `dns-local` 和 `ipv4_only` 显式解析，避免
   `default_domain_resolver` 把本地域名交给中国公网 DNS；
+- `push.apple.com` 及其 `akadns.net` 别名在 FakeIP catch-all 前使用 `dns-local`
+  返回真实地址，并在基础路由中固定直连；
 - 校时/NTP/STUN、iCloud 和 Xiaomi 等稳定兼容例外交给真实 resolver；
 - 其余 A/AAAA 查询交给 `dns-fakeip`，包含普通中国域名；
 - FakeIP catch-all 未接管的 `cn` 查询交给直连的中国 HTTPS DNS，其余查询交给通过
@@ -126,6 +136,9 @@ Shadowrocket 使用 `GEOIP,CN`。三者都是域名规则之后的**解析型兜
 - base TUN 启用 `strict_route`，base sniff/DNS 规则以逻辑规则劫持 protocol DNS 或目标
   端口 53；`224.0.0.251/32`、`ff02::fb/128` 则在进入该识别规则前绕开 TUN，
   让 mDNS 留在本地链路，同时保留对其他非标准端口明文 DNS 的协议识别。
+- APNs 的 `17.249.0.0/16`、`17.252.0.0/16`、`17.57.144.0/22`、
+  `17.188.128.0/18`、`17.188.20.0/23` 以及 Apple 公布的四个 IPv6 网段同样绕开
+  TUN。若所在网络阻断 APNs 直连，应移除这些排除项，并为 APNs 域名单独选择代理。
 
 base 不再维护不完整的 connectivity-check 域名摘录。Android captive portal 包排除、
 Apple 网络检测等由相应图形客户端或平台集成负责；Mihomo 继续保留其原生
@@ -167,6 +180,10 @@ resolver 最小暴露之间的折中，不应描述为严格的按域名双路 D
   [规则动作](https://sing-box.sagernet.org/configuration/route/rule_action/)、
   [TUN](https://sing-box.sagernet.org/configuration/inbound/tun/)与
   [废弃项](https://sing-box.sagernet.org/deprecated/)；
+- APNs：[Apple 网络要求](https://support.apple.com/102266)，以及 sing-box 中
+  [透明代理故障记录](https://github.com/SagerNet/sing-box/issues/760)和
+  [sniff 后重解析故障记录](https://github.com/SagerNet/sing-box/issues/1375)，以及
+  Mihomo 中 [APNs 进入代理出口的记录](https://github.com/MetaCubeX/mihomo/issues/1993)；
 - Shadowrocket：[LOWERTOP 配置与手册](https://github.com/LOWERTOP/Shadowrocket)；
 - DoH 传输语义：[RFC 8484](https://www.rfc-editor.org/rfc/rfc8484)。
 
@@ -179,8 +196,10 @@ resolver 最小暴露之间的折中，不应描述为严格的按域名双路 D
 - 没有明文公网 nameserver 或全局 system fallback；
 - 应用 DoH/DoT 规则位于普通服务规则之前；
 - base TUN 的 DNS hijack 与路由配置仍存在且顺序正确；
+- Mihomo APNs 域名同时使用 system resolver 与真实 IP，APNs 地址位于 TUN 排除列表；
 - sing-box 本地域名解析位于 FakeIP 与公网 resolver 之前，LAN 来源守卫位于 sniff
   和普通路由规则之前；
+- sing-box APNs 域名位于 FakeIP 之前并固定直连，APNs 地址位于 TUN 排除列表；
 - sing-box 默认 DNS、FakeIP 与 TUN 地址保持 IPv4-only。
 
 自定义 source、手动删除模板 rule set、改变 processor 顺序或使用全局路由模式，

@@ -42,6 +42,11 @@ export function singBoxDefaultBase(namingLocale: ConfigNamingLocale): string {
         "server": "dns-local"
       },
       {
+        "domain_suffix": ["push.apple.com", "akadns.net"],
+        "action": "route",
+        "server": "dns-local"
+      },
+      {
         "domain": [
           "Mijia Cloud",
           "dlg.io.mi.com",
@@ -79,8 +84,17 @@ export function singBoxDefaultBase(namingLocale: ConfigNamingLocale): string {
         "172.16.0.0/12",
         "192.168.0.0/16",
         "169.254.0.0/16",
+        "17.249.0.0/16",
+        "17.252.0.0/16",
+        "17.57.144.0/22",
+        "17.188.128.0/18",
+        "17.188.20.0/23",
         "fe80::/10",
         "fc00::/7",
+        "2620:149:a44::/48",
+        "2403:300:a42::/48",
+        "2403:300:a51::/48",
+        "2a01:b740:a42::/48",
         "224.0.0.251/32",
         "ff02::fb/128"
       ]
@@ -134,6 +148,10 @@ export function singBoxDefaultBase(namingLocale: ConfigNamingLocale): string {
         "mode": "or",
         "rules": [{ "protocol": "dns" }, { "port": 53 }],
         "action": "hijack-dns"
+      },
+      {
+        "domain_suffix": ["push.apple.com", "akadns.net"],
+        "outbound": "direct"
       },
       { "clash_mode": "direct", "outbound": "direct" },
       { "clash_mode": "global", "outbound": "${anchor}" }

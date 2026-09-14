@@ -4,7 +4,6 @@ package service_test
 
 import (
 	"bytes"
-	"context"
 	"encoding/json/v2"
 	"testing"
 
@@ -32,6 +31,7 @@ sniffer:
     - "Mijia Cloud"
     - "dlg.io.mi.com"
     - "+.push.apple.com"
+    - "+.akadns.net"
   sniff:
     HTTP:
       ports: [80, 8080, 8880]
@@ -53,8 +53,17 @@ tun:
     - 172.16.0.0/12
     - 192.168.0.0/16
     - 169.254.0.0/16
+    - 17.249.0.0/16
+    - 17.252.0.0/16
+    - 17.57.144.0/22
+    - 17.188.128.0/18
+    - 17.188.20.0/23
     - fe80::/10
     - fc00::/7
+    - 2620:149:a44::/48
+    - 2403:300:a42::/48
+    - 2403:300:a51::/48
+    - 2a01:b740:a42::/48
     - 224.0.0.251/32
     - ff02::fb/128
 dns:
@@ -75,6 +84,8 @@ dns:
     - "localhost.sec.qq.com"
     - "localhost.*.weixin.qq.com"
     - "*.icloud.com"
+    - "+.push.apple.com"
+    - "+.akadns.net"
     - "time.*.com"
     - "ntp.*.com"
     - "+.pool.ntp.org"
@@ -85,6 +96,10 @@ dns:
     - "https://223.6.6.6/dns-query#DIRECT"
   nameserver-policy:
     "geosite:private":
+      - system
+    "+.push.apple.com":
+      - system
+    "+.akadns.net":
       - system
     "rule-set:cn":
       - "https://223.5.5.5/dns-query#DIRECT"
@@ -121,7 +136,7 @@ rules: []
 		})},
 	}
 
-	result, err := service.New().GetFile(context.Background(), domain.FileRequest{Spec: &spec})
+	result, err := service.New().GetFile(t.Context(), domain.FileRequest{Spec: &spec})
 	require.NoError(t, err)
 
 	parsed, err := mihomoconfig.Parse(result.Content)
@@ -137,7 +152,7 @@ rules: []
 }
 
 func TestServiceMihomoAdaptiveGroupIsAcceptedByLockedCore(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
 	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
 		Name:   "default",
