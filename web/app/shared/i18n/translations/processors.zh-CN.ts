@@ -28,6 +28,7 @@ export const processorZhCN = {
   "processors.filePreset.singBox.tailscaleExternal.label": "Tailscale 共存",
   "processors.filePreset.singBox.tailnetShare.label": "共享到 Tailnet",
   "processors.filePreset.singBox.fakeIPCompat.label": "Fake-IP 兼容规则",
+  "processors.filePreset.singBox.fakeIPRuleSetGeodata.label": "DustinWin Fake-IP 规则",
   "processors.quick.allowInsecure": "跳过证书校验",
   "processors.quick.default": "保持默认",
   "processors.quick.disabled": "禁用",

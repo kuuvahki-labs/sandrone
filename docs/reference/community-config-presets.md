@@ -109,13 +109,20 @@ driver 先展开成功渲染的订阅节点名（包括 endpoint），JS 再筛�
 | 预设 | 动机 | 默认 | 生成行为 | 风险 | 依赖 / 冲突 | 主要来源 |
 | --- | --- | --- | --- | --- | --- | --- |
 | QUIC 强制回退 | 迫使兼容流量回退至 TCP。 | 关 | 在通用规则前插入 `{protocol:"quic",action:"reject"}`；协议识别由 base 的 sniff 规则提供。 | 失去 HTTP/3 优势；若用户移除 base sniff，规则可能不再命中。 | 无。 | [RFC 9000](https://www.rfc-editor.org/rfc/rfc9000)、[sing-box Protocol](https://sing-box.sagernet.org/configuration/route/rule/#protocol) |
-| Fake-IP 兼容扩展（稳定） | 让额外的兼容域名返回真实 IP。 | 关 | 从 `domain`、`domain_suffix`、`domain_regex` 参数建立一个受管的纯域名 inline rule-set，并把真实 resolver 规则插在所有 FakeIP 规则之前；可显式指定 resolver。 | 例外只改变 DNS 答案，不自动改变路由策略；列表或 resolver 非法时生成失败。 | 需要现有 FakeIP server；与 base 内置例外叠加。 | [sing-box DNS rule](https://sing-box.sagernet.org/configuration/dns/rule/)、[sing-box FakeIP](https://sing-box.sagernet.org/configuration/dns/server/fakeip/) |
+| Fake-IP 兼容扩展（稳定） | 让额外的兼容域名返回真实 IP。 | 关 | 从 `domain`、`domain_suffix`、`domain_regex` 参数建立一个受管的纯域名 inline rule-set，并把真实 resolver 规则插在所有 FakeIP 规则之前；可显式指定 resolver。 | 例外只改变 DNS 答案，不自动改变路由策略；列表或 resolver 非法时生成失败。 | 需要现有 FakeIP server；与 DustinWin 上游规则互斥，并与 base 内置例外叠加。 | [sing-box DNS rule](https://sing-box.sagernet.org/configuration/dns/rule/)、[sing-box FakeIP](https://sing-box.sagernet.org/configuration/dns/server/fakeip/) |
+| DustinWin Fake-IP 规则 | 用 sing-box 原生远程 rule-set 跟随社区维护的真实 IP 例外。 | 关 | 建立固定来源的 binary remote rule-set，以显式 HTTP client 下载并每 `1d` 检查；真实 resolver 规则插在最早的 FakeIP 规则之前，可显式指定 resolver。不添加 `DIRECT` 路由，也不改 DNS 或路由最终策略。 | 内容和较宽的关键字匹配由第三方上游动态维护；CDN 缓存可能推迟新版本可见时间，`1d` 不是更新到达保证。例外只改变 DNS 答案。 | 需要现有 FakeIP server，以及 `route.default_http_client` 引用的 HTTP client；未指定默认时只接受唯一一个已配置 client。与稳定扩展互斥，切换时原位替换。 | [DustinWin ruleset_geodata](https://github.com/DustinWin/ruleset_geodata)、[sing-box Rule Set](https://sing-box.sagernet.org/configuration/rule-set/)、[sing-box DNS rule](https://sing-box.sagernet.org/configuration/dns/rule/) |
 | Tailscale 原生接管 | 由 sing-box 自身建立 Tailnet endpoint。 | 关 | 创建 Tailscale endpoint 与 MagicDNS server，移除 base TUN 的标准共存 exclusions，并在通用规则前加入 endpoint 路由；保留 DNS/路由最终策略。完整内容见[脚本](../../web/app/features/files/processors/scripts/sing-box-tailscale-native.js)。 | 未填写 Auth Key 时由目标核心在日志打印交互式登录 URL；若用户移除 base TUN，生成会失败。 | 与外部共存互斥。 | [sing-box Tailscale endpoint](https://sing-box.sagernet.org/configuration/endpoint/tailscale/)、[Tailscale DNS server](https://sing-box.sagernet.org/configuration/dns/server/tailscale/)、[preferred_by](https://sing-box.sagernet.org/configuration/route/rule/#preferred_by) |
 | Tailscale 共存 | 让系统 Tailscale 与 sing-box TUN 共存。 | 关 | 标准 Tailnet 地址绕开 TUN，`ts.net` 使用 MagicDNS；FakeIP 下让 `tailscale.com` 走原默认真实 DNS（条件见下文）。不创建 endpoint，不改最终策略；完整内容见[脚本](../../web/app/features/files/processors/scripts/sing-box-tailscale-external.js)。 | 系统 Tailscale 和 base TUN 必须仍然存在并正确配置；FakeIP 的默认 DNS 不符合复用条件时处理器报错。 | 与原生接管互斥。 | [Tailscale MagicDNS](https://tailscale.com/docs/features/magicdns)、[Tailscale DNS](https://tailscale.com/docs/reference/dns-in-tailscale) |
 | Tailnet 代理共享 | 让 Tailnet 设备连接 sing-box mixed listener。 | 关 | 为用户填写的精确 Tailnet IPv4/IPv6 地址分别生成 `tailnet-share-v4`/`tailnet-share-v6` inbound；默认端口 2081，避开 base 的 LAN listener，可选成对用户名和密码。 | 地址默认为空，首次生成前必须填写；只接受各一个 `100.64.0.0/10` IPv4 和 `fd7a:115c:a1e0::/48` IPv6，并检查 wildcard 与既有监听冲突。 | 依赖 Tailscale 外部共存；TUN 由 base 提供。 | [sing-box Mixed](https://sing-box.sagernet.org/configuration/inbound/mixed/)、[Tailscale CGNAT](https://tailscale.com/kb/1015/100.x-addresses) |
 
 Fake-IP 扩展的保存参数是 `preset_id:"fakeip-compat"`、三个字符串数组
 `domain`/`domain_suffix`/`domain_regex` 和可选 `server` tag；三个数组合计至少一项。
+DustinWin 上游规则的保存参数仅是 `preset_id:"fakeip-ruleset-geodata"` 和可选
+`server` tag。来源 URL、`binary` 格式、受管 tag 和 `1d` 检查间隔固定为预设身份，
+不会由请求参数临时替换。脚本优先使用 `route.default_http_client` 指向的唯一 client；
+未设置时仅在 `http_clients` 恰有一个带 tag 的项目时使用它，否则生成失败。上游当前
+转换内容包含 `ntp`、`stun`、`time` 等较宽的关键字规则，具体命中范围可随后续发布变化；
+sing-box 的 `1d` 只控制重新检查间隔，不能绕过 jsDelivr 缓存或保证一天内取得新产物。
 Tailnet 分享的保存参数是 `preset_id:"tailnet-share"`、`listen_addresses:[]`、
 `listen_port:2081`、`username:""`、`password:""`。新增后的空地址是待配置状态，
 执行会明确失败，不会退化成 wildcard listener。脚本拥有的业务参数都不接受请求级

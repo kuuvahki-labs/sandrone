@@ -143,6 +143,7 @@ describe("sing-box file processor defaults", () => {
       "tailscale-external",
       "tailnet-share",
       "fakeip-compat",
+      "fakeip-ruleset-geodata",
     ]);
     const scenarioIDs = [
       "quic-fallback",
@@ -635,6 +636,71 @@ describe("sing-box file processor defaults", () => {
 
   });
 
+  it("switches FakeIP list modes in place while preserving edited processors", () => {
+    const customBefore = customProcessor("before");
+    const customAfter = customProcessor("after");
+    const stable = singBoxProcessorPreset("fakeip-compat");
+    const upstream = singBoxProcessorPreset("fakeip-ruleset-geodata");
+    const current = [customBefore, stable, customAfter];
+
+    expect(presetDescriptor("fakeip-compat")).toMatchObject({
+      defaultOn: false,
+      dependencies: [],
+      conflicts: ["fakeip-ruleset-geodata"],
+      replaceConflictsInPlace: true,
+    });
+    expect(presetDescriptor("fakeip-ruleset-geodata")).toMatchObject({
+      defaultOn: false,
+      dependencies: [],
+      conflicts: ["fakeip-compat"],
+      replaceConflictsInPlace: true,
+    });
+
+    const upstreamPlan = planFileProcessorPresetAddition(
+      singBoxProcessorPresets,
+      "fakeip-ruleset-geodata",
+      current,
+      en,
+    );
+    expect(upstreamPlan.removedPresetIDs).toEqual(["fakeip-compat"]);
+    expect(applyPlan(current, upstreamPlan)).toEqual([customBefore, upstream, customAfter]);
+    expect(planFileProcessorPresetAddition(
+      singBoxProcessorPresets,
+      "fakeip-ruleset-geodata",
+      [upstream],
+      en,
+    )).toMatchObject({ additions: [], removeIndices: [] });
+
+    const stablePlan = planFileProcessorPresetAddition(
+      singBoxProcessorPresets,
+      "fakeip-compat",
+      [customBefore, upstream, customAfter],
+      en,
+    );
+    expect(stablePlan.removedPresetIDs).toEqual(["fakeip-ruleset-geodata"]);
+    expect(applyPlan([customBefore, upstream, customAfter], stablePlan)).toEqual(current);
+
+    const editedStable = {
+      ...stable,
+      params: {
+        ...stable.params,
+        source: {
+          ...(stable.params?.source as Record<string, unknown>),
+          content: `${String((stable.params?.source as Record<string, unknown>).content)}\n// edited`,
+        },
+      },
+    };
+    const withEdited = [editedStable, upstream];
+    const editedPlan = planFileProcessorPresetAddition(
+      singBoxProcessorPresets,
+      "fakeip-compat",
+      withEdited,
+      en,
+    );
+    expect(editedPlan.removeIndices).toEqual([1]);
+    expect(applyPlan(withEdited, editedPlan)).toEqual([editedStable, stable]);
+  });
+
   it("builds the managed presets with editable typed arguments", () => {
     expect(singBoxProcessorPreset("tailnet-share")).toMatchObject({
       params: { args: {
@@ -670,6 +736,9 @@ describe("sing-box file processor defaults", () => {
       ],
     });
     expect((fakeIPArgs.domain_regex as string[]).some((value) => value.includes("*"))).toBe(false);
+    expect(singBoxProcessorPreset("fakeip-ruleset-geodata")).toMatchObject({
+      params: { args: { preset_id: "fakeip-ruleset-geodata", server: "" } },
+    });
   });
 
   it("shares exact Tailnet IPs with optional authentication and replaces owned listeners", () => {
@@ -860,6 +929,162 @@ describe("sing-box file processor defaults", () => {
       .toThrowError("incompatible DNS rule for sandrone-fakeip-compat");
   });
 
+  it("adds the managed DustinWin rule-set before the earliest FakeIP DNS route", () => {
+    const original = {
+      http_clients: [{ tag: "rule-set-direct" }, { tag: "rule-set-proxy" }],
+      dns: {
+        servers: [
+          { type: "https", tag: "dns-remote", server: "1.1.1.1" },
+          { type: "tls", tag: "dns-explicit", server: "8.8.8.8" },
+          { type: "fakeip", tag: "fake-one" },
+          { type: "fakeip", tag: "fake-two" },
+        ],
+        rules: [
+          { domain: ["before.example"], server: "dns-remote" },
+          { domain: ["first-fake.example"], server: "fake-two" },
+          { domain: ["middle.example"], server: "dns-remote" },
+          { domain: ["second-fake.example"], server: "fake-one" },
+        ],
+        final: "dns-remote",
+      },
+      route: {
+        default_http_client: "rule-set-direct",
+        final: "LockedRouteFinal",
+        rule_set: [{ type: "inline", tag: "private", rules: [] }],
+        rules: [{ outbound: "LockedFinal" }],
+      },
+    };
+    const first = runManaged("fakeip-ruleset-geodata", original, { server: "dns-explicit" });
+    expect(first.stringifyCalls).toBe(1);
+    expect(first.document).toEqual({
+      ...original,
+      dns: {
+        ...original.dns,
+        rules: [
+          original.dns.rules[0],
+          { rule_set: ["sandrone-fakeip-ruleset-geodata"], action: "route", server: "dns-explicit" },
+          ...original.dns.rules.slice(1),
+        ],
+      },
+      route: {
+        ...original.route,
+        rule_set: [
+          original.route.rule_set[0],
+          {
+            type: "remote",
+            tag: "sandrone-fakeip-ruleset-geodata",
+            format: "binary",
+            url: "https://cdn.jsdelivr.net/gh/DustinWin/ruleset_geodata@sing-box-ruleset/fakeip-filter.srs",
+            http_client: "rule-set-direct",
+            update_interval: "1d",
+          },
+        ],
+      },
+    });
+    expect(runManaged("fakeip-ruleset-geodata", first.document, { server: "dns-explicit" }).document)
+      .toEqual(first.document);
+  });
+
+  it("uses dns.final and a sole HTTP client when explicit defaults are omitted", () => {
+    const original = {
+      http_clients: [{ tag: "only-client" }],
+      dns: {
+        servers: [{ type: "local", tag: "real" }, { type: "fakeip", tag: "fake" }],
+        rules: [{ server: "fake" }],
+        final: "real",
+      },
+      route: { rules: [{ outbound: "LockedFinal" }] },
+    };
+    const result = runManaged("fakeip-ruleset-geodata", original).document;
+    expect((result.dns as { rules: unknown[] }).rules[0]).toEqual({
+      rule_set: ["sandrone-fakeip-ruleset-geodata"],
+      action: "route",
+      server: "real",
+    });
+    expect((result.route as { rule_set: unknown[] }).rule_set[0]).toMatchObject({
+      tag: "sandrone-fakeip-ruleset-geodata",
+      http_client: "only-client",
+    });
+  });
+
+  it("rejects invalid DustinWin rule-set inputs and collisions atomically", () => {
+    const managedRuleSet = {
+      type: "remote",
+      tag: "sandrone-fakeip-ruleset-geodata",
+      format: "binary",
+      url: "https://cdn.jsdelivr.net/gh/DustinWin/ruleset_geodata@sing-box-ruleset/fakeip-filter.srs",
+      http_client: "rule-set-direct",
+      update_interval: "1d",
+    };
+    const base = {
+      http_clients: [{ tag: "rule-set-direct" }],
+      dns: {
+        servers: [{ type: "local", tag: "real" }, { type: "fakeip", tag: "fake" }],
+        rules: [{ server: "fake" }],
+        final: "real",
+      },
+      route: { default_http_client: "rule-set-direct", rule_set: [], rules: [] },
+    };
+    const cases = [
+      {
+        document: { ...base, dns: { ...base.dns, servers: [{ type: "local", tag: "real" }] } },
+        error: "requires a tagged FakeIP DNS server",
+      },
+      {
+        document: { ...base, dns: { ...base.dns, rules: [{ server: "real" }] } },
+        error: "requires a DNS rule routed to FakeIP",
+      },
+      {
+        document: { ...base, dns: { ...base.dns, final: "fake" } },
+        error: "requires a tagged real DNS resolver",
+      },
+      {
+        document: { ...base, http_clients: [] },
+        error: "requires one configured default HTTP client",
+      },
+      {
+        document: {
+          ...base,
+          http_clients: [{ tag: "one" }, { tag: "two" }],
+          route: { ...base.route, default_http_client: "" },
+        },
+        error: "requires one configured default HTTP client",
+      },
+      {
+        document: {
+          ...base,
+          route: { ...base.route, rule_set: [{ ...managedRuleSet, url: "https://example.com/other.srs" }] },
+        },
+        error: "found incompatible route rule-set tag sandrone-fakeip-ruleset-geodata",
+      },
+      {
+        document: { ...base, route: { ...base.route, rule_set: [managedRuleSet, managedRuleSet] } },
+        error: "found duplicate route rule-set tag sandrone-fakeip-ruleset-geodata",
+      },
+      {
+        document: {
+          ...base,
+          dns: {
+            ...base.dns,
+            rules: [
+              { rule_set: ["sandrone-fakeip-ruleset-geodata", "private"], action: "route", server: "real" },
+              ...base.dns.rules,
+            ],
+          },
+        },
+        error: "found incompatible DNS rule for sandrone-fakeip-ruleset-geodata",
+      },
+    ];
+
+    for (const test of cases) {
+      const execution = prepareManaged("fakeip-ruleset-geodata", test.document);
+      const before = execution.input.file.content;
+      expect(execution.run).toThrowError(test.error);
+      expect(execution.input.file.content).toBe(before);
+      expect(execution.stringifyCalls()).toBe(0);
+    }
+  });
+
   it("declares the full Tailscale dependency chain and cascades dependents", () => {
     expect(presetDescriptor("tailnet-share")).toMatchObject({ dependencies: ["tailscale-external"], conflicts: [] });
     expect(planFileProcessorPresetAddition(singBoxProcessorPresets, "tailnet-share", [], en).addedPresetIDs)
@@ -871,7 +1096,7 @@ describe("sing-box file processor defaults", () => {
   });
 
   it("recognizes managed scripts with common execution params but not edited sources or invalid business args", () => {
-    for (const id of ["tailscale-native", "tailscale-external", "tailnet-share", "fakeip-compat"] as const) {
+    for (const id of ["tailscale-native", "tailscale-external", "tailnet-share", "fakeip-compat", "fakeip-ruleset-geodata"] as const) {
       const preset = singBoxProcessorPreset(id);
       const descriptor = presetDescriptor(id);
       expect(descriptor.recognize({ ...preset, params: { ...preset.params, timeout_ms: 5000 } })).toBe(true);
@@ -919,6 +1144,7 @@ describe("sing-box file processor defaults", () => {
       ["tailscale-external", "preset_id"],
       ["tailnet-share", "listen_port"],
       ["fakeip-compat", "domain"],
+      ["fakeip-ruleset-geodata", "server"],
     ] as const;
     for (const [id] of managed) {
       expect(prepareManaged(id, {}, {}, { stage: "nodes" }).run).toThrowError("requires sing-box file-stage input");
@@ -1006,7 +1232,12 @@ function prepareTailscale(
   };
 }
 
-type ManagedScriptPresetID = "tailscale-native" | "tailscale-external" | "tailnet-share" | "fakeip-compat";
+type ManagedScriptPresetID =
+  | "tailscale-native"
+  | "tailscale-external"
+  | "tailnet-share"
+  | "fakeip-compat"
+  | "fakeip-ruleset-geodata";
 
 function runManaged(
   id: ManagedScriptPresetID,

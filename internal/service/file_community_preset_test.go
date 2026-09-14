@@ -563,6 +563,69 @@ func TestServiceCommunityPresetSingBoxFakeIPCompatUsesExactRawAsset(t *testing.T
 	}}, compat["rules"])
 }
 
+func TestServiceCommunityPresetSingBoxFakeIPRuleSetGeodataUsesExactRawAsset(t *testing.T) {
+	spec := domain.FileSpec{
+		Name: "sing-box-fakeip-ruleset-geodata.json",
+		Kind: domain.FileKindSingBox,
+		Source: domain.FileSource{Type: "inline", Content: `{
+			"http_clients": [{"tag":"rule-set-direct"}],
+			"dns": {
+				"servers": [
+					{"type":"https","tag":"dns-remote","server":"1.1.1.1"},
+					{"type":"fakeip","tag":"dns-fakeip"}
+				],
+				"rules": [
+					{"domain_suffix":["before.example"],"server":"dns-remote"},
+					{"query_type":["A","AAAA"],"action":"route","server":"dns-fakeip"}
+				],
+				"final": "dns-remote"
+			},
+			"inbounds": [],
+			"outbounds": [],
+			"route": {
+				"default_http_client":"rule-set-direct",
+				"rule_set":[],
+				"rules":[]
+			}
+		}`},
+		Config: &domain.FileConfig{Settings: completeTypedSettings(t, map[string]any{
+			"rules": []map[string]any{{"outbound": "Proxy"}},
+		})},
+		Processors: []domain.ProcessorSpec{
+			singBoxManagedScriptProcessor(
+				t,
+				"fakeip-ruleset-geodata",
+				"DustinWin Fake-IP 规则",
+				"sing-box-fakeip-ruleset-geodata.js",
+				map[string]any{"server": ""},
+			),
+		},
+	}
+
+	result, err := service.New().GetFile(t.Context(), domain.FileRequest{Spec: &spec})
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	doc := decodeSingBoxCommunityPresetResult(t, result.Content)
+	dnsRules := requireAnySlice(t, requireStringMap(t, doc["dns"])["rules"])
+	require.Len(t, dnsRules, 3)
+	require.Equal(t, map[string]any{
+		"rule_set": []any{"sandrone-fakeip-ruleset-geodata"},
+		"action":   "route",
+		"server":   "dns-remote",
+	}, requireStringMap(t, dnsRules[1]))
+	ruleSets := requireAnySlice(t, requireStringMap(t, doc["route"])["rule_set"])
+	upstream := requireStringMapWithField(t, ruleSets, "tag", "sandrone-fakeip-ruleset-geodata")
+	require.Equal(t, map[string]any{
+		"type":            "remote",
+		"tag":             "sandrone-fakeip-ruleset-geodata",
+		"format":          "binary",
+		"url":             "https://cdn.jsdelivr.net/gh/DustinWin/ruleset_geodata@sing-box-ruleset/fakeip-filter.srs",
+		"http_client":     "rule-set-direct",
+		"update_interval": "1d",
+	}, upstream)
+}
+
 func TestServiceCommunityPresetSingBoxManagedRequestOverrideFailsWithoutResult(t *testing.T) {
 	spec := domain.FileSpec{
 		Name:   "sing-box-managed-override.json",

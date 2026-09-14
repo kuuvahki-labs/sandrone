@@ -14,6 +14,7 @@ import {
   recognizeOrderedRuleProcessorPreset,
 } from "~/features/files/processors/ordered-rule-preset";
 import singBoxFakeIPCompatScript from "~/features/files/processors/scripts/sing-box-fakeip-compat.js?raw";
+import singBoxFakeIPRuleSetGeodataScript from "~/features/files/processors/scripts/sing-box-fakeip-ruleset-geodata.js?raw";
 import singBoxOutboundAdapterScript from "~/features/files/processors/scripts/sing-box-outbound-adapter.js?raw";
 import singBoxTailnetShareScript from "~/features/files/processors/scripts/sing-box-tailnet-share.js?raw";
 import singBoxTailscaleExternalScript from "~/features/files/processors/scripts/sing-box-tailscale-external.js?raw";
@@ -27,15 +28,22 @@ export type SingBoxProcessorPresetID =
   | "tailscale-native"
   | "tailscale-external"
   | "tailnet-share"
-  | "fakeip-compat";
+  | "fakeip-compat"
+  | "fakeip-ruleset-geodata";
 type SingBoxOrderedRuleProcessorPresetID = "quic-fallback";
-type SingBoxScriptProcessorPresetID = "tailscale-native" | "tailscale-external" | "tailnet-share" | "fakeip-compat";
+type SingBoxScriptProcessorPresetID =
+  | "tailscale-native"
+  | "tailscale-external"
+  | "tailnet-share"
+  | "fakeip-compat"
+  | "fakeip-ruleset-geodata";
 
 const MANAGED_SCRIPTS: Readonly<Record<SingBoxScriptProcessorPresetID, string>> = {
   "tailscale-native": singBoxTailscaleNativeScript,
   "tailscale-external": singBoxTailscaleExternalScript,
   "tailnet-share": singBoxTailnetShareScript,
   "fakeip-compat": singBoxFakeIPCompatScript,
+  "fakeip-ruleset-geodata": singBoxFakeIPRuleSetGeodataScript,
 };
 
 const FAKEIP_COMPAT_DOMAIN = [
@@ -156,7 +164,22 @@ export const singBoxProcessorPresets: readonly FileProcessorPreset[] = [
   managedScriptDescriptor("tailscale-native", "tailscale", "processors.filePreset.singBox.tailscaleNative.label", [], ["tailscale-external"]),
   managedScriptDescriptor("tailscale-external", "tailscale", "processors.filePreset.singBox.tailscaleExternal.label", [], ["tailscale-native"]),
   managedScriptDescriptor("tailnet-share", "tailscale", "processors.filePreset.singBox.tailnetShare.label", ["tailscale-external"]),
-  managedScriptDescriptor("fakeip-compat", "network", "processors.filePreset.singBox.fakeIPCompat.label"),
+  managedScriptDescriptor(
+    "fakeip-compat",
+    "network",
+    "processors.filePreset.singBox.fakeIPCompat.label",
+    [],
+    ["fakeip-ruleset-geodata"],
+    true,
+  ),
+  managedScriptDescriptor(
+    "fakeip-ruleset-geodata",
+    "network",
+    "processors.filePreset.singBox.fakeIPRuleSetGeodata.label",
+    [],
+    ["fakeip-compat"],
+    true,
+  ),
 ];
 
 export function defaultSingBoxProcessors(t: Translator, { namingLocale }: { namingLocale: ConfigNamingLocale }): ProcessorDetail[] {
@@ -219,6 +242,7 @@ function managedScriptDescriptor(
   labelKey: FileProcessorPreset["labelKey"],
   dependencies: readonly SingBoxProcessorPresetID[] = [],
   conflicts: readonly SingBoxProcessorPresetID[] = [],
+  replaceConflictsInPlace = false,
 ): FileProcessorPreset {
   return {
     id,
@@ -227,6 +251,7 @@ function managedScriptDescriptor(
     defaultOn: false,
     dependencies,
     conflicts,
+    replaceConflictsInPlace,
     build: (t) => managedScriptProcessor(id, t(labelKey)),
     recognize: (processor) => recognizeManagedScriptProcessor(id, processor),
     isCurrent: (processor) => isCurrentManagedScriptProcessor(id, processor),
@@ -250,6 +275,7 @@ function managedScriptDefaultArgs(id: SingBoxScriptProcessorPresetID): Record<st
       domain_regex: [...FAKEIP_COMPAT_DOMAIN_REGEX],
       server: "",
     };
+    case "fakeip-ruleset-geodata": return { preset_id: id, server: "" };
     default: return { preset_id: id };
   }
 }
@@ -289,6 +315,8 @@ function validManagedScriptArgs(id: SingBoxScriptProcessorPresetID, value: unkno
       && isStringArray(value.domain)
       && isStringArray(value.domain_suffix)
       && isStringArray(value.domain_regex)
+      && typeof value.server === "string";
+    case "fakeip-ruleset-geodata": return isExactRecord(value, ["preset_id", "server"])
       && typeof value.server === "string";
     default: return isExactRecord(value, ["preset_id"]);
   }

@@ -28,6 +28,7 @@ export const processorEnUS = {
   "processors.filePreset.singBox.tailscaleExternal.label": "Tailscale coexistence",
   "processors.filePreset.singBox.tailnetShare.label": "Share to Tailnet",
   "processors.filePreset.singBox.fakeIPCompat.label": "Fake-IP compatibility",
+  "processors.filePreset.singBox.fakeIPRuleSetGeodata.label": "DustinWin Fake-IP rules",
   "processors.quick.allowInsecure": "Skip certificate verification",
   "processors.quick.default": "Keep default",
   "processors.quick.disabled": "Disabled",
