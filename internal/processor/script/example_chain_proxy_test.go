@@ -51,7 +51,7 @@ proxy-groups:
     type: select
     proxies: [DIRECT]
 `
-	out := applyExampleFileScript(t, "mihomo-chain-proxy.js", "mihomo", input, map[string]any{
+	out := applyExampleFileScript(t, "chain-proxy.js", "mihomo", input, map[string]any{
 		"landing_pattern": "^落地",
 		"front_proxies":   []string{"香港节点"},
 	})
@@ -79,7 +79,7 @@ proxy-groups:
     filter: 香港
     exclude-filter: 测试
 `
-	out := applyExampleFileScript(t, "mihomo-chain-proxy.js", "mihomo", input, map[string]any{
+	out := applyExampleFileScript(t, "chain-proxy.js", "mihomo", input, map[string]any{
 		"landing_pattern": "^落地",
 		"front_proxies":   []string{"香港节点"},
 	})
@@ -100,7 +100,7 @@ func TestExampleSingBoxChainProxyRewritesFinalFile(t *testing.T) {
     {"type": "vless", "tag": "落地 A", "server": "landing.example.com", "server_port": 443}
   ]
 }`
-	out := applyExampleFileScript(t, "sing-box-chain-proxy.js", "sing-box", input, map[string]any{
+	out := applyExampleFileScript(t, "chain-proxy.js", "sing-box", input, map[string]any{
 		"landing_pattern": "^落地",
 		"front_proxies":   []string{"香港节点"},
 	})
@@ -121,8 +121,8 @@ func TestExampleChainProxyLeavesFileUnchangedWithoutLandingMatches(t *testing.T)
 		kind     string
 		content  string
 	}{
-		{filename: "mihomo-chain-proxy.js", kind: "mihomo", content: "proxies: []\n"},
-		{filename: "sing-box-chain-proxy.js", kind: "sing-box", content: `{"outbounds":[]}`},
+		{filename: "chain-proxy.js", kind: "mihomo", content: "proxies: []\n"},
+		{filename: "chain-proxy.js", kind: "sing-box", content: `{"outbounds":[]}`},
 	}
 	for _, test := range tests {
 		t.Run(test.kind, func(t *testing.T) {

@@ -68,10 +68,21 @@ curl -sS -X POST \
 
 ## 复用仓库脚本
 
+编写多客户端 file-stage 脚本时，可复制
+[`multi-client-file.js`](../../examples/script-templates/multi-client-file.js)。模板把输入校验、
+参数解析、客户端选择和成功后的正文写回固定在 `main` 中；每个成品脚本仍是自包含单文件，
+不依赖 `require`、`import` 或构建步骤。
+
 | 示例 | 适用场景 |
 | --- | --- |
 | [`normalize-nodes.js`](../../examples/scripts/normalize-nodes.js) | 过滤信息节点、去重和规范化名称；会删除不满足配置的节点，使用前预览结果。 |
 | [`reindex-normalized-nodes.js`](../../examples/scripts/reindex-normalized-nodes.js) | 在最终顺序确定后重编规范化名称的序号，不排序或增删节点。`template`、`separator` 需与名称规范化配置一致。 |
+| [`subscription-filter-group.js`](../../examples/scripts/subscription-filter-group.js) | 为 Mihomo、sing-box 或 Shadowrocket 增加由 `filter` 参数筛选的订阅分组。 |
+| [`custom-routing.js`](../../examples/scripts/custom-routing.js) | 从 `rules` 及可选 `routes` 参数生成三端路由规则。 |
+| [`custom-hosts.js`](../../examples/scripts/custom-hosts.js) | 从 `hosts` 参数写入三端精确主机名映射。 |
+| [`real-ip-domains.js`](../../examples/scripts/real-ip-domains.js) | 从 `domain` / `domain_suffix` 参数为三端添加 FakeIP 例外。 |
+| [`domain-suffix-doh.js`](../../examples/scripts/domain-suffix-doh.js) | 为三端指定域名后缀的 DoH；另见[使用说明](domain-suffix-doh.md)。 |
+| [`chain-proxy.js`](../../examples/scripts/chain-proxy.js) | 为 Mihomo 或 sing-box 配置链式代理和对应选择组。 |
 
 参数、模板变量和默认值由脚本头部维护。在仓库根目录用 `jq` 登记脚本，例如：
 

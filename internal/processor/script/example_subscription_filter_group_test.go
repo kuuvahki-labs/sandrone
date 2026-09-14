@@ -1,6 +1,7 @@
 package script_test
 
 import (
+	"encoding/json/v2"
 	"strings"
 	"testing"
 
@@ -83,6 +84,63 @@ FINAL,Main
 	require.Contains(t, string(first.File.Content), "Main = select,Filtered,DIRECT,Other\n")
 	require.Contains(t, string(first.File.Content), "Filtered = select,policy-regex-filter=(?i)premium|iplc\n")
 	require.Equal(t, 1, countLines(string(first.File.Content), "Filtered = "))
+}
+
+func TestExampleSubscriptionFilterGroupPrependsSingBoxGroupIdempotently(t *testing.T) {
+	input := `{
+  "outbounds": [
+    {"type":"selector","tag":"Main","outbounds":["direct","Filtered","Standard JP","Filtered"]},
+    {"type":"selector","tag":"Filtered","outbounds":["old-node"]},
+    {"type":"selector","tag":"Filtered","outbounds":["duplicate"]},
+    {"type":"direct","tag":"direct"},
+    {"type":"shadowsocks","tag":"Premium HK","server":"hk.example.com","server_port":8388},
+    {"type":"shadowsocks","tag":"Standard JP","server":"jp.example.com","server_port":8388}
+  ],
+  "endpoints": [
+    {"type":"wireguard","tag":"Premium WG"}
+  ],
+  "route":{"rules":[],"final":"Main"}
+}`
+	args := map[string]any{
+		"filter":       "(?i)premium",
+		"target_group": "Main",
+		"group_name":   "Filtered",
+	}
+	first := applyExampleFileScript(t, "subscription-filter-group.js", "sing-box", input, args)
+	second := applyExampleFileScript(t, "subscription-filter-group.js", "sing-box", string(first.File.Content), args)
+
+	var firstDoc, secondDoc map[string]any
+	require.NoError(t, json.Unmarshal(first.File.Content, &firstDoc))
+	require.NoError(t, json.Unmarshal(second.File.Content, &secondDoc))
+	require.Equal(t, firstDoc, secondDoc)
+	outbounds := requireObjectList(t, firstDoc["outbounds"])
+	require.Equal(t, []any{"Filtered", "direct", "Standard JP"},
+		requireNamedObject(t, outbounds, "tag", "Main")["outbounds"])
+	require.Equal(t, []any{"Premium HK", "Premium WG"},
+		requireNamedObject(t, outbounds, "tag", "Filtered")["outbounds"])
+}
+
+func TestExampleSubscriptionFilterGroupSkipsEmptySingBoxGroup(t *testing.T) {
+	input := `{
+  "outbounds": [
+    {"type":"selector","tag":"Main","outbounds":["direct"]},
+    {"type":"direct","tag":"direct"},
+    {"type":"shadowsocks","tag":"Standard JP","server":"jp.example.com","server_port":8388}
+  ]
+}`
+	out := applyExampleFileScript(t, "subscription-filter-group.js", "sing-box", input, map[string]any{
+		"filter":       "premium",
+		"target_group": "Main",
+		"group_name":   "Filtered",
+	})
+
+	var doc map[string]any
+	require.NoError(t, json.Unmarshal(out.File.Content, &doc))
+	outbounds := requireObjectList(t, doc["outbounds"])
+	require.Equal(t, []any{"direct"}, requireNamedObject(t, outbounds, "tag", "Main")["outbounds"])
+	require.Len(t, outbounds, 3)
+	require.Equal(t, input, string(out.File.Content))
+	require.Equal(t, []string{"subscription_filter_group_empty"}, warningCodes(out.Warnings))
 }
 
 func countLines(content, prefix string) int {

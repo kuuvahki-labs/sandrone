@@ -23,53 +23,75 @@
  * Shadowrocket 保留全局 DNS、其他 Host 和规则；重复执行会更新目标项，不重复追加。
  */
 
+var SCRIPT_NAME = "domain-suffix-doh.js";
+
+var ADAPTERS = {
+    mihomo: {apply: applyMihomo},
+    "sing-box": {apply: applySingBox},
+    shadowrocket: {apply: applyShadowrocket}
+};
+
 function main(input, api) {
-    if (!input || input.stage !== "file" || !input.file || typeof input.file.content !== "string") {
-        throw new Error("domain-suffix-doh requires file-stage text input");
-    }
-    var kind = input.file.kind;
-    if (kind !== "mihomo" && kind !== "sing-box" && kind !== "shadowrocket") {
+    requireFile(input);
+    var adapter = ADAPTERS[input.file.kind];
+    if (!adapter) {
         throw new Error("domain-suffix-doh 仅支持 mihomo、sing-box 和 shadowrocket");
     }
-    var args = input.args || {};
-    var suffixes = readSuffixes(args.suffixes);
-    var endpoint = readEndpoint(args.doh);
-    if (kind === "shadowrocket") {
-        input.file.content = configureShadowrocket(input.file.content, api, suffixes, endpoint);
-        return input;
-    }
-    var codec = kind === "mihomo" ? api.yaml : api.json;
-    var doc = requireObject(codec.parse(input.file.content), "文件正文");
-    var dns = requireObject(doc.dns, "dns");
 
-    if (kind === "mihomo") {
-        if (dns.enable !== true) throw new Error("请先启用 Mihomo dns.enable");
-        var policy = dns["nameserver-policy"] === undefined ? {} :
-            requireObject(dns["nameserver-policy"], "dns.nameserver-policy");
-        suffixes.forEach(function(suffix) {
-            policy["+." + suffix] = [endpoint.url + "#DIRECT"];
-        });
-        dns["nameserver-policy"] = policy;
-        dns["direct-nameserver-follow-policy"] = true;
-    } else {
-        configureSingBox(dns, args, suffixes, endpoint);
-    }
-    input.file.content = codec.stringify(doc);
+    var args = readArgs(input.args || {}, api);
+    var content = applyOperation(input.file.content, args, api, adapter);
+    if (content !== undefined) input.file.content = content;
     return input;
 }
 
-function configureShadowrocket(content, api, suffixes, endpoint) {
-    if (endpoint.url.indexOf(",") !== -1) {
+function readArgs(args, api) {
+    return {
+        suffixes: readSuffixes(args.suffixes),
+        endpoint: readEndpoint(args.doh),
+        bootstrap: args.bootstrap,
+        tag: args.tag
+    };
+}
+
+function applyOperation(content, args, api, adapter) {
+    return adapter.apply(content, args, api);
+}
+
+function applyMihomo(content, args, api) {
+    var document = api.yaml.parse(content);
+    document = requireObject(document, "文件正文");
+    var dns = requireObject(document.dns, "dns");
+    if (dns.enable !== true) throw new Error("请先启用 Mihomo dns.enable");
+    var policy = dns["nameserver-policy"] === undefined ? {} :
+        requireObject(dns["nameserver-policy"], "dns.nameserver-policy");
+    args.suffixes.forEach(function(suffix) {
+        policy["+." + suffix] = [args.endpoint.url + "#DIRECT"];
+    });
+    dns["nameserver-policy"] = policy;
+    dns["direct-nameserver-follow-policy"] = true;
+    return api.yaml.stringify(document);
+}
+
+function applySingBox(content, args, api) {
+    var document = api.json.parse(content);
+    document = requireObject(document, "文件正文");
+    var dns = requireObject(document.dns, "dns");
+    configureSingBox(dns, args, args.suffixes, args.endpoint);
+    return api.json.stringify(document);
+}
+
+function applyShadowrocket(content, args, api) {
+    if (args.endpoint.url.indexOf(",") !== -1) {
         throw new Error("Shadowrocket doh URL 不能包含未编码的逗号，请使用 %2C");
     }
     var doc = api.ini.parse(content);
     var hostKeys = Object.create(null);
     var hostLines = [];
     var ruleLines = [];
-    suffixes.forEach(function(suffix) {
+    args.suffixes.forEach(function(suffix) {
         [suffix, "*." + suffix].forEach(function(key) {
             hostKeys[key] = true;
-            hostLines.push(key + " = server:" + endpoint.url);
+            hostLines.push(key + " = server:" + args.endpoint.url);
         });
         ruleLines.push("DOMAIN-SUFFIX," + suffix + ",DIRECT");
     });
@@ -88,7 +110,7 @@ function configureShadowrocket(content, api, suffixes, endpoint) {
             section.lines = section.lines.filter(function(line) {
                 var fields = line.split(",");
                 return fields.length < 3 || fields[0].trim().toUpperCase() !== "DOMAIN-SUFFIX" ||
-                    suffixes.indexOf(fields[1].trim().toLowerCase()) === -1;
+                    args.suffixes.indexOf(fields[1].trim().toLowerCase()) === -1;
             });
         }
     });
@@ -217,4 +239,10 @@ function requireObject(value, name) {
 function requireArray(value, name) {
     if (!Array.isArray(value)) throw new Error(name + " 必须是数组");
     return value;
+}
+
+function requireFile(input) {
+    if (!input || input.stage !== "file" || !input.file || typeof input.file.content !== "string") {
+        throw new Error(SCRIPT_NAME + " requires file-stage text input");
+    }
 }

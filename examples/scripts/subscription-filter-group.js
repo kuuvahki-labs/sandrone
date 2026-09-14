@@ -1,5 +1,5 @@
 /*
- * Sandrone Mihomo / Shadowrocket 订阅筛选分组文件脚本
+ * Sandrone Mihomo / sing-box / Shadowrocket 订阅筛选分组文件脚本
  *
  * 作为 file-stage script processor 使用，直接修改最终配置：
  *   1. 新增一个通过关键字或正则筛选订阅节点的 select 组；
@@ -16,29 +16,105 @@
  *     target_group: "🚀 节点选择"
  *     group_name: "精品节点"
  *
- * Mihomo 使用 include-all-proxies + filter；Shadowrocket 使用
- * policy-regex-filter。Shadowrocket 的 filter 不能包含逗号或换行。
+ * Mihomo 使用 include-all-proxies + filter；sing-box 从最终配置中的代理
+ * outbound / endpoint 计算当前成员；Shadowrocket 使用 policy-regex-filter。
+ * Shadowrocket 的 filter 不能包含逗号或换行。
  * 脚本可重复执行：同名筛选组会被更新，目标组中只保留一个首位引用。
  */
 
+var SCRIPT_NAME = "subscription-filter-group.js";
+
+var ADAPTERS = {
+    mihomo: {apply: applyMihomo},
+    "sing-box": {apply: applySingBox},
+    shadowrocket: {apply: applyShadowrocket}
+};
+
 function main(input, api) {
-    requireSupportedFile(input);
-    var args = input.args || {};
+    requireFile(input);
+    var adapter = ADAPTERS[input.file.kind];
+    if (!adapter) {
+        throw new Error("文件类型必须是 mihomo、sing-box 或 shadowrocket");
+    }
+
+    var args = readArgs(input.args || {}, api);
+    var content = applyOperation(input.file.content, args, api, adapter);
+    if (content !== undefined) input.file.content = content;
+    return input;
+}
+
+function readArgs(args, api) {
     var filter = readRequiredString(args.filter, "filter");
     var targetGroupName = readRequiredString(args.target_group, "target_group");
     var groupName = readOptionalString(args.group_name, "订阅筛选");
     if (groupName === targetGroupName) throw new Error("group_name 不能与 target_group 相同");
-
-    if (input.file.kind === "shadowrocket") {
-        applyShadowrocket(input, api, filter, targetGroupName, groupName);
-    } else {
-        applyMihomo(input, api, filter, targetGroupName, groupName);
-    }
-    return input;
+    return {filter: filter, targetGroupName: targetGroupName, groupName: groupName};
 }
 
-function applyMihomo(input, api, filter, targetGroupName, groupName) {
-    var doc = api.yaml.parse(input.file.content);
+function applyOperation(content, args, api, adapter) {
+    return adapter.apply(content, args, api);
+}
+
+function applySingBox(content, args, api) {
+    var doc = api.json.parse(content);
+    var filter = args.filter;
+    var targetGroupName = args.targetGroupName;
+    var groupName = args.groupName;
+    if (!isObject(doc) || !Array.isArray(doc.outbounds)) {
+        throw new Error("sing-box 文件根节点必须包含 outbounds 数组");
+    }
+    if (doc.endpoints !== undefined && !Array.isArray(doc.endpoints)) {
+        throw new Error("sing-box endpoints 必须是数组");
+    }
+
+    var targetGroup = findSingBoxOutbound(doc.outbounds, targetGroupName);
+    if (!targetGroup) throw new Error("未找到 target_group: " + targetGroupName);
+    if (!isSingBoxGroup(targetGroup) || !isStringArray(targetGroup.outbounds)) {
+        throw new Error("target_group 必须使用显式 outbounds 列表: " + targetGroupName);
+    }
+
+    var groupCollisions = doc.outbounds.filter(function(outbound) {
+        return isObject(outbound) && outbound.tag === groupName;
+    });
+    if (groupCollisions.some(function(outbound) { return !isSingBoxGroup(outbound); })) {
+        throw new Error("group_name 与非分组 outbound 冲突: " + groupName);
+    }
+    if ((doc.endpoints || []).some(function(endpoint) {
+        return isObject(endpoint) && endpoint.tag === groupName;
+    })) {
+        throw new Error("group_name 与 endpoint 冲突: " + groupName);
+    }
+
+    var matcher = compilePattern(filter);
+    var candidates = doc.outbounds.concat(doc.endpoints || []).filter(isSingBoxProxyTarget).map(function(outbound) {
+        return outbound.tag;
+    });
+    var members = uniqueStrings(candidates.filter(function(tag) { return matcher.test(tag); }));
+
+    if (members.length === 0) {
+        api.warn({
+            code: "subscription_filter_group_empty",
+            message: "filter 未匹配任何 sing-box 代理 outbound 或 endpoint，已跳过分组: " + groupName
+        });
+        return undefined;
+    }
+
+    targetGroup.outbounds = [groupName].concat(targetGroup.outbounds.filter(function(member) {
+        return member !== groupName;
+    }));
+    doc.outbounds = upsertSingBoxGroup(doc.outbounds, groupName, {
+        type: "selector",
+        tag: groupName,
+        outbounds: members
+    });
+    return api.json.stringify(doc);
+}
+
+function applyMihomo(content, args, api) {
+    var doc = api.yaml.parse(content);
+    var filter = args.filter;
+    var targetGroupName = args.targetGroupName;
+    var groupName = args.groupName;
     if (!doc || typeof doc !== "object" || Array.isArray(doc)) {
         throw new Error("Mihomo 文件根节点必须是 YAML 对象");
     }
@@ -58,15 +134,18 @@ function applyMihomo(input, api, filter, targetGroupName, groupName) {
         "include-all-proxies": true,
         filter: filter
     });
-    input.file.content = api.yaml.stringify(doc);
+    return api.yaml.stringify(doc);
 }
 
-function applyShadowrocket(input, api, filter, targetGroupName, groupName) {
+function applyShadowrocket(content, args, api) {
+    var filter = args.filter;
+    var targetGroupName = args.targetGroupName;
+    var groupName = args.groupName;
     if (/[,\r\n]/.test(filter)) throw new Error("Shadowrocket filter 不能包含逗号或换行");
     requireShadowrocketName(targetGroupName, "target_group");
     requireShadowrocketName(groupName, "group_name");
 
-    var doc = api.ini.parse(input.file.content);
+    var doc = api.ini.parse(content);
     var sections = doc && Array.isArray(doc.sections) ? doc.sections : [];
     var targetSection = null;
     var targetLine = null;
@@ -103,7 +182,7 @@ function applyShadowrocket(input, api, filter, targetGroupName, groupName) {
     var targetIndex = findShadowrocketGroupLine(targetSection.lines, targetGroupName);
     targetSection.lines.splice(targetIndex + 1, 0,
         groupName + " = select,policy-regex-filter=" + filter);
-    input.file.content = api.ini.stringify(doc);
+    return api.ini.stringify(doc);
 }
 
 function upsertMihomoGroup(groups, name, replacement) {
@@ -123,6 +202,57 @@ function findMihomoGroup(groups, name) {
         if (groups[index] && groups[index].name === name) return groups[index];
     }
     return null;
+}
+
+function upsertSingBoxGroup(outbounds, tag, replacement) {
+    var found = false;
+    return outbounds.map(function(outbound) {
+        if (!isObject(outbound) || outbound.tag !== tag) return outbound;
+        if (found) return null;
+        found = true;
+        return replacement;
+    }).filter(function(outbound) {
+        return outbound !== null;
+    }).concat(found ? [] : [replacement]);
+}
+
+function findSingBoxOutbound(outbounds, tag) {
+    for (var index = 0; index < outbounds.length; index += 1) {
+        if (isObject(outbounds[index]) && outbounds[index].tag === tag) return outbounds[index];
+    }
+    return null;
+}
+
+function isSingBoxGroup(outbound) {
+    return isObject(outbound) && (outbound.type === "selector" || outbound.type === "urltest");
+}
+
+function isSingBoxProxyTarget(outbound) {
+    if (!isObject(outbound) || typeof outbound.type !== "string" ||
+        typeof outbound.tag !== "string" || !outbound.tag.trim()) return false;
+    return outbound.type !== "selector" && outbound.type !== "urltest" &&
+        outbound.type !== "direct" && outbound.type !== "block" && outbound.type !== "dns";
+}
+
+function compilePattern(value) {
+    var insensitive = value.indexOf("(?i)") === 0;
+    var pattern = insensitive ? value.slice(4) : value;
+    if (!pattern.trim()) throw new Error("filter 必须是非空筛选表达式");
+    try {
+        return new RegExp(pattern, insensitive ? "i" : "");
+    } catch (error) {
+        throw new Error("filter 不是有效正则表达式: " + error.message);
+    }
+}
+
+function uniqueStrings(values) {
+    return values.filter(function(value, index) { return values.indexOf(value) === index; });
+}
+
+function isStringArray(value) {
+    return Array.isArray(value) && value.every(function(item) {
+        return typeof item === "string" && item !== "";
+    });
 }
 
 function parseShadowrocketGroup(line) {
@@ -184,11 +314,12 @@ function readOptionalString(value, fallback) {
     return value.trim();
 }
 
-function requireSupportedFile(input) {
+function requireFile(input) {
     if (!input || input.stage !== "file" || !input.file || typeof input.file.content !== "string") {
-        throw new Error("subscription filter group script requires file-stage text input");
+        throw new Error(SCRIPT_NAME + " requires file-stage text input");
     }
-    if (input.file.kind !== "mihomo" && input.file.kind !== "shadowrocket") {
-        throw new Error("文件类型必须是 mihomo 或 shadowrocket");
-    }
+}
+
+function isObject(value) {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
 }
