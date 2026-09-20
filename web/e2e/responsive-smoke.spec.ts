@@ -253,17 +253,21 @@ const routes = [
   { project: "desktop", path: "/subscriptions/new?type=local", heading: "新建订阅", content: "内容", focus: true },
 ];
 
-test("sing-box regex groups add a visible processor and allow its removal", async ({ page }, testInfo) => {
+test("sing-box regex groups expose the outbound adapter requirement", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile", "covered by the mobile editor smoke flow");
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/files/new?source=sing-box");
   const groups = page.getByRole("button", { name: "代理组", exact: true });
   if (await groups.getAttribute("aria-expanded") === "false") await groups.click();
-  await page.getByRole("button", { name: "添加代理组", exact: true }).click();
-  const customGroup = page.getByRole("button", { name: /代理组 自定义$/ }).last();
-  await expect(customGroup).toBeVisible();
-  if (await customGroup.getAttribute("aria-expanded") === "false") await customGroup.click();
+  const configInput = page.locator('input[name="config"]');
+  const initialGroups = (JSON.parse(await configInput.inputValue()) as {
+    settings: { groups: Array<Record<string, unknown>> };
+  }).settings.groups;
+  const targetGroup = initialGroups.find((group) => group.type === "urltest");
+  expect(targetGroup).toMatchObject({ tag: expect.any(String) });
+  const targetTag = String(targetGroup!.tag);
+  await page.getByRole("button", { name: `展开代理组 ${targetTag}`, exact: true }).click();
   const memberSource = page.getByRole("combobox", { name: "成员来源", exact: true });
   await expect(memberSource).toBeVisible();
   await memberSource.click();
@@ -290,8 +294,11 @@ test("sing-box regex groups add a visible processor and allow its removal", asyn
   await expect(notice).toBeVisible();
   await pattern.fill("JP");
   await expect(card).toHaveCount(0);
-  const config = JSON.parse(await page.locator('input[name="config"]').inputValue());
-  expect(config.settings.groups.at(-1)).toMatchObject({ filter: "JP", outbounds: ["$nodes"] });
+  const config = JSON.parse(await configInput.inputValue()) as {
+    settings: { groups: Array<Record<string, unknown>> };
+  };
+  expect(config.settings.groups.find((group) => group.tag === targetTag))
+    .toMatchObject({ filter: "JP", outbounds: ["$nodes"] });
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);
   expect(errors).toEqual([]);
