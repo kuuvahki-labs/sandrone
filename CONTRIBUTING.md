@@ -70,8 +70,9 @@ Web 依赖方向和 FileDriver 分工见 [Web 模块约定](web/AGENTS.md)。
 | Shell、构建、CI 或部署配置 | 语法/配置校验及受影响命令或构建路径的验证；不因文件后缀是文档就省略可执行示例的必要检查。 |
 
 `make check` 是完整 Go 门禁：格式检查、`go vet`、默认 Go 测试、CLI 构建和 Go lint，
-不包含 Web 检查。远端
-[CI](.github/workflows/ci.yml) 另有模块校验与独立 Web job，保留其完整检查。
+不包含 Web 检查。远端 [CI](.github/workflows/ci.yml) 将 Web 静态检查、代表性 Vitest
+smoke 与 built SPA Playwright smoke 拆为并行 job；完整 Vitest 套件由每日定时及手动触发的
+[Web UI full tests](.github/workflows/web-ui-full.yml) 覆盖。
 迭代时可单独运行 `make test`、`make vet` 或 `make lint`；完整门禁通过后无需重复运行单项。
 
 使用 `make fmt` 自动格式化 Go 文件并排序 import，按标准库、第三方、本项目分组；

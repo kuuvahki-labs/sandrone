@@ -37,8 +37,8 @@ jobs:
       - name: Run Go checks
         run: make check
 
-  web:
-    name: Web UI checks
+  web-static:
+    name: Web static checks
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -69,10 +69,62 @@ jobs:
       - name: Lint Web UI
         run: pnpm lint
 
-      - name: Test Web UI
-        run: pnpm test:run
+  web-unit:
+    name: Web unit checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
 
-      - name: Test built Web UI in Chromium
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11.24.0
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install Web UI dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Test Web UI smoke suite
+        run: pnpm test:ci
+
+  web:
+    name: Web UI checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11.24.0
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install Web UI dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Test built Web UI smoke in Chromium
         run: pnpm test:e2e
 
       - name: Upload tested Web UI
@@ -89,6 +141,8 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - go
+      - web-static
+      - web-unit
       - web
     concurrency:
       group: vercel-${{ github.ref }}
@@ -199,6 +253,8 @@ jobs:
       queue: max
     needs:
       - go
+      - web-static
+      - web-unit
       - web
     permissions:
       contents: read
@@ -267,6 +323,8 @@ jobs:
       queue: max
     needs:
       - go
+      - web-static
+      - web-unit
       - web
     permissions:
       contents: write
