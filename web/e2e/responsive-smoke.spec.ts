@@ -400,7 +400,12 @@ test("sing-box regex groups add a visible processor and allow its removal", asyn
   const groups = page.getByRole("button", { name: "代理组", exact: true });
   if (await groups.getAttribute("aria-expanded") === "false") await groups.click();
   await page.getByRole("button", { name: "添加代理组", exact: true }).click();
-  await page.getByRole("combobox", { name: "成员来源", exact: true }).click();
+  const customGroup = page.getByRole("button", { name: /代理组 自定义$/ }).last();
+  await expect(customGroup).toBeVisible();
+  if (await customGroup.getAttribute("aria-expanded") === "false") await customGroup.click();
+  const memberSource = page.getByRole("combobox", { name: "成员来源", exact: true });
+  await expect(memberSource).toBeVisible();
+  await memberSource.click();
   await page.getByRole("option", { name: "正则筛选", exact: true }).click();
   const pattern = page.getByRole("textbox", { name: "包含正则", exact: true });
   await expect(pattern).toHaveValue(".*");
