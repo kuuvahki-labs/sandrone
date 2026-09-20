@@ -95,8 +95,8 @@ jobs:
       - name: Install Web UI dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Test Web UI smoke suite
-        run: pnpm test:ci
+      - name: Test full Web UI suite
+        run: pnpm test:run
 
   web:
     name: Web UI checks

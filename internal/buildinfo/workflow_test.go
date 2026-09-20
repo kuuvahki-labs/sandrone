@@ -134,7 +134,7 @@ func testCIContracts(t *testing.T) {
 	stepByRun(t, webStatic, "pnpm typecheck")
 	stepByRun(t, webStatic, "pnpm lint")
 	webUnit := jobByName(t, workflow, "web-unit")
-	stepByRun(t, webUnit, "pnpm test:ci")
+	stepByRun(t, webUnit, "pnpm test:run")
 	check := jobByName(t, workflow, "container-check")
 	if check.If != "github.ref_type != 'tag'" || len(check.Needs) != 0 || check.Permissions["packages"] == "write" {
 		t.Errorf("container check gate/permissions = %+v", check)
@@ -184,17 +184,6 @@ func testCIContracts(t *testing.T) {
 	requireFields(t, publication.Env, map[string]string{"GH_TOKEN": "${{ secrets.GITHUB_TOKEN }}"})
 	requireCommands(t, publication.Run, "dist/sandrone_linux_amd64.tar.gz", "dist/sandrone_linux_arm64.tar.gz", "dist/checksums.txt", `gh release upload "${GITHUB_REF_NAME}" "${artifacts[@]}" --clobber`, `gh release create "${GITHUB_REF_NAME}" "${artifacts[@]}" --verify-tag --generate-notes ${prerelease_flag}`, `prerelease_flag="--prerelease"`, `^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$`)
 	testWebArtifactContract(t, workflow)
-	testFullWebWorkflow(t)
-}
-func testFullWebWorkflow(t *testing.T) {
-	t.Helper()
-	workflow := readWorkflow(t, "web-ui-full.yml")
-	for _, event := range []string{"schedule", "workflow_dispatch"} {
-		if _, ok := workflow.On[event]; !ok {
-			t.Errorf("full Web workflow missing trigger %s", event)
-		}
-	}
-	stepByRun(t, jobByName(t, workflow, "web-full"), "pnpm test:run")
 }
 func testWebArtifactContract(t *testing.T, workflow workflowSpec) {
 	t.Helper()

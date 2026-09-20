@@ -14,7 +14,6 @@
     "preview": "vite preview --host 127.0.0.1 --outDir build/client",
     "start": "vite preview --host 127.0.0.1 --outDir build/client",
     "test": "vitest",
-    "test:ci": "node scripts/run-ci-tests.mjs",
     "test:run": "vitest --run && node --test scripts/*.test.mjs",
     "pretest:e2e": "playwright install chromium-headless-shell",
     "test:e2e": "playwright test",
