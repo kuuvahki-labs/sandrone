@@ -16,17 +16,25 @@ RUN if [ -n "$PNPM_REGISTRY" ]; then pnpm config set registry "$PNPM_REGISTRY"; 
 COPY web/ ./
 RUN pnpm build
 
-FROM --platform=$BUILDPLATFORM golang:1.27.0-bookworm AS build
+FROM --platform=$BUILDPLATFORM golang:1.27.0-bookworm AS go-deps
 WORKDIR /src
 
 ARG GOPROXY=""
-ARG TARGETOS
-ARG TARGETARCH
 
 COPY go.mod go.sum ./
 RUN if [ -n "$GOPROXY" ]; then go env -w GOPROXY="$GOPROXY"; fi \
   && go mod download
 
+FROM go-deps AS catalog
+
+COPY scripts/generate-ruleset-catalog.sh ./scripts/generate-ruleset-catalog.sh
+COPY internal/tools/ruleset-catalog-gen ./internal/tools/ruleset-catalog-gen
+RUN RULESET_CATALOG_CACHE_DIR= ./scripts/generate-ruleset-catalog.sh generate /out
+
+FROM go-deps AS build
+
+ARG TARGETOS
+ARG TARGETARCH
 ARG VERSION="dev"
 ARG REVISION=""
 ARG BUILD_TIME=""
@@ -37,10 +45,11 @@ RUN if [ -z "$REVISION" ] && [ "$VERSION" != "dev" ]; then \
 
 COPY . .
 COPY --from=web /src/web/build/client ./internal/entry/webui/static
+COPY --from=catalog /out/catalog.json.gz ./internal/service/catalog_builtin/catalog.json.gz
 RUN build_time="$BUILD_TIME"; \
   if [ -z "$build_time" ]; then build_time="$(date -u +%Y-%m-%dT%H:%M:%SZ)"; fi; \
   CGO_ENABLED=0 GOOS="$TARGETOS" GOARCH="$TARGETARCH" \
-  make build BUILD_BIN=/out/sandrone VERSION="$VERSION" REVISION="$REVISION" BUILD_TIME="$build_time"
+  make build-check BUILD_BIN=/out/sandrone VERSION="$VERSION" REVISION="$REVISION" BUILD_TIME="$build_time"
 
 FROM debian:bookworm-slim AS runtime
 

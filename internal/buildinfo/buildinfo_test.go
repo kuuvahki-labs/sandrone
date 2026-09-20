@@ -668,7 +668,9 @@ func TestBuildMetadataContracts(t *testing.T) {
 	}
 	for _, want := range []string{
 		`FROM --platform=$BUILDPLATFORM node:24.17.0-bookworm AS web`,
-		`FROM --platform=$BUILDPLATFORM golang:1.27.0-bookworm AS build`,
+		`FROM --platform=$BUILDPLATFORM golang:1.27.0-bookworm AS go-deps`,
+		`FROM go-deps AS catalog`,
+		`FROM go-deps AS build`,
 		`ARG VERSION="dev"`,
 		"ARG REVISION",
 		"ARG BUILD_TIME",
@@ -676,6 +678,9 @@ func TestBuildMetadataContracts(t *testing.T) {
 		"ARG TARGETARCH",
 		`CGO_ENABLED=0 GOOS="$TARGETOS" GOARCH="$TARGETARCH"`,
 		`COPY --from=web /src/web/build/client ./internal/entry/webui/static`,
+		`RUN RULESET_CATALOG_CACHE_DIR= ./scripts/generate-ruleset-catalog.sh generate /out`,
+		`COPY --from=catalog /out/catalog.json.gz ./internal/service/catalog_builtin/catalog.json.gz`,
+		`make build-check BUILD_BIN=/out/sandrone`,
 		`if [ -z "$REVISION" ] && [ "$VERSION" != "dev" ]; then`,
 		"org.opencontainers.image.source=https://github.com/kuuvahki-labs/sandrone",
 	} {
@@ -688,6 +693,9 @@ func TestBuildMetadataContracts(t *testing.T) {
 	}
 	if !strings.Contains(string(dockerignore), "internal/entry/webui/static") {
 		t.Error("Docker context must exclude ignored host Web UI assets before copying the current web build")
+	}
+	if !strings.Contains(string(dockerignore), "internal/service/catalog_builtin/catalog.json.gz") {
+		t.Error("Docker context must exclude the host-generated rule-set catalog")
 	}
 	if labelAt, copyAt := strings.LastIndex(string(dockerfile), "LABEL "), strings.LastIndex(string(dockerfile), "COPY --from=web"); labelAt < copyAt {
 		t.Error("Dockerfile OCI labels must follow runtime package and asset layers")
@@ -714,11 +722,12 @@ func TestManualReleaseWorkflowIncrementsPatchAndDispatchesTagCI(t *testing.T) {
 	}
 	job := jobByName(t, workflow, "release-tag")
 	requireFields(t, stepByAction(t, job, "actions/checkout").With, map[string]string{"fetch-depth": "0"})
+	requireFields(t, stepByAction(t, job, "actions/setup-go").With, map[string]string{"go-version-file": "go.mod"})
 	stepByRun(t, job, `if [[ "${GITHUB_REF}" != "refs/heads/main" ]]`)
 	resolve := stepByRun(t, job, "./scripts/release.sh next-version")
-	requireCommands(t, resolve.Run, `git show-ref --verify --quiet "refs/tags/${tag}"`, `printf '%s\n' "${version}" > internal/buildinfo/VERSION`, `GITHUB_REF_NAME="${tag}" sh ./scripts/release.sh validate-tag`)
+	requireCommands(t, resolve.Run, `git show-ref --verify --quiet "refs/tags/${tag}"`, `printf '%s\n' "${version}" > internal/buildinfo/VERSION`, `./scripts/generate-ruleset-catalog.sh update-sources`, `make ruleset-catalog`, `GITHUB_REF_NAME="${tag}" sh ./scripts/release.sh validate-tag`)
 	commit := stepByRun(t, job, "git push --atomic")
-	requireCommands(t, commit.Run, `git commit -m "chore(release): bump version to ${RELEASE_VERSION}"`, `git tag -a "${RELEASE_TAG}" -m "Release ${RELEASE_TAG}"`, `git push --atomic origin HEAD:refs/heads/main "refs/tags/${RELEASE_TAG}"`)
+	requireCommands(t, commit.Run, `git add internal/buildinfo/VERSION internal/tools/ruleset-catalog-gen/sources.lock`, `git commit -m "chore(release): bump version to ${RELEASE_VERSION}"`, `git tag -a "${RELEASE_TAG}" -m "Release ${RELEASE_TAG}"`, `git push --atomic origin HEAD:refs/heads/main "refs/tags/${RELEASE_TAG}"`)
 	dispatchCI := stepByRun(t, job, `gh workflow run ci.yml --ref "${RELEASE_TAG}"`)
 	requireFields(t, dispatchCI.Env, map[string]string{"GH_TOKEN": "${{ github.token }}", "RELEASE_TAG": "${{ steps.release.outputs.tag }}"})
 }

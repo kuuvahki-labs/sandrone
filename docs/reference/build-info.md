@@ -68,9 +68,12 @@ make image SANDRONE_IMAGE=ghcr.io/kuuvahki-labs/sandrone:v0.1.0
 
 发布可以通过两种方式触发：直接推送与规范版本匹配的 `v<version>` Git tag，或在
 `main` 上手动运行 `Create Release`。手动流程从最新稳定 `vMAJOR.MINOR.PATCH` tag
-自动递增 patch，更新并提交 `internal/buildinfo/VERSION`，创建 annotated tag，再以
-该 tag 显式运行 CI。例如最新稳定 tag 为 `v0.1.0` 时，下一次手动发布会创建
-`v0.1.1`。只有匹配版本文件的 tag 才触发发布；分支 CI 不上传发布附件。
+自动递增 patch，同时把三个规则集目录上游刷新为完整 commit SHA。流程按新锁生成并
+验证 catalog，再提交版本文件和 source lock、创建 annotated tag，最后以该 tag 显式
+运行 CI。后续构建按 tag 内的 lock 生成相同 catalog；本机 CLI 生成复用 Git object
+cache，Docker 生成使用独立的 BuildKit layer cache。例如最新稳定 tag 为 `v0.1.0`
+时，下一次手动发布会创建 `v0.1.1`。只有匹配版本文件的 tag 才触发发布；分支 CI
+不上传发布附件。
 
 发布版本采用比本地构建身份更严格的规则：只允许 ASCII 字母、数字、点和连字符，
 发布版本不允许加号，并且最多 127 个字符。CI 会添加 `v` 前缀，因此完整 OCI tag

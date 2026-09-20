@@ -94,7 +94,7 @@ help: ## Show available targets.
 	@printf '  %-28s %s\n' 'build-bin' 'Generate the catalog and build the CLI in the repo; override BIN as needed.'
 	@printf '  %-28s %s\n' 'release-artifacts' 'Build Linux release archives and checksums.'
 	@printf '  %-28s %s\n' 'snapshot-artifacts' 'Build local dev Linux archives under dist/snapshot.'
-	@printf '  %-28s %s\n' 'ruleset-catalog' 'Generate the ignored build-time rule-set URL snapshot.'
+	@printf '  %-28s %s\n' 'ruleset-catalog' 'Generate the ignored rule-set URL snapshot from locked sources.'
 	@printf '  %-28s %s\n' 'build-webui' 'Build web UI assets and copy them into Go embed static files.'
 	@printf '  %-28s %s\n' 'image' 'Build a locally tagged container image.'
 	@printf '  %-28s %s\n' 'lint' 'Run golangci-lint with .golangci.yml.'
@@ -121,7 +121,7 @@ test-webui-e2e:
 	cd web && pnpm test:e2e
 
 ruleset-catalog:
-	GO="$(GO)" GOFLAGS="-mod=readonly" ./scripts/generate-ruleset-catalog.sh "$(RULESET_CATALOG_DIR)"
+	GO="$(GO)" GOFLAGS="-mod=readonly" ./scripts/generate-ruleset-catalog.sh generate "$(RULESET_CATALOG_DIR)"
 
 build: ruleset-catalog
 	$(GO) build $(GOFLAGS) $(BUILD_VCS_ARG) $(BUILD_LDFLAGS_ARG) -o $(BUILD_BIN) $(CMD_PKG)
