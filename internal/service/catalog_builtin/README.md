@@ -12,8 +12,9 @@ Refresh all three commits and regenerate the catalog with:
 make ruleset-catalog
 ```
 
-The manual release workflow performs both steps and commits the lock before it
-creates a tag. The generator derives URL metadata from the locked `meta`
+The manual release workflow refreshes and commits the lock before it creates a
+tag. Tag CI generates and validates the catalog while building release artifacts
+and container images. The generator derives URL metadata from the locked `meta`
 and `sing` commits of `MetaCubeX/meta-rules-dat` and the locked `master` commit's
 `rule/Shadowrocket` subtree of `blackmatrix7/ios_rule_script`. For Blackmatrix it
 selects `.list` files named in category README `使用说明` sections and checks their

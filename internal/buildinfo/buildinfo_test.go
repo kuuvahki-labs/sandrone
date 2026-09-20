@@ -722,10 +722,17 @@ func TestManualReleaseWorkflowIncrementsPatchAndDispatchesTagCI(t *testing.T) {
 	}
 	job := jobByName(t, workflow, "release-tag")
 	requireFields(t, stepByAction(t, job, "actions/checkout").With, map[string]string{"fetch-depth": "0"})
-	requireFields(t, stepByAction(t, job, "actions/setup-go").With, map[string]string{"go-version-file": "go.mod"})
+	for _, step := range job.Steps {
+		if strings.HasPrefix(step.Uses, "actions/setup-go@") {
+			t.Error("manual release must resolve source commits without setting up Go")
+		}
+	}
 	stepByRun(t, job, `if [[ "${GITHUB_REF}" != "refs/heads/main" ]]`)
 	resolve := stepByRun(t, job, "./scripts/release.sh next-version")
-	requireCommands(t, resolve.Run, `git show-ref --verify --quiet "refs/tags/${tag}"`, `printf '%s\n' "${version}" > internal/buildinfo/VERSION`, `./scripts/generate-ruleset-catalog.sh update-sources`, `make ruleset-catalog`, `GITHUB_REF_NAME="${tag}" sh ./scripts/release.sh validate-tag`)
+	requireCommands(t, resolve.Run, `git show-ref --verify --quiet "refs/tags/${tag}"`, `printf '%s\n' "${version}" > internal/buildinfo/VERSION`, `./scripts/generate-ruleset-catalog.sh update-sources`, `GITHUB_REF_NAME="${tag}" sh ./scripts/release.sh validate-tag`)
+	if strings.Contains(resolve.Run, "make ruleset-catalog") {
+		t.Error("manual release must not generate the rule-set catalog")
+	}
 	commit := stepByRun(t, job, "git push --atomic")
 	requireCommands(t, commit.Run, `git add internal/buildinfo/VERSION internal/tools/ruleset-catalog-gen/sources.lock`, `git commit -m "chore(release): bump version to ${RELEASE_VERSION}"`, `git tag -a "${RELEASE_TAG}" -m "Release ${RELEASE_TAG}"`, `git push --atomic origin HEAD:refs/heads/main "refs/tags/${RELEASE_TAG}"`)
 	dispatchCI := stepByRun(t, job, `gh workflow run ci.yml --ref "${RELEASE_TAG}"`)
