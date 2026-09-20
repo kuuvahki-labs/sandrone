@@ -101,7 +101,7 @@ const uiCapabilities = {
 function settingsEnvelope(ignoredWarnings: Array<{ code: string; field?: string; source?: string; target?: string }> = []) {
   const settings = {
     schema_version: 1,
-    http: { listen: "127.0.0.1:1137" },
+    http: { listen: "127.0.0.1:19137" },
     mcp: { path: "/mcp", max_output_bytes: 1048576 },
     log: { level: "info" },
     remote_defaults: { timeout_ms: 15000 },

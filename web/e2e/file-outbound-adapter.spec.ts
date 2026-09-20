@@ -20,7 +20,7 @@ const preview = {
 };
 const settings = {
   schema_version: 1,
-  http: { listen: "127.0.0.1:1137" },
+  http: { listen: "127.0.0.1:19137" },
   mcp: { path: "/mcp", max_output_bytes: 1048576 },
   log: { level: "info" },
   remote_defaults: { timeout_ms: 15000 },
@@ -32,7 +32,12 @@ const settings = {
   scheduled_refresh: { enabled: false, schedule: "@every 10m", targets: [] },
 };
 
-async function mockFileAPI(page: Page) {
+async function mockFileAPI(page: Page, testInfo: TestInfo) {
+  const baseURL = testInfo.project.use.baseURL;
+  if (typeof baseURL !== "string") {
+    throw new Error("Playwright baseURL must be configured for file adapter tests");
+  }
+  const expectedOrigin = new URL(baseURL).origin;
   const files = new Map<string, StoredFile>();
   const saves: StoredFile[] = [];
   const specReads: string[] = [];
@@ -46,7 +51,7 @@ async function mockFileAPI(page: Page) {
   await page.route("**/*", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
-    if (url.origin !== "http://127.0.0.1:4173") {
+    if (url.origin !== expectedOrigin) {
       unexpectedRequests.push(request.url());
       await route.abort();
       return;
@@ -142,7 +147,7 @@ async function captureEvidence(page: Page, testInfo: TestInfo, filename: string,
 
 test("new sing-box saves an explicit default in the adapter and reopens a missing-target warning", async ({ page }, testInfo) => {
   const issues = collectConsoleIssues(page);
-  const api = await mockFileAPI(page);
+  const api = await mockFileAPI(page, testInfo);
   await page.goto("/files/new?source=sing-box");
   await assertPageIdentity(page, "New file");
   const processorInput = page.locator('input[name="processors"]');
@@ -183,7 +188,7 @@ test("new sing-box saves an explicit default in the adapter and reopens a missin
 
 test("Mihomo regions generate directly and restore selection and group type after saving", async ({ page }, testInfo) => {
   const issues = collectConsoleIssues(page);
-  const api = await mockFileAPI(page);
+  const api = await mockFileAPI(page, testInfo);
   await page.goto("/files/new?source=mihomo");
   await assertPageIdentity(page, "New file");
   const controls = page.getByRole("group", { name: "Adaptive groups", exact: true });
@@ -228,7 +233,7 @@ test("Mihomo regions generate directly and restore selection and group type afte
 
 test("sing-box generator option changes leave existing regex groups saveable", async ({ page }, testInfo) => {
   const issues = collectConsoleIssues(page);
-  const api = await mockFileAPI(page);
+  const api = await mockFileAPI(page, testInfo);
   await page.goto("/files/new?source=sing-box");
   await assertPageIdentity(page, "New file");
   await page.getByRole("combobox", { name: "Subscription", exact: true }).click();
