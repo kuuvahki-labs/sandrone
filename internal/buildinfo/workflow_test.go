@@ -94,15 +94,19 @@ func requireCommands(t *testing.T, run string, commands ...string) {
 		}
 	}
 }
+func requireWebChecks(t *testing.T, job workflowJob) {
+	t.Helper()
+	needs := slices.Sorted(slices.Values(job.Needs))
+	if !slices.Equal(needs, []string{"go", "web", "web-static", "web-unit"}) {
+		t.Errorf("Web check dependencies = %v", needs)
+	}
+}
 func requireReleaseGate(t *testing.T, job workflowJob, group string) {
 	t.Helper()
 	if job.If != "github.ref_type == 'tag'" {
 		t.Errorf("publication condition = %q", job.If)
 	}
-	needs := slices.Sorted(slices.Values(job.Needs))
-	if !slices.Equal(needs, []string{"go", "web"}) {
-		t.Errorf("publication needs = %v", needs)
-	}
+	requireWebChecks(t, job)
 	if job.Concurrency.Group != group || job.Concurrency.Cancel || job.Concurrency.Queue != "max" {
 		t.Errorf("publication concurrency = %+v", job.Concurrency)
 	}
@@ -126,6 +130,11 @@ func testCIContracts(t *testing.T) {
 	if !slices.Equal(push.Branches, []string{"main"}) || !slices.Equal(push.Tags, []string{"v*"}) {
 		t.Errorf("push trigger = %+v", push)
 	}
+	webStatic := jobByName(t, workflow, "web-static")
+	stepByRun(t, webStatic, "pnpm typecheck")
+	stepByRun(t, webStatic, "pnpm lint")
+	webUnit := jobByName(t, workflow, "web-unit")
+	stepByRun(t, webUnit, "pnpm test:ci")
 	check := jobByName(t, workflow, "container-check")
 	if check.If != "github.ref_type != 'tag'" || len(check.Needs) != 0 || check.Permissions["packages"] == "write" {
 		t.Errorf("container check gate/permissions = %+v", check)
@@ -175,6 +184,17 @@ func testCIContracts(t *testing.T) {
 	requireFields(t, publication.Env, map[string]string{"GH_TOKEN": "${{ secrets.GITHUB_TOKEN }}"})
 	requireCommands(t, publication.Run, "dist/sandrone_linux_amd64.tar.gz", "dist/sandrone_linux_arm64.tar.gz", "dist/checksums.txt", `gh release upload "${GITHUB_REF_NAME}" "${artifacts[@]}" --clobber`, `gh release create "${GITHUB_REF_NAME}" "${artifacts[@]}" --verify-tag --generate-notes ${prerelease_flag}`, `prerelease_flag="--prerelease"`, `^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$`)
 	testWebArtifactContract(t, workflow)
+	testFullWebWorkflow(t)
+}
+func testFullWebWorkflow(t *testing.T) {
+	t.Helper()
+	workflow := readWorkflow(t, "web-ui-full.yml")
+	for _, event := range []string{"schedule", "workflow_dispatch"} {
+		if _, ok := workflow.On[event]; !ok {
+			t.Errorf("full Web workflow missing trigger %s", event)
+		}
+	}
+	stepByRun(t, jobByName(t, workflow, "web-full"), "pnpm test:run")
 }
 func testWebArtifactContract(t *testing.T, workflow workflowSpec) {
 	t.Helper()

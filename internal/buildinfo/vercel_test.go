@@ -4,7 +4,6 @@ import (
 	"compress/gzip"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 )
@@ -81,9 +80,7 @@ func TestVercelWorkflowUsesPrebuiltAssetPipeline(t *testing.T) {
 	if job.If != "github.ref_type == 'tag' || (github.event_name == 'push' && github.ref == 'refs/heads/main')" {
 		t.Errorf("Vercel condition = %q", job.If)
 	}
-	if !slices.Equal(slices.Sorted(slices.Values(job.Needs)), []string{"go", "web"}) {
-		t.Errorf("Vercel needs = %v", job.Needs)
-	}
+	requireWebChecks(t, job)
 	if job.Concurrency.Group != "vercel-${{ github.ref }}" || !job.Concurrency.Cancel {
 		t.Errorf("Vercel concurrency = %+v", job.Concurrency)
 	}
