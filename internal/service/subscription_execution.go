@@ -173,6 +173,9 @@ func (s *Service) executeSubscription(
 	}
 	base.Nodes = validatedBase.Nodes
 	base.Warnings = append(base.Warnings, baseValidationWarnings...)
+	if base.RemoteInput != nil && len(base.Nodes) > 0 {
+		s.commitRemoteFetchCache(ctx, base.RemoteInput)
+	}
 	before := &domain.NodeSet{
 		Nodes:        append([]domain.NodeIR{}, base.Nodes...),
 		Dependencies: append([]domain.ResourceRef{}, base.Dependencies...),

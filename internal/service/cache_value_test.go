@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"net/http"
 	"testing"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cachepkg "github.com/kuuvahki-labs/sandrone/internal/cache"
+	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
 
 type ownedCacheFixture struct {
@@ -80,4 +82,41 @@ func TestBusinessCacheValueUsesOneConservativeAbsoluteDeadline(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, found)
 	require.Equal(t, now.Add(10*time.Minute), shortenedOnHit.ExpiresAt, "a shorter effective TTL must also shorten a full hit")
+}
+
+func TestRemoteFetchCacheIgnoresLegacySubscriptionRecords(t *testing.T) {
+	ctx := withSubscriptionCacheOwner(t.Context(), "A")
+	svc := New(WithFS(afero.NewMemMapFs()))
+	key, owned := ownedCacheKey(ctx, cacheKeyPrefixRemoteFetch)
+	require.True(t, owned)
+	entryID, err := remoteFetchCacheEntryID(domain.RemoteInput{URL: "https://example.test/sub"})
+	require.NoError(t, err)
+	require.NoError(t, cachepkg.SetJSON(ctx, svc.cache, key, remoteFetchCacheValue{
+		Records: map[string]remoteFetchCacheRecord{
+			entryID: {
+				Body:       []byte("temporary upstream error"),
+				Headers:    http.Header{"Content-Type": []string{"text/plain"}},
+				StatusCode: http.StatusOK,
+			},
+		},
+	}, time.Hour))
+
+	require.Nil(t, svc.readRemoteFetchCache(ctx, key, entryID, time.Hour))
+	fileCtx := withFileCacheOwner(t.Context(), "base")
+	fileKey, owned := ownedCacheKey(fileCtx, cacheKeyPrefixRemoteFetch)
+	require.True(t, owned)
+	require.NoError(t, cachepkg.SetJSON(fileCtx, svc.cache, fileKey, remoteFetchCacheValue{
+		Records: map[string]remoteFetchCacheRecord{
+			entryID: {Body: []byte("legacy file body"), StatusCode: http.StatusOK},
+		},
+	}, time.Hour))
+	require.NotNil(t, svc.readRemoteFetchCache(fileCtx, fileKey, entryID, time.Hour))
+
+	valid := &remoteInputResult{
+		Body:       []byte("ss://aes-128-gcm:secret@example.com:8388#node"),
+		Headers:    http.Header{"Content-Type": []string{"text/plain"}},
+		StatusCode: http.StatusOK,
+	}
+	require.NoError(t, svc.writeRemoteFetchCache(ctx, key, entryID, time.Hour, valid))
+	require.NotNil(t, svc.readRemoteFetchCache(ctx, key, entryID, time.Hour))
 }

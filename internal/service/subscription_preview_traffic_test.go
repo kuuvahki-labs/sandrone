@@ -3,8 +3,10 @@ package service_test
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 	"time"
 
@@ -1083,6 +1085,161 @@ func TestServiceSubscriptionPreviewCachesUntilForcedRefresh(t *testing.T) {
 	require.Equal(t, 2, calls)
 }
 
+func TestServiceSubscriptionPreviewCachesOnlySuccessfulRemoteContent(t *testing.T) {
+	ctx := t.Context()
+	body := "temporary upstream error"
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		_, _ = w.Write([]byte(body))
+	}))
+	defer server.Close()
+
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	putProjectSettings(t, svc, ctx, func(update *domain.SettingsUpdate) {
+		update.CacheDefaults.RemoteFetchTTLSeconds = 60
+	})
+	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+		Name:   "remote/recovery",
+		Type:   domain.SubscriptionTypeRemote,
+		Format: "uri-list",
+		Remote: &domain.RemoteInput{URL: server.URL},
+	}))
+
+	_, err := svc.PreviewSubscription(ctx, "remote/recovery")
+	require.Error(t, err)
+
+	body = "ss://aes-128-gcm:secret@example.com:8388#recovered"
+	recovered, err := svc.PreviewSubscription(ctx, "remote/recovery")
+	require.NoError(t, err)
+	require.Equal(t, "recovered", recovered.Nodes[0].After.Name)
+
+	body = "ss://aes-128-gcm:secret@example.com:8388#new-upstream-value"
+	cached, err := svc.PreviewSubscription(ctx, "remote/recovery")
+	require.NoError(t, err)
+	require.Equal(t, "recovered", cached.Nodes[0].After.Name)
+	require.Equal(t, 2, calls)
+}
+
+func TestServiceSubscriptionPreviewFailedRefreshPreservesLastSuccessfulRemoteContent(t *testing.T) {
+	ctx := t.Context()
+	body := "ss://aes-128-gcm:secret@example.com:8388#stable"
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		_, _ = w.Write([]byte(body))
+	}))
+	defer server.Close()
+
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	putProjectSettings(t, svc, ctx, func(update *domain.SettingsUpdate) {
+		update.CacheDefaults.RemoteFetchTTLSeconds = 60
+	})
+	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+		Name:   "remote/stable",
+		Type:   domain.SubscriptionTypeRemote,
+		Format: "uri-list",
+		Remote: &domain.RemoteInput{URL: server.URL},
+	}))
+
+	first, err := svc.PreviewSubscription(ctx, "remote/stable")
+	require.NoError(t, err)
+	require.Equal(t, "stable", first.Nodes[0].After.Name)
+
+	body = "temporary upstream error"
+	_, err = svc.PreviewSubscriptionRequest(ctx, domain.SubscriptionPreviewRequest{Name: "remote/stable", Refresh: true})
+	require.Error(t, err)
+
+	cached, err := svc.PreviewSubscription(ctx, "remote/stable")
+	require.NoError(t, err)
+	require.Equal(t, "stable", cached.Nodes[0].After.Name)
+	require.Equal(t, 2, calls)
+}
+
+func TestServiceSubscriptionPreviewValidRefreshReplacesCacheBeforeProcessorFailure(t *testing.T) {
+	ctx := t.Context()
+	body := "ss://aes-128-gcm:secret@example.com:8388#original"
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		_, _ = w.Write([]byte(body))
+	}))
+	defer server.Close()
+
+	processorFails := false
+	svc := service.New(
+		service.WithFS(afero.NewMemMapFs()),
+		service.WithProcessor(func(registry *processor.Registry) {
+			registry.RegisterNode("toggle_error", func(domain.ProcessorSpec) (domain.NodeProcessor, error) {
+				return &toggleErrorProcessor{fails: &processorFails}, nil
+			})
+		}),
+	)
+	putProjectSettings(t, svc, ctx, func(update *domain.SettingsUpdate) {
+		update.CacheDefaults.RemoteFetchTTLSeconds = 60
+	})
+	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+		Name:   "remote/processor-failure",
+		Type:   domain.SubscriptionTypeRemote,
+		Format: "uri-list",
+		Remote: &domain.RemoteInput{URL: server.URL},
+		Processors: []domain.ProcessorSpec{{
+			Type: "toggle_error", Stage: domain.StageNodes,
+		}},
+	}))
+
+	original, err := svc.PreviewSubscription(ctx, "remote/processor-failure")
+	require.NoError(t, err)
+	require.Equal(t, "original", original.Nodes[0].After.Name)
+
+	body = "ss://aes-128-gcm:secret@example.com:8388#refreshed"
+	processorFails = true
+	_, err = svc.PreviewSubscriptionRequest(ctx, domain.SubscriptionPreviewRequest{
+		Name: "remote/processor-failure", Refresh: true,
+	})
+	require.ErrorContains(t, err, "processor failed")
+
+	body = "temporary upstream error"
+	processorFails = false
+	cached, err := svc.PreviewSubscription(ctx, "remote/processor-failure")
+	require.NoError(t, err)
+	require.Equal(t, "refreshed", cached.Nodes[0].After.Name)
+	require.Equal(t, 2, calls)
+}
+
+func TestServiceSubscriptionTrafficDoesNotCacheInvalidNodeBody(t *testing.T) {
+	ctx := t.Context()
+	body := "temporary upstream error"
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		w.Header().Set("Subscription-Userinfo", "upload=1024; download=2048; total=10240")
+		_, _ = w.Write([]byte(body))
+	}))
+	defer server.Close()
+
+	svc := service.New(service.WithFS(afero.NewMemMapFs()))
+	putProjectSettings(t, svc, ctx, func(update *domain.SettingsUpdate) {
+		update.CacheDefaults.RemoteFetchTTLSeconds = 60
+	})
+	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
+		Name:   "remote/traffic-recovery",
+		Type:   domain.SubscriptionTypeRemote,
+		Format: "uri-list",
+		Remote: &domain.RemoteInput{URL: server.URL},
+	}))
+
+	traffic, err := svc.SubscriptionTraffic(ctx, domain.SubscriptionTrafficRequest{Name: "remote/traffic-recovery"})
+	require.NoError(t, err)
+	require.NotNil(t, traffic.Traffic)
+
+	body = "ss://aes-128-gcm:secret@example.com:8388#recovered"
+	preview, err := svc.PreviewSubscription(ctx, "remote/traffic-recovery")
+	require.NoError(t, err)
+	require.Equal(t, "recovered", preview.Nodes[0].After.Name)
+	require.Equal(t, 2, calls)
+}
+
 func TestSavedRemoteFetchCacheIsResourceLocal(t *testing.T) {
 	ctx := context.Background()
 	calls := 0
@@ -1116,4 +1273,17 @@ func TestSavedRemoteFetchCacheIsResourceLocal(t *testing.T) {
 		_, err := resourceStore.Stat(ctx, "cache/remote_fetch/subscriptions/"+name+".json")
 		require.NoError(t, err)
 	}
+}
+
+type toggleErrorProcessor struct {
+	fails *bool
+}
+
+func (*toggleErrorProcessor) Name() string { return "toggle_error" }
+
+func (p *toggleErrorProcessor) ApplyNodes(_ context.Context, input domain.NodeProcessInput) (domain.NodeProcessOutput, error) {
+	if *p.fails {
+		return domain.NodeProcessOutput{}, errors.New("processor failed")
+	}
+	return domain.NodeProcessOutput{Nodes: slices.Clone(input.Nodes)}, nil
 }

@@ -108,7 +108,7 @@ Store-backed Cache。
 
 | key 前缀 | 缓存值 | TTL 来源 |
 | --- | --- | --- |
-| `remote_fetch` | 受控 HTTP(S) 响应 | `RemoteInput.cache_ttl_seconds`，零值继承项目默认 |
+| `remote_fetch` | 受控 HTTP(S) 响应；订阅正文须解析出有效节点 | `RemoteInput.cache_ttl_seconds`，零值继承项目默认 |
 | `probe` | 按连接保存的节点观测 | probe 请求，零值继承项目 `cache_defaults.probe_ttl_seconds` |
 | `subscription_snapshot` | 已保存订阅处理前后的 canonical `NodeSet` 与依赖 revision | Subscription 三态覆盖或项目默认 |
 
@@ -119,12 +119,19 @@ Subscription 的 `snapshot_ttl_seconds` 是 nullable 三态字段：省略时
 可以复用订阅执行快照。
 过大的 subscription-snapshot 会跳过缓存写入，仍返回本次执行结果。
 
+远程 Subscription 的新响应在订阅解析和节点校验得到至少一个有效节点后写入，不依赖
+后续 processor 是否成功；错误正文不会覆盖上一次成功缓存。collection 的 remote
+节点输入也只在解析成功后写入。
+其他 remote 文件或脚本仍以 HTTP 抓取成功作为写入边界。traffic 查询可以独立返回响应头
+中的用量，但正文无法解析为有效节点时不会回填与订阅执行共享的 remote-fetch cache。
+
 订阅执行快照的 identity 包含构建身份、Subscription 定义、请求上下文和
 remote/probe/script 执行设置，不包含输出 target。它保存处理前后的 canonical
 `NodeSet`，供 preview、renderer、typed file、share 和脚本订阅调用复用。
 命中前核对实际依赖资源的 revision，定义变化立即 miss；远程内容与 probe 观测则
-可以在 snapshot TTL 内保持旧值。`refresh` 跳过各持久缓存读取，成功后按当前 TTL
-重新填充。最终目标正文每次生成，不作为持久缓存结果保存。
+可以在 snapshot TTL 内保持旧值。`refresh` 跳过各持久缓存读取；remote-fetch、probe
+和 subscription-snapshot 分别在自身有效性边界满足后按当前 TTL 重新填充。最终目标正文
+每次生成，不作为持久缓存结果保存。
 
 probe 和 scheduler 的运行时可用性不参与快照 identity，因此具备 probe 能力的
 实例可刷新共享快照，其他实例直接消费。双方仍需上述 identity 一致且 snapshot TTL

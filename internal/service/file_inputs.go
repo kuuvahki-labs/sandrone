@@ -154,7 +154,7 @@ func (s *Service) resolveRemoteNodeInput(ctx context.Context, input domain.NodeI
 		TimeoutMS:       input.TimeoutMS,
 		CacheTTLSeconds: input.CacheTTLSeconds,
 	}
-	result, err := s.fetchRemoteCached(ctx, remote)
+	result, err := s.fetchRemoteCached(withDeferredRemoteFetchCacheWrite(ctx), remote)
 	if err != nil {
 		return nil, nodeInputReadError(input, err)
 	}
@@ -162,5 +162,6 @@ func (s *Service) resolveRemoteNodeInput(ctx context.Context, input domain.NodeI
 	if err != nil {
 		return nil, err
 	}
+	s.commitRemoteFetchCache(ctx, result)
 	return nodeSet, nil
 }

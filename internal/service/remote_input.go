@@ -33,6 +33,7 @@ type remoteInputResult struct {
 	Headers     http.Header
 	StatusCode  int
 	ContentHash string
+	cacheWrite  remoteFetchCacheWrite
 }
 
 func (s *Service) parseRequestInput(ctx context.Context, req domain.ParseRequest) (*parseInputResult, error) {
@@ -62,10 +63,11 @@ func (s *Service) fetchRemoteInput(ctx context.Context, input domain.RemoteInput
 	ref.URL = sanitizedTrafficSourceURL(ref.URL)
 	return &remoteInputResult{
 		SourceRef:   ref,
-		Body:        append([]byte{}, result.Body...),
+		Body:        bytes.Clone(result.Body),
 		Headers:     result.Headers.Clone(),
 		StatusCode:  result.StatusCode,
 		ContentHash: result.ContentHash,
+		cacheWrite:  result.cacheWrite,
 	}, nil
 }
 
@@ -91,7 +93,7 @@ func (s *Service) fetchPublicRemoteInput(ctx context.Context, input domain.Remot
 	ref.URL = sanitizedTrafficSourceURL(ref.URL)
 	return &remoteInputResult{
 		SourceRef:   ref,
-		Body:        append([]byte{}, result.Body...),
+		Body:        bytes.Clone(result.Body),
 		Headers:     result.Headers.Clone(),
 		StatusCode:  result.StatusCode,
 		ContentHash: result.ContentHash,

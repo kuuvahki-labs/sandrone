@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log/slog"
@@ -14,8 +15,10 @@ import (
 )
 
 const (
-	cacheKeyPrefixRemoteFetch = "remote_fetch"
-	cacheKeyPrefixProbe       = "probe"
+	cacheKeyPrefixRemoteFetch             = "remote_fetch"
+	cacheKeyPrefixProbe                   = "probe"
+	remoteFetchCacheRecordVersion         = 1
+	remoteFetchSubscriptionCacheKeyPrefix = cacheKeyPrefixRemoteFetch + "/" + cacheResourceSubscriptions + "/"
 )
 
 type remoteFetchCacheRecord struct {
@@ -24,10 +27,48 @@ type remoteFetchCacheRecord struct {
 	StatusCode  int              `json:"status_code,omitzero"`
 	ContentHash string           `json:"content_hash,omitempty"`
 	SourceRef   domain.SourceRef `json:"source_ref,omitempty"`
+	Version     int              `json:"version,omitzero"`
 }
 
 type remoteFetchCacheValue struct {
 	Records map[string]remoteFetchCacheRecord `json:"records"`
+}
+
+type deferRemoteFetchCacheWriteContextKey struct{}
+
+type remoteFetchCacheWrite struct {
+	key             string
+	entryID         string
+	ttl             time.Duration
+	cacheTTLSeconds int
+	url             string
+}
+
+func withDeferredRemoteFetchCacheWrite(ctx context.Context) context.Context {
+	return context.WithValue(ctx, deferRemoteFetchCacheWriteContextKey{}, true)
+}
+
+func remoteFetchCacheWriteDeferred(ctx context.Context) bool {
+	deferred, _ := ctx.Value(deferRemoteFetchCacheWriteContextKey{}).(bool)
+	return deferred
+}
+
+func (s *Service) commitRemoteFetchCache(ctx context.Context, result *remoteInputResult) {
+	if result == nil || result.cacheWrite.key == "" {
+		return
+	}
+	write := result.cacheWrite
+	result.cacheWrite = remoteFetchCacheWrite{}
+	if err := s.writeRemoteFetchCache(ctx, write.key, write.entryID, write.ttl, result); err != nil {
+		s.log(ctx, slog.LevelWarn, "service remote fetch cache write failed",
+			"operation", "remote_fetch",
+			"cache_key", write.key,
+			"cache_hit", false,
+			"cache_ttl_seconds", write.cacheTTLSeconds,
+			"url", write.url,
+			"error", err.Error(),
+		)
+	}
 }
 
 func (s *Service) fetchRemoteCached(ctx context.Context, input domain.RemoteInput) (*remoteInputResult, error) {
@@ -71,21 +112,21 @@ func (s *Service) fetchRemoteCached(ctx context.Context, input domain.RemoteInpu
 	}
 	out := &remoteInputResult{
 		SourceRef:   result.SourceRef,
-		Body:        append([]byte{}, result.Body...),
+		Body:        bytes.Clone(result.Body),
 		Headers:     result.Headers.Clone(),
 		StatusCode:  result.StatusCode,
 		ContentHash: result.ContentHash,
 	}
 	if ttl > 0 && cacheEntryID != "" {
-		if err := s.writeRemoteFetchCache(ctx, cacheKey, cacheEntryID, ttl, out); err != nil {
-			s.log(ctx, slog.LevelWarn, "service remote fetch cache write failed",
-				"operation", "remote_fetch",
-				"cache_key", cacheKey,
-				"cache_hit", false,
-				"cache_ttl_seconds", input.CacheTTLSeconds,
-				"url", input.URL,
-				"error", err.Error(),
-			)
+		out.cacheWrite = remoteFetchCacheWrite{
+			key:             cacheKey,
+			entryID:         cacheEntryID,
+			ttl:             ttl,
+			cacheTTLSeconds: input.CacheTTLSeconds,
+			url:             input.URL,
+		}
+		if !remoteFetchCacheWriteDeferred(ctx) {
+			s.commitRemoteFetchCache(ctx, out)
 		}
 	}
 	return out, nil
@@ -100,14 +141,14 @@ func (s *Service) readRemoteFetchCache(ctx context.Context, key, entryID string,
 		return nil
 	}
 	record, found := item.Value.Records[entryID]
-	if !found {
+	if !found || (strings.HasPrefix(key, remoteFetchSubscriptionCacheKeyPrefix) && record.Version != remoteFetchCacheRecordVersion) {
 		return nil
 	}
 	ref := record.SourceRef
 	ref.Note = appendSourceRefNote(ref.Note, "cache_hit=true")
 	return &remoteInputResult{
 		SourceRef:   ref,
-		Body:        append([]byte{}, record.Body...),
+		Body:        bytes.Clone(record.Body),
 		Headers:     record.Headers.Clone(),
 		StatusCode:  record.StatusCode,
 		ContentHash: record.ContentHash,
@@ -126,11 +167,12 @@ func (s *Service) writeRemoteFetchCache(ctx context.Context, key, entryID string
 		value.Records = map[string]remoteFetchCacheRecord{}
 	}
 	value.Records[entryID] = remoteFetchCacheRecord{
-		Body:        append([]byte{}, result.Body...),
+		Body:        bytes.Clone(result.Body),
 		Headers:     result.Headers.Clone(),
 		StatusCode:  result.StatusCode,
 		ContentHash: result.ContentHash,
 		SourceRef:   result.SourceRef,
+		Version:     remoteFetchCacheRecordVersion,
 	}
 	return cachepkg.SetJSON(ctx, s.cache, key, value, remaining)
 }

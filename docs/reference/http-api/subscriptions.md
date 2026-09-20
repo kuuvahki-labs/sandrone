@@ -125,7 +125,9 @@ preview、不同格式 render、typed file、share 与脚本订阅调用共享�
 }
 ```
 
-`refresh: true` 绕过本次底层 remote-fetch 缓存。traffic 没有独立缓存层。
+`refresh: true` 绕过本次底层 remote-fetch 缓存。traffic 没有独立缓存层；响应头中的
+用量可以独立返回，但只有正文也能解析为有效节点时，本次响应才会回填共享的
+remote-fetch cache。
 成功时返回 `200`：
 
 ```json
@@ -167,7 +169,7 @@ traffic 只适用于 `remote`；它不执行订阅的 nodes processors，不返�
 | --- | --- | --- |
 | `format` | string | 必填且非空；目标 renderer 格式。 |
 | `args` | object | 可选 string-to-string 参数，传给本次脚本/资源执行。 |
-| `refresh` | boolean | 可选；为 `true` 时跳过 snapshot、remote-fetch 和 probe 缓存读取，并在成功后重新填充。 |
+| `refresh` | boolean | 可选；为 `true` 时跳过 snapshot、remote-fetch 和 probe 缓存读取；各缓存按自身有效性边界重新填充。 |
 
 查询参数 `arg.<key>=<value>` 也进入本次 args；body `args` 的同名键覆盖查询值。
 processor 和脚本参数的完整执行语义分别见

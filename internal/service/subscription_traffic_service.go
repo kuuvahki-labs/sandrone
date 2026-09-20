@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
+	"github.com/kuuvahki-labs/sandrone/internal/nodevalidation"
 )
 
 func (s *Service) SubscriptionTraffic(ctx context.Context, req domain.SubscriptionTrafficRequest) (*domain.SubscriptionTrafficResult, error) {
@@ -31,7 +32,7 @@ func (s *Service) SubscriptionTraffic(ctx context.Context, req domain.Subscripti
 	if sub.Type != domain.SubscriptionTypeRemote {
 		return nil, domain.NewError(domain.CodeInvalidArgument, "subscription traffic requires remote subscription")
 	}
-	remote, err := s.fetchRemoteInput(ctx, *sub.Remote)
+	remote, err := s.fetchRemoteInput(withDeferredRemoteFetchCacheWrite(ctx), *sub.Remote)
 	if err != nil {
 		return nil, err
 	}
@@ -42,5 +43,17 @@ func (s *Service) SubscriptionTraffic(ctx context.Context, req domain.Subscripti
 		Format:           sub.Format,
 		Traffic:          subscriptionTrafficItem(traffic),
 	}
+	if s.remoteSubscriptionResponseCacheable(ctx, sub, remote) {
+		s.commitRemoteFetchCache(ctx, remote)
+	}
 	return result.Clone(), nil
+}
+
+func (s *Service) remoteSubscriptionResponseCacheable(ctx context.Context, sub domain.Subscription, remote *remoteInputResult) bool {
+	parsed, err := s.parseNodeContent(ctx, sub.Format, remote.Body, true, &remote.SourceRef)
+	if err != nil || parsed == nil {
+		return false
+	}
+	validated, _, err := validateNodeBatch(parsed.Nodes, nodevalidation.StageNormalized, "")
+	return err == nil && len(validated.Nodes) > 0
 }

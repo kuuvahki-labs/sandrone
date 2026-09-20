@@ -15,6 +15,7 @@ type subscriptionBaseNodes struct {
 	Traffic      []domain.SubscriptionTrafficItem
 	Meta         map[string]string
 	Source       *domain.SourceInfo
+	RemoteInput  *remoteInputResult
 }
 
 func normalizeSubscription(sub domain.Subscription) (domain.Subscription, error) {
@@ -58,12 +59,13 @@ func (s *Service) parseSubscriptionBaseNodes(ctx context.Context, sub domain.Sub
 		parsed         *parseInputResult
 		traffic        []domain.SubscriptionTrafficItem
 		trafficWarning []domain.Warning
+		remoteInput    *remoteInputResult
 		err            error
 	)
 	if sub.Type == domain.SubscriptionTypeRemote {
-		remoteInput, fetchErr := s.fetchRemoteInput(ctx, *sub.Remote)
-		if fetchErr != nil {
-			return nil, fetchErr
+		remoteInput, err = s.fetchRemoteInput(withDeferredRemoteFetchCacheWrite(ctx), *sub.Remote)
+		if err != nil {
+			return nil, err
 		}
 		traffic, trafficWarning = s.subscriptionTrafficFromRemote(sub, remoteInput)
 		parsed, err = s.parseNodeContent(ctx, sub.Format, remoteInput.Body, true, &remoteInput.SourceRef)
@@ -85,12 +87,13 @@ func (s *Service) parseSubscriptionBaseNodes(ctx context.Context, sub domain.Sub
 	}
 	warnings = append(warnings, trafficWarning...)
 	return &subscriptionBaseNodes{
-		Nodes:    append([]domain.NodeIR{}, parsed.Nodes...),
-		Sources:  sourcesSlice(parsed.Source),
-		Warnings: warnings,
-		Traffic:  domain.CloneSubscriptionTrafficItems(traffic),
-		Meta:     cloneStringMap(sub.Meta),
-		Source:   parsed.Source,
+		Nodes:       append([]domain.NodeIR{}, parsed.Nodes...),
+		Sources:     sourcesSlice(parsed.Source),
+		Warnings:    warnings,
+		Traffic:     domain.CloneSubscriptionTrafficItems(traffic),
+		Meta:        cloneStringMap(sub.Meta),
+		Source:      parsed.Source,
+		RemoteInput: remoteInput,
 	}, nil
 }
 
