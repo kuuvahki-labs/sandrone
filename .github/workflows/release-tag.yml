@@ -42,7 +42,14 @@ jobs:
             exit 1
           fi
           printf '%s\n' "${version}" > internal/buildinfo/VERSION
-          ./scripts/generate-ruleset-catalog.sh update-sources
+          meta_revision="$(git ls-remote --exit-code https://github.com/MetaCubeX/meta-rules-dat.git refs/heads/meta | cut -f1)"
+          sing_revision="$(git ls-remote --exit-code https://github.com/MetaCubeX/meta-rules-dat.git refs/heads/sing | cut -f1)"
+          shadowrocket_revision="$(git ls-remote --exit-code https://github.com/blackmatrix7/ios_rule_script.git refs/heads/master | cut -f1)"
+          {
+            echo "METACUBEX_META_REVISION=${meta_revision}"
+            echo "METACUBEX_SING_REVISION=${sing_revision}"
+            echo "SHADOWROCKET_REVISION=${shadowrocket_revision}"
+          } > internal/tools/ruleset-catalog-gen/sources.lock
           GITHUB_REF_NAME="${tag}" sh ./scripts/release.sh validate-tag
           {
             echo "version=${version}"

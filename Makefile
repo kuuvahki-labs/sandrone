@@ -121,7 +121,7 @@ test-webui-e2e:
 	cd web && pnpm test:e2e
 
 ruleset-catalog:
-	GO="$(GO)" GOFLAGS="-mod=readonly" ./scripts/generate-ruleset-catalog.sh generate "$(RULESET_CATALOG_DIR)"
+	GO="$(GO)" GOFLAGS="-mod=readonly" ./scripts/generate-ruleset-catalog.sh "$(RULESET_CATALOG_DIR)"
 
 build: ruleset-catalog
 	$(GO) build $(GOFLAGS) $(BUILD_VCS_ARG) $(BUILD_LDFLAGS_ARG) -o $(BUILD_BIN) $(CMD_PKG)

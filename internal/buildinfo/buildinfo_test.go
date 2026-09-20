@@ -668,9 +668,8 @@ func TestBuildMetadataContracts(t *testing.T) {
 	}
 	for _, want := range []string{
 		`FROM --platform=$BUILDPLATFORM node:24.17.0-bookworm AS web`,
-		`FROM --platform=$BUILDPLATFORM golang:1.27.0-bookworm AS go-deps`,
-		`FROM go-deps AS catalog`,
-		`FROM go-deps AS build`,
+		`FROM --platform=$BUILDPLATFORM golang:1.27.0-bookworm AS catalog`,
+		`FROM --platform=$BUILDPLATFORM golang:1.27.0-bookworm AS build`,
 		`ARG VERSION="dev"`,
 		"ARG REVISION",
 		"ARG BUILD_TIME",
@@ -678,7 +677,8 @@ func TestBuildMetadataContracts(t *testing.T) {
 		"ARG TARGETARCH",
 		`CGO_ENABLED=0 GOOS="$TARGETOS" GOARCH="$TARGETARCH"`,
 		`COPY --from=web /src/web/build/client ./internal/entry/webui/static`,
-		`RUN RULESET_CATALOG_CACHE_DIR= ./scripts/generate-ruleset-catalog.sh generate /out`,
+		`COPY internal/tools/ruleset-catalog-gen/main.go internal/tools/ruleset-catalog-gen/sources.lock ./internal/tools/ruleset-catalog-gen/`,
+		`RUN RULESET_CATALOG_CACHE_DIR= ./scripts/generate-ruleset-catalog.sh /out`,
 		`COPY --from=catalog /out/catalog.json.gz ./internal/service/catalog_builtin/catalog.json.gz`,
 		`make build-check BUILD_BIN=/out/sandrone`,
 		`if [ -z "$REVISION" ] && [ "$VERSION" != "dev" ]; then`,
@@ -690,6 +690,9 @@ func TestBuildMetadataContracts(t *testing.T) {
 	}
 	if strings.Contains(string(dockerfile), `COPY --from=web --chown=sandrone:sandrone /src/web/build/client /app/static`) {
 		t.Error("Dockerfile must not duplicate embedded Web UI assets in the runtime image")
+	}
+	if strings.Contains(string(dockerfile), `COPY internal/tools/ruleset-catalog-gen ./internal/tools/ruleset-catalog-gen`) {
+		t.Error("Docker catalog stage must not depend on generator tests")
 	}
 	if !strings.Contains(string(dockerignore), "internal/entry/webui/static") {
 		t.Error("Docker context must exclude ignored host Web UI assets before copying the current web build")
@@ -729,9 +732,20 @@ func TestManualReleaseWorkflowIncrementsPatchAndDispatchesTagCI(t *testing.T) {
 	}
 	stepByRun(t, job, `if [[ "${GITHUB_REF}" != "refs/heads/main" ]]`)
 	resolve := stepByRun(t, job, "./scripts/release.sh next-version")
-	requireCommands(t, resolve.Run, `git show-ref --verify --quiet "refs/tags/${tag}"`, `printf '%s\n' "${version}" > internal/buildinfo/VERSION`, `./scripts/generate-ruleset-catalog.sh update-sources`, `GITHUB_REF_NAME="${tag}" sh ./scripts/release.sh validate-tag`)
+	requireCommands(t, resolve.Run,
+		`git show-ref --verify --quiet "refs/tags/${tag}"`,
+		`printf '%s\n' "${version}" > internal/buildinfo/VERSION`,
+		`git ls-remote --exit-code https://github.com/MetaCubeX/meta-rules-dat.git refs/heads/meta`,
+		`git ls-remote --exit-code https://github.com/MetaCubeX/meta-rules-dat.git refs/heads/sing`,
+		`git ls-remote --exit-code https://github.com/blackmatrix7/ios_rule_script.git refs/heads/master`,
+		`} > internal/tools/ruleset-catalog-gen/sources.lock`,
+		`GITHUB_REF_NAME="${tag}" sh ./scripts/release.sh validate-tag`,
+	)
 	if strings.Contains(resolve.Run, "make ruleset-catalog") {
 		t.Error("manual release must not generate the rule-set catalog")
+	}
+	if strings.Contains(resolve.Run, "generate-ruleset-catalog.sh") {
+		t.Error("manual release must resolve source commits directly with Git")
 	}
 	commit := stepByRun(t, job, "git push --atomic")
 	requireCommands(t, commit.Run, `git add internal/buildinfo/VERSION internal/tools/ruleset-catalog-gen/sources.lock`, `git commit -m "chore(release): bump version to ${RELEASE_VERSION}"`, `git tag -a "${RELEASE_TAG}" -m "Release ${RELEASE_TAG}"`, `git push --atomic origin HEAD:refs/heads/main "refs/tags/${RELEASE_TAG}"`)

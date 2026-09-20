@@ -16,28 +16,28 @@ RUN if [ -n "$PNPM_REGISTRY" ]; then pnpm config set registry "$PNPM_REGISTRY"; 
 COPY web/ ./
 RUN pnpm build
 
-FROM --platform=$BUILDPLATFORM golang:1.27.0-bookworm AS go-deps
+FROM --platform=$BUILDPLATFORM golang:1.27.0-bookworm AS catalog
+WORKDIR /src
+
+COPY go.mod ./
+COPY scripts/generate-ruleset-catalog.sh ./scripts/generate-ruleset-catalog.sh
+COPY internal/tools/ruleset-catalog-gen/main.go internal/tools/ruleset-catalog-gen/sources.lock ./internal/tools/ruleset-catalog-gen/
+RUN RULESET_CATALOG_CACHE_DIR= ./scripts/generate-ruleset-catalog.sh /out
+
+FROM --platform=$BUILDPLATFORM golang:1.27.0-bookworm AS build
 WORKDIR /src
 
 ARG GOPROXY=""
-
-COPY go.mod go.sum ./
-RUN if [ -n "$GOPROXY" ]; then go env -w GOPROXY="$GOPROXY"; fi \
-  && go mod download
-
-FROM go-deps AS catalog
-
-COPY scripts/generate-ruleset-catalog.sh ./scripts/generate-ruleset-catalog.sh
-COPY internal/tools/ruleset-catalog-gen ./internal/tools/ruleset-catalog-gen
-RUN RULESET_CATALOG_CACHE_DIR= ./scripts/generate-ruleset-catalog.sh generate /out
-
-FROM go-deps AS build
-
 ARG TARGETOS
 ARG TARGETARCH
 ARG VERSION="dev"
 ARG REVISION=""
 ARG BUILD_TIME=""
+
+COPY go.mod go.sum ./
+RUN if [ -n "$GOPROXY" ]; then go env -w GOPROXY="$GOPROXY"; fi \
+  && go mod download
+
 RUN if [ -z "$REVISION" ] && [ "$VERSION" != "dev" ]; then \
     printf '%s\n' 'VERSION requires a complete REVISION; use VERSION=dev for untraceable builds' >&2; \
     exit 1; \
