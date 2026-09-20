@@ -28,9 +28,9 @@ type ScriptDefaults struct {
 }
 
 type CacheDefaults struct {
-	RemoteFetchTTLSeconds          int `json:"remote_fetch_ttl_seconds,omitzero" yaml:"remote_fetch_ttl_seconds,omitempty"`
-	ProbeTTLSeconds                int `json:"probe_ttl_seconds,omitzero" yaml:"probe_ttl_seconds,omitempty"`
-	SubscriptionSnapshotTTLSeconds int `json:"subscription_snapshot_ttl_seconds,omitzero" yaml:"subscription_snapshot_ttl_seconds,omitempty"`
+	FetchTTLSeconds    int `json:"fetch_ttl_seconds,omitzero" yaml:"fetch_ttl_seconds,omitempty"`
+	ProbeTTLSeconds    int `json:"probe_ttl_seconds,omitzero" yaml:"probe_ttl_seconds,omitempty"`
+	SnapshotTTLSeconds int `json:"snapshot_ttl_seconds,omitzero" yaml:"snapshot_ttl_seconds,omitempty"`
 }
 
 type Settings struct {
@@ -70,9 +70,9 @@ func (s *Settings) UnmarshalJSONFrom(decoder *jsontext.Decoder) error {
 
 func (s Settings) CacheDefaultsSpecified() bool {
 	return s.cacheDefaultsSet ||
-		s.CacheDefaults.RemoteFetchTTLSeconds != 0 ||
+		s.CacheDefaults.FetchTTLSeconds != 0 ||
 		s.CacheDefaults.ProbeTTLSeconds != 0 ||
-		s.CacheDefaults.SubscriptionSnapshotTTLSeconds != 0
+		s.CacheDefaults.SnapshotTTLSeconds != 0
 }
 
 func (s *Settings) SpecifyCacheDefaults(value CacheDefaults) {

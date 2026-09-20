@@ -18,9 +18,9 @@ func (s *Service) deleteCacheOwner(ctx context.Context, resourceKind, resourceNa
 }
 
 var ownedCacheKeyPrefixes = []string{
-	cacheKeyPrefixRemoteFetch,
+	cacheKeyPrefixFetch,
 	cacheKeyPrefixProbe,
-	cacheKeyPrefixSubscriptionSnapshot,
+	cacheKeyPrefixSnapshot,
 }
 
 // ClearCache deletes every value owned by the configured cache backend.

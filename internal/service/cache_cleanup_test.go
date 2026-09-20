@@ -17,7 +17,7 @@ import (
 func TestClearCacheClearsConfiguredBackend(t *testing.T) {
 	cache := newTestCache()
 	cache.values["probe/subscriptions/A"] = cachepkg.Item{Value: []byte(`"probe"`), ExpiresAt: time.Now().Add(time.Hour)}
-	cache.values["subscription_snapshot/files/B"] = cachepkg.Item{Value: []byte(`"nodes"`), ExpiresAt: time.Now().Add(time.Hour)}
+	cache.values["snapshot/files/B"] = cachepkg.Item{Value: []byte(`"nodes"`), ExpiresAt: time.Now().Add(time.Hour)}
 	svc := service.New(service.WithCache(cache))
 
 	require.NoError(t, svc.ClearCache(context.Background()))
@@ -44,17 +44,17 @@ func TestResourceDeletionClearsAllOwnedCacheLayers(t *testing.T) {
 
 	require.NoError(t, svc.DeleteSubscription(ctx, "sub"))
 	require.ElementsMatch(t, []string{
-		"remote_fetch/subscriptions/sub",
+		"fetch/subscriptions/sub",
 		"probe/subscriptions/sub",
-		"subscription_snapshot/subscriptions/sub",
+		"snapshot/subscriptions/sub",
 	}, cache.deleted)
 
 	cache.deleted = nil
 	require.NoError(t, svc.DeleteFile(ctx, "file"))
 	require.ElementsMatch(t, []string{
-		"remote_fetch/files/file",
+		"fetch/files/file",
 		"probe/files/file",
-		"subscription_snapshot/files/file",
+		"snapshot/files/file",
 	}, cache.deleted)
 }
 

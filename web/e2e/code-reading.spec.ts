@@ -10,7 +10,7 @@ const settings = {
   appearance: { locale: "zh-CN", theme_mode: "dark" },
   remote_defaults: { timeout_ms: 15000 },
   script_defaults: { timeout_ms: 2000 },
-  cache_defaults: { remote_fetch_ttl_seconds: 0, probe_ttl_seconds: 0, subscription_snapshot_ttl_seconds: 0 },
+  cache_defaults: { fetch_ttl_seconds: 0, probe_ttl_seconds: 0, snapshot_ttl_seconds: 0 },
   subscriptions: { auto_load_traffic: false, ignored_warnings: [] },
 };
 

@@ -116,9 +116,9 @@ function settingsEnvelope(ignoredWarnings: Array<{ code: string; field?: string;
     },
     script_defaults: { timeout_ms: 2000 },
     cache_defaults: {
-      remote_fetch_ttl_seconds: 0,
+      fetch_ttl_seconds: 0,
     probe_ttl_seconds: 0,
-    subscription_snapshot_ttl_seconds: 0,
+    snapshot_ttl_seconds: 0,
     },
     appearance: { theme_mode: "dark", locale: "zh-CN" },
     subscriptions: { auto_load_traffic: false, ignored_warnings: ignoredWarnings },

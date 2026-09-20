@@ -24,7 +24,7 @@ func (s *Service) remoteInputWithDefaults(input domain.RemoteInput) domain.Remot
 		out.TimeoutMS = defaults.TimeoutMS
 	}
 	if out.CacheTTLSeconds <= 0 {
-		out.CacheTTLSeconds = settings.CacheDefaults.RemoteFetchTTLSeconds
+		out.CacheTTLSeconds = settings.CacheDefaults.FetchTTLSeconds
 	}
 	return out
 }

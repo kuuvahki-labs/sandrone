@@ -698,7 +698,7 @@ func TestServiceConvertResolvesEmptyUserAgentWithoutPersistentCache(t *testing.T
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
 	putProjectSettings(t, svc, context.Background(), func(update *domain.SettingsUpdate) {
 		update.RemoteDefaults.UserAgent = ""
-		update.CacheDefaults.RemoteFetchTTLSeconds = 60
+		update.CacheDefaults.FetchTTLSeconds = 60
 	})
 
 	for range 2 {
@@ -790,7 +790,7 @@ func TestServiceTransientRemoteFetchUsesRuntimeDefaultOnEveryRequest(t *testing.
 			TimeoutMS: 8000,
 		}
 		update.CacheDefaults = domain.CacheDefaults{
-			RemoteFetchTTLSeconds: 60,
+			FetchTTLSeconds: 60,
 		}
 	})
 

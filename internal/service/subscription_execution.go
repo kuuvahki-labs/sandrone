@@ -142,7 +142,7 @@ func (s *Service) executeSubscription(
 	snapshotStatus := snapshotCacheStatusDisabled
 	snapshotTTLSeconds := s.subscriptionSnapshotTTLSeconds(sub.SnapshotTTLSeconds)
 	snapshotEntryID := ""
-	_, cacheOwned := ownedCacheKey(ctx, cacheKeyPrefixSubscriptionSnapshot)
+	_, cacheOwned := ownedCacheKey(ctx, cacheKeyPrefixSnapshot)
 	if sub.Name != "" && snapshotTTLSeconds > 0 && s.cache != nil && cacheOwned {
 		snapshotEntryID, err = s.subscriptionSnapshotCacheEntryID(sub, req)
 		if err != nil {

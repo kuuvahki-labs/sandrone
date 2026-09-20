@@ -1021,7 +1021,7 @@ func TestServiceSubscriptionTrafficReusesRemoteFetchUntilForcedRefresh(t *testin
 
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
 	putProjectSettings(t, svc, ctx, func(update *domain.SettingsUpdate) {
-		update.CacheDefaults.RemoteFetchTTLSeconds = 3600
+		update.CacheDefaults.FetchTTLSeconds = 3600
 	})
 	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
 		Name:   "remote/live",
@@ -1060,7 +1060,7 @@ func TestServiceSubscriptionPreviewCachesUntilForcedRefresh(t *testing.T) {
 
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
 	putProjectSettings(t, svc, ctx, func(update *domain.SettingsUpdate) {
-		update.CacheDefaults.RemoteFetchTTLSeconds = 3600
+		update.CacheDefaults.FetchTTLSeconds = 3600
 	})
 	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
 		Name:   "remote/live",
@@ -1097,7 +1097,7 @@ func TestServiceSubscriptionPreviewCachesOnlySuccessfulRemoteContent(t *testing.
 
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
 	putProjectSettings(t, svc, ctx, func(update *domain.SettingsUpdate) {
-		update.CacheDefaults.RemoteFetchTTLSeconds = 60
+		update.CacheDefaults.FetchTTLSeconds = 60
 	})
 	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
 		Name:   "remote/recovery",
@@ -1133,7 +1133,7 @@ func TestServiceSubscriptionPreviewFailedRefreshPreservesLastSuccessfulRemoteCon
 
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
 	putProjectSettings(t, svc, ctx, func(update *domain.SettingsUpdate) {
-		update.CacheDefaults.RemoteFetchTTLSeconds = 60
+		update.CacheDefaults.FetchTTLSeconds = 60
 	})
 	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
 		Name:   "remote/stable",
@@ -1176,7 +1176,7 @@ func TestServiceSubscriptionPreviewValidRefreshReplacesCacheBeforeProcessorFailu
 		}),
 	)
 	putProjectSettings(t, svc, ctx, func(update *domain.SettingsUpdate) {
-		update.CacheDefaults.RemoteFetchTTLSeconds = 60
+		update.CacheDefaults.FetchTTLSeconds = 60
 	})
 	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
 		Name:   "remote/processor-failure",
@@ -1220,7 +1220,7 @@ func TestServiceSubscriptionTrafficDoesNotCacheInvalidNodeBody(t *testing.T) {
 
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
 	putProjectSettings(t, svc, ctx, func(update *domain.SettingsUpdate) {
-		update.CacheDefaults.RemoteFetchTTLSeconds = 60
+		update.CacheDefaults.FetchTTLSeconds = 60
 	})
 	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
 		Name:   "remote/traffic-recovery",
@@ -1253,7 +1253,7 @@ func TestSavedRemoteFetchCacheIsResourceLocal(t *testing.T) {
 	resourceStore := store.NewFSStore(fs)
 	svc := service.New(service.WithStore(resourceStore))
 	putProjectSettings(t, svc, ctx, func(update *domain.SettingsUpdate) {
-		update.CacheDefaults.RemoteFetchTTLSeconds = 60
+		update.CacheDefaults.FetchTTLSeconds = 60
 	})
 	for _, name := range []string{"A", "B"} {
 		require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
@@ -1270,7 +1270,7 @@ func TestSavedRemoteFetchCacheIsResourceLocal(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 2, calls)
 	for _, name := range []string{"A", "B"} {
-		_, err := resourceStore.Stat(ctx, "cache/remote_fetch/subscriptions/"+name+".json")
+		_, err := resourceStore.Stat(ctx, "cache/fetch/subscriptions/"+name+".json")
 		require.NoError(t, err)
 	}
 }

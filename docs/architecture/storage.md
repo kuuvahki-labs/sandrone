@@ -108,9 +108,9 @@ Store-backed Cache。
 
 | key 前缀 | 缓存值 | TTL 来源 |
 | --- | --- | --- |
-| `remote_fetch` | 受控 HTTP(S) 响应；订阅正文须解析出有效节点 | `RemoteInput.cache_ttl_seconds`，零值继承项目默认 |
+| `fetch` | 受控 HTTP(S) 响应；订阅正文须解析出有效节点 | `RemoteInput.cache_ttl_seconds`，零值继承项目默认 |
 | `probe` | 按连接保存的节点观测 | probe 请求，零值继承项目 `cache_defaults.probe_ttl_seconds` |
-| `subscription_snapshot` | 已保存订阅处理前后的 canonical `NodeSet` 与依赖 revision | Subscription 三态覆盖或项目默认 |
+| `snapshot` | 已保存订阅处理前后的 canonical `NodeSet` 与依赖 revision | Subscription 三态覆盖或项目默认 |
 
 Subscription 的 `snapshot_ttl_seconds` 是 nullable 三态字段：省略时
 继承项目默认，显式 `0` 关闭，正数覆盖；项目默认值为 `0`。持久缓存只属于已保存的 Subscription

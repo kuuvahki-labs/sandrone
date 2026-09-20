@@ -49,8 +49,8 @@ func TestResourceReadsSnapshotHitAndNextRequest(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, snapshotCacheStatusHit, preview.SnapshotCacheStatus)
 	require.Equal(t, map[string]int{
-		"subscriptions/example.json":                             1,
-		"cache/subscription_snapshot/subscriptions/example.json": 1,
+		"subscriptions/example.json":                1,
+		"cache/snapshot/subscriptions/example.json": 1,
 	}, st.reads)
 
 	// An independent writer must be visible to the next execution.

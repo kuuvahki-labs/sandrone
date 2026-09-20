@@ -441,14 +441,14 @@ func validateAppearance(value domain.AppearanceSettings) error {
 }
 
 func validateCacheDefaults(value domain.CacheDefaults) error {
-	if value.RemoteFetchTTLSeconds < 0 {
-		return invalid("remote_fetch_ttl_seconds must be non-negative")
+	if value.FetchTTLSeconds < 0 {
+		return invalid("fetch_ttl_seconds must be non-negative")
 	}
 	if value.ProbeTTLSeconds < 0 {
 		return invalid("probe_ttl_seconds must be non-negative")
 	}
-	if value.SubscriptionSnapshotTTLSeconds < 0 {
-		return invalid("subscription_snapshot_ttl_seconds must be non-negative")
+	if value.SnapshotTTLSeconds < 0 {
+		return invalid("snapshot_ttl_seconds must be non-negative")
 	}
 	return nil
 }

@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	cacheKeyPrefixSubscriptionSnapshot = "subscription_snapshot"
-	maxSubscriptionSnapshotCacheBytes  = 16 << 20
+	cacheKeyPrefixSnapshot            = "snapshot"
+	maxSubscriptionSnapshotCacheBytes = 16 << 20
 
 	snapshotCacheStatusDisabled = "disabled"
 	snapshotCacheStatusHit      = "hit"
@@ -37,7 +37,7 @@ func (s *Service) subscriptionSnapshotTTLSeconds(override *int) int {
 	if override != nil {
 		return *override
 	}
-	return s.currentSettings().CacheDefaults.SubscriptionSnapshotTTLSeconds
+	return s.currentSettings().CacheDefaults.SnapshotTTLSeconds
 }
 
 func (s *Service) subscriptionSnapshotCacheEntryID(sub domain.Subscription, req subscriptionExecutionRequest) (string, error) {
@@ -54,7 +54,7 @@ func (s *Service) subscriptionSnapshotCacheEntryID(sub domain.Subscription, req 
 }
 
 func (s *Service) readSubscriptionSnapshotCache(ctx context.Context, entryID string, ttl time.Duration) *subscriptionExecutionResult {
-	key, owned := ownedCacheKey(ctx, cacheKeyPrefixSubscriptionSnapshot)
+	key, owned := ownedCacheKey(ctx, cacheKeyPrefixSnapshot)
 	if s.cache == nil || entryID == "" || !owned {
 		return nil
 	}
@@ -85,7 +85,7 @@ func (s *Service) writeSubscriptionSnapshotCache(
 	ttlSeconds int,
 	result *subscriptionExecutionResult,
 ) {
-	key, owned := ownedCacheKey(ctx, cacheKeyPrefixSubscriptionSnapshot)
+	key, owned := ownedCacheKey(ctx, cacheKeyPrefixSnapshot)
 	if s.cache == nil || entryID == "" || ttlSeconds <= 0 || !subscriptionSnapshotCacheable(result) || !owned {
 		return
 	}

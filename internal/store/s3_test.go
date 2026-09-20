@@ -200,10 +200,10 @@ func TestS3StoreListRootAcrossPages(t *testing.T) {
 	client.pageSize = 1
 	storage := newS3Store(client, "bucket", "namespace/")
 	for key, body := range map[string]string{
-		"namespace/settings.json":                 "{}",
-		"namespace/subscriptions/demo.json":       "one",
-		"namespace/cache/probe/result.json":       "two",
-		"namespace/cache/remote_fetch/value.json": "three",
+		"namespace/settings.json":           "{}",
+		"namespace/subscriptions/demo.json": "one",
+		"namespace/cache/probe/result.json": "two",
+		"namespace/cache/fetch/value.json":  "three",
 	} {
 		client.objects[key] = fakeS3Object{body: []byte(body)}
 	}
@@ -216,10 +216,10 @@ func TestS3StoreListRootAcrossPages(t *testing.T) {
 	}
 	require.Equal(t, []string{
 		"cache",
+		"cache/fetch",
+		"cache/fetch/value.json",
 		"cache/probe",
 		"cache/probe/result.json",
-		"cache/remote_fetch",
-		"cache/remote_fetch/value.json",
 		"settings.json",
 		"subscriptions",
 		"subscriptions/demo.json",

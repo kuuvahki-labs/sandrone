@@ -87,7 +87,7 @@ func TestBusinessCacheValueUsesOneConservativeAbsoluteDeadline(t *testing.T) {
 func TestRemoteFetchCacheIgnoresLegacySubscriptionRecords(t *testing.T) {
 	ctx := withSubscriptionCacheOwner(t.Context(), "A")
 	svc := New(WithFS(afero.NewMemMapFs()))
-	key, owned := ownedCacheKey(ctx, cacheKeyPrefixRemoteFetch)
+	key, owned := ownedCacheKey(ctx, cacheKeyPrefixFetch)
 	require.True(t, owned)
 	entryID, err := remoteFetchCacheEntryID(domain.RemoteInput{URL: "https://example.test/sub"})
 	require.NoError(t, err)
@@ -103,7 +103,7 @@ func TestRemoteFetchCacheIgnoresLegacySubscriptionRecords(t *testing.T) {
 
 	require.Nil(t, svc.readRemoteFetchCache(ctx, key, entryID, time.Hour))
 	fileCtx := withFileCacheOwner(t.Context(), "base")
-	fileKey, owned := ownedCacheKey(fileCtx, cacheKeyPrefixRemoteFetch)
+	fileKey, owned := ownedCacheKey(fileCtx, cacheKeyPrefixFetch)
 	require.True(t, owned)
 	require.NoError(t, cachepkg.SetJSON(fileCtx, svc.cache, fileKey, remoteFetchCacheValue{
 		Records: map[string]remoteFetchCacheRecord{

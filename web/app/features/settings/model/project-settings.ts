@@ -38,9 +38,9 @@ export const defaultProjectSettings: SettingsView = {
     timeout_ms: 2000,
   },
   cache_defaults: {
-    remote_fetch_ttl_seconds: 0,
+    fetch_ttl_seconds: 0,
     probe_ttl_seconds: 0,
-    subscription_snapshot_ttl_seconds: 0,
+    snapshot_ttl_seconds: 0,
   },
   appearance: {
     theme_mode: "dark",

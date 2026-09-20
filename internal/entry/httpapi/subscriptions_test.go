@@ -248,7 +248,7 @@ func TestSubscriptionPreviewReturnsSnapshotCacheStatusHeader(t *testing.T) {
 	ctx := context.Background()
 	rt := testRuntime(t, app.Config{})
 	update := settingsUpdate()
-	update.CacheDefaults.SubscriptionSnapshotTTLSeconds = 60
+	update.CacheDefaults.SnapshotTTLSeconds = 60
 	_, err := rt.Service.PutSettings(ctx, update)
 	require.NoError(t, err)
 	require.NoError(t, rt.Service.PutSubscription(ctx, domain.Subscription{

@@ -157,7 +157,7 @@ func TestEngineSettingsRoundTrip(t *testing.T) {
 	require.Equal(t, "url_test", defaults.Settings.ProbeDefaults.Method)
 	require.Equal(t, "sing-box", defaults.Settings.ProbeDefaults.Core)
 	require.Equal(t, "200-299", defaults.Settings.ProbeDefaults.ExpectedStatus)
-	require.Zero(t, defaults.Settings.CacheDefaults.SubscriptionSnapshotTTLSeconds)
+	require.Zero(t, defaults.Settings.CacheDefaults.SnapshotTTLSeconds)
 
 	update := sandrone.SettingsUpdate{
 		SchemaVersion: defaults.Settings.SchemaVersion,
@@ -180,9 +180,9 @@ func TestEngineSettingsRoundTrip(t *testing.T) {
 			Concurrency:    12,
 		},
 		CacheDefaults: sandrone.CacheDefaults{
-			RemoteFetchTTLSeconds:          120,
-			ProbeTTLSeconds:                300,
-			SubscriptionSnapshotTTLSeconds: 45,
+			FetchTTLSeconds:    120,
+			ProbeTTLSeconds:    300,
+			SnapshotTTLSeconds: 45,
 		},
 		Appearance:    defaults.Settings.Appearance,
 		Subscriptions: defaults.Settings.Subscriptions,

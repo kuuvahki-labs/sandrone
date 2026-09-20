@@ -26,7 +26,7 @@ const settings = {
   remote_defaults: { timeout_ms: 15000 },
   probe_defaults: { method: "url_test", core: "sing-box", url: "https://cp.cloudflare.com", ntp_server: "time.apple.com", timeout_ms: 5000, attempts: 1, concurrency: 10 },
   script_defaults: { timeout_ms: 2000 },
-  cache_defaults: { remote_fetch_ttl_seconds: 0, probe_ttl_seconds: 0, subscription_snapshot_ttl_seconds: 0 },
+  cache_defaults: { fetch_ttl_seconds: 0, probe_ttl_seconds: 0, snapshot_ttl_seconds: 0 },
   appearance: { theme_mode: "dark", locale: "en-US" },
   subscriptions: { auto_load_traffic: false, ignored_warnings: [] },
   scheduled_refresh: { enabled: false, schedule: "@every 10m", targets: [] },

@@ -132,9 +132,9 @@ describe("settings service page", () => {
       }),
       script_defaults: { timeout_ms: 3500 },
       cache_defaults: expect.objectContaining({
-        remote_fetch_ttl_seconds: 120,
+        fetch_ttl_seconds: 120,
         probe_ttl_seconds: 300,
-        subscription_snapshot_ttl_seconds: 300,
+        snapshot_ttl_seconds: 300,
       }),
       mcp: expect.objectContaining({ path: "/agent" }),
       subscriptions: {

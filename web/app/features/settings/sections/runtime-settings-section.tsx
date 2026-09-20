@@ -101,8 +101,8 @@ export function RuntimeSettingsSection({
             fullWidth
             label={t("settings.runtime.remoteFetchCacheTTLSeconds")}
             type="number"
-            value={numberInputValue(value.cache_defaults.remote_fetch_ttl_seconds)}
-            onChange={(event) => updateCacheDefaults({ remote_fetch_ttl_seconds: numberOrZero(event.target.value) })}
+            value={numberInputValue(value.cache_defaults.fetch_ttl_seconds)}
+            onChange={(event) => updateCacheDefaults({ fetch_ttl_seconds: numberOrZero(event.target.value) })}
           />
         </RuntimeSettingsGroup>
         <RuntimeSettingsGroup id="runtime-script-defaults" title={t("settings.runtime.group.script")}>
@@ -190,9 +190,9 @@ export function RuntimeSettingsSection({
             fullWidth
             label={t("settings.runtime.subscriptionSnapshotTTLSeconds")}
             type="number"
-            value={numberInputValue(value.cache_defaults.subscription_snapshot_ttl_seconds)}
+            value={numberInputValue(value.cache_defaults.snapshot_ttl_seconds)}
             onChange={(event) =>
-              updateCacheDefaults({ subscription_snapshot_ttl_seconds: numberOrZero(event.target.value) })
+              updateCacheDefaults({ snapshot_ttl_seconds: numberOrZero(event.target.value) })
             }
           />
         </RuntimeSettingsGroup>

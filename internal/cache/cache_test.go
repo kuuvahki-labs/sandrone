@@ -48,11 +48,11 @@ func TestCacheSetReplacesValueAndTTL(t *testing.T) {
 	ctx := context.Background()
 	now := time.Date(2026, 6, 30, 12, 0, 0, 0, time.UTC)
 	c := cache.New(store.NewFSStore(afero.NewMemMapFs()), func() time.Time { return now })
-	require.NoError(t, c.Set(ctx, "remote_fetch/files/config", []byte("old"), time.Minute))
+	require.NoError(t, c.Set(ctx, "fetch/files/config", []byte("old"), time.Minute))
 	now = now.Add(30 * time.Second)
-	require.NoError(t, c.Set(ctx, "remote_fetch/files/config", []byte("new"), 2*time.Minute))
+	require.NoError(t, c.Set(ctx, "fetch/files/config", []byte("new"), 2*time.Minute))
 
-	item, found, err := c.Get(ctx, "remote_fetch/files/config")
+	item, found, err := c.Get(ctx, "fetch/files/config")
 	require.NoError(t, err)
 	require.True(t, found)
 	require.Equal(t, []byte("new"), item.Value)
@@ -89,9 +89,9 @@ func TestCacheKeepsLargeIncompressibleValuesRaw(t *testing.T) {
 	for index := range value {
 		value[index] = byte(random.Uint32())
 	}
-	require.NoError(t, c.Set(ctx, "remote_fetch/subscriptions/random", value, time.Minute))
+	require.NoError(t, c.Set(ctx, "fetch/subscriptions/random", value, time.Minute))
 
-	body, err := resourceStore.Read(ctx, "cache/remote_fetch/subscriptions/random.json")
+	body, err := resourceStore.Read(ctx, "cache/fetch/subscriptions/random.json")
 	require.NoError(t, err)
 	var envelope storedCacheEnvelope
 	require.NoError(t, json.Unmarshal(body, &envelope))
@@ -125,11 +125,11 @@ func TestCacheMissingCorruptAndInvalidKeys(t *testing.T) {
 	resourceStore := store.NewFSStore(afero.NewMemMapFs())
 	c := cache.New(resourceStore, time.Now)
 
-	_, found, err := c.Get(ctx, "remote_fetch/subscriptions/missing")
+	_, found, err := c.Get(ctx, "fetch/subscriptions/missing")
 	require.NoError(t, err)
 	require.False(t, found)
-	require.NoError(t, resourceStore.Write(ctx, "cache/remote_fetch/subscriptions/bad.json", []byte(`{bad json`)))
-	_, _, err = c.Get(ctx, "remote_fetch/subscriptions/bad")
+	require.NoError(t, resourceStore.Write(ctx, "cache/fetch/subscriptions/bad.json", []byte(`{bad json`)))
+	_, _, err = c.Get(ctx, "fetch/subscriptions/bad")
 	require.Error(t, err)
 	require.Error(t, c.Set(ctx, "../escape", []byte("value"), time.Minute))
 }

@@ -29,7 +29,7 @@ func TestSubscriptionSnapshotCacheIsSharedAcrossPreviewRenderAndTypedFile(t *tes
 		}),
 	)
 	putProjectSettings(t, svc, ctx, func(update *domain.SettingsUpdate) {
-		update.CacheDefaults.SubscriptionSnapshotTTLSeconds = 60
+		update.CacheDefaults.SnapshotTTLSeconds = 60
 	})
 	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
 		Name:    "shared",
@@ -103,7 +103,7 @@ func TestSubscriptionSnapshotCacheSharesProbedRefreshWithDisabledRuntime(t *test
 		}}),
 	)
 	putProjectSettings(t, producer, ctx, func(update *domain.SettingsUpdate) {
-		update.CacheDefaults.SubscriptionSnapshotTTLSeconds = 60
+		update.CacheDefaults.SnapshotTTLSeconds = 60
 	})
 	probeProcessor := domain.ProcessorSpec{
 		Type: "probe", Stage: domain.StageNodes,
@@ -174,7 +174,7 @@ func TestSubscriptionSnapshotCacheIdentityIncludesRequestAndNotRenderTarget(t *t
 		}),
 	)
 	putProjectSettings(t, svc, ctx, func(update *domain.SettingsUpdate) {
-		update.CacheDefaults.SubscriptionSnapshotTTLSeconds = 60
+		update.CacheDefaults.SnapshotTTLSeconds = 60
 	})
 	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
 		Name: "variant", Type: domain.SubscriptionTypeLocal, Format: "uri-list",
@@ -203,7 +203,7 @@ func TestSubscriptionSnapshotCacheInvalidatesWhenDependencyChanges(t *testing.T)
 	ctx := context.Background()
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
 	putProjectSettings(t, svc, ctx, func(update *domain.SettingsUpdate) {
-		update.CacheDefaults.SubscriptionSnapshotTTLSeconds = 60
+		update.CacheDefaults.SnapshotTTLSeconds = 60
 	})
 	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
 		Name: "child", Type: domain.SubscriptionTypeLocal, Format: "uri-list",
@@ -238,7 +238,7 @@ func TestSubscriptionSnapshotCacheResourceOverrideCanDisableDefault(t *testing.T
 	disabled := 0
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
 	putProjectSettings(t, svc, ctx, func(update *domain.SettingsUpdate) {
-		update.CacheDefaults.SubscriptionSnapshotTTLSeconds = 60
+		update.CacheDefaults.SnapshotTTLSeconds = 60
 	})
 	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
 		Name: "disabled", Type: domain.SubscriptionTypeLocal, Format: "uri-list",
@@ -272,8 +272,8 @@ func TestSubscriptionSnapshotTTLCanOutliveRemoteFetchTTL(t *testing.T) {
 		service.WithClock(func() time.Time { return now }),
 	)
 	putProjectSettings(t, svc, ctx, func(update *domain.SettingsUpdate) {
-		update.CacheDefaults.RemoteFetchTTLSeconds = 1
-		update.CacheDefaults.SubscriptionSnapshotTTLSeconds = 10
+		update.CacheDefaults.FetchTTLSeconds = 1
+		update.CacheDefaults.SnapshotTTLSeconds = 10
 	})
 	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
 		Name: "remote", Type: domain.SubscriptionTypeRemote, Format: "uri-list",

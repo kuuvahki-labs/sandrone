@@ -127,9 +127,9 @@ export interface ScriptDefaultsInput {
 }
 
 export interface CacheDefaultsInput {
-  remote_fetch_ttl_seconds: number;
+  fetch_ttl_seconds: number;
   probe_ttl_seconds: number;
-  subscription_snapshot_ttl_seconds: number;
+  snapshot_ttl_seconds: number;
 }
 
 export type ScheduledRefreshTargetKind = "subscription" | "file";

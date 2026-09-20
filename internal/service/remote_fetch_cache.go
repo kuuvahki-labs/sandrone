@@ -15,10 +15,10 @@ import (
 )
 
 const (
-	cacheKeyPrefixRemoteFetch             = "remote_fetch"
-	cacheKeyPrefixProbe                   = "probe"
-	remoteFetchCacheRecordVersion         = 1
-	remoteFetchSubscriptionCacheKeyPrefix = cacheKeyPrefixRemoteFetch + "/" + cacheResourceSubscriptions + "/"
+	cacheKeyPrefixFetch             = "fetch"
+	cacheKeyPrefixProbe             = "probe"
+	remoteFetchCacheRecordVersion   = 1
+	fetchSubscriptionCacheKeyPrefix = cacheKeyPrefixFetch + "/" + cacheResourceSubscriptions + "/"
 )
 
 type remoteFetchCacheRecord struct {
@@ -61,7 +61,7 @@ func (s *Service) commitRemoteFetchCache(ctx context.Context, result *remoteInpu
 	result.cacheWrite = remoteFetchCacheWrite{}
 	if err := s.writeRemoteFetchCache(ctx, write.key, write.entryID, write.ttl, result); err != nil {
 		s.log(ctx, slog.LevelWarn, "service remote fetch cache write failed",
-			"operation", "remote_fetch",
+			"operation", "fetch",
 			"cache_key", write.key,
 			"cache_hit", false,
 			"cache_ttl_seconds", write.cacheTTLSeconds,
@@ -80,7 +80,7 @@ func (s *Service) fetchRemoteCached(ctx context.Context, input domain.RemoteInpu
 	}
 	input = s.remoteInputWithDefaults(input)
 	ttl := time.Duration(input.CacheTTLSeconds) * time.Second
-	cacheKey, cacheOwned := ownedCacheKey(ctx, cacheKeyPrefixRemoteFetch)
+	cacheKey, cacheOwned := ownedCacheKey(ctx, cacheKeyPrefixFetch)
 	cacheEntryID := ""
 	if ttl > 0 && cacheOwned {
 		var err error
@@ -91,7 +91,7 @@ func (s *Service) fetchRemoteCached(ctx context.Context, input domain.RemoteInpu
 		if !cacheReadBypass(ctx) {
 			if cached := s.readRemoteFetchCache(ctx, cacheKey, cacheEntryID, ttl); cached != nil {
 				s.log(ctx, slog.LevelInfo, "service remote fetch cache hit",
-					"operation", "remote_fetch",
+					"operation", "fetch",
 					"cache_key", cacheKey,
 					"cache_hit", true,
 					"cache_ttl_seconds", input.CacheTTLSeconds,
@@ -141,7 +141,7 @@ func (s *Service) readRemoteFetchCache(ctx context.Context, key, entryID string,
 		return nil
 	}
 	record, found := item.Value.Records[entryID]
-	if !found || (strings.HasPrefix(key, remoteFetchSubscriptionCacheKeyPrefix) && record.Version != remoteFetchCacheRecordVersion) {
+	if !found || (strings.HasPrefix(key, fetchSubscriptionCacheKeyPrefix) && record.Version != remoteFetchCacheRecordVersion) {
 		return nil
 	}
 	ref := record.SourceRef

@@ -41,9 +41,9 @@ func TestClearCacheDeletesAllPersistentKeysAndIsIdempotent(t *testing.T) {
 	ctx := context.Background()
 	keys := make([]string, 0, 3)
 	for _, prefix := range []string{
-		"remote_fetch",
+		"fetch",
 		"probe",
-		"subscription_snapshot",
+		"snapshot",
 	} {
 		key := prefix + "/subscriptions/all"
 		require.NoError(t, cache.Set(ctx, key, []byte(`{"entries":{"entry":"value"}}`), time.Hour))
