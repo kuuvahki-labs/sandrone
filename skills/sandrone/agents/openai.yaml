@@ -1,4 +1,4 @@
 interface:
   display_name: "Sandrone"
-  short_description: "Operate Sandrone resources and conversion workflows safely"
-  default_prompt: "Use $sandrone to inspect my Sandrone resources and complete the requested subscription or FileSpec task safely."
+  short_description: "管理 Sandrone 资源、转换流程和 processor 脚本"
+  default_prompt: "使用 $sandrone 查看并按要求处理我的 Subscription 或 FileSpec。"

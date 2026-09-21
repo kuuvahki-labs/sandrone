@@ -1,37 +1,34 @@
 ---
 name: sandrone
-description: Operate Sandrone subscriptions, FileSpecs, conversions and processor scripts, or explain their reports.
+description: 使用 Sandrone 转换代理数据，查看或管理 Subscription 和 FileSpec，编写 processor 脚本并渲染客户端配置。
 ---
 
 # Sandrone
 
-Use the bundled HTTP script when shell access, `curl`, and `SANDRONE_URL` are
-available; a connected Sandrone MCP server is another execution option. Follow
-the user's chosen interface when specified. MCP client requirements are in the
-[MCP reference](https://github.com/kuuvahki-labs/sandrone/blob/main/docs/reference/mcp.md). If neither interface is available,
-explain how to configure `SANDRONE_URL` (and `SANDRONE_TOKEN` when required) or
-connect MCP. Explaining a supplied report needs no server connection.
+优先使用用户指定的入口。未指定时，有 shell、`curl` 和 `SANDRONE_URL` 就使用
+随附的 `scripts/sandrone-api.sh`；否则使用已连接的 Sandrone MCP。两者都不可用时，
+说明如何设置 `SANDRONE_URL`、可选的 `SANDRONE_TOKEN`，或连接 MCP。
 
-Read [workflows](references/workflows.md) for endpoint mappings and resource
-operations. Discover only the capabilities, schemas and current definitions
-needed for the task; reuse valid results, refreshing after a server change or
-schema mismatch. Live schemas describe supported payloads; this Skill does not
-maintain a second field catalog.
+## 资料来源
 
-## Writes and verification
+- 构造请求前，从当前服务的 `/v1/schemas` 或 `sandrone://schemas` 读取所需
+  schema；不要凭 Skill 中的静态描述猜字段。
+- 仓库存在时优先读取同版本的本地文档。否则按需查看 GitHub 上的
+  [文档索引](https://github.com/kuuvahki-labs/sandrone/blob/main/docs/README.md)、
+  [HTTP API](https://github.com/kuuvahki-labs/sandrone/tree/main/docs/reference/http-api)、
+  [MCP 参考](https://github.com/kuuvahki-labs/sandrone/blob/main/docs/reference/mcp.md)和
+  [示例](https://github.com/kuuvahki-labs/sandrone/tree/main/examples)。部署版本不是
+  `main` 时，尽量查看对应 tag 或 commit 的内容。
+- 需要端点与资源操作映射时读取 [操作参考](references/workflows.md)。只获取当前任务
+  所需的文档、schema 和资源定义。
 
-An explicit request to create, update or delete a resource authorizes that
-operation. Inspection, drafts, preview and rendering alone do not authorize
-persistence. Resolve the target from available context and read its existing
-definition before overwriting or deleting it; ask only if the target remains
-ambiguous. Read [safety](references/safety.md) before writes or sensitive-data
-handling.
+## 写入与验证
 
-Complete authorized persistence and verify the affected behavior. Input or
-processor changes usually need preview/render; metadata-only changes can be
-verified by reading the saved definition. Report saved state separately from a
-failed verification, without repeating the write just to retry verification.
+只有明确的创建、更新或删除请求才授权持久化；查看、起草、preview 和 render 不授权
+写入。覆盖或删除前读取现有定义，目标仍不明确时再询问。涉及写入或敏感数据时读取
+[安全边界](references/safety.md)。
 
-Return the resource name, persistence status, relevant output and material
-warnings. Use structured error codes to interpret failures. When MCP reports
-`body_omitted`, report the size limit; it has not created a hidden file or share.
+完成已授权写入后验证受影响行为：输入或 processor 变更通常执行 preview/render，
+仅元数据变更可回读定义。按结构化 `code`、warning 和实际响应判断结果；写入成功但
+验证失败时分别说明，不要为重试验证而重复写入。`body_omitted` 只表示正文因大小限制
+被省略，不表示服务创建了文件或分享链接。

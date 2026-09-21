@@ -1,25 +1,14 @@
-# Sandrone Safety
+# Sandrone 安全边界
 
-## Writes and retries
+`put` 会立即覆盖同名完整定义，`delete` 没有回收站；操作前读取现有定义。删除资源
+不会级联删除引用，依赖它的资源可能随后失败。
 
-Apply the [write rule](../SKILL.md#writes-and-verification). `put` immediately
-saves and replaces the same name; `delete` has no recycle bin. Read the existing
-definition before either operation. Deleting a resource does not cascade to its
-references, which may then fail to resolve.
+传输错误不能证明写入失败。重试前确认服务身份并回读准确目标；切换 HTTP/MCP 也不能
+证明第一次操作未生效。以实际响应判断结果，HTTP 删除成功返回 `{"ok":true}`。
 
-A transport error may hide whether a write succeeded. Verify the server identity
-and reread the exact target before retrying. Switching interfaces is not evidence
-that the first write failed. Report success using the actual response; HTTP
-resource deletion returns `{"ok":true}`.
+远程输入、流量刷新、render 和 probe 可能访问网络。processor 脚本不能任意访问
+文件系统、子进程、环境变量或网络。
 
-## External effects and sensitive data
-
-Remote inputs, traffic refresh, render flows and probes may access the network.
-Choose verification that exercises the changed behavior. Scripts have no arbitrary
-filesystem, subprocess, environment-variable or general network access.
-
-Definitions, outputs, reports and warnings can contain credentials and private
-subscription URLs. Avoid copying them into chat or logs unless needed for the
-user's request; keep request-body files private and out of tracked files.
-The bundled HTTP script reads bearer credentials from `SANDRONE_TOKEN` and avoids
-putting them in curl arguments. Use a trusted network or TLS for cross-host HTTP.
+定义、输出和 warning 可能包含凭据或私有订阅 URL。除非任务确有需要，不复制到对话
+或日志；请求正文文件不得纳入 Git。随附脚本从 `SANDRONE_TOKEN` 读取 bearer token，
+不会把 token 放进 `curl` 参数。跨主机访问使用可信网络或 TLS。
