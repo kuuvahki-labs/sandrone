@@ -27,33 +27,6 @@ describe("FileProcessorBuilder", () => {
     expect(currentProcessors()).toHaveLength(2);
   });
 
-  it("adds the complete Tailnet share chain and cascades it when native Tailscale is selected", () => {
-    localStorage.setItem("sandrone.locale", "en-US");
-    const ref = createRef<FileProcessorBuilderHandle>();
-    render(<FileProcessorBuilder ref={ref} kind="sing-box" />);
-
-    act(() => ref.current!.prependPresets(["tailnet-share"]));
-    expect(currentProcessors().map((processor) => processor.name)).toEqual([
-      "Tailscale coexistence",
-      "Share to Tailnet",
-    ]);
-    expect(currentProcessors()[1]).toMatchObject({
-      params: { args: {
-        preset_id: "tailnet-share",
-        listen_addresses: [],
-        listen_port: 2081,
-        username: "",
-        password: "",
-      } },
-    });
-
-    act(() => ref.current!.prependPresets(["tailscale-native"]));
-    expect(currentProcessors().map((processor) => processor.name)).toEqual([
-      "Native Tailscale",
-    ]);
-    expect(screen.getByRole("alert")).toHaveTextContent("Removed conflicts: Tailscale coexistence, Share to Tailnet");
-  });
-
   it("preserves a legacy managed script until the user reselects its preset", async () => {
     localStorage.setItem("sandrone.locale", "en-US");
     const user = userEvent.setup();

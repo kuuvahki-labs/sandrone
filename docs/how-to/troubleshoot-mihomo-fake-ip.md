@@ -79,7 +79,7 @@ curl -fsS \
 ## Tailscale / MagicDNS
 
 若故障涉及 Tailscale，先按
-[社区配置预设](../reference/community-config-presets.md#tailscale-三态与安全边界)
+[社区配置预设](../reference/community-config-presets.md#tailscale-模式与安全边界)
 核对模式、精确 DNS、TUN、规则与入站边界。本页只补充现场验证：渲染最终 YAML，
 确认系统实际采用预期 resolver，并分别检查名称解析、目标路由和入站 ACL。
 

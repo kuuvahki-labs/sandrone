@@ -26,6 +26,7 @@ function main(input, api) {
 const TAILSCALE_RANGES = ["100.64.0.0/10", "fd7a:115c:a1e0::/48"];
 
 const TAILSCALE_RULES = [
+  "DOMAIN-SUFFIX,tailscale.com,DIRECT",
   "DOMAIN-SUFFIX,ts.net,DIRECT",
   "IP-CIDR,100.64.0.0/10,DIRECT,no-resolve",
   "IP-CIDR,fd7a:115c:a1e0::/48,DIRECT,no-resolve",

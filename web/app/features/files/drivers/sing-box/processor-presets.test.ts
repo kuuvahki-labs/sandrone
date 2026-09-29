@@ -9,8 +9,6 @@ import {
 import { createTranslator } from "~/shared/i18n/context";
 
 import legacyOutboundAdapterScript from "./legacy/sing-box-outbound-adapter-reject-empty.js?raw";
-import legacyTailscaleExternalScript from "./legacy/sing-box-tailscale-external.js?raw";
-import legacyTailscaleNativeScript from "./legacy/sing-box-tailscale-native.js?raw";
 import {
   defaultSingBoxProcessors,
   singBoxProcessorPreset as buildSingBoxProcessorPreset,
@@ -139,9 +137,7 @@ describe("sing-box file processor defaults", () => {
       "outbound-adapter",
       "github-rule-source-mirror",
       "quic-fallback",
-      "tailscale-native",
       "tailscale-external",
-      "tailnet-share",
       "fakeip-compat",
       "fakeip-ruleset-geodata",
     ]);
@@ -165,33 +161,23 @@ describe("sing-box file processor defaults", () => {
   });
 
   it("builds Tailscale processors with stable preset markers", () => {
-    for (const id of ["tailscale-native", "tailscale-external"] as const) {
-      const preset = singBoxProcessorPreset(id as SingBoxProcessorPresetID);
-      expect(preset).toEqual({
-        name: id === "tailscale-native" ? "Native Tailscale" : "Tailscale coexistence",
-        type: "script",
-        stage: "file",
-        params: {
-          source: { type: "inline", content: expect.any(String) },
-          args: id === "tailscale-native"
-            ? { preset_id: id, auth_key: "" }
-            : { preset_id: id },
-        },
-      });
-      expect(recognizedFileProcessorPresetID(singBoxProcessorPresets, preset)).toBe(id);
-    }
-
-    expect(presetDescriptor("tailscale-native" as SingBoxProcessorPresetID)).toMatchObject({
-      category: "tailscale",
-      defaultOn: false,
-      dependencies: [],
-      conflicts: ["tailscale-external"],
+    const id = "tailscale-external";
+    const preset = singBoxProcessorPreset(id);
+    expect(preset).toEqual({
+      name: "Tailscale coexistence",
+      type: "script",
+      stage: "file",
+      params: {
+        source: { type: "inline", content: expect.any(String) },
+        args: { preset_id: id },
+      },
     });
-    expect(presetDescriptor("tailscale-external" as SingBoxProcessorPresetID)).toMatchObject({
+    expect(recognizedFileProcessorPresetID(singBoxProcessorPresets, preset)).toBe(id);
+    expect(presetDescriptor(id)).toMatchObject({
       category: "tailscale",
       defaultOn: false,
       dependencies: [],
-      conflicts: ["tailscale-native"],
+      conflicts: [],
     });
   });
 
@@ -256,9 +242,16 @@ describe("sing-box file processor defaults", () => {
           ],
         },
       ],
+      route: {
+        final: "LockedRouteFinal",
+        rules: [
+          { domain_suffix: ["tailscale.com"], outbound: "direct" },
+          { ip_cidr: ["100.64.0.0/10", "fd7a:115c:a1e0::/48"], outbound: "direct" },
+          { outbound: "LockedFinal" },
+        ],
+      },
     });
     expect(first.document.endpoints).toEqual(original.endpoints);
-    expect(first.document.route).toEqual(original.route);
 
     const second = runTailscale("tailscale-external", first.document);
     expect(second.document).toEqual(first.document);
@@ -280,6 +273,7 @@ describe("sing-box file processor defaults", () => {
         rules: [catchAll, magicDNSRule, magicDNSRule],
         final: "chosen-resolver",
       },
+      route: { rules: [{ outbound: "LockedFinal" }] },
     };
 
     const first = runTailscale("tailscale-external", original);
@@ -290,6 +284,13 @@ describe("sing-box file processor defaults", () => {
         magicDNSRule,
         { domain_suffix: ["tailscale.com"], action: "route", server: "chosen-resolver" },
         catchAll,
+      ],
+    });
+    expect(first.document.route).toEqual({
+      rules: [
+        { domain_suffix: ["tailscale.com"], outbound: "direct" },
+        { ip_cidr: ["100.64.0.0/10", "fd7a:115c:a1e0::/48"], outbound: "direct" },
+        { outbound: "LockedFinal" },
       ],
     });
     expect(runTailscale("tailscale-external", first.document).document).toEqual(first.document);
@@ -308,6 +309,7 @@ describe("sing-box file processor defaults", () => {
         servers: [realServer, { type: "fakeip", tag: "fake" }],
         rules: [{ server: "fake" }],
       },
+      route: { rules: [{ outbound: "LockedFinal" }] },
     };
     expect(runTailscale("tailscale-external", original).document.dns).toEqual({
       servers: [...original.dns.servers, { type: "udp", tag: "ts-dns", server: "100.100.100.100" }],
@@ -332,6 +334,7 @@ describe("sing-box file processor defaults", () => {
     const execution = prepareTailscale("tailscale-external", {
       inbounds: [{ type: "tun", tag: "tun-in" }],
       dns: { servers: [defaultServer, { type: "fakeip", tag: "fake" }] },
+      route: { rules: [{ outbound: "LockedFinal" }] },
     });
     const before = execution.input.file.content;
     expect(execution.run).toThrowError("requires a tagged real default DNS server");
@@ -346,6 +349,7 @@ describe("sing-box file processor defaults", () => {
         servers: [{ type: "local", tag: "real" }, { type: "fakeip", tag: "fake" }],
         final,
       },
+      route: { rules: [{ outbound: "LockedFinal" }] },
     });
     const before = execution.input.file.content;
     expect(execution.run).toThrowError("requires a tagged real default DNS server");
@@ -353,103 +357,7 @@ describe("sing-box file processor defaults", () => {
     expect(execution.stringifyCalls()).toBe(0);
   });
 
-  it("applies native Tailscale with v1.14.0 endpoint, DNS, and route shapes", () => {
-    const endpoint = {
-      type: "tailscale",
-      tag: "ts-ep",
-      ephemeral: false,
-      accept_routes: false,
-    };
-    const dnsServer = {
-      type: "tailscale",
-      tag: "ts-dns",
-      endpoint: "ts-ep",
-      accept_default_resolvers: false,
-    };
-    const dnsRule = { preferred_by: "ts-dns", action: "route", server: "ts-dns" };
-    const routeRule = {
-      preferred_by: ["ts-ep"],
-      action: "route",
-      outbound: "ts-ep",
-    };
-    const original = {
-      dns: {
-        servers: [{ type: "local", tag: "dns-local" }, dnsServer, dnsServer],
-        rules: [{ domain_suffix: ["user.example"], server: "dns-local" }, dnsRule, dnsRule],
-        final: "LockedDNSFinal",
-      },
-      inbounds: [
-        { type: "mixed", tag: "mixed-in" },
-        {
-          type: "tun",
-          tag: "tun-in",
-          route_exclude_address: [
-            "192.0.2.0/24",
-            "100.64.0.0/10",
-            "fd7a:115c:a1e0::/48",
-            "100.64.0.0/10",
-          ],
-        },
-      ],
-      endpoints: [
-        { type: "wireguard", tag: "keep-ep", address: ["192.0.2.1/32"] },
-        endpoint,
-        endpoint,
-      ],
-      route: {
-        final: "LockedRouteFinal",
-        rules: [
-          { domain_suffix: ["user.example"], outbound: "direct" },
-          routeRule,
-          routeRule,
-          { rule_set: ["private"], outbound: "direct" },
-          { outbound: "LockedFinal" },
-        ],
-      },
-    };
-
-    const first = runTailscale("tailscale-native", original, "tskey-auth-test");
-    expect(first.stringifyCalls).toBe(1);
-    expect(first.document.endpoints).toEqual([
-      original.endpoints[0],
-      { ...endpoint, auth_key: "tskey-auth-test" },
-    ]);
-    expect((first.document.dns as Record<string, unknown>).servers).toEqual([
-      { type: "local", tag: "dns-local" },
-      dnsServer,
-    ]);
-    expect((first.document.dns as Record<string, unknown>).rules).toEqual([
-      { domain_suffix: ["user.example"], server: "dns-local" },
-      dnsRule,
-    ]);
-    expect(first.document.route).toEqual({
-      final: "LockedRouteFinal",
-      rules: [
-        { domain_suffix: ["user.example"], outbound: "direct" },
-        routeRule,
-        { rule_set: ["private"], outbound: "direct" },
-        { outbound: "LockedFinal" },
-      ],
-    });
-    expect((first.document.inbounds as Array<Record<string, unknown>>)[1]).toEqual({
-      type: "tun",
-      tag: "tun-in",
-      route_exclude_address: ["192.0.2.0/24"],
-    });
-    expect(first.document.dns).toMatchObject({ final: "LockedDNSFinal" });
-    expect(endpoint).toEqual({
-      type: "tailscale",
-      tag: "ts-ep",
-      ephemeral: false,
-      accept_routes: false,
-    });
-
-    const second = runTailscale("tailscale-native", first.document, "tskey-auth-test");
-    expect(second.document).toEqual(first.document);
-    expect(second.stringifyCalls).toBe(1);
-  });
-
-  it("fails closed on ambiguous TUN and incompatible owned endpoint or DNS tags", () => {
+  it("rejects incompatible external Tailscale tags without changing the file", () => {
     const base = {
       dns: { servers: [], rules: [], final: "LockedDNSFinal" },
       inbounds: [{ type: "tun", tag: "tun-in", route_exclude_address: [] }],
@@ -458,65 +366,25 @@ describe("sing-box file processor defaults", () => {
     };
     const cases = [
       {
-        id: "tailscale-native" as const,
-        document: {
-          ...base,
-          inbounds: [{ type: "tun", tag: "first" }, { type: "tun", tag: "second" }],
-        },
+        document: { ...base, inbounds: [{ type: "tun", tag: "first" }, { type: "tun", tag: "second" }] },
         error: "Sandrone sing-box Tailscale preset found ambiguous TUN inbounds",
       },
       {
-        id: "tailscale-native" as const,
-        document: {
-          ...base,
-          endpoints: [{ type: "tailscale", tag: "ts-ep", hostname: "custom" }],
-        },
-        error: "Sandrone sing-box Tailscale native preset found incompatible endpoint tag ts-ep",
-      },
-      {
-        id: "tailscale-native" as const,
-        document: {
-          ...base,
-          dns: { ...base.dns, servers: [{ type: "udp", tag: "ts-dns", server: "100.100.100.100" }] },
-        },
-        error: "Sandrone sing-box Tailscale native preset found incompatible DNS server tag ts-dns",
-      },
-      {
-        id: "tailscale-external" as const,
-        document: {
-          ...base,
-          endpoints: [{ type: "tailscale", tag: "ts-ep", ephemeral: false, accept_routes: false }],
-        },
+        document: { ...base, endpoints: [{ type: "tailscale", tag: "ts-ep", ephemeral: false, accept_routes: false }] },
         error: "Sandrone sing-box Tailscale external preset found incompatible endpoint tag ts-ep",
       },
       {
-        id: "tailscale-external" as const,
-        document: {
-          ...base,
-          dns: { ...base.dns, servers: [{ type: "tailscale", tag: "ts-dns", endpoint: "ts-ep" }] },
-        },
+        document: { ...base, dns: { ...base.dns, servers: [{ type: "tailscale", tag: "ts-dns", endpoint: "ts-ep" }] } },
         error: "Sandrone sing-box Tailscale external preset found incompatible DNS server tag ts-dns",
       },
       {
-        id: "tailscale-native" as const,
-        document: {
-          ...base,
-          outbounds: [{ type: "direct", tag: "ts-ep" }],
-        },
-        error: "Sandrone sing-box Tailscale native preset found incompatible outbound tag ts-ep",
-      },
-      {
-        id: "tailscale-external" as const,
-        document: {
-          ...base,
-          outbounds: [{ type: "direct", tag: "ts-ep" }],
-        },
+        document: { ...base, outbounds: [{ type: "direct", tag: "ts-ep" }] },
         error: "Sandrone sing-box Tailscale external preset found incompatible outbound tag ts-ep",
       },
     ];
 
     for (const test of cases) {
-      const execution = prepareTailscale(test.id, test.document);
+      const execution = prepareTailscale("tailscale-external", test.document);
       const before = execution.input.file.content;
       expect(execution.run).toThrowError(test.error);
       expect(execution.input.file.content).toBe(before);
@@ -524,116 +392,37 @@ describe("sing-box file processor defaults", () => {
     }
   });
 
-  it("prevalidates every mutated target shape and assigns only after one successful stringify", () => {
+  it("validates external Tailscale target shapes before serializing and assigns only after stringify", () => {
     const base = {
       dns: { servers: [], rules: [], final: "LockedDNSFinal" },
       inbounds: [{ type: "tun", tag: "tun-in", route_exclude_address: [] }],
-      outbounds: [],
       endpoints: [],
       route: { final: "LockedRouteFinal", rules: [{ outbound: "LockedFinal" }] },
     };
     const cases = [
-      {
-        id: "tailscale-external" as const,
-        document: { ...base, inbounds: "invalid" },
-        error: "Sandrone sing-box Tailscale external preset requires inbounds to be an array of objects",
-      },
-      {
-        id: "tailscale-external" as const,
-        document: { ...base, dns: [] },
-        error: "Sandrone sing-box Tailscale external preset requires dns to be an object",
-      },
-      {
-        id: "tailscale-external" as const,
-        document: { ...base, dns: { servers: "invalid", rules: [] } },
-        error: "Sandrone sing-box Tailscale external preset requires dns.servers to be an array of objects",
-      },
-      {
-        id: "tailscale-external" as const,
-        document: { ...base, endpoints: "invalid" },
-        error: "Sandrone sing-box Tailscale external preset requires endpoints to be an array of objects",
-      },
-      {
-        id: "tailscale-native" as const,
-        document: { ...base, route: [] },
-        error: "Sandrone sing-box Tailscale native preset requires route to be an object",
-      },
-      {
-        id: "tailscale-native" as const,
-        document: { ...base, route: { final: "LockedRouteFinal", rules: "invalid" } },
-        error: "Sandrone sing-box Tailscale native preset requires route.rules to be an array of objects",
-      },
-      {
-        id: "tailscale-native" as const,
-        document: {
-          ...base,
-          inbounds: [{ type: "tun", tag: "tun-in", route_exclude_address: [false] }],
-        },
-        error: "Sandrone sing-box Tailscale native preset requires TUN route_exclude_address to be an array of strings",
-      },
+      { document: { ...base, inbounds: "invalid" }, error: "requires inbounds to be an array of objects" },
+      { document: { ...base, dns: [] }, error: "requires dns to be an object" },
+      { document: { ...base, dns: { servers: "invalid", rules: [] } }, error: "requires dns.servers to be an array of objects" },
+      { document: { ...base, endpoints: "invalid" }, error: "requires endpoints to be an array of objects" },
+      { document: { ...base, route: [] }, error: "requires route to be an object" },
+      { document: { ...base, route: { final: "LockedRouteFinal", rules: "invalid" } }, error: "requires route.rules to be an array of objects" },
     ];
 
     for (const test of cases) {
-      const execution = prepareTailscale(test.id, test.document as Record<string, unknown>);
+      const execution = prepareTailscale("tailscale-external", test.document as Record<string, unknown>);
       const before = execution.input.file.content;
       expect(execution.run).toThrowError(test.error);
       expect(execution.input.file.content).toBe(before);
       expect(execution.stringifyCalls()).toBe(0);
     }
 
-    for (const id of ["tailscale-native", "tailscale-external"] as const) {
-      const execution = prepareTailscale(id, base, () => {
-        throw new Error("stringify failed");
-      });
-      const before = execution.input.file.content;
-      expect(execution.run).toThrowError("stringify failed");
-      expect(execution.input.file.content).toBe(before);
-      expect(execution.stringifyCalls()).toBe(1);
-    }
-  });
-
-  it("replaces Tailscale modes atomically while preserving edited and ordered processors", () => {
-    const customBefore = customProcessor("before");
-    const customAfter = customProcessor("after");
-    const current = [
-      customBefore,
-      singBoxProcessorPreset("tailscale-external" as SingBoxProcessorPresetID),
-      customAfter,
-    ];
-
-    const native = planFileProcessorPresetAddition(
-      singBoxProcessorPresets,
-      "tailscale-native",
-      current,
-      en,
-    );
-    expect(native.removedPresetIDs).toEqual(["tailscale-external"]);
-    expect(applyPlan(current, native)).toEqual([
-      customBefore,
-      customAfter,
-      singBoxProcessorPreset("tailscale-native" as SingBoxProcessorPresetID),
-    ]);
-
-    const repeated = applyPlan(
-      applyPlan(current, native),
-      planFileProcessorPresetAddition(
-        singBoxProcessorPresets,
-        "tailscale-native",
-        applyPlan(current, native),
-        en,
-      ),
-    );
-    expect(repeated).toEqual(applyPlan(current, native));
-
-    const external = planFileProcessorPresetAddition(
-      singBoxProcessorPresets,
-      "tailscale-external",
-      [singBoxProcessorPreset("tailscale-native")],
-      en,
-    );
-    expect(external.removedPresetIDs).toEqual(["tailscale-native"]);
-    expect(external.addedPresetIDs).toEqual(["tailscale-external"]);
-
+    const execution = prepareTailscale("tailscale-external", base, () => {
+      throw new Error("stringify failed");
+    });
+    const before = execution.input.file.content;
+    expect(execution.run).toThrowError("stringify failed");
+    expect(execution.input.file.content).toBe(before);
+    expect(execution.stringifyCalls()).toBe(1);
   });
 
   it("switches FakeIP list modes in place while preserving edited processors", () => {
@@ -702,15 +491,6 @@ describe("sing-box file processor defaults", () => {
   });
 
   it("builds the managed presets with editable typed arguments", () => {
-    expect(singBoxProcessorPreset("tailnet-share")).toMatchObject({
-      params: { args: {
-        preset_id: "tailnet-share",
-        listen_addresses: [],
-        listen_port: 2081,
-        username: "",
-        password: "",
-      } },
-    });
     const fakeIPArgs = singBoxProcessorPreset("fakeip-compat").params?.args as Record<string, unknown>;
     expect(fakeIPArgs).toEqual({
       preset_id: "fakeip-compat",
@@ -739,72 +519,6 @@ describe("sing-box file processor defaults", () => {
     expect(singBoxProcessorPreset("fakeip-ruleset-geodata")).toMatchObject({
       params: { args: { preset_id: "fakeip-ruleset-geodata", server: "" } },
     });
-  });
-
-  it("shares exact Tailnet IPs with optional authentication and replaces owned listeners", () => {
-    const base = { inbounds: [{ type: "tun", tag: "tun-in" }, { type: "mixed", tag: "mixed-in", listen: "127.0.0.1", listen_port: 2080 }] };
-    const first = runManaged("tailnet-share", base, {
-      listen_addresses: ["100.64.0.7", "fd7a:115c:a1e0::7"],
-      listen_port: 2443,
-      username: "alice",
-      password: "secret",
-    });
-    expect(first.document.inbounds).toEqual([
-      ...base.inbounds,
-      { type: "mixed", tag: "tailnet-share-v4", listen: "100.64.0.7", listen_port: 2443, users: [{ username: "alice", password: "secret" }] },
-      { type: "mixed", tag: "tailnet-share-v6", listen: "fd7a:115c:a1e0::7", listen_port: 2443, users: [{ username: "alice", password: "secret" }] },
-    ]);
-    expect(runManaged("tailnet-share", first.document, {
-      listen_addresses: ["100.64.0.7", "fd7a:115c:a1e0::7"], listen_port: 2443, username: "alice", password: "secret",
-    }).document).toEqual(first.document);
-    expect(runManaged("tailnet-share", first.document, {
-      listen_addresses: ["100.127.255.254"], listen_port: 2081, username: "", password: "",
-    }).document.inbounds).toEqual([
-      ...base.inbounds,
-      { type: "mixed", tag: "tailnet-share-v4", listen: "100.127.255.254", listen_port: 2081 },
-    ]);
-    expect(() => runManaged("tailnet-share", base, {
-      listen_addresses: ["100.63.255.255"], listen_port: 2443, username: "", password: "",
-    })).toThrowError("requires a unique exact IP in the Tailnet ranges");
-    expect(() => runManaged("tailnet-share", {
-      inbounds: [...base.inbounds, { type: "mixed", tag: "wild", listen: "0.0.0.0", listen_port: 2443 }],
-    }, {
-      listen_addresses: ["100.64.0.7"], listen_port: 2443, username: "", password: "",
-    })).toThrowError("conflicting listener socket");
-    expect(() => runManaged("tailnet-share", {
-      inbounds: [...base.inbounds, { type: "mixed", tag: "wild-default", listen_port: 2443 }],
-    }, {
-      listen_addresses: ["100.64.0.7"], listen_port: 2443, username: "", password: "",
-    })).toThrowError("conflicting listener socket");
-    expect(() => runManaged("tailnet-share", {
-      inbounds: [...base.inbounds, { type: "mixed", tag: "same-ip", listen: "fd7a:115c:a1e0:0:0:0:0:7", listen_port: 2443 }],
-    }, {
-      listen_addresses: ["fd7a:115c:a1e0::7"], listen_port: 2443, username: "", password: "",
-    })).toThrowError("conflicting listener socket");
-  });
-
-  it("rejects invalid Tailnet share arguments and owned-tag collisions", () => {
-    const base = { inbounds: [{ type: "tun", tag: "tun-in" }] };
-    const invalidCases = [
-      { args: { listen_addresses: [], listen_port: 2080, username: "", password: "" }, error: "at least one exact Tailnet IP address" },
-      { args: { listen_addresses: ["100.64.0.7/32"], listen_port: 2080, username: "", password: "" }, error: "unique exact IP in the Tailnet ranges" },
-      { args: { listen_addresses: ["fd7a:115c:a1e1::7"], listen_port: 2080, username: "", password: "" }, error: "unique exact IP in the Tailnet ranges" },
-      { args: { listen_addresses: ["100.64.0.7", "100.65.0.8"], listen_port: 2080, username: "", password: "" }, error: "unique exact IP in the Tailnet ranges" },
-      { args: { listen_addresses: ["100.64.0.7"], listen_port: 2080, username: "alice", password: "" }, error: "requires username and password together" },
-      { args: { listen_addresses: ["100.64.0.7"], listen_port: 0, username: "", password: "" }, error: "requires a valid listen_port" },
-    ];
-    for (const test of invalidCases) {
-      expect(() => runManaged("tailnet-share", base, test.args)).toThrowError(test.error);
-    }
-    const compatible = { type: "mixed", tag: "tailnet-share-v4", listen: "100.64.0.9", listen_port: 2080 };
-    expect(() => runManaged("tailnet-share", { inbounds: [base.inbounds[0], compatible, compatible] }, {
-      listen_addresses: ["100.64.0.7"], listen_port: 2080, username: "", password: "",
-    })).toThrowError("duplicate inbound tag tailnet-share-v4");
-    expect(() => runManaged("tailnet-share", {
-      inbounds: [base.inbounds[0], { type: "http", tag: "tailnet-share-v4", listen: "100.64.0.9", listen_port: 2080 }],
-    }, {
-      listen_addresses: ["100.64.0.7"], listen_port: 2080, username: "", password: "",
-    })).toThrowError("incompatible inbound tag tailnet-share-v4");
   });
 
   it("adds one inline FakeIP compatibility rule-set before any FakeIP DNS route", () => {
@@ -1085,18 +799,8 @@ describe("sing-box file processor defaults", () => {
     }
   });
 
-  it("declares the full Tailscale dependency chain and cascades dependents", () => {
-    expect(presetDescriptor("tailnet-share")).toMatchObject({ dependencies: ["tailscale-external"], conflicts: [] });
-    expect(planFileProcessorPresetAddition(singBoxProcessorPresets, "tailnet-share", [], en).addedPresetIDs)
-      .toEqual(["tailscale-external", "tailnet-share"]);
-    const current = [singBoxProcessorPreset("tailscale-external"), singBoxProcessorPreset("tailnet-share")];
-    const native = planFileProcessorPresetAddition(singBoxProcessorPresets, "tailscale-native", current, en);
-    expect(native.removedPresetIDs).toEqual(["tailscale-external", "tailnet-share"]);
-    expect(native.addedPresetIDs).toEqual(["tailscale-native"]);
-  });
-
   it("recognizes managed scripts with common execution params but not edited sources or invalid business args", () => {
-    for (const id of ["tailscale-native", "tailscale-external", "tailnet-share", "fakeip-compat", "fakeip-ruleset-geodata"] as const) {
+    for (const id of ["tailscale-external", "fakeip-compat", "fakeip-ruleset-geodata"] as const) {
       const preset = singBoxProcessorPreset(id);
       const descriptor = presetDescriptor(id);
       expect(descriptor.recognize({ ...preset, params: { ...preset.params, timeout_ms: 5000 } })).toBe(true);
@@ -1106,43 +810,9 @@ describe("sing-box file processor defaults", () => {
     }
   });
 
-  it("recognizes exact legacy Tailscale sources and refreshes them only when reselected", () => {
-    const legacyNative = {
-      ...singBoxProcessorPreset("tailscale-native"),
-      params: {
-        source: { type: "inline", content: legacyTailscaleNativeScript },
-        timeout_ms: 5000,
-        args: { auth_key: "legacy-secret" },
-      },
-    };
-    const legacyExternal = {
-      ...singBoxProcessorPreset("tailscale-external"),
-      params: { source: { type: "inline", content: legacyTailscaleExternalScript }, timeout_ms: 5000 },
-    };
-    expect(recognizedFileProcessorPresetID(singBoxProcessorPresets, legacyNative)).toBe("tailscale-native");
-    expect(recognizedFileProcessorPresetID(singBoxProcessorPresets, legacyExternal)).toBe("tailscale-external");
-    expect(presetDescriptor("tailscale-native").isCurrent?.(legacyNative)).toBe(false);
-    expect(presetDescriptor("tailscale-external").isCurrent?.(legacyExternal)).toBe(false);
-
-    const nativePlan = planFileProcessorPresetAddition(singBoxProcessorPresets, "tailscale-native", [legacyNative], en);
-    expect(nativePlan.updatedPresetIDs).toEqual(["tailscale-native"]);
-    expect(nativePlan.addedPresetIDs).toEqual(["tailscale-native"]);
-    expect((nativePlan.additions.at(-1)?.processor.params?.source as Record<string, unknown>).content)
-      .not.toBe(legacyTailscaleNativeScript);
-    expect(planFileProcessorPresetAddition(singBoxProcessorPresets, "tailnet-share", [legacyExternal], en).updatedPresetIDs)
-      .toEqual(["tailscale-external"]);
-
-    expect(recognizedFileProcessorPresetID(singBoxProcessorPresets, {
-      ...legacyNative,
-      params: { ...legacyNative.params, source: { type: "inline", content: `${legacyTailscaleNativeScript}\n` } },
-    })).toBeNull();
-  });
-
   it("rejects managed request overrides and wrong execution envelopes before parsing content", () => {
     const managed = [
-      ["tailscale-native", "auth_key"],
       ["tailscale-external", "preset_id"],
-      ["tailnet-share", "listen_port"],
       ["fakeip-compat", "domain"],
       ["fakeip-ruleset-geodata", "server"],
     ] as const;
@@ -1182,14 +852,13 @@ function singBoxProcessorPreset(id: SingBoxProcessorPresetID) {
   return buildSingBoxProcessorPreset(id, en(preset.labelKey));
 }
 
-type TailscalePresetID = "tailscale-native" | "tailscale-external";
+type TailscalePresetID = "tailscale-external";
 
 function runTailscale(
   id: TailscalePresetID,
   document: Record<string, unknown>,
-  authKey = "",
 ): { document: Record<string, unknown>; stringifyCalls: number } {
-  const execution = prepareTailscale(id, document, JSON.stringify, authKey);
+  const execution = prepareTailscale(id, document, JSON.stringify);
   execution.run();
   return {
     document: JSON.parse(execution.input.file.content) as Record<string, unknown>,
@@ -1201,7 +870,6 @@ function prepareTailscale(
   id: TailscalePresetID,
   document: Record<string, unknown>,
   stringify: (value: unknown) => string = JSON.stringify,
-  authKey = "",
 ) {
   const preset = singBoxProcessorPreset(id as SingBoxProcessorPresetID);
   const source = (preset.params?.source as Record<string, unknown> | undefined)?.content;
@@ -1210,9 +878,7 @@ function prepareTailscale(
     stage: "file",
     file: { kind: "sing-box", content: JSON.stringify(document) },
     request: { args: {} },
-    args: id === "tailscale-native"
-      ? { preset_id: id, auth_key: authKey }
-      : { preset_id: id },
+    args: { preset_id: id },
   };
   let stringifyCalls = 0;
   const api = {
@@ -1233,9 +899,7 @@ function prepareTailscale(
 }
 
 type ManagedScriptPresetID =
-  | "tailscale-native"
   | "tailscale-external"
-  | "tailnet-share"
   | "fakeip-compat"
   | "fakeip-ruleset-geodata";
 

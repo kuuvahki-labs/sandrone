@@ -1,6 +1,4 @@
-import { runInNewContext } from "node:vm";
-
-import { dump, load } from "js-yaml";
+import { load } from "js-yaml";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -42,9 +40,11 @@ describe("Mihomo processor presets", () => {
         "nameserver-policy": { "<+.ts.net>": "100.100.100.100" },
       },
       tun: { "route-exclude-address+": ["100.64.0.0/10", "fd7a:115c:a1e0::/48"] },
-    });
-    expect(presetYAML("tailnet-share")).toEqual({
-      "lan-allowed-ips+": ["100.64.0.0/10", "fd7a:115c:a1e0::/48"],
+      "+rules": [
+        "DOMAIN-SUFFIX,tailscale.com,DIRECT",
+        "IP-CIDR,100.64.0.0/10,DIRECT,no-resolve",
+        "IP-CIDR6,fd7a:115c:a1e0::/48,DIRECT,no-resolve",
+      ],
     });
     expect(presetYAML("fake-ip-compat")).toEqual({
       dns: {
@@ -132,189 +132,6 @@ describe("Mihomo processor presets", () => {
 
   });
 
-  it("builds native Tailscale with editable auth_key and recognizes its managed params", () => {
-    const id = "tailscale-native";
-    const preset = mihomoProcessorPreset(id);
-
-    expect(preset).toEqual({
-      name: "Native Tailscale",
-      type: "script",
-      stage: "file",
-      params: {
-        source: { type: "inline", content: expect.any(String) },
-        args: { auth_key: "" },
-      },
-    });
-    expect(recognizedFileProcessorPresetID(mihomoProcessorPresets, preset)).toBe(id);
-
-    const params = preset.params as Record<string, unknown>;
-    const source = params.source as Record<string, unknown>;
-    expect(recognizedFileProcessorPresetID(mihomoProcessorPresets, {
-      ...preset,
-      params: { ...params, source: { ...source, content: `${String(source.content)}\n// user edit` } },
-    })).toBeNull();
-    expect(recognizedFileProcessorPresetID(mihomoProcessorPresets, {
-      ...preset,
-      params: { ...params, args: {} },
-    })).toBeNull();
-    expect(recognizedFileProcessorPresetID(mihomoProcessorPresets, {
-      ...preset,
-      params: { ...params, args: { auth_key: "tskey-auth-test" } },
-    })).toBe(id);
-  });
-
-  it("applies native Tailscale atomically, exactly once, and before the safe generic anchor", () => {
-    const original = {
-      proxies: [
-        { name: "TAILSCALE", type: "tailscale", ephemeral: false, udp: true, "accept-routes": false },
-        { name: "Node", type: "ss", server: "example.com", port: 8388 },
-        { name: "TAILSCALE", type: "tailscale", ephemeral: false, udp: true, "accept-routes": false },
-      ],
-      rules: [
-        "DOMAIN,user.example,DIRECT",
-        "DOMAIN-SUFFIX,ts.net,TAILSCALE",
-        "DOMAIN-SUFFIX,ts.net,TAILSCALE",
-        "RULE-SET,private,DIRECT",
-        "MATCH,LockedFinal",
-      ],
-      dns: {
-        "fake-ip-filter": ["+.ts.net", "base", "+.ts.net"],
-        "nameserver-policy": { "existing.example": "system" },
-      },
-      tun: {
-        "route-exclude-address": [
-          "192.0.2.0/24",
-          "100.64.0.0/10",
-          "fd7a:115c:a1e0::/48",
-          "100.64.0.0/10",
-        ],
-      },
-    };
-
-    const first = runNativeTailscale(original, "tskey-auth-test");
-    expect(first.stringifyCalls).toBe(1);
-    expect(first.document.proxies).toEqual([
-      { name: "TAILSCALE", type: "tailscale", "auth-key": "tskey-auth-test", ephemeral: false, udp: true, "accept-routes": false },
-      original.proxies[1],
-    ]);
-    expect(first.document.rules).toEqual([
-      "DOMAIN,user.example,DIRECT",
-      "DOMAIN-SUFFIX,ts.net,TAILSCALE",
-      "IP-CIDR,100.64.0.0/10,TAILSCALE,no-resolve",
-      "IP-CIDR6,fd7a:115c:a1e0::/48,TAILSCALE,no-resolve",
-      "RULE-SET,private,DIRECT",
-      "MATCH,LockedFinal",
-    ]);
-    expect(first.document.dns).toEqual({
-      "fake-ip-filter": ["+.ts.net", "base"],
-      "nameserver-policy": {
-        "existing.example": "system",
-        "+.ts.net": "100.100.100.100",
-      },
-    });
-    expect(first.document.tun).toEqual({
-      "route-exclude-address": ["192.0.2.0/24"],
-    });
-
-    const second = runNativeTailscale(first.document, "tskey-auth-test");
-    expect(second.document).toEqual(first.document);
-    expect(second.stringifyCalls).toBe(1);
-  });
-
-  it("rejects incompatible native structures before stringify or content assignment", () => {
-    const cases = [
-      {
-        name: "invalid proxies",
-        document: { proxies: "invalid", rules: ["MATCH,LockedFinal"], dns: {}, tun: {} },
-        error: "Sandrone Mihomo Tailscale native preset requires proxies to be an array of objects",
-      },
-      {
-        name: "invalid rules",
-        document: { proxies: [], rules: ["MATCH,LockedFinal", { custom: true }], dns: {}, tun: {} },
-        error: "Sandrone Mihomo Tailscale native preset requires rules to be an array of strings",
-      },
-      {
-        name: "invalid DNS",
-        document: { proxies: [], rules: ["MATCH,LockedFinal"], dns: [], tun: {} },
-        error: "Sandrone Mihomo Tailscale native preset requires dns to be an object",
-      },
-      {
-        name: "invalid TUN",
-        document: { proxies: [], rules: ["MATCH,LockedFinal"], dns: {}, tun: [] },
-        error: "Sandrone Mihomo Tailscale native preset requires tun to be an object",
-      },
-      {
-        name: "same-name proxy with extra fields",
-        document: {
-          proxies: [{ name: "TAILSCALE", type: "tailscale", ephemeral: false, udp: true, "accept-routes": false, hostname: "custom" }],
-          rules: ["MATCH,LockedFinal"],
-          dns: {},
-          tun: {},
-        },
-        error: "Sandrone Mihomo Tailscale native preset found incompatible proxy named TAILSCALE",
-      },
-      {
-        name: "invalid DNS filter",
-        document: {
-          proxies: [],
-          rules: ["MATCH,LockedFinal"],
-          dns: { "fake-ip-filter": "invalid" },
-          tun: {},
-        },
-        error: "Sandrone Mihomo Tailscale native preset requires dns.fake-ip-filter to be an array of strings",
-      },
-      {
-        name: "invalid DNS policy",
-        document: {
-          proxies: [],
-          rules: ["MATCH,LockedFinal"],
-          dns: { "nameserver-policy": [] },
-          tun: {},
-        },
-        error: "Sandrone Mihomo Tailscale native preset requires dns.nameserver-policy to be an object",
-      },
-      {
-        name: "invalid route exclusions",
-        document: {
-          proxies: [],
-          rules: ["MATCH,LockedFinal"],
-          dns: {},
-          tun: { "route-exclude-address": ["192.0.2.0/24", false] },
-        },
-        error: "Sandrone Mihomo Tailscale native preset requires tun.route-exclude-address to be an array of strings",
-      },
-      {
-        name: "missing safe rule anchor",
-        document: {
-          proxies: [],
-          rules: ["DOMAIN,user.example,DIRECT"],
-          dns: {},
-          tun: {},
-        },
-        error: "Sandrone preset tailscale-native cannot find a safe mihomo rule anchor",
-      },
-    ];
-
-    for (const test of cases) {
-      const execution = prepareNativeTailscale(test.document);
-      const before = execution.input.file.content;
-      expect(execution.run, test.name).toThrowError(test.error);
-      expect(execution.input.file.content).toBe(before);
-      expect(execution.stringifyCalls()).toBe(0);
-    }
-
-    const stringifyFailure = prepareNativeTailscale(
-      { proxies: [], rules: ["MATCH,LockedFinal"], dns: {}, tun: {} },
-      () => {
-        throw new Error("stringify failed");
-      },
-    );
-    const before = stringifyFailure.input.file.content;
-    expect(stringifyFailure.run).toThrowError("stringify failed");
-    expect(stringifyFailure.input.file.content).toBe(before);
-    expect(stringifyFailure.stringifyCalls()).toBe(1);
-  });
-
   it("builds the exact QUIC ordered-rule processor", () => {
     expect(mihomoProcessorPreset("quic-fallback")).toMatchObject({
       type: "script",
@@ -338,15 +155,8 @@ describe("Mihomo processor presets", () => {
       "fake-ip-openclash",
       "fake-ip-shellcrash",
       "quic-fallback",
-      "tailscale-native",
       "tailscale-external",
-      "tailnet-share",
     ]);
-    expect(presetDescriptor("tailscale-native")).toMatchObject({
-      defaultOn: false,
-      dependencies: [],
-      conflicts: ["tailscale-external"],
-    });
     expect(presetDescriptor("github-rule-source-mirror")).toMatchObject({
       defaultOn: true,
       dependencies: [],
@@ -355,9 +165,8 @@ describe("Mihomo processor presets", () => {
     expect(presetDescriptor("tailscale-external")).toMatchObject({
       defaultOn: false,
       dependencies: [],
-      conflicts: ["tailscale-native"],
+      conflicts: [],
     });
-    expect(presetDescriptor("tailnet-share").dependencies).toEqual(["tailscale-external"]);
     expect([
       "fake-ip-compat",
       "fake-ip-openclash",
@@ -397,28 +206,6 @@ describe("Mihomo processor presets", () => {
       { id: "quic-fallback", defaultOn: false, dependencies: [], conflicts: [] },
     ]);
 
-    const editedTailnetShare = mihomoProcessorPreset("tailnet-share");
-    editedTailnetShare.params = {
-      ...editedTailnetShare.params,
-      content: `${String(editedTailnetShare.params?.content)}\n# user edit`,
-    };
-    const nativeCurrent = [
-      mihomoProcessorPreset("tailscale-external"),
-      mihomoProcessorPreset("tailnet-share"),
-      editedTailnetShare,
-    ];
-    const nativePlan = planFileProcessorPresetAddition(
-      mihomoProcessorPresets,
-      "tailscale-native",
-      nativeCurrent,
-      en,
-    );
-    expect(nativePlan.removeIndices).toEqual([0, 1]);
-    expect(nativePlan.removedPresetIDs).toEqual(["tailscale-external", "tailnet-share"]);
-    const nativeRemovals = new Set(nativePlan.removeIndices);
-    const nativeSurvivors = nativeCurrent.filter((_, index) => !nativeRemovals.has(index));
-    expect(nativeSurvivors).toEqual([editedTailnetShare]);
-    expect(nativeSurvivors[0]).toBe(editedTailnetShare);
   });
 
   it("has no keepalive preset surface and never disables process lookup", () => {
@@ -471,7 +258,7 @@ describe("Mihomo processor presets", () => {
   it("switches Fake-IP sources atomically while preserving unrelated processors", () => {
     const before = mihomoProcessorPreset("quic-fallback");
     const stable = mihomoProcessorPreset("fake-ip-compat");
-    const after = mihomoProcessorPreset("tailnet-share");
+    const after = { name: "after", type: "script", stage: "file", params: { source: { type: "inline", content: "// after" } } } as const;
     const plan = planFileProcessorPresetAddition(
       mihomoProcessorPresets,
       "fake-ip-shellcrash",
@@ -520,40 +307,4 @@ function presetContent(id: MihomoProcessorPresetID): string {
   const content = mihomoProcessorPreset(id).params?.content;
   expect(typeof content).toBe("string");
   return String(content);
-}
-
-function runNativeTailscale(document: Record<string, unknown>, authKey = "") {
-  const execution = prepareNativeTailscale(document, undefined, authKey);
-  execution.run();
-  return {
-    document: load(execution.input.file.content) as Record<string, unknown>,
-    stringifyCalls: execution.stringifyCalls(),
-  };
-}
-
-function prepareNativeTailscale(
-  document: Record<string, unknown>,
-  stringify = (value: unknown) => dump(JSON.parse(JSON.stringify(value))),
-  authKey = "",
-) {
-  const preset = mihomoProcessorPreset("tailscale-native");
-  const source = (preset.params?.source as Record<string, unknown> | undefined)?.content;
-  expect(typeof source).toBe("string");
-  const input = { file: { content: dump(document) }, args: { auth_key: authKey } };
-  let stringifyCalls = 0;
-  const api = {
-    yaml: {
-      parse: load,
-      stringify: (value: unknown) => {
-        stringifyCalls += 1;
-        return stringify(value);
-      },
-    },
-  };
-  const context: { input: typeof input; api: typeof api; output?: typeof input } = { input, api };
-  return {
-    input,
-    run: () => runInNewContext(`${String(source)}\nglobalThis.output = main(input, api);`, context),
-    stringifyCalls: () => stringifyCalls,
-  };
 }

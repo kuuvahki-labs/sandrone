@@ -14,6 +14,8 @@ function main(input, api) {
   const dnsRules = optionalObjectArray(dns.rules, "Sandrone sing-box Tailscale external preset requires dns.rules to be an array of objects");
   const endpoints = optionalObjectArray(document.endpoints, "Sandrone sing-box Tailscale external preset requires endpoints to be an array of objects");
   const outbounds = optionalObjectArray(document.outbounds, "Sandrone sing-box Tailscale external preset requires outbounds to be an array of objects");
+  const route = requiredObject(document.route, "Sandrone sing-box Tailscale external preset requires route to be an object");
+  const routeRules = requiredObjectArray(route.rules, "Sandrone sing-box Tailscale external preset requires route.rules to be an array of objects");
 
   for (const endpoint of endpoints) {
     if (endpoint.tag === "ts-ep") throw new Error("Sandrone sing-box Tailscale external preset found incompatible endpoint tag ts-ep");
@@ -24,6 +26,12 @@ function main(input, api) {
   for (const server of dnsServers) {
     if (server.tag === "ts-dns" && !exactEqual(server, EXTERNAL_DNS_SERVER)) throw new Error("Sandrone sing-box Tailscale external preset found incompatible DNS server tag ts-dns");
   }
+
+  const anchorIndex = firstAnchorIndex(routeRules);
+  if (anchorIndex < 0) throw new Error("Sandrone preset tailscale-external cannot find a safe sing-box rule anchor");
+  const retainedRouteRules = routeRules.filter((rule) => !isOwnedExternalRouteRule(rule));
+  const routeInsertionIndex = routeRules.slice(0, anchorIndex).filter((rule) => !isOwnedExternalRouteRule(rule)).length;
+  retainedRouteRules.splice(routeInsertionIndex, 0, ...EXTERNAL_ROUTE_RULES);
 
   const fakeTags = new Set(dnsServers.filter((server) => server.type === "fakeip" && typeof server.tag === "string").map((server) => server.tag));
   const ownedDNSRules = [EXTERNAL_DNS_RULE];
@@ -38,6 +46,7 @@ function main(input, api) {
     ...document,
     dns: { ...dns, servers: ensureOneExactObject(dnsServers, EXTERNAL_DNS_SERVER), rules: retainedRules },
     inbounds: updatedInbounds,
+    route: { ...route, rules: retainedRouteRules },
   };
   input.file.content = api.json.stringify(updated);
   return input;
@@ -46,6 +55,10 @@ function main(input, api) {
 const TAILSCALE_RANGES = ["100.64.0.0/10", "fd7a:115c:a1e0::/48"];
 const EXTERNAL_DNS_SERVER = { type: "udp", tag: "ts-dns", server: "100.100.100.100" };
 const EXTERNAL_DNS_RULE = { domain_suffix: ["ts.net"], action: "route", server: "ts-dns" };
+const EXTERNAL_ROUTE_RULES = [
+  { domain_suffix: ["tailscale.com"], outbound: "direct" },
+  { ip_cidr: TAILSCALE_RANGES, outbound: "direct" },
+];
 
 function isOwnedExternalDNSRule(rule) {
   return exactEqual(rule, EXTERNAL_DNS_RULE)
@@ -56,6 +69,21 @@ function isOwnedExternalDNSRule(rule) {
       && typeof rule.server === "string"
       && Object.keys(rule).sort().join(",") === "action,domain_suffix,server");
 }
+
+function isOwnedExternalRouteRule(rule) {
+  return EXTERNAL_ROUTE_RULES.some((owned) => exactEqual(rule, owned));
+}
+
+function firstAnchorIndex(rules) {
+  const privateRuleSet = rules.findIndex((rule) => containsPrivateRuleSet(rule.rule_set));
+  if (privateRuleSet >= 0) return privateRuleSet;
+  const privateIP = rules.findIndex((rule) => rule.ip_is_private === true);
+  if (privateIP >= 0) return privateIP;
+  return rules.findIndex(isMatchAllFinalRule);
+}
+
+function containsPrivateRuleSet(value) { return Array.isArray(value) ? value.includes("private") : value === "private"; }
+function isMatchAllFinalRule(rule) { return typeof rule.outbound === "string" && Object.keys(rule).every((key) => key === "outbound" || key === "action" && rule.action === "route"); }
 
 function defaultRealDNSTag(dns, servers) {
   const matches = typeof dns.final === "string" && dns.final
@@ -134,6 +162,7 @@ function exactEqual(left, right) {
 }
 
 function requiredObjectArray(value, message) { if (!Array.isArray(value) || value.some((item) => !isObject(item))) throw new Error(message); return value; }
+function requiredObject(value, message) { if (!isObject(value)) throw new Error(message); return value; }
 function optionalObjectArray(value, message) { if (value === undefined) return []; return requiredObjectArray(value, message); }
 function optionalStringArray(value, message) { if (value === undefined) return []; if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) throw new Error(message); return value; }
 function optionalObject(value, message) { if (value === undefined) return {}; if (!isObject(value)) throw new Error(message); return value; }

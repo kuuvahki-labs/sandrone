@@ -377,7 +377,6 @@ export const zhCN = {
   "processor.moreActions": "更多处理器操作：{label}",
   "processor.mihomoPreset.fakeIpCompat": "Fake-IP 兼容扩展",
   "processor.mihomoPreset.tailscale": "Tailscale 共存",
-  "processor.mihomoPreset.tailnetShare": "Tailnet 代理共享",
   "processor.moveDown": "下移处理器",
   "processor.moveUp": "上移处理器",
   "processor.namePlaceholder": "留空使用默认名称",

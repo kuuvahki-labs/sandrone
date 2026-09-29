@@ -83,6 +83,7 @@ curl -sS -X POST \
 | [`real-ip-domains.js`](../../examples/scripts/real-ip-domains.js) | 从 `domain` / `domain_suffix` 参数为三端添加 FakeIP 例外。 |
 | [`domain-suffix-doh.js`](../../examples/scripts/domain-suffix-doh.js) | 为三端指定域名后缀的 DoH；另见[使用说明](domain-suffix-doh.md)。 |
 | [`chain-proxy.js`](../../examples/scripts/chain-proxy.js) | 为 Mihomo 或 sing-box 配置链式代理和对应选择组。 |
+| [`tailscale-native.js`](../../examples/scripts/tailscale-native.js) | 为 Mihomo 或 sing-box 配置客户端自身的 Tailscale endpoint、MagicDNS 和路由。 |
 
 参数、模板变量和默认值由脚本头部维护。在仓库根目录用 `jq` 登记脚本，例如：
 

@@ -9,3 +9,7 @@ tun:
   route-exclude-address+:
     - 100.64.0.0/10
     - fd7a:115c:a1e0::/48
++rules:
+  - "DOMAIN-SUFFIX,tailscale.com,DIRECT"
+  - "IP-CIDR,100.64.0.0/10,DIRECT,no-resolve"
+  - "IP-CIDR6,fd7a:115c:a1e0::/48,DIRECT,no-resolve"

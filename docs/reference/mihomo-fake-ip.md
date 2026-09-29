@@ -89,5 +89,9 @@ fake-IP 问题，新增条目优先采用满足需求的最窄范围；用户可
 ## Tailscale 与 MagicDNS
 
 `+.ts.net` 例外只决定 Tailnet FQDN 是否得到真实 DNS 结果，不单独选择 TAILSCALE
-路由或排除 TUN 地址。模式、MagicDNS、地址段和依赖见
-[社区配置预设](community-config-presets.md#tailscale-三态与安全边界)。
+路由或排除 TUN 地址。模式、MagicDNS 和地址段见
+[社区配置预设](community-config-presets.md#tailscale-模式与安全边界)。
+
+Tailscale 共存预设另外把 `tailscale.com` 的域名规则和标准 Tailnet 地址段放在普通
+规则之前并交给 `DIRECT`。`ts.net` 不使用域名级 `DIRECT`，继续通过
+`100.100.100.100` 的 MagicDNS 解析；其地址由 TUN 排除和 IP 直连规则共同保护。

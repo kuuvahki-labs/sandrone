@@ -28,9 +28,9 @@ describe("file processor preset planner", () => {
 
   it("places a new consumer after a dependency inserted before another surviving consumer", () => {
     const newConsumer = preset("other-native", "Other Native", { dependencies: ["native-base"] });
-    const current = [custom("before"), built("tailscale-native")];
+    const current = [custom("before"), built("primary-mode")];
     const plan = buildPresetPlan([...catalog, newConsumer], "other-native", current, t, { position: "prepend" });
-    expect(applyPlan(current, plan).map(nameOf)).toEqual(["before", "Native Base", "Other Native", "Tailscale Native"]);
+    expect(applyPlan(current, plan).map(nameOf)).toEqual(["before", "Native Base", "Other Native", "Primary Mode"]);
   });
 
   it("adds dependencies once in topological order", () => {
@@ -44,11 +44,11 @@ describe("file processor preset planner", () => {
 
   it("inserts missing dependencies before an existing managed consumer", () => {
     const before = custom("before");
-    const native = built("tailscale-native");
+    const native = built("primary-mode");
     const after = custom("after");
     const current = [before, native, after];
 
-    const plan = planFileProcessorPresetAddition(catalog, "tailscale-native", current);
+    const plan = planFileProcessorPresetAddition(catalog, "primary-mode", current);
 
     expect(plan.additions).toEqual([{
       presetID: "native-base",
@@ -57,7 +57,7 @@ describe("file processor preset planner", () => {
     }]);
     expect(plan.removeIndices).toEqual([]);
     const applied = applyPlan(current, plan);
-    expect(applied.map(nameOf)).toEqual(["before", "Native Base", "Tailscale Native", "after"]);
+    expect(applied.map(nameOf)).toEqual(["before", "Native Base", "Primary Mode", "after"]);
     expect(applied[0]).toBe(before);
     expect(applied[2]).toBe(native);
     expect(applied[3]).toBe(after);
@@ -79,50 +79,50 @@ describe("file processor preset planner", () => {
   it("atomically removes recognized conflicts and preserves every other relative position", () => {
     const current = [
       custom("before"),
-      built("tailscale-external"),
+      built("alternate-mode"),
       custom("middle"),
       built("stun"),
       custom("after"),
     ];
-    const plan = planFileProcessorPresetAddition(catalog, "tailscale-native", current);
+    const plan = planFileProcessorPresetAddition(catalog, "primary-mode", current);
 
     expect(plan.removeIndices).toEqual([1, 3]);
-    expect(plan.removedPresetIDs).toEqual(["tailscale-external", "stun"]);
+    expect(plan.removedPresetIDs).toEqual(["alternate-mode", "stun"]);
     expect(applyPlan(current, plan).filter(isCustom).map(nameOf)).toEqual(["before", "middle", "after"]);
   });
 
   it("never removes an edited processor that no longer matches exactly", () => {
     const edited = { ...built("stun"), params: { mode: "yaml_override", content: "edited" } };
-    const plan = planFileProcessorPresetAddition(catalog, "tailscale-native", [edited]);
+    const plan = planFileProcessorPresetAddition(catalog, "primary-mode", [edited]);
 
     expect(plan.removeIndices).toEqual([]);
   });
 
   it("cascades conflict removal through exact managed reverse dependents", () => {
-    const transitive = built("tailnet-access");
-    const external = built("tailscale-external");
-    const share = built("tailnet-share");
+    const transitive = built("nested-addon");
+    const external = built("alternate-mode");
+    const share = built("dependent-addon");
     const current = [transitive, custom("middle"), external, share];
 
-    const plan = planFileProcessorPresetAddition(catalog, "tailscale-native", current);
+    const plan = planFileProcessorPresetAddition(catalog, "primary-mode", current);
 
     expect(plan.removeIndices).toEqual([0, 2, 3]);
     expect(plan.removedPresetIDs).toEqual([
-      "tailnet-access",
-      "tailscale-external",
-      "tailnet-share",
+      "nested-addon",
+      "alternate-mode",
+      "dependent-addon",
     ]);
   });
 
   it("preserves edited and unrecognized reverse dependents", () => {
     const editedShare = {
-      ...built("tailnet-share"),
+      ...built("dependent-addon"),
       params: { mode: "yaml_override", content: "edited share" },
     };
     const unknown = custom("unknown");
-    const current = [built("tailscale-external"), editedShare, unknown];
+    const current = [built("alternate-mode"), editedShare, unknown];
 
-    const plan = planFileProcessorPresetAddition(catalog, "tailscale-native", current);
+    const plan = planFileProcessorPresetAddition(catalog, "primary-mode", current);
 
     expect(plan.removeIndices).toEqual([0]);
     const applied = applyPlan(current, plan);
@@ -131,9 +131,9 @@ describe("file processor preset planner", () => {
   });
 
   it("does not cascade a dependent when the requested closure restores its dependency", () => {
-    const native = built("tailscale-native");
+    const native = built("primary-mode");
 
-    const plan = planFileProcessorPresetAddition(catalog, "tailscale-native", [native]);
+    const plan = planFileProcessorPresetAddition(catalog, "primary-mode", [native]);
 
     expect(plan.removeIndices).toEqual([]);
     expect(plan.addedPresetIDs).toEqual(["native-base"]);
@@ -144,13 +144,13 @@ describe("file processor preset planner", () => {
     const before = custom("before");
     const unrelated = built("unrelated");
     const editedShare = {
-      ...built("tailnet-share"),
+      ...built("dependent-addon"),
       params: { mode: "yaml_override", content: "edited share" },
     };
     const after = custom("after");
-    const current = [before, built("tailscale-external"), unrelated, editedShare, after];
+    const current = [before, built("alternate-mode"), unrelated, editedShare, after];
 
-    const plan = planFileProcessorPresetAddition(catalog, "tailscale-native", current);
+    const plan = planFileProcessorPresetAddition(catalog, "primary-mode", current);
     const applied = applyPlan(current, plan);
     const survivingCurrent = applied.filter((processor) => current.includes(processor));
 
@@ -245,13 +245,13 @@ const catalog: readonly FileProcessorPreset[] = [
   preset("linux-acceleration", "Linux", { dependencies: ["tun"], conflicts: ["stun"] }),
   preset("mptcp", "MPTCP", { dependencies: ["linux-acceleration", "tun"] }),
   preset("native-base", "Native Base"),
-  preset("tailscale-external", "Tailscale External"),
-  preset("tailnet-share", "Tailnet Share", { dependencies: ["tailscale-external"] }),
-  preset("tailnet-access", "Tailnet Access", { dependencies: ["tailnet-share"] }),
+  preset("alternate-mode", "Alternate Mode"),
+  preset("dependent-addon", "Dependent Addon", { dependencies: ["alternate-mode"] }),
+  preset("nested-addon", "Nested Addon", { dependencies: ["dependent-addon"] }),
   preset("stun", "STUN"),
-  preset("tailscale-native", "Tailscale Native", {
+  preset("primary-mode", "Primary Mode", {
     dependencies: ["native-base"],
-    conflicts: ["tailscale-external", "stun"],
+    conflicts: ["alternate-mode", "stun"],
   }),
   preset("unrelated", "Unrelated"),
 ];

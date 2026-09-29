@@ -5,14 +5,12 @@ import {
   type OrderedRuleProcessorPresetOptions,
   recognizeOrderedRuleProcessorPreset,
 } from "~/features/files/processors/ordered-rule-preset";
-import mihomoTailscaleNativeScript from "~/features/files/processors/scripts/mihomo-tailscale-native.js?raw";
 import type { Translator } from "~/shared/i18n/context";
 import type { ProcessorDetail } from "~/shared/resources/types";
 
 import fakeIPCompatContent from "./preset-content/fake-ip-compat.yaml?raw";
 import fakeIPOpenClashContent from "./preset-content/fake-ip-openclash.yaml?raw";
 import fakeIPShellCrashContent from "./preset-content/fake-ip-shellcrash.yaml?raw";
-import tailnetShareContent from "./preset-content/tailnet-share.yaml?raw";
 import tailscaleExternalContent from "./preset-content/tailscale-external.yaml?raw";
 
 export type MihomoProcessorPresetID =
@@ -20,14 +18,11 @@ export type MihomoProcessorPresetID =
   | "fake-ip-openclash"
   | "fake-ip-shellcrash"
   | "quic-fallback"
-  | "tailscale-native"
-  | "tailscale-external"
-  | "tailnet-share";
+  | "tailscale-external";
 type MihomoOrderedRuleProcessorPresetID = "quic-fallback";
-type MihomoNativeProcessorPresetID = "tailscale-native";
 type MihomoMergeProcessorPresetID = Exclude<
   MihomoProcessorPresetID,
-  MihomoOrderedRuleProcessorPresetID | MihomoNativeProcessorPresetID
+  MihomoOrderedRuleProcessorPresetID
 >;
 
 const PRESET_CONTENT: Record<MihomoMergeProcessorPresetID, string> = {
@@ -35,7 +30,6 @@ const PRESET_CONTENT: Record<MihomoMergeProcessorPresetID, string> = {
   "fake-ip-openclash": withoutTrailingNewline(fakeIPOpenClashContent),
   "fake-ip-shellcrash": withoutTrailingNewline(fakeIPShellCrashContent),
   "tailscale-external": withoutTrailingNewline(tailscaleExternalContent),
-  "tailnet-share": withoutTrailingNewline(tailnetShareContent),
 };
 function withoutTrailingNewline(content: string): string {
   return content.endsWith("\n") ? content.slice(0, -1) : content;
@@ -51,7 +45,6 @@ const ORDERED_RULE_PRESETS: Record<MihomoOrderedRuleProcessorPresetID, OrderedRu
 
 export function mihomoProcessorPreset(id: MihomoProcessorPresetID, name: string): ProcessorDetail {
   if (isOrderedRulePresetID(id)) return orderedRuleProcessorPreset(ORDERED_RULE_PRESETS[id], name);
-  if (id === "tailscale-native") return mihomoTailscaleNativeProcessor(name);
   return {
     name,
     type: "merge",
@@ -91,21 +84,12 @@ export const mihomoProcessorPresets: readonly FileProcessorPreset[] = [
     "network",
     "processors.filePreset.mihomo.quicFallback.label",
   ),
-  mihomoTailscaleNativeDescriptor(),
   descriptor(
     "tailscale-external",
     "tailscale",
     "processor.mihomoPreset.tailscale",
     false,
     [],
-    ["tailscale-native"],
-  ),
-  descriptor(
-    "tailnet-share",
-    "tailscale",
-    "processor.mihomoPreset.tailnetShare",
-    false,
-    ["tailscale-external"],
   ),
 ];
 
@@ -191,56 +175,6 @@ function orderedRuleDescriptor(
     build: (t) => orderedRuleProcessorPreset(options, t(labelKey)),
     recognize: (processor) => recognizeOrderedRuleProcessorPreset(processor, options),
   };
-}
-
-function mihomoTailscaleNativeProcessor(name: string): ProcessorDetail {
-  return {
-    name,
-    type: "script",
-    stage: "file",
-    params: {
-      source: {
-        type: "inline",
-        content: mihomoTailscaleNativeScript,
-      },
-      args: { auth_key: "" },
-    },
-  };
-}
-
-function mihomoTailscaleNativeDescriptor(): FileProcessorPreset {
-  return {
-    id: "tailscale-native",
-    category: "tailscale",
-    labelKey: "processors.filePreset.mihomo.tailscaleNative.label",
-    defaultOn: false,
-    dependencies: [],
-    conflicts: ["tailscale-external"],
-    build: (t) => mihomoTailscaleNativeProcessor(t("processors.filePreset.mihomo.tailscaleNative.label")),
-    recognize: (processor) => {
-      if (processor.type !== "script") return false;
-      if (!isExactRecord(processor.params, ["source"])
-        && !isExactRecord(processor.params, ["args", "source"])) return false;
-      const source = processor.params.source;
-      if (!isExactRecord(source, ["content", "type"])
-        || source.type !== "inline"
-        || source.content !== mihomoTailscaleNativeScript) return false;
-      if (!("args" in processor.params)) return true;
-      const args = processor.params.args;
-      return isExactRecord(args, ["auth_key"])
-        && typeof args.auth_key === "string";
-    },
-  };
-}
-
-function isExactRecord(
-  value: unknown,
-  expectedKeys: readonly string[],
-): value is Record<string, unknown> {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
-  const keys = Object.keys(value).sort();
-  return keys.length === expectedKeys.length
-    && keys.every((key, index) => key === expectedKeys[index]);
 }
 
 function isOrderedRulePresetID(id: MihomoProcessorPresetID): id is MihomoOrderedRuleProcessorPresetID {

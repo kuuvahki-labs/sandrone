@@ -73,6 +73,8 @@ describe("Shadowrocket processor presets", () => {
   it("builds and recognizes the exact external Tailscale script", () => {
     const descriptor = presetDescriptor("tailscale-external");
     const processor = descriptor.build(en);
+    const source = processor.params?.source as Record<string, unknown>;
+    const content = String(source.content);
 
     expect(processor).toEqual({
       name: "Tailscale coexistence",
@@ -88,6 +90,12 @@ describe("Shadowrocket processor presets", () => {
       dependencies: [],
       conflicts: ["tailscale-native"],
     });
+    expect(content).toContain("\"DOMAIN-SUFFIX,tailscale.com,DIRECT\"");
+    expect(content.indexOf("\"DOMAIN-SUFFIX,tailscale.com,DIRECT\"")).toBeLessThan(
+      content.indexOf("\"DOMAIN-SUFFIX,ts.net,DIRECT\""),
+    );
+    expect(content).toContain("\"IP-CIDR,100.64.0.0/10,DIRECT,no-resolve\"");
+    expect(content).toContain("\"IP-CIDR,fd7a:115c:a1e0::/48,DIRECT,no-resolve\"");
     expect(recognizedFileProcessorPresetID(shadowrocketProcessorPresets, processor))
       .toBe("tailscale-external");
     expect(recognizedFileProcessorPresetID(shadowrocketProcessorPresets, {

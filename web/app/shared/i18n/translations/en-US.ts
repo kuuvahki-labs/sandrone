@@ -378,7 +378,6 @@ export const enUS: Record<TranslationKey, string> = {
   "processor.moreActions": "More processor actions: {label}",
   "processor.mihomoPreset.fakeIpCompat": "Fake-IP compatibility extension",
   "processor.mihomoPreset.tailscale": "Tailscale coexistence",
-  "processor.mihomoPreset.tailnetShare": "Tailnet proxy sharing",
   "processor.moveDown": "Move processor down",
   "processor.moveUp": "Move processor up",
   "processor.namePlaceholder": "Leave blank to use the default name",

@@ -6,7 +6,6 @@ import type {
 } from "~/features/files/drivers/core/processor-presets";
 import legacySingBoxOutboundAdapterScript from "~/features/files/drivers/sing-box/legacy/sing-box-outbound-adapter-reject-empty.js?raw";
 import legacySingBoxTailscaleExternalScript from "~/features/files/drivers/sing-box/legacy/sing-box-tailscale-external.js?raw";
-import legacySingBoxTailscaleNativeScript from "~/features/files/drivers/sing-box/legacy/sing-box-tailscale-native.js?raw";
 import { githubRuleSourceMirrorPreset } from "~/features/files/processors/github-rule-source-mirror-preset";
 import {
   orderedRuleProcessorPreset,
@@ -16,32 +15,24 @@ import {
 import singBoxFakeIPCompatScript from "~/features/files/processors/scripts/sing-box-fakeip-compat.js?raw";
 import singBoxFakeIPRuleSetGeodataScript from "~/features/files/processors/scripts/sing-box-fakeip-ruleset-geodata.js?raw";
 import singBoxOutboundAdapterScript from "~/features/files/processors/scripts/sing-box-outbound-adapter.js?raw";
-import singBoxTailnetShareScript from "~/features/files/processors/scripts/sing-box-tailnet-share.js?raw";
 import singBoxTailscaleExternalScript from "~/features/files/processors/scripts/sing-box-tailscale-external.js?raw";
-import singBoxTailscaleNativeScript from "~/features/files/processors/scripts/sing-box-tailscale-native.js?raw";
 import type { Translator } from "~/shared/i18n/context";
 import type { ProcessorDetail } from "~/shared/resources/types";
 
 export type SingBoxProcessorPresetID =
   | "outbound-adapter"
   | "quic-fallback"
-  | "tailscale-native"
   | "tailscale-external"
-  | "tailnet-share"
   | "fakeip-compat"
   | "fakeip-ruleset-geodata";
 type SingBoxOrderedRuleProcessorPresetID = "quic-fallback";
 type SingBoxScriptProcessorPresetID =
-  | "tailscale-native"
   | "tailscale-external"
-  | "tailnet-share"
   | "fakeip-compat"
   | "fakeip-ruleset-geodata";
 
 const MANAGED_SCRIPTS: Readonly<Record<SingBoxScriptProcessorPresetID, string>> = {
-  "tailscale-native": singBoxTailscaleNativeScript,
   "tailscale-external": singBoxTailscaleExternalScript,
-  "tailnet-share": singBoxTailnetShareScript,
   "fakeip-compat": singBoxFakeIPCompatScript,
   "fakeip-ruleset-geodata": singBoxFakeIPRuleSetGeodataScript,
 };
@@ -161,9 +152,7 @@ export const singBoxProcessorPresets: readonly FileProcessorPreset[] = [
     "network",
     "processors.filePreset.singBox.quicFallback.label",
   ),
-  managedScriptDescriptor("tailscale-native", "tailscale", "processors.filePreset.singBox.tailscaleNative.label", [], ["tailscale-external"]),
-  managedScriptDescriptor("tailscale-external", "tailscale", "processors.filePreset.singBox.tailscaleExternal.label", [], ["tailscale-native"]),
-  managedScriptDescriptor("tailnet-share", "tailscale", "processors.filePreset.singBox.tailnetShare.label", ["tailscale-external"]),
+  managedScriptDescriptor("tailscale-external", "tailscale", "processors.filePreset.singBox.tailscaleExternal.label"),
   managedScriptDescriptor(
     "fakeip-compat",
     "network",
@@ -260,14 +249,6 @@ function managedScriptDescriptor(
 
 function managedScriptDefaultArgs(id: SingBoxScriptProcessorPresetID): Record<string, unknown> {
   switch (id) {
-    case "tailscale-native": return { preset_id: id, auth_key: "" };
-    case "tailnet-share": return {
-      preset_id: id,
-      listen_addresses: [],
-      listen_port: 2081,
-      username: "",
-      password: "",
-    };
     case "fakeip-compat": return {
       preset_id: id,
       domain: [...FAKEIP_COMPAT_DOMAIN],
@@ -305,12 +286,6 @@ function isCurrentManagedScriptProcessor(
 function validManagedScriptArgs(id: SingBoxScriptProcessorPresetID, value: unknown): boolean {
   if (!isRecord(value) || value.preset_id !== id) return false;
   switch (id) {
-    case "tailscale-native": return isExactRecord(value, ["auth_key", "preset_id"]) && typeof value.auth_key === "string";
-    case "tailnet-share": return isExactRecord(value, ["listen_addresses", "listen_port", "password", "preset_id", "username"])
-      && isStringArray(value.listen_addresses)
-      && typeof value.listen_port === "number"
-      && typeof value.username === "string"
-      && typeof value.password === "string";
     case "fakeip-compat": return isExactRecord(value, ["domain", "domain_regex", "domain_suffix", "preset_id", "server"])
       && isStringArray(value.domain)
       && isStringArray(value.domain_suffix)
@@ -323,10 +298,7 @@ function validManagedScriptArgs(id: SingBoxScriptProcessorPresetID, value: unkno
 }
 
 function validLegacyTailscaleArgs(id: SingBoxScriptProcessorPresetID, value: unknown): boolean {
-  if (id === "tailscale-external") return value === undefined || isExactRecord(value, []);
-  return id === "tailscale-native"
-    && isExactRecord(value, ["auth_key"])
-    && typeof value.auth_key === "string";
+  return id === "tailscale-external" && (value === undefined || isExactRecord(value, []));
 }
 
 function inlineSourceContent(value: unknown): string | null {
@@ -338,9 +310,7 @@ function inlineSourceContent(value: unknown): string | null {
 }
 
 function isLegacyTailscaleSource(id: SingBoxScriptProcessorPresetID, source: string): boolean {
-  return id === "tailscale-native"
-    ? source === legacySingBoxTailscaleNativeScript
-    : id === "tailscale-external" && source === legacySingBoxTailscaleExternalScript;
+  return id === "tailscale-external" && source === legacySingBoxTailscaleExternalScript;
 }
 
 function isStringArray(value: unknown): value is string[] {

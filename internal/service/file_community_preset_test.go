@@ -51,7 +51,7 @@ func TestServiceCommunityPresetMihomoOrderedScenariosUseExactRawAsset(t *testing
 	require.False(t, hasCaseInsensitiveKeyFragment(doc, "keepalive"))
 }
 
-func TestServiceCommunityPresetMihomoTailscaleNativeGeneratesFullFile(t *testing.T) {
+func TestServiceExampleScriptTailscaleNativeMihomoGeneratesFullFile(t *testing.T) {
 	ctx := context.Background()
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
 	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
@@ -60,9 +60,9 @@ func TestServiceCommunityPresetMihomoTailscaleNativeGeneratesFullFile(t *testing
 		Format:  "uri-list",
 		Content: "ss://aes-128-gcm:example-password@example.com:8388#Native-Node",
 	}))
-	script := communityPresetRawScript(t, "mihomo-tailscale-native.js")
+	script := exampleScriptRaw(t, "tailscale-native.js")
 	spec := domain.FileSpec{
-		Name: "mihomo-tailscale-native.yaml",
+		Name: "mihomo-tailscale-native-example.yaml",
 		Kind: domain.FileKindMihomo,
 		Source: domain.FileSource{Type: "inline", Content: `dns:
   fake-ip-filter:
@@ -89,8 +89,8 @@ tun:
 			}),
 		},
 		Processors: []domain.ProcessorSpec{
-			mihomoTailscaleNativeProcessor(t, script, "tskey-auth-test"),
-			mihomoTailscaleNativeProcessor(t, script, "tskey-auth-test"),
+			tailscaleNativeExampleProcessor(t, script, "tskey-auth-test"),
+			tailscaleNativeExampleProcessor(t, script, "tskey-auth-test"),
 		},
 	}
 
@@ -162,12 +162,17 @@ tun:
 dns:
   fake-ip-filter+:
     - "+.ts.net"
+    - "+.tailscale.com"
   nameserver-policy:
     "<+.ts.net>": 100.100.100.100
 tun:
   route-exclude-address+:
     - 100.64.0.0/10
-    - fd7a:115c:a1e0::/48`)},
+    - fd7a:115c:a1e0::/48
++rules:
+  - "DOMAIN-SUFFIX,tailscale.com,DIRECT"
+  - "IP-CIDR,100.64.0.0/10,DIRECT,no-resolve"
+  - "IP-CIDR6,fd7a:115c:a1e0::/48,DIRECT,no-resolve"`)},
 	}
 
 	result, err := svc.GetFile(ctx, domain.FileRequest{Spec: &spec})
@@ -180,19 +185,22 @@ tun:
 	require.Equal(t, "External-Node", requireStringMap(t, proxies[0])["name"])
 	require.NotEqual(t, "tailscale", requireStringMap(t, proxies[0])["type"])
 	require.Equal(t, []any{
+		"DOMAIN-SUFFIX,tailscale.com,DIRECT",
+		"IP-CIDR,100.64.0.0/10,DIRECT,no-resolve",
+		"IP-CIDR6,fd7a:115c:a1e0::/48,DIRECT,no-resolve",
 		"DOMAIN,user.example,DIRECT",
 		"RULE-SET,private,DIRECT",
 		"MATCH,LockedFinal",
 	}, doc["rules"])
 	dns := requireStringMap(t, doc["dns"])
-	require.Equal(t, []any{"base.example", "+.ts.net"}, dns["fake-ip-filter"])
+	require.Equal(t, []any{"base.example", "+.ts.net", "+.tailscale.com"}, dns["fake-ip-filter"])
 	require.Equal(t, "100.100.100.100", requireStringMap(t, dns["nameserver-policy"])["+.ts.net"])
 	tun := requireStringMap(t, doc["tun"])
 	require.Equal(t, []any{"192.0.2.0/24", "100.64.0.0/10", "fd7a:115c:a1e0::/48"}, tun["route-exclude-address"])
 	assertNoTailscaleSecretsOrExitNode(t, doc, result.Content)
 }
 
-func TestServiceCommunityPresetMihomoTailscaleNativeRejectsIncompatibleNamedProxy(t *testing.T) {
+func TestServiceExampleScriptTailscaleNativeMihomoRejectsIncompatibleNamedProxy(t *testing.T) {
 	ctx := context.Background()
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
 	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
@@ -212,7 +220,7 @@ func TestServiceCommunityPresetMihomoTailscaleNativeRejectsIncompatibleNamedProx
 			}),
 		},
 		Processors: []domain.ProcessorSpec{
-			mihomoTailscaleNativeProcessor(t, communityPresetRawScript(t, "mihomo-tailscale-native.js")),
+			tailscaleNativeExampleProcessor(t, exampleScriptRaw(t, "tailscale-native.js")),
 		},
 	}
 
@@ -221,7 +229,31 @@ func TestServiceCommunityPresetMihomoTailscaleNativeRejectsIncompatibleNamedProx
 	require.Nil(t, result)
 	require.Error(t, err)
 	require.True(t, domain.IsCode(err, domain.CodeScriptRuntime), "got %v", err)
-	require.Contains(t, err.Error(), "Sandrone Mihomo Tailscale native preset found incompatible proxy named TAILSCALE")
+	require.Contains(t, err.Error(), "tailscale-native.js Mihomo found incompatible proxy named TAILSCALE")
+}
+
+func TestServiceExampleScriptTailscaleNativeMihomoRejectsCoexistenceRules(t *testing.T) {
+	spec := domain.FileSpec{
+		Name:   "mihomo-tailscale-conflict.yaml",
+		Kind:   domain.FileKindMihomo,
+		Source: domain.FileSource{Type: "inline", Content: "dns: {}\ntun: {}\n"},
+		Config: &domain.FileConfig{Settings: completeTypedSettings(t, map[string]any{
+			"rules": []string{
+				"IP-CIDR,100.64.0.0/10,DIRECT,no-resolve",
+				"MATCH,LockedFinal",
+			},
+		})},
+		Processors: []domain.ProcessorSpec{
+			tailscaleNativeExampleProcessor(t, exampleScriptRaw(t, "tailscale-native.js")),
+		},
+	}
+
+	result, err := service.New().GetFile(t.Context(), domain.FileRequest{Spec: &spec})
+
+	require.Nil(t, result)
+	require.Error(t, err)
+	require.True(t, domain.IsCode(err, domain.CodeScriptRuntime), "got %v", err)
+	require.Contains(t, err.Error(), "requires removing the Tailscale coexistence processor first")
 }
 
 func TestServiceCommunityPresetSingBoxOrderedScenariosUseExactRawAsset(t *testing.T) {
@@ -262,7 +294,7 @@ func TestServiceCommunityPresetSingBoxOrderedScenariosUseExactRawAsset(t *testin
 	}, route["rules"])
 }
 
-func TestServiceCommunityPresetSingBoxTailscaleNativeGeneratesFullFile(t *testing.T) {
+func TestServiceExampleScriptTailscaleNativeSingBoxGeneratesFullFile(t *testing.T) {
 	ctx := context.Background()
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
 	require.NoError(t, svc.PutSubscription(ctx, domain.Subscription{
@@ -271,10 +303,10 @@ func TestServiceCommunityPresetSingBoxTailscaleNativeGeneratesFullFile(t *testin
 		Format:  "uri-list",
 		Content: "ss://aes-128-gcm:example-password@example.com:8388#Native-Node",
 	}))
-	script := communityPresetRawScript(t, "sing-box-tailscale-native.js")
-	processor := singBoxTailscaleProcessor(t, "tailscale-native", "Tailscale 原生接管", script, "tskey-auth-test")
+	script := exampleScriptRaw(t, "tailscale-native.js")
+	processor := tailscaleNativeExampleProcessor(t, script, "tskey-auth-test")
 	spec := domain.FileSpec{
-		Name: "sing-box-tailscale-native.json",
+		Name: "sing-box-tailscale-native-example.json",
 		Kind: domain.FileKindSingBox,
 		Source: domain.FileSource{Type: "inline", Content: `{
 			"dns": {
@@ -354,6 +386,30 @@ func TestServiceCommunityPresetSingBoxTailscaleNativeGeneratesFullFile(t *testin
 	require.NotContains(t, strings.ToLower(string(result.Content)), "exit_node")
 }
 
+func TestServiceExampleScriptTailscaleNativeSingBoxRejectsCoexistenceRules(t *testing.T) {
+	spec := domain.FileSpec{
+		Name:   "sing-box-tailscale-conflict.json",
+		Kind:   domain.FileKindSingBox,
+		Source: domain.FileSource{Type: "inline", Content: `{"dns":{},"inbounds":[{"type":"tun","tag":"tun-in"}],"route":{"rules":[]}}`},
+		Config: &domain.FileConfig{Settings: completeTypedSettings(t, map[string]any{
+			"rules": []map[string]any{
+				{"ip_cidr": []string{"100.64.0.0/10", "fd7a:115c:a1e0::/48"}, "outbound": "direct"},
+				{"outbound": "LockedFinal"},
+			},
+		})},
+		Processors: []domain.ProcessorSpec{
+			tailscaleNativeExampleProcessor(t, exampleScriptRaw(t, "tailscale-native.js")),
+		},
+	}
+
+	result, err := service.New().GetFile(t.Context(), domain.FileRequest{Spec: &spec})
+
+	require.Nil(t, result)
+	require.Error(t, err)
+	require.True(t, domain.IsCode(err, domain.CodeScriptRuntime), "got %v", err)
+	require.Contains(t, err.Error(), "sing-box requires removing the Tailscale coexistence processor first")
+}
+
 func TestServiceCommunityPresetSingBoxTailscaleExternalGeneratesDistinctFullFile(t *testing.T) {
 	ctx := context.Background()
 	svc := service.New(service.WithFS(afero.NewMemMapFs()))
@@ -363,8 +419,7 @@ func TestServiceCommunityPresetSingBoxTailscaleExternalGeneratesDistinctFullFile
 		Format:  "uri-list",
 		Content: "ss://aes-128-gcm:example-password@example.com:8388#External-Node",
 	}))
-	script := communityPresetRawScript(t, "sing-box-tailscale-external.js")
-	processor := singBoxTailscaleProcessor(t, "tailscale-external", "Tailscale 共存", script)
+	processor := singBoxManagedScriptProcessor(t, "tailscale-external", "Tailscale 共存", "sing-box-tailscale-external.js", nil)
 	spec := domain.FileSpec{
 		Name: "sing-box-tailscale-external.json",
 		Kind: domain.FileKindSingBox,
@@ -430,82 +485,12 @@ func TestServiceCommunityPresetSingBoxTailscaleExternalGeneratesDistinctFullFile
 	require.Equal(t, "LockedRouteFinal", route["final"])
 	require.Equal(t, []any{
 		map[string]any{"domain_suffix": []any{"user.example"}, "outbound": "direct"},
+		map[string]any{"domain_suffix": []any{"tailscale.com"}, "outbound": "direct"},
+		map[string]any{"ip_cidr": []any{"100.64.0.0/10", "fd7a:115c:a1e0::/48"}, "outbound": "direct"},
 		map[string]any{"rule_set": []any{"private"}, "outbound": "direct"},
 		map[string]any{"outbound": "LockedFinal"},
 	}, route["rules"])
 	assertNoTailscaleSecretsOrExitNode(t, doc, result.Content)
-}
-
-func TestServiceCommunityPresetSingBoxTailnetShareRunsExactProcessorChain(t *testing.T) {
-	spec := domain.FileSpec{
-		Name: "sing-box-tailnet-share.json",
-		Kind: domain.FileKindSingBox,
-		Source: domain.FileSource{Type: "inline", Content: `{
-			"dns": {
-				"servers": [
-					{"type":"https","tag":"dns-remote","server":"1.1.1.1"},
-					{"type":"fakeip","tag":"dns-fakeip"}
-				],
-				"rules": [{"query_type":["A","AAAA"],"action":"route","server":"dns-fakeip"}],
-				"final": "dns-remote"
-			},
-			"inbounds": [
-				{"type":"mixed","tag":"mixed-in","listen":"127.0.0.1","listen_port":2080},
-				{
-					"type":"tun","tag":"tun-in","address":["172.19.0.1/30","fdfe:dcba:9876::1/126"],
-					"auto_route":true,"strict_route":true,
-					"route_exclude_address":[
-						"10.0.0.0/8","172.16.0.0/12","192.168.0.0/16","169.254.0.0/16",
-						"fe80::/10","fc00::/7","224.0.0.251/32","ff02::fb/128"
-					]
-				}
-			],
-			"outbounds": [],
-			"endpoints": [],
-			"route": {"rule_set":[],"rules":[]}
-		}`},
-		Config: &domain.FileConfig{Settings: completeTypedSettings(t, map[string]any{
-			"rules": []map[string]any{
-				{"rule_set": []string{"private"}, "outbound": "direct"},
-				{"outbound": "Proxy"},
-			},
-		})},
-		Processors: []domain.ProcessorSpec{
-			singBoxManagedScriptProcessor(t, "tailscale-external", "Tailscale 共存", "sing-box-tailscale-external.js", nil),
-			singBoxManagedScriptProcessor(t, "tailnet-share", "共享到 Tailnet", "sing-box-tailnet-share.js", map[string]any{
-				"listen_addresses": []string{"100.64.0.7", "fd7a:115c:a1e0::7"},
-				"listen_port":      2443,
-				"username":         "alice",
-				"password":         "secret",
-			}),
-		},
-	}
-
-	result, err := service.New().GetFile(t.Context(), domain.FileRequest{Spec: &spec})
-
-	require.NoError(t, err)
-	require.NotNil(t, result)
-	doc := decodeSingBoxCommunityPresetResult(t, result.Content)
-	inbounds := requireAnySlice(t, doc["inbounds"])
-	tun := requireStringMapWithField(t, inbounds, "tag", "tun-in")
-	require.Equal(t, true, tun["auto_route"])
-	require.Equal(t, []any{
-		"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16",
-		"fe80::/10", "fc00::/7", "224.0.0.251/32", "ff02::fb/128",
-		"100.64.0.0/10", "fd7a:115c:a1e0::/48",
-	}, tun["route_exclude_address"])
-	for tag, address := range map[string]string{
-		"tailnet-share-v4": "100.64.0.7",
-		"tailnet-share-v6": "fd7a:115c:a1e0::7",
-	} {
-		inbound := requireStringMapWithField(t, inbounds, "tag", tag)
-		require.Equal(t, "mixed", inbound["type"])
-		require.Equal(t, address, inbound["listen"])
-		require.Equal(t, float64(2443), inbound["listen_port"])
-		require.Equal(t, []any{map[string]any{"username": "alice", "password": "secret"}}, inbound["users"])
-	}
-	dns := requireStringMap(t, doc["dns"])
-	requireStringMapWithField(t, requireAnySlice(t, dns["servers"]), "tag", "ts-dns")
 }
 
 func TestServiceCommunityPresetSingBoxFakeIPCompatUsesExactRawAsset(t *testing.T) {
@@ -749,6 +734,7 @@ func TestServiceCommunityPresetShadowrocketTailscaleExternalGeneratesFullFile(t 
 		"example.com = 192.0.2.1",
 	}, modelSectionLines(t, model, "Host"))
 	require.Equal(t, []string{
+		"DOMAIN-SUFFIX,tailscale.com,DIRECT",
 		"DOMAIN-SUFFIX,ts.net,DIRECT",
 		"IP-CIDR,100.64.0.0/10,DIRECT,no-resolve",
 		"IP-CIDR,fd7a:115c:a1e0::/48,DIRECT,no-resolve",
@@ -947,36 +933,19 @@ func mihomoMergeProcessor(t *testing.T, name, content string) domain.ProcessorSp
 	}
 }
 
-func mihomoTailscaleNativeProcessor(t *testing.T, script string, authKeys ...string) domain.ProcessorSpec {
+func tailscaleNativeExampleProcessor(t *testing.T, script string, authKeys ...string) domain.ProcessorSpec {
 	t.Helper()
 	authKey := ""
 	if len(authKeys) > 0 {
 		authKey = authKeys[0]
 	}
 	return domain.ProcessorSpec{
-		Name:  "Tailscale 原生接管",
+		Name:  "Tailscale 原生示例",
 		Type:  "script",
 		Stage: domain.StageFile,
 		Params: params(t, map[string]any{
 			"source": inlineScriptSource(script),
 			"args":   map[string]any{"auth_key": authKey},
-		}),
-	}
-}
-
-func singBoxTailscaleProcessor(t *testing.T, presetID, name, script string, authKeys ...string) domain.ProcessorSpec {
-	t.Helper()
-	args := map[string]any{"preset_id": presetID}
-	if len(authKeys) > 0 {
-		args["auth_key"] = authKeys[0]
-	}
-	return domain.ProcessorSpec{
-		Name:  name,
-		Type:  "script",
-		Stage: domain.StageFile,
-		Params: params(t, map[string]any{
-			"source": inlineScriptSource(script),
-			"args":   args,
 		}),
 	}
 }
@@ -1098,5 +1067,15 @@ func communityPresetRawScript(t *testing.T, name string) string {
 	path := filepath.Join(filepath.Dir(testFile), "..", "..", "web", "app", "features", "files", "processors", "scripts", name)
 	body, err := os.ReadFile(path)
 	require.NoError(t, err, "read exact community preset asset %s", path)
+	return string(body)
+}
+
+func exampleScriptRaw(t *testing.T, name string) string {
+	t.Helper()
+	_, testFile, _, ok := runtime.Caller(0)
+	require.True(t, ok)
+	path := filepath.Join(filepath.Dir(testFile), "..", "..", "examples", "scripts", name)
+	body, err := os.ReadFile(path)
+	require.NoError(t, err, "read example script %s", path)
 	return string(body)
 }
