@@ -184,7 +184,7 @@ function deferred<T>() {
   return { promise, reject, resolve };
 }
 
-it("shows cached items immediately and refreshes stale data on focus and remount", async () => {
+it("shows cached items immediately and refreshes stale data on remount", async () => {
   const next = deferred<unknown>();
   let fresh = true;
   const cached = () => ({ value: { values: ["cached"] }, fresh });
@@ -197,13 +197,12 @@ it("shows cached items immediately and refreshes stale data on focus and remount
   expect(load).not.toHaveBeenCalled();
   fresh = false;
   act(() => { window.dispatchEvent(new Event("focus")); });
-  expect(first.result.current.items).toEqual(["cached"]);
-  expect(first.result.current.loaded).toBe(true);
-  await act(async () => { next.resolve({ values: ["updated"] }); });
-  expect(first.result.current.items).toEqual(["updated"]);
+  expect(load).not.toHaveBeenCalled();
   first.unmount();
   const second = renderHook(() => useResourceList({ load, cached, map: mapValues, showNotice: ignoreNotice, t }));
   expect(second.result.current.items).toEqual(["cached"]);
+  expect(second.result.current.loaded).toBe(true);
+  await act(async () => { next.resolve({ values: ["updated"] }); });
   await waitFor(() => expect(second.result.current.items).toEqual(["updated"]));
-  expect(load).toHaveBeenCalledTimes(2);
+  expect(load).toHaveBeenCalledTimes(1);
 });

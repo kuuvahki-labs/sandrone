@@ -65,11 +65,8 @@ export function useResourceList<T>({
       setLoading(false);
     }
     void refresh(false);
-    const onFocus = () => { void refresh(false); };
-    window.addEventListener("focus", onFocus);
     return () => {
       generation.current += 1;
-      window.removeEventListener("focus", onFocus);
     };
   }, [cached, map, refresh]);
 
