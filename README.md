@@ -12,9 +12,15 @@
   </p>
 </div>
 
-Sandrone 管理本地与远程订阅，通过统一的 `NodeIR` 执行有序处理链，再生成
-Mihomo、sing-box、Shadowrocket 配置或分享链接。同一套转换语义同时服务于
-Web UI、CLI、HTTP API、MCP 与可嵌入 Go API。
+Sandrone 是一个可自托管的订阅与客户端配置工作台。在网页中组合和整理订阅，
+选择配置模板，编辑代理组、规则集与分流规则，再生成、检查和分享
+Mihomo、sing-box 或 Shadowrocket 配置。
+
+也支持命令行、HTTP API 和 MCP，可通过 Go API 嵌入其他程序。
+
+[![图形化配置：模板选择与代理组编辑](docs/screenshots/config-editor.png)](docs/screenshots/config-editor.png)
+
+选择配置模板，编辑代理组的类型、成员与引用关系。
 
 ## 为什么是 Sandrone
 
@@ -26,7 +32,9 @@ Web UI、CLI、HTTP API、MCP 与可嵌入 Go API。
   探测结果保留或排列节点；保存整理规则后，每次生成都会沿用。
 - **开箱即用的完整配置**：内置客户端模板和常用预设，提供分组、分流规则与
   DNS 设置，帮助你从订阅生成客户端配置，减少从零编写的工作。
-- **默认好用，也能灵活定制**：在界面中调整分组和规则，按需修改 DNS、组合或
+- **通过界面维护客户端配置**：选择内置模板，编辑代理组的类型与成员，管理
+  规则集来源，调整分流规则的匹配条件、目标策略和顺序。
+- **默认好用，也能灵活定制**：通过基础配置编辑调整 DNS 等设置，按需组合或
   移除预设；有更细的需求时，可以编辑原始配置或用脚本扩展节点与文件处理。
 - **结果可检查，配置易交付**：预览节点处理前后的变化和最终配置，查看兼容性
   提醒、测试节点可用性，再下载或生成分享链接，添加到对应客户端。
@@ -59,21 +67,39 @@ curl http://127.0.0.1:1137/version
 订阅到 Mihomo 文件的工作流；偏好命令行则从[第一次转换](docs/tutorials/first-conversion.md)
 开始。
 
+## 界面示例
+
+**订阅组合与处理链**
+
+[![组合订阅与节点处理链](docs/screenshots/subscription-processors.png)](docs/screenshots/subscription-processors.png)
+
+组合多个订阅，通过过滤、去重、重命名和排序整理节点。
+
+**分流规则编辑**
+
+[![分流规则的匹配条件与目标策略编辑](docs/screenshots/routing-rules.png)](docs/screenshots/routing-rules.png)
+
+编辑分流规则的匹配条件和目标策略，并调整匹配顺序。
+
+[查看规则集与分流配置](docs/screenshots/config-editor-lower.png)。
+
 ## 一条配置如何产生
 
 ```text
 本地内容 / 远程订阅
           ↓
-       统一 NodeIR
+  组合订阅，按需整理节点
           ↓
-过滤 → 去重 → 重命名 → 排序 → 探测 → 受限脚本
+选择模板，编辑代理组、规则集与分流规则
+          ↓
+ 按需调整基础配置与文件处理
           ↓
 Mihomo / sing-box 完整配置，或 Shadowrocket 无节点配置
           ↓
      预览、下载或分享链接
 ```
 
-每一步都有稳定契约：格式能力见[格式与能力参考](docs/reference/capabilities.md)，
+格式能力见[格式与能力参考](docs/reference/capabilities.md)，
 节点与文件处理语义见 [Processors 参考](docs/reference/processors.md)，完整配置的
 生成方式见[渲染客户端配置](docs/how-to/render-client-config.md)。
 
@@ -83,15 +109,15 @@ Mihomo / sing-box 完整配置，或 Shadowrocket 无节点配置
 | --- | --- |
 | 输入 | 单条分享 URI、URI 列表、Base64 订阅、Mihomo YAML / JSON、sing-box JSON |
 | 节点处理 | filter、dedup、rename、sort、quick settings、probe、sandboxed JavaScript |
+| 图形化配置 | 模板选择、代理组、规则集与分流规则编辑；基础配置原文编辑 |
 | 节点输出 | Mihomo proxies、sing-box outbounds / endpoints、Shadowrocket Subscribe（Clash YAML 别名）、Base64 / URI 列表 |
 | 完整文件 | Mihomo、sing-box typed config、Shadowrocket 无节点 typed config，以及 static / remote file |
 | 文件处理 | YAML / JSON / INI merge、JSON Patch、template 与 sandboxed JavaScript |
 | 运行能力 | preview、CLI diagnose、声明式 TCP / UDP / URL probe、缓存、定时刷新、分享、备份与恢复 |
 | 接入方式 | Web UI、CLI、HTTP API、MCP Streamable HTTP、`pkg/sandrone` Go API |
 
-格式转换存在目标客户端无法表达的边界。Sandrone 会保留可保留的原始字段并返回
-warning，不把“成功输出”伪装成“完全无损”；精确范围以
-[capability catalog](docs/reference/capabilities.md) 为准。
+格式转换受目标客户端能力限制，无法完整保留的字段会返回兼容性提醒。
+具体支持范围见[格式与能力参考](docs/reference/capabilities.md)。
 
 ## 部署与集成
 
