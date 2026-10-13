@@ -29,7 +29,7 @@ export function ServiceConnectionSection({
           </Typography>
           <TextField
             fullWidth
-            label="Public Base URL"
+            label={t("settings.publicBaseUrl.label")}
             placeholder="https://example.com"
             type="url"
             value={baseUrl}

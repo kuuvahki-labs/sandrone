@@ -71,7 +71,7 @@ describe("settings page", () => {
 
     await user.click(screen.getByRole("combobox", { name: "主题模式" }));
     await user.click(screen.getByRole("option", { name: "浅色" }));
-    fireEvent.change(screen.getByRole("textbox", { name: "Public Base URL" }), {
+    fireEvent.change(screen.getByRole("textbox", { name: "基础 URL" }), {
       target: { value: "https://public.example.test" },
     });
     await user.click(saveBaseUrl);

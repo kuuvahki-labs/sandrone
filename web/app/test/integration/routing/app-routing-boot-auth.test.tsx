@@ -31,7 +31,7 @@ describe("React Router app boot and auth workflows", () => {
     renderApp("/settings");
 
     expect(await screen.findByRole("heading", { name: "设置" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "Public Base URL" })).toHaveValue(window.location.origin);
+    expect(screen.getByRole("textbox", { name: "基础 URL" })).toHaveValue(window.location.origin);
     expect(settingsRequestPaths(requests)).toEqual(expect.arrayContaining(["/v1/settings", "/version"]));
   });
 

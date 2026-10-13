@@ -67,6 +67,7 @@ export const settingsZhCN = {
   "settings.ignoredWarnings.restoreOne": "恢复 {warning}",
   "settings.ignoredWarnings.title": "已忽略的订阅警告",
   "settings.publicBaseUrl.title": "服务连接",
+  "settings.publicBaseUrl.label": "基础 URL",
   "settings.publicBaseUrl.save": "保存服务地址",
   "settings.runtime.cacheZeroHint": "缓存时间设为 0 时关闭。",
   "settings.runtime.group.cache": "缓存",

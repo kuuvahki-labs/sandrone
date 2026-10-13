@@ -67,6 +67,7 @@ export const settingsEnUS = {
   "settings.ignoredWarnings.restoreOne": "Restore {warning}",
   "settings.ignoredWarnings.title": "Ignored subscription warnings",
   "settings.publicBaseUrl.title": "Service connection",
+  "settings.publicBaseUrl.label": "Base URL",
   "settings.publicBaseUrl.save": "Save service address",
   "settings.runtime.cacheZeroHint": "Set a cache lifetime to 0 to disable it.",
   "settings.runtime.group.cache": "Cache",
