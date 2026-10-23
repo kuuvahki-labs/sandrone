@@ -5,8 +5,15 @@ package service_test
 import (
 	"bytes"
 	"encoding/json/v2"
+	"net"
+	"net/netip"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 
+	mihomoinbound "github.com/metacubex/mihomo/adapter/inbound"
 	mihomoconfig "github.com/metacubex/mihomo/config"
 	// Mihomo config.Parse links its runtime general updater from this package.
 	_ "github.com/metacubex/mihomo/hub/executor"
@@ -16,6 +23,71 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 	"github.com/kuuvahki-labs/sandrone/internal/service"
 )
+
+func TestServiceMihomoWebBaseAllowsLocalProxyClientsByLockedCore(t *testing.T) {
+	_, testFile, _, ok := runtime.Caller(0)
+	require.True(t, ok)
+	basePath := filepath.Join(filepath.Dir(testFile), "..", "..", "web", "app", "features", "files", "drivers", "mihomo", "base.ts")
+	asset, err := os.ReadFile(basePath)
+	require.NoError(t, err)
+	_, template, found := strings.Cut(string(asset), "const MIHOMO_BASE = `")
+	require.True(t, found, "read the actual Web default base template")
+	base, _, found := strings.Cut(template, "`;")
+	require.True(t, found, "read the complete Web default base template")
+
+	spec := domain.FileSpec{
+		Name:   "local-proxy.yaml",
+		Kind:   domain.FileKindMihomo,
+		Source: domain.FileSource{Type: "inline", Content: base},
+		Config: &domain.FileConfig{Settings: completeTypedSettings(t, map[string]any{
+			"rule_sets": []map[string]any{
+				{
+					"name": "cn", "type": "inline", "behavior": "domain",
+					"payload": []any{"DOMAIN-SUFFIX,cn"},
+				},
+			},
+			"rules": []string{"MATCH,DIRECT"},
+		})},
+	}
+	result, err := service.New().GetFile(t.Context(), domain.FileRequest{Spec: &spec})
+	require.NoError(t, err)
+	parsed, err := mihomoconfig.Parse(result.Content)
+	require.NoError(t, err)
+	for _, proxy := range parsed.Proxies {
+		proxy := proxy
+		t.Cleanup(func() { require.NoError(t, proxy.Close()) })
+	}
+
+	allowed := mihomoinbound.AllowedIPs()
+	disallowed := mihomoinbound.DisAllowedIPs()
+	t.Cleanup(func() {
+		mihomoinbound.SetAllowedIPs(allowed)
+		mihomoinbound.SetDisAllowedIPs(disallowed)
+	})
+	mihomoinbound.SetAllowedIPs(parsed.General.LanAllowedIPs)
+	mihomoinbound.SetDisAllowedIPs(parsed.General.LanDisAllowedIPs)
+
+	for _, test := range []struct {
+		address string
+		allowed bool
+	}{
+		{address: "127.0.0.1", allowed: true},
+		{address: "127.0.0.2", allowed: true},
+		{address: "::1", allowed: true},
+		{address: "10.1.2.3", allowed: true},
+		{address: "172.16.1.2", allowed: true},
+		{address: "192.168.1.2", allowed: true},
+		{address: "fd00::1", allowed: true},
+		{address: "203.0.113.1", allowed: false},
+		{address: "2001:db8::1", allowed: false},
+	} {
+		t.Run(test.address, func(t *testing.T) {
+			remote := net.TCPAddrFromAddrPort(netip.AddrPortFrom(netip.MustParseAddr(test.address), 54321))
+			// Despite its name, true means accepted by the default mixed listener.
+			require.Equal(t, test.allowed, mihomoinbound.IsRemoteAddrDisAllowed(remote))
+		})
+	}
+}
 
 func TestServiceMihomoWebDNSIsAcceptedByLockedCore(t *testing.T) {
 	spec := domain.FileSpec{

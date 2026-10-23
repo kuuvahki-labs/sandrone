@@ -28,7 +28,9 @@ describe("file driver default bases", () => {
       "geo-update-interval": 24,
       "allow-lan": true,
       "bind-address": "*",
-      "lan-allowed-ips": ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fc00::/7"],
+      "lan-allowed-ips": [
+        "127.0.0.0/8", "::1/128", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fc00::/7",
+      ],
       mode: "rule",
       "log-level": "info",
       ipv6: false,
@@ -356,6 +358,7 @@ function driverBase(kind: string, locale: "en-US" | "zh-CN" = "en-US"): string {
 function mihomoDefaultCapabilities(base: Record<string, unknown>) {
   const dns = asRecord(base.dns);
   const tun = asRecord(base.tun);
+  const allowedIPs = stringList(base["lan-allowed-ips"]);
   return {
     cacheFakeIP: asRecord(base.profile)["store-fake-ip"] === true,
     controlAPI: base["external-controller"] === "127.0.0.1:9090",
@@ -363,7 +366,7 @@ function mihomoDefaultCapabilities(base: Record<string, unknown>) {
     fakeIPv4: dns["enhanced-mode"] === "fake-ip",
     ipv4OnlyByDefault: base.ipv6 === false && dns.ipv6 === false,
     lanMixedProxy: base["allow-lan"] === true
-      && stringList(base["lan-allowed-ips"]).slice(0, 3).join(",") === "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16",
+      && ["127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"].every((prefix) => allowedIPs.includes(prefix)),
     localDNS: stringList(dns["fake-ip-filter"]).includes("geosite:private"),
     modeRules: base.mode === "rule",
     tun: tun.enable === true,
