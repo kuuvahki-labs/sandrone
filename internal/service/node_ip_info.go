@@ -14,6 +14,9 @@ import (
 
 const ipLookupTimeout = 5 * time.Second
 
+// Fake-IP addresses can be used for fetching, but have no public attribution.
+var nodeFakeIPPrefix = netip.MustParsePrefix("198.18.0.0/15")
+
 func (s *Service) InspectNode(ctx context.Context, req domain.NodeInspectRequest) (*domain.NodeInspectResult, error) {
 	if len(req.Include) == 0 {
 		return nil, domain.NewError(domain.CodeInvalidArgument, "include must contain at least one node information field")
@@ -78,7 +81,7 @@ func (s *Service) lookupNodeIPInfo(ctx context.Context, rawServer string) (*doma
 		Server:    server,
 		IP:        parsed.String(),
 		IPVersion: ipVersion(parsed),
-		Public:    fetcher.IsPublicAddress(parsed),
+		Public:    fetcher.IsPublicAddress(parsed) && !nodeFakeIPPrefix.Contains(parsed),
 	}
 	if !result.Public {
 		return result, nil

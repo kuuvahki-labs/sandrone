@@ -284,7 +284,7 @@ var nonPublicPrefixes = []netip.Prefix{
 	netip.MustParsePrefix("192.0.2.0/24"),
 	netip.MustParsePrefix("192.88.99.0/24"),
 	netip.MustParsePrefix("192.168.0.0/16"),
-	netip.MustParsePrefix("198.18.0.0/15"),
+	// netip.MustParsePrefix("198.18.0.0/15"),
 	netip.MustParsePrefix("198.51.100.0/24"),
 	netip.MustParsePrefix("203.0.113.0/24"),
 	netip.MustParsePrefix("224.0.0.0/4"),
@@ -303,8 +303,9 @@ var nonPublicPrefixes = []netip.Prefix{
 }
 
 // IsPublicAddress reports whether ip may be sent to an external network
-// service. It rejects private, reserved, documentation, transition, and
-// Mihomo fake-IP ranges in addition to non-global-unicast addresses.
+// service. It rejects private, reserved, documentation, and transition ranges
+// in addition to non-global-unicast addresses, but allows 198.18.0.0/15
+// for fake-IP routing.
 func IsPublicAddress(ip netip.Addr) bool {
 	if !ip.IsValid() || !ip.IsGlobalUnicast() {
 		return false

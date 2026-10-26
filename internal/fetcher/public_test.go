@@ -23,7 +23,6 @@ func TestFetchPublicRejectsNonPublicIPAddresses(t *testing.T) {
 		"169.254.1.1",
 		"172.16.0.1",
 		"192.168.0.1",
-		"198.18.0.1",
 		"192.88.99.1",
 		"[::1]",
 		"[64:ff9b::7f00:1]",
@@ -37,6 +36,44 @@ func TestFetchPublicRejectsNonPublicIPAddresses(t *testing.T) {
 			require.Error(t, err)
 			require.Contains(t, err.Error(), "public")
 		})
+	}
+}
+
+func TestFetchPublicAllowsFakeIPAddresses(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("remote-body"))
+	}))
+	defer server.Close()
+
+	for _, ip := range []string{"198.18.0.0", "198.18.0.1", "198.19.0.1", "198.19.255.255"} {
+		for _, viaDNS := range []bool{false, true} {
+			host := ip
+			if viaDNS {
+				host = "subscription.example"
+			}
+			t.Run(ip+"/"+host, func(t *testing.T) {
+				resolver := &stubResolver{addresses: []net.IPAddr{{IP: net.ParseIP(ip)}}}
+				var dialAddress string
+				f := New(
+					WithResolver(resolver),
+					WithDialContext(func(ctx context.Context, network, address string) (net.Conn, error) {
+						dialAddress = address
+						return (&net.Dialer{}).DialContext(ctx, network, server.Listener.Addr().String())
+					}),
+				)
+
+				result, err := f.FetchPublic(t.Context(), Request{URL: "http://" + host + "/sub"})
+
+				require.NoError(t, err)
+				require.Equal(t, []byte("remote-body"), result.Body)
+				require.Equal(t, net.JoinHostPort(ip, "80"), dialAddress)
+				if viaDNS {
+					require.Equal(t, 1, resolver.calls)
+				} else {
+					require.Zero(t, resolver.calls)
+				}
+			})
+		}
 	}
 }
 

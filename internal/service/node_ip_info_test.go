@@ -91,6 +91,9 @@ func TestLookupNodeIPInfoNormalizesLiteralsAndProtectsNonPublicAddresses(t *test
 		{server: "2606:4700:4700::1111", wantIP: "2606:4700:4700::1111", version: 6, public: true, callDelta: 1},
 		{server: "192.168.1.2", wantIP: "192.168.1.2", version: 4, public: false},
 		{server: "198.18.0.1", wantIP: "198.18.0.1", version: 4, public: false},
+		{server: "198.18.0.0", wantIP: "198.18.0.0", version: 4, public: false},
+		{server: "198.19.255.255", wantIP: "198.19.255.255", version: 4, public: false},
+		{server: "::ffff:198.18.0.1", wantIP: "198.18.0.1", version: 4, public: false},
 		{server: "203.0.113.10", wantIP: "203.0.113.10", version: 4, public: false},
 	}
 	wantCalls := 0
