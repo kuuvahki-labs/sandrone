@@ -1,4 +1,4 @@
-import { useDeferredValue, useId, useMemo, useState } from "react";
+import { type ReactNode, useDeferredValue, useId, useMemo, useState } from "react";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
@@ -221,15 +221,12 @@ function PreviewNodeCard({
           onClick={() => setExpanded((value) => !value)}
         >
           <CardContent className="min-w-0 [&:last-child]:pb-4">
-            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto] items-start gap-3">
-              <div className="min-w-0">
-                <PreviewNodeSummary diff={diff} />
-              </div>
+            <PreviewNodeSummary diff={diff}>
               {probeSummary ? <PreviewProbeSummary summary={probeSummary} /> : null}
               <span aria-hidden className="flex size-8 items-center justify-center">
                 {expanded ? <KeyboardArrowUpIcon fontSize="small" /> : <KeyboardArrowDownIcon fontSize="small" />}
               </span>
-            </div>
+            </PreviewNodeSummary>
           </CardContent>
         </CardActionArea>
         <Collapse id={detailsId} in={expanded} timeout="auto" unmountOnExit>
@@ -359,7 +356,7 @@ function formatPreviewCheckedAt(value: string, locale: string): string {
   return formatter.format(timestamp);
 }
 
-function PreviewNodeSummary({ diff }: { diff: SubscriptionPreviewNodeDiff }) {
+function PreviewNodeSummary({ diff, children }: { diff: SubscriptionPreviewNodeDiff; children: ReactNode }) {
   const { t } = useI18n();
   const node = previewNodeForSummary(diff);
   const changes = diff.status === "modified" ? nodeFieldChanges(diff) : [];
@@ -368,7 +365,17 @@ function PreviewNodeSummary({ diff }: { diff: SubscriptionPreviewNodeDiff }) {
 
   return (
     <div className="grid min-w-0 grid-cols-1 gap-2">
-      <NodeSummaryItem node={node} />
+      <div className="grid min-w-0 grid-cols-1 gap-1">
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto] items-start gap-3">
+          <Typography className="min-w-0 break-words font-medium [overflow-wrap:anywhere]" component="p" variant="subtitle1">
+            {node?.name || t("subscriptions.preview.unnamedNode")}
+          </Typography>
+          {children}
+        </div>
+        <Typography className="break-words [overflow-wrap:anywhere]" color="text.secondary" variant="body2">
+          {node?.type ?? "-"} · {node?.endpoint ?? "-"}
+        </Typography>
+      </div>
       {visibleChanges.length ? (
         <div aria-label={t("subscriptions.preview.nodeChangeSummary")} className="grid min-w-0 gap-1">
           {visibleChanges.map((change) => (
@@ -388,20 +395,6 @@ function PreviewNodeSummary({ diff }: { diff: SubscriptionPreviewNodeDiff }) {
           ) : null}
         </div>
       ) : null}
-    </div>
-  );
-}
-
-function NodeSummaryItem({ node }: { node?: SubscriptionPreviewNode }) {
-  const { t } = useI18n();
-  return (
-    <div className="grid min-w-0 grid-cols-1 gap-1">
-      <Typography className="break-words font-medium [overflow-wrap:anywhere]" component="p" variant="subtitle1">
-        {node?.name || t("subscriptions.preview.unnamedNode")}
-      </Typography>
-      <Typography className="break-words [overflow-wrap:anywhere]" color="text.secondary" variant="body2">
-        {node?.type ?? "-"} · {node?.endpoint ?? "-"}
-      </Typography>
     </div>
   );
 }
