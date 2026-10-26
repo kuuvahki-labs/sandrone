@@ -39,7 +39,7 @@ func runURLTest(ctx context.Context, target urlTestTarget, options urlTestOption
 	if err != nil {
 		return 0, err
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	if options.resetStartAfterDial != nil && options.resetStartAfterDial(conn) {
 		start = now()
 	}
@@ -73,7 +73,7 @@ func runURLTest(ctx context.Context, target urlTestTarget, options urlTestOption
 	if err != nil {
 		return 0, err
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	duration := now().Sub(start)
 	if !options.expectedStatus.Match(response.StatusCode) {
 		return duration, fmt.Errorf(

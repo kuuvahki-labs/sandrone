@@ -60,16 +60,16 @@ func TestSourceRefForTargetSchema(t *testing.T) {
 	mihomo := shared.SourceRefFor("mihomo-proxies", domain.NodeTypeShadowsocks)
 	require.Equal(t, "mihomo shadowsocks outbound schema", mihomo.Name)
 	require.Equal(t, "adapter/outbound/shadowsocks.go", mihomo.Path)
-	require.Equal(t, "41-53", mihomo.Lines)
+	require.Equal(t, "43-56", mihomo.Lines)
 	shadowrocketSubscription := shared.SourceRefFor("shadowrocket-proxies", domain.NodeTypeShadowsocks)
 	require.Equal(t, mihomo, shadowrocketSubscription)
 
 	singBox := shared.SourceRefFor("sing-box-outbounds", domain.NodeTypeWireGuard)
 	require.Equal(t, "sing-box wireguard endpoint schema", singBox.Name)
 	require.Equal(t, "option/wireguard.go", singBox.Path)
-	require.Equal(t, "9-29", singBox.Lines)
-	require.Equal(t, "github.com/sagernet/sing-box@v1.14.0", singBox.Repo)
-	require.Equal(t, "v1.14.0", singBox.Revision)
+	require.Equal(t, "9-33", singBox.Lines)
+	require.Equal(t, "github.com/sagernet/sing-box@v1.14.4", singBox.Repo)
+	require.Equal(t, "v1.14.4", singBox.Revision)
 
 	uri := shared.SourceRefFor("uri-list", domain.NodeTypeTrojan)
 	require.Equal(t, "trojan", uri.Name)
@@ -78,28 +78,28 @@ func TestSourceRefForTargetSchema(t *testing.T) {
 	mieru := shared.SourceRefFor("mihomo-proxies", domain.NodeTypeMieru)
 	require.Equal(t, "mihomo mieru outbound schema", mieru.Name)
 	require.Equal(t, "adapter/outbound/mieru.go", mieru.Path)
-	require.Equal(t, "30-42", mieru.Lines)
+	require.Equal(t, "30-43", mieru.Lines)
 
 	mihomoHysteria2 := shared.SourceRefFor("mihomo-proxies", domain.NodeTypeHysteria2)
-	require.Equal(t, "github.com/metacubex/mihomo@v1.19.30", mihomoHysteria2.Repo)
-	require.Equal(t, "v1.19.30", mihomoHysteria2.Revision)
+	require.Equal(t, "github.com/metacubex/mihomo@v1.19.33", mihomoHysteria2.Repo)
+	require.Equal(t, "v1.19.33", mihomoHysteria2.Revision)
 	require.Equal(t, "adapter/outbound/hysteria2.go", mihomoHysteria2.Path)
 	require.Equal(t, "39-90", mihomoHysteria2.Lines)
 	require.Contains(t, mihomoHysteria2.Note, "Realm")
 
 	singBoxHysteria2 := shared.SourceRefFor("sing-box-outbounds", domain.NodeTypeHysteria2)
-	require.Equal(t, "github.com/sagernet/sing-box@v1.14.0", singBoxHysteria2.Repo)
-	require.Equal(t, "v1.14.0", singBoxHysteria2.Revision)
+	require.Equal(t, "github.com/sagernet/sing-box@v1.14.4", singBoxHysteria2.Repo)
+	require.Equal(t, "v1.14.4", singBoxHysteria2.Revision)
 	require.Equal(t, "option/hysteria2.go", singBoxHysteria2.Path)
-	require.Equal(t, "22-83, 202-219", singBoxHysteria2.Lines)
+	require.Equal(t, "32-68, 207-224", singBoxHysteria2.Lines)
 	require.Contains(t, singBoxHysteria2.Note, "Realm")
 
 	singBoxRefs := shared.SourceRefs("sing-box")
 	require.Contains(t, singBoxRefs, domain.SourceRef{
 		Kind:     "implementation",
 		Name:     "sing-box Hysteria2 QUIC schema",
-		Repo:     "github.com/sagernet/sing-box@v1.14.0",
-		Revision: "v1.14.0",
+		Repo:     "github.com/sagernet/sing-box@v1.14.4",
+		Revision: "v1.14.4",
 		Path:     "option/http.go",
 		Lines:    "14-26",
 		Note:     "JSON tags for Hysteria2 HTTP/2 and QUIC tuning fields",

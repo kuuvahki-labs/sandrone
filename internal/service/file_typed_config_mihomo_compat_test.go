@@ -15,8 +15,7 @@ import (
 
 	mihomoinbound "github.com/metacubex/mihomo/adapter/inbound"
 	mihomoconfig "github.com/metacubex/mihomo/config"
-	// Mihomo config.Parse links its runtime general updater from this package.
-	_ "github.com/metacubex/mihomo/hub/executor"
+	_ "github.com/metacubex/mihomo/hub/executor" // Links config.Parse's runtime general updater.
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 

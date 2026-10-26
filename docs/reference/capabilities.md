@@ -60,8 +60,8 @@ processor 按[处理器契约](processors.md#probe)降级为 warning 并继续�
 | `reversible` | 是否声明可逆 |
 
 字段项还带 `protocol`、`ir_field`、`status`、`source_ref`，必要时有
-`notes`。Mihomo 字段依据固定到 v1.19.30，sing-box 字段依据固定到
-v1.14.0；Shadowrocket 字段引用固定的上游 revision。调用方需要精确、可审计
+`notes`。Mihomo 字段依据固定到 v1.19.33，sing-box 字段依据固定到
+v1.14.4；Shadowrocket 字段引用固定的上游 revision。调用方需要精确、可审计
 的字段清单时，应读取对应的单条详情，而不是根据目标名称猜测。
 
 ## 输入格式

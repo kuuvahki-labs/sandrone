@@ -151,7 +151,7 @@ Shadowrocket 共存会把 Tailnet 流量旁路到物理网络，不支持同机�
 标准 `100.64.0.0/10` 与 `fd7a:115c:a1e0::/48` 不代表用户发布的 subnet routes；
 额外子网、Exit Node 或其他高级选项可按目标客户端语义编辑示例脚本。
 
-sing-box 的固定目标 v1.14.0 在 route 与 DNS rule 都使用 `preferred_by` 匹配
+sing-box 的固定目标 v1.14.4 在 route 与 DNS rule 都使用 `preferred_by` 匹配
 endpoint 提供的 MagicDNS 域名和 allowed IP。MagicDNS server 明确关闭
 `accept_default_resolvers`，因此普通查询不会把 Tailscale resolver 当作全局
 fallback。原生示例把 MagicDNS 规则放在 FakeIP 规则之前；共存预设将 `ts.net`、

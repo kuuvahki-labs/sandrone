@@ -81,7 +81,7 @@ func renderHysteria(node domain.NodeIR) (map[string]any, bool, map[string]bool, 
 	applyTLS(out, node)
 	warnings := []domain.Warning{}
 	if hy.QUIC != nil && !hy.QUIC.IsZero() {
-		warnings = append(warnings, lossyWarning(node, "hysteria.quic", "sing-box v1.14.0 hysteria outbound schema has no QUIC tuning fields represented by NodeIR"))
+		warnings = append(warnings, lossyWarning(node, "hysteria.quic", "this adapter does not map Hysteria v1 QUIC tuning fields to sing-box"))
 	}
 	return out, false, nil, warnings, nil
 }

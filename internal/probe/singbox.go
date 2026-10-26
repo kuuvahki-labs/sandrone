@@ -85,7 +85,7 @@ func (b *SingBoxBackend) Probe(ctx context.Context, backendReq BackendRequest, n
 	if err != nil {
 		return nil, domain.WrapError(domain.CodeProbeCoreStartFailed, "create sing-box instance", err)
 	}
-	defer instance.Close()
+	defer func() { _ = instance.Close() }()
 	if err := instance.Start(); err != nil {
 		return nil, domain.WrapError(domain.CodeProbeCoreStartFailed, "start sing-box instance", err)
 	}
@@ -205,7 +205,7 @@ func (b *SingBoxNTPBackend) Probe(ctx context.Context, backendReq BackendRequest
 	if err != nil {
 		return nil, domain.WrapError(domain.CodeProbeCoreStartFailed, "create sing-box instance", err)
 	}
-	defer instance.Close()
+	defer func() { _ = instance.Close() }()
 	if err := instance.Start(); err != nil {
 		return nil, domain.WrapError(domain.CodeProbeCoreStartFailed, "start sing-box instance", err)
 	}
@@ -278,7 +278,7 @@ func (b *SingBoxNTPBackend) ntpRoundTrip(ctx context.Context, outbound interface
 	if err != nil {
 		return 0, err
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	if deadline, ok := ctx.Deadline(); ok {
 		_ = conn.SetDeadline(deadline)
 	}
