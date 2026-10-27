@@ -1,6 +1,7 @@
 package service
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -29,6 +30,33 @@ func TestNormalizeNodesMatchesUpstreamVMessAndVLESSMapping(t *testing.T) {
 	require.Equal(t, "33333333-3333-3333-3333-333333333333", normalized[5].UUID)
 	require.Equal(t, "123456", nodes[0].UUID)
 	require.Equal(t, "33333333333333333333333333333333", nodes[5].UUID)
+}
+
+func TestNormalizeNodesCanonicalizesOnlyKnownVMessCiphers(t *testing.T) {
+	t.Parallel()
+	for _, cipher := range []string{"auto", "none", "zero", "aes-128-cfb", "aes-128-gcm", "chacha20-poly1305"} {
+		t.Run(cipher, func(t *testing.T) {
+			t.Parallel()
+			nodes := []domain.NodeIR{{Type: domain.NodeTypeVMess, Cipher: strings.ToUpper(cipher)}}
+			normalized := normalizeNodes(nodes)
+			require.Equal(t, cipher, normalized[0].Cipher)
+			require.Equal(t, strings.ToUpper(cipher), nodes[0].Cipher)
+		})
+	}
+	for _, cipher := range []string{"", "NULL", "CHACHA20-IETF-POLY1305", "AES-256-GCM", " auto ", "PRIVATE-CIPHER"} {
+		t.Run("unchanged_"+cipher, func(t *testing.T) {
+			t.Parallel()
+			nodes := []domain.NodeIR{{Type: domain.NodeTypeVMess, Cipher: cipher}}
+			require.Equal(t, nodes, normalizeNodes(nodes))
+		})
+	}
+	for _, nodeType := range []domain.NodeType{domain.NodeTypeShadowsocks, domain.NodeTypeShadowsocksR, domain.NodeTypeVLESS} {
+		t.Run(string(nodeType), func(t *testing.T) {
+			t.Parallel()
+			nodes := []domain.NodeIR{{Type: nodeType, Cipher: "AES-128-GCM"}}
+			require.Equal(t, nodes, normalizeNodes(nodes))
+		})
+	}
 }
 
 func TestNormalizeNodesDefaultsRealityClientFingerprintsWithoutMutatingInput(t *testing.T) {

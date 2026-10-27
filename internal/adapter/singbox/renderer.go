@@ -2,6 +2,7 @@ package singbox
 
 import (
 	"context"
+	"encoding/pem"
 	"fmt"
 	"strings"
 
@@ -67,6 +68,13 @@ func nodeToSingBox(node domain.NodeIR) (map[string]any, bool, map[string]bool, [
 	if field := singBoxUnsupportedECHDNSField(node); field != "" {
 		return nil, false, nil, nil, domain.NewError(domain.CodeRenderFailed, field+" requires a custom ECH DNS transport that sing-box cannot express")
 	}
+	var err error
+	node, err = shared.WithRenderedECHConfig(node, func(data []byte) string {
+		return string(pem.EncodeToMemory(&pem.Block{Type: "ECH CONFIGS", Bytes: data}))
+	})
+	if err != nil {
+		return nil, false, nil, nil, err
+	}
 	if node.Network != "" && node.Network != "tcp" && node.Network != "udp" {
 		return nil, false, nil, nil, domain.NewError(domain.CodeRenderFailed, "network must be tcp or udp")
 	}
@@ -99,12 +107,12 @@ func nodeToSingBox(node domain.NodeIR) (map[string]any, bool, map[string]bool, [
 }
 
 func singBoxUnsupportedECHDNSField(node domain.NodeIR) string {
-	if node.TLS != nil && node.TLS.ECH != nil && node.TLS.ECH.DNS != "" {
+	if node.TLS != nil && node.TLS.ECH != nil && node.TLS.ECH.Enabled && node.TLS.ECH.DNS != "" {
 		return "tls.ech.dns"
 	}
 	if node.Transport != nil && node.Transport.XHTTP != nil && node.Transport.XHTTP.DownloadSettings != nil {
 		tls := node.Transport.XHTTP.DownloadSettings.TLS
-		if tls != nil && tls.ECH != nil && tls.ECH.DNS != "" {
+		if tls != nil && tls.ECH != nil && tls.ECH.Enabled && tls.ECH.DNS != "" {
 			return "transport.xhttp.download_settings.tls.ech.dns"
 		}
 	}
@@ -114,6 +122,20 @@ func singBoxUnsupportedECHDNSField(node domain.NodeIR) string {
 func renderSS(node domain.NodeIR) (map[string]any, bool, map[string]bool, []domain.Warning, error) {
 	if node.Server == "" || node.Port == 0 || node.Cipher == "" || node.Password == "" {
 		return nil, false, nil, nil, domain.NewError(domain.CodeRenderFailed, "missing ss fields")
+	}
+	// Match the locked sing-box outbound's sing-shadowsocks2 method registry.
+	// Legacy chacha20 has a different nonce format from chacha20-ietf; do not
+	// rename it or reject it globally, since other targets support that method.
+	switch node.Cipher {
+	case "none",
+		"aes-128-ctr", "aes-192-ctr", "aes-256-ctr",
+		"aes-128-cfb", "aes-192-cfb", "aes-256-cfb",
+		"rc4-md5", "chacha20-ietf", "xchacha20",
+		"aes-128-gcm", "aes-192-gcm", "aes-256-gcm",
+		"chacha20-ietf-poly1305", "xchacha20-ietf-poly1305",
+		"2022-blake3-aes-128-gcm", "2022-blake3-aes-256-gcm", "2022-blake3-chacha20-poly1305":
+	default:
+		return nil, false, nil, nil, domain.NewError(domain.CodeRenderFailed, fmt.Sprintf("unsupported sing-box shadowsocks cipher %q", node.Cipher))
 	}
 	out := baseOutbound(node, "shadowsocks")
 	out["method"] = node.Cipher
@@ -237,6 +259,15 @@ func renderAnyTLS(node domain.NodeIR) (map[string]any, bool, map[string]bool, []
 func renderTUIC(node domain.NodeIR) (map[string]any, bool, map[string]bool, []domain.Warning, error) {
 	if node.Server == "" || node.Port == 0 || node.TLS == nil || !node.TLS.Enabled {
 		return nil, false, nil, nil, domain.NewError(domain.CodeRenderFailed, "missing tuic fields")
+	}
+	if node.TUIC != nil {
+		// sing-quic validates these exact names when constructing its client.
+		// Keep this target-specific: Mihomo also implements bbr_meta_v1/v2.
+		switch node.TUIC.CongestionControl {
+		case "", "cubic", "new_reno", "bbr":
+		default:
+			return nil, false, nil, nil, domain.NewError(domain.CodeRenderFailed, "unsupported sing-box TUIC congestion control algorithm")
+		}
 	}
 	out := baseOutbound(node, "tuic")
 	if node.UUID != "" {

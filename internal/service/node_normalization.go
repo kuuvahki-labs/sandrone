@@ -4,6 +4,7 @@ import (
 	"crypto/sha1" //nolint:gosec // UUIDv5 is defined in terms of SHA-1; this is not used for security.
 	"fmt"
 	"strings"
+	"unicode/utf8"
 	"uuid"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
@@ -14,11 +15,26 @@ const defaultRealityClientFingerprint = "chrome"
 func normalizeNodes(nodes []domain.NodeIR) []domain.NodeIR {
 	out := append([]domain.NodeIR{}, nodes...)
 	for index := range out {
+		out[index].Name = strings.ToValidUTF8(out[index].Name, "\uFFFD")
+		out[index].Warnings = domain.WarningsWithValidUTF8(out[index].Warnings)
 		normalizeNodeUUID(&out[index])
+		normalizeNodeVMessCipher(&out[index])
 		normalizeNodeVLESSFlow(&out[index])
 		normalizeNodeRealityClientFingerprints(&out[index])
 	}
 	return out
+}
+
+func normalizeNodeVMessCipher(node *domain.NodeIR) {
+	if node == nil || node.Type != domain.NodeTypeVMess {
+		return
+	}
+	// Mihomo accepts case-insensitive cipher names. Keep unknown values intact
+	// for semantic validation instead of guessing a replacement algorithm.
+	switch cipher := strings.ToLower(node.Cipher); cipher {
+	case "auto", "none", "zero", "aes-128-cfb", "aes-128-gcm", "chacha20-poly1305":
+		node.Cipher = cipher
+	}
 }
 
 func normalizeNodeVLESSFlow(node *domain.NodeIR) {
@@ -31,7 +47,7 @@ func normalizeNodeVLESSFlow(node *domain.NodeIR) {
 }
 
 func normalizeNodeUUID(node *domain.NodeIR) {
-	if node == nil || strings.TrimSpace(node.UUID) == "" {
+	if node == nil || strings.TrimSpace(node.UUID) == "" || !utf8.ValidString(node.UUID) {
 		return
 	}
 	parsed, err := uuid.Parse(node.UUID)
@@ -92,15 +108,20 @@ func normalizeParsedNodes(parsed *parseInputResult) {
 	if parsed == nil {
 		return
 	}
+	if parsed.Source != nil {
+		parsed.Source.Warnings = domain.WarningsWithValidUTF8(parsed.Source.Warnings)
+	}
 	for index := range parsed.Nodes {
 		node := &parsed.Nodes[index]
+		node.Name = strings.ToValidUTF8(node.Name, "\uFFFD")
+		node.Warnings = domain.WarningsWithValidUTF8(node.Warnings)
 		normalizeNodeVLESSFlow(node)
 		if node.Type != domain.NodeTypeVLESS ||
 			!strings.EqualFold(strings.TrimSpace(node.Flow), domain.VLESSFlowVision) ||
 			vlessVisionTransportCompatible(node.Transport) {
 			continue
 		}
-		transportType := strings.TrimSpace(node.Transport.Type)
+		transportType := strings.ToValidUTF8(strings.TrimSpace(node.Transport.Type), "\uFFFD")
 		node.Flow = ""
 		nodeIndex := index
 		node.Warnings = append(node.Warnings, domain.Warning{

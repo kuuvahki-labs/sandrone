@@ -52,7 +52,12 @@ func TestBatchConvertThroughProxyWithExitPipeline(t *testing.T) {
 	require.NoError(t, err)
 	portValue, err := strconv.Atoi(port)
 	require.NoError(t, err)
-	nodes := []map[string]any{{"name": "original", "type": "http", "server": host, "port": portValue}}
+	nodes := []map[string]any{
+		{"name": "original", "type": "http", "server": host, "port": portValue},
+		{"name": "invalid-vmess", "type": "vmess", "server": "proxy.example", "port": 443, "uuid": "11111111-1111-4111-8111-111111111111", "cipher": "null"},
+		{"name": "unsupported-plugin", "type": "ss", "server": "proxy.example", "port": 443, "cipher": "aes-128-gcm", "password": "fixture-password", "plugin": "gost-plugin"},
+		{"name": "invalid-core-key", "type": "ss", "server": "proxy.example", "port": 443, "cipher": "2022-blake3-aes-128-gcm", "password": "not-a-base64-key"},
+	}
 	nodeBody, err := json.Marshal(nodes)
 	require.NoError(t, err)
 	source := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(nodeBody) }))
@@ -81,16 +86,28 @@ func TestBatchConvertThroughProxyWithExitPipeline(t *testing.T) {
 	require.NoError(t, err)
 	var result []sandrone.NodeIR
 	require.NoError(t, json.Unmarshal(body, &result))
-	require.Len(t, result, 1)
+	require.Len(t, result, 3, "exit-info annotates failures without removing nodes")
+	require.Equal(t, "original", result[0].Name)
+	require.Equal(t, "true", result[0].Meta["exit.valid"])
 	require.Equal(t, "US", result[0].Meta["exit.country"])
 	require.Equal(t, "8.8.8.8", result[0].Meta["exit.ip"])
-	require.NotEqual(t, "original", result[0].Name)
+	require.Equal(t, "unsupported-plugin", result[1].Name)
+	require.Equal(t, "false", result[1].Meta["exit.valid"])
+	require.Equal(t, "invalid-core-key", result[2].Name)
+	require.Equal(t, "false", result[2].Meta["exit.valid"])
 	require.EqualValues(t, 1, requests.Load(), "cross-source deduplication must precede the single GET")
 	body, err = os.ReadFile(reportPath)
 	require.NoError(t, err)
 	var report sandrone.Report
 	require.NoError(t, json.Unmarshal(body, &report))
 	require.Len(t, report.SourceResults, 2)
-	require.Equal(t, 1, report.SourceResults[0].NodeCount)
-	require.Equal(t, 1, report.SourceResults[1].NodeCount)
+	require.Equal(t, 4, report.SourceResults[0].NodeCount)
+	require.Equal(t, 4, report.SourceResults[1].NodeCount)
+	var dropped int
+	for _, warning := range report.Warnings {
+		if warning.Code == "node_validation_dropped" && warning.Field == "cipher" {
+			dropped++
+		}
+	}
+	require.Equal(t, 2, dropped, "invalid VMess nodes must be removed before starting the HTTP core")
 }

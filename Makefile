@@ -2,7 +2,7 @@
 
 GO ?= go
 GOFMT ?= $(shell $(GO) env GOROOT)/bin/gofmt
-GOFLAGS ?= -mod=readonly -tags probe_singbox,with_quic,with_wireguard,with_utls
+GOFLAGS ?= -mod=readonly -tags=probe_singbox,with_quic,with_wireguard,with_utls,with_gvisor
 PKGS ?= ./...
 CMD_PKG ?= ./cmd/sandrone
 BIN ?= sandrone

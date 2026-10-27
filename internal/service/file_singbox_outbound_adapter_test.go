@@ -154,8 +154,8 @@ func TestServiceSingBoxOutboundAdapterUsesRenderedOutboundsAndEndpoints(t *testi
 		}
 		return false
 	}, "unsupported node must be skipped by the renderer, not by parsing")
-	// Constructing a WireGuard device requires with_gvisor, which is not part
-	// of the default test tags. Validate its core schema without creating one.
+	// Check the generated file schema here; script_http_wireguard_test.go
+	// covers WireGuard runtime initialization in the default build.
 	var options option.Options
 	require.NoError(t, options.UnmarshalJSONContext(include.Context(t.Context()), result.Content))
 }

@@ -91,6 +91,67 @@ func TestValidateRejectsProtocolSpecificRequiredFields(t *testing.T) {
 	}
 }
 
+func TestValidateWireGuardPeerAllowedIPs(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name     string
+		prefixes []string
+		valid    bool
+	}{
+		{name: "missing"},
+		{name: "bare address", prefixes: []string{"192.0.2.1"}},
+		{name: "invalid mask", prefixes: []string{"0.0.0.0/33"}},
+		{name: "default routes", prefixes: []string{"0.0.0.0/0", "::/0"}, valid: true},
+		{name: "restricted route", prefixes: []string{"192.0.2.0/24"}, valid: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			node := domain.NodeIR{Name: "wg", Type: domain.NodeTypeWireGuard, Server: "proxy.example", Port: 51820,
+				WireGuard: &domain.WireGuardOptions{PrivateKey: "private", Address: []string{"10.0.0.2/32"},
+					Peers: []domain.WireGuardPeer{{PublicKey: "public", AllowedIPs: tc.prefixes}},
+				},
+			}
+			result := nodevalidation.Validate([]domain.NodeIR{node}, nodevalidation.StageNormalized, "")
+			require.Equal(t, tc.valid, result.Counts.Valid == 1)
+			if !tc.valid {
+				require.Len(t, result.Issues, 1)
+				require.Equal(t, "wireguard.peers.allowed_ips", result.Issues[0].Field)
+			}
+		})
+	}
+}
+
+func TestValidateVMessCipher(t *testing.T) {
+	t.Parallel()
+	base := domain.NodeIR{
+		Name: "vmess", Type: domain.NodeTypeVMess, Server: "example.com", Port: 443,
+		UUID: "11111111-1111-1111-1111-111111111111",
+	}
+	for _, cipher := range []string{"", "auto", "none", "zero", "aes-128-cfb", "aes-128-gcm", "chacha20-poly1305"} {
+		t.Run("valid_"+cipher, func(t *testing.T) {
+			t.Parallel()
+			node := base
+			node.Cipher = cipher
+			result := nodevalidation.Validate([]domain.NodeIR{node}, nodevalidation.StageNormalized, "")
+			require.Equal(t, []domain.NodeIR{node}, result.Nodes)
+			require.Empty(t, result.Issues)
+		})
+	}
+	for _, cipher := range []string{"null", "NULL", "chacha20-ietf-poly1305", "aes-256-gcm", "AUTO", " auto ", "private-cipher-secret"} {
+		t.Run("invalid_"+cipher, func(t *testing.T) {
+			t.Parallel()
+			node := base
+			node.Cipher = cipher
+			result := nodevalidation.Validate([]domain.NodeIR{node}, nodevalidation.StageNormalized, "")
+			require.Empty(t, result.Nodes)
+			require.Equal(t, 1, result.Counts.Invalid)
+			require.Len(t, result.Issues, 1)
+			require.Equal(t, "node_validation_invalid", result.Issues[0].Code)
+			require.Equal(t, "cipher", result.Issues[0].Field)
+			require.NotContains(t, result.Issues[0].Message, cipher)
+		})
+	}
+}
+
 func TestValidateVLESSFlow(t *testing.T) {
 	t.Parallel()
 	base := domain.NodeIR{

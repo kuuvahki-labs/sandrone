@@ -81,6 +81,34 @@ func TestLockedSingBoxRejectsRealmWithOuterEndpoint(t *testing.T) {
 	require.ErrorContains(t, err, "realm conflicts with server, server_port, and server_ports")
 }
 
+func TestLockedSingBoxSSPluginRegistryAndRendererIsolation(t *testing.T) {
+	ctx := include.Context(t.Context())
+	var options option.Options
+	require.NoError(t, options.UnmarshalJSONContext(ctx, []byte(`{
+  "outbounds":[{"type":"shadowsocks","tag":"unsupported","server":"127.0.0.1","server_port":9,
+    "method":"aes-256-gcm","password":"fixture","plugin":"gost-plugin"}]
+}`)))
+	_, err := box.New(box.Options{Context: ctx, Options: options})
+	require.ErrorContains(t, err, "plugin not found: gost-plugin")
+
+	nodes := []domain.NodeIR{
+		{Name: "unsupported", Type: domain.NodeTypeShadowsocks, Server: "127.0.0.1", Port: 9, Cipher: "aes-256-gcm", Password: "fixture", Plugin: "gost-plugin"},
+		{Name: "plain", Type: domain.NodeTypeShadowsocks, Server: "127.0.0.1", Port: 9, Cipher: "aes-256-gcm", Password: "fixture"},
+		{Name: "obfs", Type: domain.NodeTypeShadowsocks, Server: "127.0.0.1", Port: 9, Cipher: "aes-256-gcm", Password: "fixture", Plugin: "simple-obfs"},
+		{Name: "v2ray", Type: domain.NodeTypeShadowsocks, Server: "127.0.0.1", Port: 9, Cipher: "aes-256-gcm", Password: "fixture", Plugin: "v2ray-plugin"},
+	}
+	body, report, err := singbox.NewRenderer().RenderWithReport(t.Context(), nodes, domain.RenderOptions{})
+	require.NoError(t, err)
+	require.Equal(t, 3, report.SuccessCount)
+	require.Len(t, report.Warnings, 1)
+	require.Equal(t, "render_node_skipped", report.Warnings[0].Code)
+	var renderedOptions option.Options
+	require.NoError(t, renderedOptions.UnmarshalJSONContext(ctx, body))
+	instance, err := box.New(box.Options{Context: ctx, Options: renderedOptions})
+	require.NoError(t, err)
+	require.NoError(t, instance.Close())
+}
+
 func TestSingBoxHysteria2SubsecondDurationRoundTripsLockedOptions(t *testing.T) {
 	nodes, source, err := singbox.NewParser().Parse(context.Background(), []byte(`{
   "type":"hysteria2",

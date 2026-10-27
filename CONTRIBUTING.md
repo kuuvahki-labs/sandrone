@@ -85,12 +85,12 @@ Playwright 默认启动 built SPA，已包含 `pnpm build`；成功的默认 E2E
 构建并复制 Go 嵌入资源时使用 `make build-webui`。
 
 Makefile 默认使用
-`GOFLAGS=-mod=readonly -tags probe_singbox,with_quic,with_wireguard,with_utls`。
+`GOFLAGS=-mod=readonly -tags=probe_singbox,with_quic,with_wireguard,with_utls,with_gvisor`。
 运行窄测试时也应保留这些 flag：
 
 ```sh
-go test -mod=readonly -tags probe_singbox,with_quic,with_wireguard,with_utls ./internal/service
-go test -mod=readonly -tags probe_singbox,with_quic,with_wireguard,with_utls -run '^TestName$' ./internal/service
+go test -mod=readonly -tags=probe_singbox,with_quic,with_wireguard,with_utls,with_gvisor ./internal/service
+go test -mod=readonly -tags=probe_singbox,with_quic,with_wireguard,with_utls,with_gvisor -run '^TestName$' ./internal/service
 make test PKGS=./internal/service TESTFLAGS='-run ^TestName$'
 ```
 

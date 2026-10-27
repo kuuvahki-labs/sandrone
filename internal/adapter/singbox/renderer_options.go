@@ -2,6 +2,7 @@ package singbox
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
@@ -120,6 +121,15 @@ func applyTransport(out map[string]any, node domain.NodeIR) error {
 			domain.CodeRenderFailed,
 			fmt.Sprintf("sing-box V2Ray transport schema does not support %q transport", node.Transport.Type),
 		)
+	}
+	// The locked core applies URL.setPath to these transports during creation.
+	// Match its percent-escape validation without changing the caller's path or
+	// interpreting query/fragment delimiters as url.Parse would.
+	switch node.Transport.Type {
+	case "websocket", "ws", "http", "httpupgrade":
+		if _, err := url.PathUnescape(node.Transport.Path); err != nil {
+			return domain.NewError(domain.CodeRenderFailed, "sing-box transport path contains an invalid URL escape")
+		}
 	}
 	transport := map[string]any{}
 	switch node.Transport.Type {

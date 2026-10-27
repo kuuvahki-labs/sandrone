@@ -21,7 +21,7 @@ type nodeHTTPRoute struct {
 	close     func() error
 }
 
-func executeNodeHTTP(ctx context.Context, nodes []domain.NodeIR, opts domain.NodeHTTPOptions, skipped map[int]string, route func(int, domain.NodeIR) (nodeHTTPRoute, error)) ([]domain.NodeHTTPResult, error) {
+func executeNodeHTTP(ctx context.Context, nodes []domain.NodeIR, opts domain.NodeHTTPOptions, skipped map[int]string, route func(context.Context, int, domain.NodeIR) (nodeHTTPRoute, error)) ([]domain.NodeHTTPResult, error) {
 	results := make([]domain.NodeHTTPResult, len(nodes))
 	concurrency := min(opts.Concurrency, len(nodes))
 	if concurrency <= 0 {
@@ -43,18 +43,31 @@ func executeNodeHTTP(ctx context.Context, nodes []domain.NodeIR, opts domain.Nod
 			}
 			select {
 			case sem <- struct{}{}:
-				defer func() { <-sem }()
 			case <-ctx.Done():
 				results[i].Error = ctx.Err().Error()
 				return
 			}
-			selected, err := route(i, node)
+			release := sync.OnceFunc(func() { <-sem })
+			ownsLease := true
+			defer func() {
+				if ownsLease {
+					release()
+				}
+			}()
+			start := time.Now()
+			defer func() { results[i].DurationMS = time.Since(start).Milliseconds() }()
+			requestCtx, cancel := context.WithTimeout(ctx, time.Duration(opts.TimeoutMS)*time.Millisecond)
+			defer cancel()
+			// Ownership passes to initialization, then to the returned route. A
+			// timed-out initializer keeps its slot until late cleanup completes.
+			ownsLease = false
+			selected, err := prepareNodeHTTPRoute(requestCtx, release, func() (nodeHTTPRoute, error) { return route(requestCtx, i, node) })
+			if selected.close != nil {
+				defer func() { _ = selected.close() }()
+			}
 			if err != nil {
 				results[i].Error = err.Error()
 				return
-			}
-			if selected.close != nil {
-				defer func() { _ = selected.close() }()
 			}
 			if selected.dialer == nil {
 				results[i].Error = "node outbound was not found"
@@ -70,7 +83,7 @@ func executeNodeHTTP(ctx context.Context, nodes []domain.NodeIR, opts domain.Nod
 			}
 			defer transport.CloseIdleConnections()
 			client := &http.Client{Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-			results[i] = requestNodeHTTP(ctx, client, i, opts)
+			results[i] = requestNodeHTTP(requestCtx, client, i, opts)
 		})
 	}
 	wg.Wait()
@@ -79,13 +92,58 @@ func executeNodeHTTP(ctx context.Context, nodes []domain.NodeIR, opts domain.Nod
 	}
 	return results, nil
 }
+
+// A core may perform blocking initialization before returning its dialer. Keep
+// that work within the node deadline and close a late result rather than leaking
+// it or allowing it to issue a request after the caller has timed out. The lease
+// covers initialization, HTTP and cleanup; timing out does not release capacity
+// while the core is still alive. Queued workers remain cancelable by the caller.
+func prepareNodeHTTPRoute(ctx context.Context, release func(), create func() (nodeHTTPRoute, error)) (nodeHTTPRoute, error) {
+	type outcome struct {
+		route nodeHTTPRoute
+		err   error
+	}
+	done := make(chan outcome)
+	go func() {
+		result := outcome{}
+		func() {
+			defer func() {
+				if recover() != nil {
+					result.err = fmt.Errorf("HTTP core initialization panicked")
+				}
+			}()
+			result.route, result.err = create()
+		}()
+		closeRoute := result.route.close
+		result.route.close = func() error {
+			defer release()
+			if closeRoute != nil {
+				return closeRoute()
+			}
+			return nil
+		}
+		select {
+		case done <- result:
+		case <-ctx.Done():
+			if result.route.close != nil {
+				func() {
+					defer func() { _ = recover() }() // Match worker isolation for late cleanup.
+					_ = result.route.close()
+				}()
+			}
+		}
+	}()
+	select {
+	case result := <-done:
+		return result.route, result.err
+	case <-ctx.Done():
+		return nodeHTTPRoute{}, ctx.Err()
+	}
+}
+
 func requestNodeHTTP(ctx context.Context, client *http.Client, index int, opts domain.NodeHTTPOptions) (result domain.NodeHTTPResult) {
 	result.Index = index
-	start := time.Now()
-	defer func() { result.DurationMS = time.Since(start).Milliseconds() }()
-	requestCtx, cancel := context.WithTimeout(ctx, time.Duration(opts.TimeoutMS)*time.Millisecond)
-	defer cancel()
-	request, err := http.NewRequestWithContext(requestCtx, opts.Method, opts.URL, nil)
+	request, err := http.NewRequestWithContext(ctx, opts.Method, opts.URL, nil)
 	if err != nil {
 		result.Error = err.Error()
 		return

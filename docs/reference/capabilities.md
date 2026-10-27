@@ -90,6 +90,24 @@ VMess URI 输入同时接受 legacy `vmess://Base64(JSON)` 与 Discussion #716
 的字段，未支持参数保留为 Raw 并产生 warning。VMess URI 输出仍为 legacy
 Base64 JSON，不承诺对 #716 的完整或无损往返。
 
+节点显示名中的非法 UTF-8 统一替换为 `U+FFFD`，诊断文本同步处理。其它节点字段必须
+能表示为合法 UTF-8 JSON，否则按节点拒绝；不会替换认证或连接字段来绕过校验。
+
+VMess `cipher` 接受 `auto`、`none`、`zero`、`aes-128-cfb`、`aes-128-gcm`
+和 `chacha20-poly1305`，已知值统一为小写；空值沿用目标默认行为。
+字符串 `"null"` 等未知值由共享校验剔除并报告 `node_validation_dropped`，
+不会猜测为 `auto` 或 `none`。JSON null 与字段缺失仍按缺省值处理。
+
+Mihomo 平铺 WireGuard 配置的默认路由按本地地址族展开为 `0.0.0.0/0`
+和／或 `::/0`，裸地址规范化为 `/32` 或 `/128`；显式 `peers` 的
+`allowed-ips` 必须是非空 CIDR 列表，不补默认路由。单 peer 的受限路由
+输出到 Mihomo 时保留 `peers` 表达，避免平铺配置的默认路由扩大访问范围。
+
+启用的 ECH 静态配置接受单个 `ECHConfigList` 的标准 Base64（可省略 padding）或
+`ECH CONFIGS` PEM；渲染到 sing-box 时输出 PEM，Mihomo 输出标准 Base64，
+配置字节保持不变。畸形编码或不完整的列表会导致目标跳过节点；配置缺省时仍使用
+目标的 DNS 发现，不会删除 ECH 后降级为普通 TLS。
+
 URI parser 还以严格完整匹配接受 Shadowrocket 的 VMess/VLESS Base64 authority
 方言，并把 `vmess1://` 作为 VMess scheme alias。VMess `aid`/`alterId` 冲突、
 无法唯一拆分的 legacy v1 `host;/path`、非法 authority 或未知历史组合都会拒绝，
@@ -387,6 +405,14 @@ Mihomo YAML 或 sing-box JSON 当作互相透传的配置：
   节点并产生 `render_node_skipped`，不会删除连接关键字段后输出或进入 probe。
 - SS `v2ray-plugin` 的结构化 Mihomo options 会把布尔 `mux` 映射为 SIP003 整数；
   `skip-cert-verify: false` 作为无操作默认值消费，`true` 因目标插件无法表达而跳过节点。
+- SS 插件仅支持 `obfs-local`（含 `obfs`、`simple-obfs` 别名）和 `v2ray-plugin`；
+  其它插件跳过节点并报告 `render_node_skipped`，不移除插件后降级连接。
+- SS 加密方式按目标核心能力检查；例如 Mihomo 支持的 `chacha20` 在 sing-box
+  输出中跳过，不改写为线级语义不同的 `chacha20-ietf`。
+- TUIC 拥塞控制仅接受 sing-box 支持的 `cubic`、`new_reno`、`bbr` 或空值，
+  其它值在该目标中跳过；Mihomo 的专有算法和默认行为不受影响。
+- HTTPUpgrade、WebSocket 和 HTTP 路径中的非法百分号转义在 sing-box 输出前
+  跳过，合法路径保持原样，不猜测或补齐损坏的转义。
 - Hysteria v1 `hop_interval` 只有在目标 sing-box duration schema 能接受时才输出；
   Hysteria2 的秒区间则拆成 `hop_interval`/`hop_interval_max`。
 

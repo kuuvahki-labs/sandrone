@@ -2,6 +2,7 @@ package mihomo
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"strings"
 	"time"
@@ -86,6 +87,11 @@ func nodeToMihomo(node domain.NodeIR) (map[string]any, map[string]bool, []domain
 	if field := mihomoUnsupportedECHDNSField(node); field != "" {
 		return nil, nil, nil, domain.NewError(domain.CodeRenderFailed, field+" requires a custom ECH DNS transport that mihomo cannot express")
 	}
+	var err error
+	node, err = shared.WithRenderedECHConfig(node, base64.StdEncoding.EncodeToString)
+	if err != nil {
+		return nil, nil, nil, err
+	}
 	switch node.Type {
 	case domain.NodeTypeShadowsocks:
 		return renderSS(node)
@@ -121,12 +127,12 @@ func nodeToMihomo(node domain.NodeIR) (map[string]any, map[string]bool, []domain
 }
 
 func mihomoUnsupportedECHDNSField(node domain.NodeIR) string {
-	if node.TLS != nil && node.TLS.ECH != nil && node.TLS.ECH.DNS != "" {
+	if node.TLS != nil && node.TLS.ECH != nil && node.TLS.ECH.Enabled && node.TLS.ECH.DNS != "" {
 		return "tls.ech.dns"
 	}
 	if node.Transport != nil && node.Transport.XHTTP != nil && node.Transport.XHTTP.DownloadSettings != nil {
 		tls := node.Transport.XHTTP.DownloadSettings.TLS
-		if tls != nil && tls.ECH != nil && tls.ECH.DNS != "" {
+		if tls != nil && tls.ECH != nil && tls.ECH.Enabled && tls.ECH.DNS != "" {
 			return "transport.xhttp.download_settings.tls.ech.dns"
 		}
 	}
@@ -445,25 +451,22 @@ func renderWireGuard(node domain.NodeIR) (map[string]any, map[string]bool, []dom
 	if wg.PersistentKeepalive != 0 {
 		out["persistent-keepalive"] = wg.PersistentKeepalive
 	}
-	if len(wg.Peers) == 1 {
+	if len(wg.Peers) == 1 && mihomoWireGuardCanFlatten(wg.Peers[0], out) {
 		peer := wg.Peers[0]
-		if node.Server == "" && peer.Server != "" {
+		if peer.Server != "" {
 			out["server"] = peer.Server
 		}
-		if node.Port == 0 && peer.Port != 0 {
+		if peer.Port != 0 {
 			out["port"] = int(peer.Port)
 		}
 		out["public-key"] = peer.PublicKey
 		if peer.PreSharedKey != "" {
 			out["pre-shared-key"] = peer.PreSharedKey
 		}
-		if len(peer.AllowedIPs) > 0 {
-			out["allowed-ips"] = peer.AllowedIPs
-		}
 		if len(peer.Reserved) > 0 {
 			out["reserved"] = peer.Reserved
 		}
-	} else if len(wg.Peers) > 1 {
+	} else if len(wg.Peers) > 0 {
 		peers := make([]map[string]any, 0, len(wg.Peers))
 		for _, peer := range wg.Peers {
 			item := map[string]any{}
@@ -488,4 +491,25 @@ func renderWireGuard(node domain.NodeIR) (map[string]any, map[string]bool, []dom
 		out["peers"] = peers
 	}
 	return out, nil, nil, nil
+}
+
+func mihomoWireGuardCanFlatten(peer domain.WireGuardPeer, out map[string]any) bool {
+	defaults := mihomoWireGuardDefaultAllowedIPs([]string{
+		mihomoWireGuardAddress(shared.StringValue(out["ip"]), 32),
+		mihomoWireGuardAddress(shared.StringValue(out["ipv6"]), 128),
+	})
+	if len(defaults) == 0 || len(peer.AllowedIPs) != len(defaults) {
+		return false
+	}
+	remaining := make(map[string]bool, len(defaults))
+	for _, prefix := range defaults {
+		remaining[prefix] = true
+	}
+	for _, prefix := range peer.AllowedIPs {
+		if !remaining[prefix] {
+			return false
+		}
+		delete(remaining, prefix)
+	}
+	return len(remaining) == 0
 }

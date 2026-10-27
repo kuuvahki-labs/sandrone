@@ -274,7 +274,7 @@ const results = api.http.request(input.nodes, {
   method: "GET",                 // GET 或 HEAD，默认 GET
   core: "sing-box",              // sing-box 或 mihomo，默认 sing-box
   headers: { Accept: "text/plain" },
-  timeout_ms: 5000,               // 单节点超时，不含排队
+  timeout_ms: 5000,               // 单节点初始化和请求超时，不含排队
   concurrency: 4,
   max_response_bytes: 65536       // 正文上限
 });
@@ -285,31 +285,37 @@ const results = api.http.request(input.nodes, {
 子集等长且顺序相同；`index` 是该子集内从 0 开始的位置，与原始输入数组索引不一定相同。
 每项含 `index`、`status_code`（收到响应时）、`headers`（值为字符串数组）、`body`、
 `duration_ms` 和失败时的 `error`。正文和响应头作为 UTF-8 文本返回，无效字节用替换字符表示。
+`duration_ms` 包含节点初始化和请求，不含等待并发槽的时间。
 非 2xx 状态仍返回响应，由脚本决定是否可接受。
 
 请求经对应节点，不使用环境代理、不在失败时直连回退、不跟随重定向，不持久缓存。
 所选核心必须编译进当前二进制：sing-box 使用 `probe_singbox`，Mihomo 使用 `probe_mihomo`，
 也可同时启用。核心未编译时返回 `probe_backend_unavailable`，不会切换到另一核心；
 省略 `core` 始终选择 sing-box。
-正文超限时返回错误及空正文，响应头最多 64 KiB；单节点请求失败不取消其他节点。
-非法参数、核心缺失或启动失败使整个调用失败。调用服从 script 总超时及调用方取消；
+正文超限时返回错误及空正文，响应头最多 64 KiB；单节点构造、启动或请求失败
+保留在该项的 `error` 中，不取消其他节点。非法参数、核心缺失或整体 payload 无效
+使整个调用失败。调用服从 script 总超时及调用方取消；
 总超时或取消使整个调用失败，不返回尚未完成的部分数组。同名节点使用独立临时标识，
 不会改变输入节点名称。
 
-出口解析、过滤和命名示例在 [exit-info.js](../../examples/scripts/exit-info.js)。它对每个
-节点只做一次 GET，拒绝重复 trace 字段，校验 IP 格式、常见非公网网段及 ISO 国家代码，
-剔除无效信息并发出 warning，
-写入 `meta["exit.ip"]`、`meta["exit.country"]`，生成 `JP-a1b2c3` 一类名称并处理哈希碰撞。
-该结果只是本次请求观测，不表示未来可用性。使用时，将脚本内容填入 script 处理器的
-`source: { type: "inline", content: "…" }`，与连接去重处理器组成 `pipeline.json`。
+出口查询示例 [exit-info.js](../../examples/scripts/exit-info.js) 对每个节点只做一次 GET，
+校验响应、IP、国家代码和耗时，写入 `meta["exit.valid"]`（字符串 `"true"` 或 `"false"`）。
+成功时记录 `exit.ip`、`exit.country`、`exit.duration_ms`；失败时清除这些旧观测值并发出
+warning。它保留全部节点、原名称和原顺序，不负责过滤、命名、排序或截断。
+耗时沿用 HTTP API 的 `duration_ms`，包含初始化和请求，不含并发排队时间；
+metadata 按 NodeIR 契约保存为毫秒数字字符串。结果只代表本次请求观测。
+
+过滤、命名和数量限制等调用方策略可放在后续 inline script 处理器中，读取已有
+metadata 完成，无需重复请求。查询脚本的内容填入 script 处理器的
+`source: { type: "inline", content: "…" }`，与其它处理器合成 `pipeline.json`。
 受控 `source.type=file` 不表示任意本地路径。
 
 ```sh
 sandrone convert --input-urls urls.txt --processors pipeline.json --to json-nodes --output nodes.json
 ```
 
-处理链先连接去重，再运行脚本；建议显式设置 script 总时限，如 `timeout_ms: 300000`。
-很大的清单需要按节点数及并发调整该时限。脚本 `args.url` 可替换为返回同样 trace 格式的
+出口查询处理器应按节点数及并发设置足够的 script 总时限，如 `timeout_ms: 3600000`；
+出口查询的 `args.url` 可替换为返回同样 trace 格式的
 服务，`args.core` 可选择核心，`args.timeout_ms` 与 `args.concurrency` 可调整单节点时限与并发。
 
 ### `api.subscription.produce(name, options?)`

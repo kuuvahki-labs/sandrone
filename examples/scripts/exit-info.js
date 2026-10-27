@@ -1,4 +1,4 @@
-// Cloudflare trace example: request first, then mutate/filter the input nodes.
+// Cloudflare trace example: annotate nodes using one timed exit-info request.
 // The request is through each proxy; this does not establish future availability.
 function main(input, api) {
   var args = input.args || {};
@@ -10,11 +10,19 @@ function main(input, api) {
     concurrency: args.concurrency || 4,
     max_response_bytes: 65536
   });
-  var candidates = [];
-  results.forEach(function (result) {
+  var byIndex = [];
+  results.forEach(function (result) { byIndex[result.index] = result; });
+  // Update observations only after the exact input nodes have been requested.
+  input.nodes.forEach(function (node, index) {
+    node.meta = node.meta || {};
+    delete node.meta["exit.ip"];
+    delete node.meta["exit.country"];
+    delete node.meta["exit.duration_ms"];
+    node.meta["exit.valid"] = "false";
+    var result = byIndex[index];
     var fields = {};
     var duplicate = false;
-    result.body.split(/\r?\n/).forEach(function (line) {
+    if (result && typeof result.body === "string") result.body.split(/\r?\n/).forEach(function (line) {
       var separator = line.indexOf("=");
       if (separator > 0) {
         var key = line.slice(0, separator);
@@ -22,40 +30,17 @@ function main(input, api) {
         fields[key] = line.slice(separator + 1).trim();
       }
     });
-    if (result.error || duplicate || result.status_code !== 200 || !publicIP(fields.ip) || !validCountry(fields.loc)) {
-      api.warn({code: "exit_info_invalid", message: "No valid exit IP/country; node removed", node_index: result.index});
+    if (!result || result.error || duplicate || result.status_code !== 200 || !publicIP(fields.ip) || !validCountry(fields.loc) ||
+        typeof result.duration_ms !== "number" || !isFinite(result.duration_ms) || result.duration_ms < 0) {
+      api.warn({code: "exit_info_invalid", message: "No valid exit IP/country/duration observation", node_index: index});
       return;
     }
-    var node = input.nodes[result.index];
-    var identity = {};
-    Object.keys(node).forEach(function (key) {
-      if (["name", "meta", "tags", "raw", "ext", "warnings", "lossy", "source_format"].indexOf(key) < 0) identity[key] = node[key];
-    });
-    var key = canonical(identity);
-    var hash = api.hash.sha256(key);
-    candidates.push({node: node, ip: fields.ip, country: fields.loc, key: key, hash: hash, index: result.index});
+    node.meta["exit.valid"] = "true";
+    node.meta["exit.ip"] = fields.ip;
+    node.meta["exit.country"] = fields.loc;
+    node.meta["exit.duration_ms"] = String(result.duration_ms);
   });
-  // Resolve rare six-character hash collisions in a stable order, independently
-  // of response completion order. Preserve original order in the final output.
-  candidates.sort(function (a, b) { return a.key < b.key ? -1 : a.key > b.key ? 1 : a.index - b.index; });
-  var counts = {};
-  candidates.forEach(function (item) {
-    var base = item.country + "-" + item.hash.slice(0, 6);
-    counts[base] = (counts[base] || 0) + 1;
-    item.node.name = base + (counts[base] === 1 ? "" : "-" + counts[base]);
-    item.node.meta = item.node.meta || {};
-    item.node.meta["exit.ip"] = item.ip;
-    item.node.meta["exit.country"] = item.country;
-  });
-  candidates.sort(function (a, b) { return a.index - b.index; });
-  input.nodes = candidates.map(function (item) { return item.node; });
   return input;
-}
-
-function canonical(value) {
-  if (Array.isArray(value)) return "[" + value.map(canonical).join(",") + "]";
-  if (value && typeof value === "object") return "{" + Object.keys(value).sort().map(function (key) { return JSON.stringify(key) + ":" + canonical(value[key]); }).join(",") + "}";
-  return JSON.stringify(value);
 }
 
 function validIP(ip) {
@@ -79,7 +64,7 @@ function validIP(ip) {
 }
 
 function validCountry(country) {
-  // ISO 3166-1 alpha-2; unknown markers such as XX and T1 are deliberately removed.
+  // ISO 3166-1 alpha-2; unknown markers such as XX and T1 are not country codes.
   return typeof country === "string" && country.length === 2 && (
     " AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS YE YT ZA ZM ZW "
   ).indexOf(" " + country + " ") >= 0;

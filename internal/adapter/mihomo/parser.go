@@ -5,6 +5,7 @@ import (
 	"encoding/json/jsontext"
 	"fmt"
 	"maps"
+	"net/netip"
 	"strings"
 	"time"
 
@@ -480,8 +481,8 @@ func parseMihomoMieru(node *domain.NodeIR, proxy map[string]any) {
 func parseMihomoWireGuard(node *domain.NodeIR, proxy map[string]any) {
 	node.WireGuard = &domain.WireGuardOptions{
 		PrivateKey:          shared.StringValue(proxy["private-key"]),
-		IP:                  shared.StringValue(proxy["ip"]),
-		IPv6:                shared.StringValue(proxy["ipv6"]),
+		IP:                  mihomoWireGuardAddress(shared.StringValue(proxy["ip"]), 32),
+		IPv6:                mihomoWireGuardAddress(shared.StringValue(proxy["ipv6"]), 128),
 		MTU:                 intValueZero(proxy["mtu"]),
 		Workers:             intValueZero(proxy["workers"]),
 		PersistentKeepalive: intValueZero(proxy["persistent-keepalive"]),
@@ -492,8 +493,6 @@ func parseMihomoWireGuard(node *domain.NodeIR, proxy map[string]any) {
 	if node.WireGuard.IPv6 != "" {
 		node.WireGuard.Address = append(node.WireGuard.Address, node.WireGuard.IPv6)
 	}
-	peers := shared.StringValue(proxy["peers"])
-	_ = peers
 	peerItems, _ := proxy["peers"].([]any)
 	if len(peerItems) == 0 && shared.StringValue(proxy["public-key"]) != "" {
 		node.WireGuard.Peers = []domain.WireGuardPeer{{
@@ -501,7 +500,7 @@ func parseMihomoWireGuard(node *domain.NodeIR, proxy map[string]any) {
 			Port:         node.Port,
 			PublicKey:    shared.StringValue(proxy["public-key"]),
 			PreSharedKey: shared.StringValue(proxy["pre-shared-key"]),
-			AllowedIPs:   shared.StringSliceValue(proxy["allowed-ips"]),
+			AllowedIPs:   mihomoWireGuardDefaultAllowedIPs(node.WireGuard.Address),
 			Reserved:     uint8SliceValue(proxy["reserved"]),
 		}}
 		return
@@ -521,6 +520,43 @@ func parseMihomoWireGuard(node *domain.NodeIR, proxy map[string]any) {
 			Reserved:     uint8SliceValue(peerMap["reserved"]),
 		})
 	}
+}
+
+func mihomoWireGuardAddress(value string, bits int) string {
+	if value == "" {
+		return ""
+	}
+	candidate := value
+	if !strings.Contains(candidate, "/") {
+		candidate = fmt.Sprintf("%s/%d", candidate, bits)
+	}
+	if prefix, err := netip.ParsePrefix(candidate); err == nil {
+		return prefix.String()
+	}
+	return value // Preserve invalid input for shared semantic validation.
+}
+
+func mihomoWireGuardDefaultAllowedIPs(addresses []string) []string {
+	var has4, has6 bool
+	for _, address := range addresses {
+		prefix, err := netip.ParsePrefix(address)
+		if err != nil {
+			continue
+		}
+		if prefix.Addr().Is4() {
+			has4 = true
+		} else {
+			has6 = true
+		}
+	}
+	var allowed []string
+	if has4 {
+		allowed = append(allowed, "0.0.0.0/0")
+	}
+	if has6 {
+		allowed = append(allowed, "::/0")
+	}
+	return allowed
 }
 
 func isExplicitTrue(value any) bool {

@@ -18,6 +18,8 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
 
+const echConfigFixture = "AEH+DQA9AAAgACAJAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAEAAQAOcHVibGljLmV4YW1wbGUAAA=="
+
 func TestRenderMihomoRenderWrapper(t *testing.T) {
 	r := mihomo.NewRenderer()
 	out, err := r.Render(context.Background(), allProtocolNodes()[:1], domain.RenderOptions{Format: "mihomo-proxies"})
@@ -1210,7 +1212,7 @@ func TestRenderMihomoTLSFullOptions(t *testing.T) {
 			Fingerprint:        "sha256:abcd",
 			ECH: &domain.ECHOptions{
 				Enabled:         true,
-				Config:          []string{"ech-config", "ignored-second-config"},
+				Config:          []string{echConfigFixture},
 				QueryServerName: "ech.example.com",
 			},
 			Reality: &domain.RealityOptions{PublicKey: "public", ShortID: "abcd"},
@@ -1232,7 +1234,7 @@ func TestRenderMihomoTLSFullOptions(t *testing.T) {
 		t.Fatalf("unexpected fingerprint fields: %#v", proxy)
 	}
 	ech := proxy["ech-opts"].(map[string]any)
-	if ech["enable"] != true || ech["config"] != "ech-config" || ech["query-server-name"] != "ech.example.com" {
+	if ech["enable"] != true || ech["config"] != echConfigFixture || ech["query-server-name"] != "ech.example.com" {
 		t.Fatalf("unexpected ech opts: %#v", ech)
 	}
 	reality := proxy["reality-opts"].(map[string]any)
@@ -1474,7 +1476,7 @@ func TestRenderMihomoExtraKeysAreSorted(t *testing.T) {
 			ALPN:    []string{"h2"},
 			ECH: &domain.ECHOptions{
 				Enabled: true,
-				Config:  []string{"ech-config"},
+				Config:  []string{echConfigFixture},
 			},
 			Reality: &domain.RealityOptions{PublicKey: "public", ShortID: "sid"},
 		},

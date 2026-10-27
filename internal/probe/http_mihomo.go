@@ -39,7 +39,7 @@ func requestNodeHTTPMihomo(ctx context.Context, nodes []domain.NodeIR, opts doma
 	// Mihomo's TLS fork is not assignable to crypto/tls. Empty ca.Option sets
 	// only these fields, matching the existing URL-test implementation.
 	tlsConfig := &tls.Config{Time: mihomoTLS.Time, RootCAs: mihomoTLS.RootCAs}
-	return executeNodeHTTP(ctx, nodes, opts, skipped, func(i int, _ domain.NodeIR) (nodeHTTPRoute, error) {
+	return executeNodeHTTP(ctx, nodes, opts, skipped, func(_ context.Context, i int, _ domain.NodeIR) (nodeHTTPRoute, error) {
 		proxy, err := mihomoadapter.ParseProxy(proxyByNode[i])
 		if err != nil {
 			return nodeHTTPRoute{}, err

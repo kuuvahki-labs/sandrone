@@ -9,6 +9,9 @@ import (
 )
 
 func renderSingBoxSSPlugin(plugin string, options map[string]any) (string, string, error) {
+	if plugin == "" {
+		return "", pluginOptionsRaw(options), nil
+	}
 	if isSingBoxSimpleObfsPlugin(plugin) {
 		return "obfs-local", simpleObfsPluginOptionsRaw(options), nil
 	}
@@ -16,7 +19,9 @@ func renderSingBoxSSPlugin(plugin string, options map[string]any) (string, strin
 		normalized, err := singBoxV2RayPluginOptionsRaw(options)
 		return "v2ray-plugin", normalized, err
 	}
-	return plugin, pluginOptionsRaw(options), nil
+	// The embedded SIP003 registry only provides these two plugins. Passing
+	// other names through would fail initialization of the entire core.
+	return "", "", domain.NewError(domain.CodeRenderFailed, "sing-box Shadowsocks supports only obfs-local and v2ray-plugin")
 }
 
 func singBoxV2RayPluginOptionsRaw(options map[string]any) (string, error) {

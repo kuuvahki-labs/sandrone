@@ -17,6 +17,8 @@ import (
 	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
 
+const echConfigFixture = "AEH+DQA9AAAgACAJAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAEAAQAOcHVibGljLmV4YW1wbGUAAA=="
+
 func TestRenderSingBoxTransportAndWireGuard(t *testing.T) {
 	r := singbox.NewRenderer()
 	nodes := []domain.NodeIR{
@@ -854,7 +856,7 @@ func TestRenderSingBoxTLSFullOptions(t *testing.T) {
 			ClientFingerprint:  "chrome",
 			ECH: &domain.ECHOptions{
 				Enabled:         true,
-				Config:          []string{"ech-config"},
+				Config:          []string{echConfigFixture},
 				QueryServerName: "ech.example.com",
 			},
 			Reality: &domain.RealityOptions{PublicKey: "public", ShortID: "abcd"},

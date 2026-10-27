@@ -45,7 +45,9 @@ func mihomoKnownFields(nodeType domain.NodeType) map[string]bool {
 	case domain.NodeTypeMieru:
 		add("port-range", "transport", "udp", "multiplexing", "handshake-mode", "traffic-pattern")
 	case domain.NodeTypeWireGuard:
-		add("private-key", "ip", "ipv6", "peers", "public-key", "pre-shared-key", "allowed-ips", "reserved", "mtu", "workers", "persistent-keepalive", "udp")
+		// allowed-ips is only consumed inside peers; the flat form uses local
+		// address families to select default routes.
+		add("private-key", "ip", "ipv6", "peers", "public-key", "pre-shared-key", "reserved", "mtu", "workers", "persistent-keepalive", "udp")
 	}
 	return common
 }

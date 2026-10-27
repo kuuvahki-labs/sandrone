@@ -108,6 +108,7 @@ func (p *Parser) parseList(in []byte, strict bool) ([]domain.NodeIR, *domain.Sou
 		}
 		nodes = append(nodes, parsed...)
 	}
+	info.Warnings = domain.WarningsWithValidUTF8(info.Warnings)
 	if len(nodes) == 0 {
 		return nil, info, domain.NewError(domain.CodeParseFailed, noListNodesMessage(info.Warnings))
 	}
@@ -231,11 +232,24 @@ func (p *Parser) parseOne(raw string) ([]domain.NodeIR, *domain.SourceInfo, erro
 	}
 	if source != nil {
 		source.Warnings = append(source.Warnings, uriUnknownWarnings(parsed, raw, 0, 0, "uri")...)
+		source.Warnings = domain.WarningsWithValidUTF8(source.Warnings)
 	}
 	return parsed, source, nil
 }
 
 func (p *Parser) parseOneRaw(raw string) ([]domain.NodeIR, *domain.SourceInfo, error) {
+	nodes, source, err := p.parseOneDecoded(raw)
+	for i := range nodes {
+		nodes[i].Name = strings.ToValidUTF8(nodes[i].Name, "\uFFFD")
+		nodes[i].Warnings = domain.WarningsWithValidUTF8(nodes[i].Warnings)
+	}
+	if source != nil {
+		source.Warnings = domain.WarningsWithValidUTF8(source.Warnings)
+	}
+	return nodes, source, err
+}
+
+func (p *Parser) parseOneDecoded(raw string) ([]domain.NodeIR, *domain.SourceInfo, error) {
 	scheme, _, ok := strings.Cut(raw, "://")
 	if !ok || scheme == "" {
 		u, err := url.Parse(raw)

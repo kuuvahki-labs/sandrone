@@ -4,6 +4,7 @@ package nodevalidation
 import (
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json/v2"
 	"net"
 	"net/url"
 	"strconv"
@@ -67,12 +68,19 @@ func validateNode(node domain.NodeIR, index int, stage Stage, target string) []d
 			Code:      code,
 			Message:   message,
 			NodeIndex: &nodeIndex,
-			RuntimeID: domain.NodeRuntimeID(node),
-			NodeName:  node.Name,
-			NodeType:  node.Type,
+			RuntimeID: strings.ToValidUTF8(domain.NodeRuntimeID(node), "\uFFFD"),
+			NodeName:  strings.ToValidUTF8(node.Name, "\uFFFD"),
+			NodeType:  domain.NodeType(strings.ToValidUTF8(string(node.Type), "\uFFFD")),
 			Field:     field,
 			Target:    target,
 		})
+	}
+	// Percent escapes and Base64 can decode arbitrary bytes from valid inputs.
+	// Check the complete serialization boundary instead of enumerating strings.
+	// Never repair credentials or expose encoding errors that may contain them.
+	if _, err := json.Marshal(node); err != nil {
+		add("node_validation_invalid", "encoding", "node fields must be representable as valid UTF-8 JSON")
+		return issues
 	}
 	required := func(field, value string) {
 		if strings.TrimSpace(value) == "" {
@@ -115,6 +123,12 @@ func validateNode(node domain.NodeIR, index int, stage Stage, target string) []d
 		}
 		if node.Type == domain.NodeTypeVLESS {
 			validateVLESS(node, add)
+		} else {
+			switch node.Cipher {
+			case "", "auto", "none", "zero", "aes-128-cfb", "aes-128-gcm", "chacha20-poly1305":
+			default:
+				add("node_validation_invalid", "cipher", "VMess cipher must be auto, none, zero, aes-128-cfb, aes-128-gcm or chacha20-poly1305")
+			}
 		}
 	case domain.NodeTypeTrojan:
 		required("password", node.Password)
@@ -595,7 +609,15 @@ func validateWireGuard(options *domain.WireGuardOptions, add func(string, string
 	for _, peer := range options.Peers {
 		if strings.TrimSpace(peer.PublicKey) == "" {
 			add("node_validation_required", "wireguard.peers.public_key", "wireguard peer public key is required")
-			break
+		}
+		if len(peer.AllowedIPs) == 0 {
+			add("node_validation_required", "wireguard.peers.allowed_ips", "wireguard peer allowed IPs are required")
+		}
+		for _, prefix := range peer.AllowedIPs {
+			if _, _, err := net.ParseCIDR(prefix); err != nil {
+				add("node_validation_invalid", "wireguard.peers.allowed_ips", "wireguard peer allowed IPs must use CIDR notation")
+				break
+			}
 		}
 	}
 }
