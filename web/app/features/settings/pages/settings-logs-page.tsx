@@ -91,11 +91,11 @@ export function SettingsLogsPage({ client, onBack }: { client: Pick<ApiClient, "
       <Paper variant="outlined" className="min-w-0 overflow-hidden" aria-busy={loading}>
         {visible.map((entry) => (
           <details key={`${snapshot?.instance_id}:${entry.id}`} className="border-b border-divider last:border-b-0">
-            <summary aria-label={t("settings.logs.details", { id: entry.id })} className="cursor-pointer px-4 py-3 focus-visible:outline-2 focus-visible:outline-primary-main">
-              <span className="inline-grid w-[calc(100%-1.5rem)] min-w-0 gap-2 align-top sm:grid-cols-[auto_auto_minmax(0,1fr)] sm:items-center sm:gap-3">
-                <time className="font-mono text-xs text-text-secondary" dateTime={entry.time}>{timestampFormat.format(new Date(entry.time))}</time>
-                <span><Chip size="small" label={entry.level.toUpperCase()} color={levelColors[entry.level as keyof typeof levelColors] ?? "default"} /></span>
-                <span className="min-w-0 truncate font-mono text-sm">{entry.message}</span>
+            <summary aria-label={t("settings.logs.details", { id: entry.id })} className="cursor-pointer px-3 py-2 focus-visible:outline-2 focus-visible:outline-primary-main sm:px-4 sm:py-3">
+              <span className="inline-grid w-[calc(100%-1.5rem)] min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 align-top sm:grid-cols-[auto_auto_minmax(0,1fr)] sm:gap-3">
+                <time className="min-w-0 font-mono text-xs text-text-secondary" dateTime={entry.time}>{timestampFormat.format(new Date(entry.time))}</time>
+                <span><Chip size="small" sx={{ height: { xs: 20, sm: 24 } }} label={entry.level.toUpperCase()} color={levelColors[entry.level as keyof typeof levelColors] ?? "default"} /></span>
+                <span className="col-span-2 min-w-0 truncate font-mono text-sm sm:col-span-1">{entry.message}</span>
               </span>
             </summary>
             <div className="grid min-w-0 gap-3 bg-action-hover px-4 pb-4 pt-2">
