@@ -29,3 +29,4 @@ internal/entry/webui/static/*
 !internal/entry/webui/static/.gitkeep
 internal/service/catalog_builtin/catalog.json.gz
 .vercel
+/tools/discover/

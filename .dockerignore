@@ -1,4 +1,5 @@
 .git
+tools/discover
 .local
 private
 data
