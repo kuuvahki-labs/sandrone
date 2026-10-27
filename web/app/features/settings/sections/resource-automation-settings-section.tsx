@@ -1,8 +1,6 @@
-import Autocomplete from "@mui/material/Autocomplete";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import Checkbox from "@mui/material/Checkbox";
-import Chip from "@mui/material/Chip";
 import Collapse from "@mui/material/Collapse";
 import Divider from "@mui/material/Divider";
 import FormControlLabel from "@mui/material/FormControlLabel";
@@ -10,14 +8,11 @@ import Switch from "@mui/material/Switch";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 
-import {
-  type ScheduledRefreshResourceChoice,
-  type ScheduledRefreshTargetOption,
-  scheduledRefreshTargetOptions,
-  targetKey,
-} from "~/features/settings/model/scheduled-refresh-targets";
+import type { ScheduledRefreshResourceChoice } from "~/features/settings/model/scheduled-refresh-targets";
 import type { ScheduledRefreshStatus, SettingsView } from "~/shared/api/client";
 import { useI18n } from "~/shared/i18n/context";
+
+import { ScheduledRefreshTargetPicker } from "./scheduled-refresh-target-picker";
 
 interface ResourceAutomationSettingsSectionProps {
   scheduledRefreshEnabled: boolean;
@@ -43,9 +38,6 @@ export function ResourceAutomationSettingsSection({
   onSubscriptionTrafficChange,
 }: ResourceAutomationSettingsSectionProps) {
   const { t } = useI18n();
-  const options = scheduledRefreshTargetOptions(scheduledRefreshValue.targets, scheduledRefreshResources);
-  const selectedKeys = new Set(scheduledRefreshValue.targets.map(targetKey));
-  const selected = options.filter((option) => selectedKeys.has(targetKey(option)));
 
   return (
     <Card component="article" variant="outlined">
@@ -103,33 +95,12 @@ export function ResourceAutomationSettingsSection({
                       schedule: event.target.value,
                     })}
                   />
-                  <Autocomplete<ScheduledRefreshTargetOption, true, false, false>
-                    disableCloseOnSelect
-                    filterSelectedOptions
-                    multiple
-                    options={options}
-                    value={selected}
-                    getOptionLabel={(option) => optionLabel(option, t("settings.scheduledRefresh.missing"))}
-                    groupBy={(option) => option.kind === "subscription"
-                      ? t("settings.scheduledRefresh.groupSubscriptions")
-                      : t("settings.scheduledRefresh.groupFiles")}
-                    isOptionEqualToValue={(option, current) => targetKey(option) === targetKey(current)}
-                    renderInput={(params) => <TextField {...params} label={t("settings.scheduledRefresh.targets")} />}
-                    renderValue={(selectedOptions, getItemProps) => selectedOptions.map((option, index) => {
-                      const { key, ...itemProps } = getItemProps({ index });
-                      return (
-                        <Chip
-                          {...itemProps}
-                          color={option.missing ? "warning" : "default"}
-                          key={key}
-                          label={optionLabel(option, t("settings.scheduledRefresh.missing"))}
-                          size="small"
-                        />
-                      );
-                    })}
-                    onChange={(_event, next) => onScheduledRefreshChange({
+                  <ScheduledRefreshTargetPicker
+                    resources={scheduledRefreshResources}
+                    targets={scheduledRefreshValue.targets}
+                    onChange={(targets) => onScheduledRefreshChange({
                       ...scheduledRefreshValue,
-                      targets: next.map(({ kind, name }) => ({ kind, name })),
+                      targets,
                     })}
                   />
                   <FormControlLabel
@@ -167,10 +138,6 @@ function ScheduledRefreshStatusView({ status }: { status?: ScheduledRefreshStatu
       <Typography variant="body2">{t("settings.scheduledRefresh.lastCounts", { success: status.last_success_count, failure: status.last_failure_count, skipped: status.skipped_count })}</Typography>
     </div>
   );
-}
-
-function optionLabel(option: ScheduledRefreshTargetOption, missingLabel: string): string {
-  return option.missing ? `${option.label} (${missingLabel})` : option.label;
 }
 
 function formatDate(value?: string): string {

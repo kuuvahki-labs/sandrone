@@ -211,9 +211,12 @@ describe("settings service page", () => {
       />,
     );
 
-    expect(screen.getByText("missing-provider (资源已缺失)")).toBeInTheDocument();
-    await user.click(screen.getByRole("combobox", { name: "更新目标" }));
-    await user.click(await screen.findByRole("option", { name: "Provider" }));
+    const targetPicker = screen.getByRole("button", { name: "更新目标" });
+    expect(targetPicker).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByText("含 1 项缺失资源")).toBeInTheDocument();
+    await user.click(targetPicker);
+    expect(within(screen.getByRole("group", { name: "文件" })).getByRole("checkbox", { name: /Client config/ })).not.toBeChecked();
+    await user.click(within(screen.getByRole("group", { name: "订阅" })).getByRole("checkbox", { name: /Provider/ }));
     await user.click(screen.getByRole("button", { name: "保存设置" }));
 
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
@@ -222,6 +225,126 @@ describe("settings service page", () => {
           { kind: "subscription", name: "missing-provider" },
           { kind: "subscription", name: "provider" },
         ],
+      }),
+    }));
+
+    await user.click(screen.getByRole("checkbox", { name: /missing-provider.*资源已缺失/ }));
+    await user.click(screen.getByRole("button", { name: "保存设置" }));
+
+    expect(onSave).toHaveBeenLastCalledWith(expect.objectContaining({
+      scheduled_refresh: expect.objectContaining({
+        targets: [{ kind: "subscription", name: "provider" }],
+      }),
+    }));
+    expect(screen.queryByText("含 1 项缺失资源")).not.toBeInTheDocument();
+  });
+
+  it("adds only search matches without losing hidden selections and clears the complete draft", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    renderRuntimePage(
+      <SettingsServicePage
+        overrides={{}}
+        restartRequired={[]}
+        scheduledRefreshResources={[
+          { kind: "subscription", name: "provider-a", label: "Provider A" },
+          { kind: "subscription", name: "provider-b", label: "Provider B" },
+          { kind: "subscription", name: "other", label: "Other" },
+          { kind: "file", name: "client.yaml", label: "Client config" },
+        ]}
+        settings={{
+          ...defaultProjectSettings,
+          scheduled_refresh: {
+            ...defaultProjectSettings.scheduled_refresh,
+            enabled: true,
+            targets: [
+              { kind: "subscription", name: "missing-provider" },
+              { kind: "file", name: "client.yaml" },
+            ],
+          },
+        }}
+        onBack={vi.fn()}
+        onRunScheduledRefresh={vi.fn()}
+        onSave={onSave}
+      />,
+    );
+
+    const targetPicker = screen.getByRole("button", { name: "更新目标" });
+    await user.click(targetPicker);
+    await user.type(screen.getByRole("searchbox", { name: "搜索" }), "PROVIDER");
+    expect(screen.queryByRole("checkbox", { name: /Client config/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "全选" }));
+    expect(screen.getByRole("button", { name: "全选" })).toBeDisabled();
+    expect(screen.getByText("已选 4 项")).toBeInTheDocument();
+
+    await user.click(targetPicker);
+    expect(targetPicker).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByText("已选 4 项")).toBeInTheDocument();
+    await user.click(targetPicker);
+    await user.clear(screen.getByRole("searchbox", { name: "搜索" }));
+    expect(screen.getByRole("checkbox", { name: /Provider A/ })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /Provider B/ })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /Client config/ })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /missing-provider.*资源已缺失/ })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /Other/ })).not.toBeChecked();
+    await user.click(screen.getByRole("button", { name: "保存设置" }));
+
+    expect(onSave).toHaveBeenLastCalledWith(expect.objectContaining({
+      scheduled_refresh: expect.objectContaining({
+        targets: [
+          { kind: "subscription", name: "missing-provider" },
+          { kind: "file", name: "client.yaml" },
+          { kind: "subscription", name: "provider-a" },
+          { kind: "subscription", name: "provider-b" },
+        ],
+      }),
+    }));
+
+    await user.type(screen.getByRole("searchbox", { name: "搜索" }), "no matching resource");
+    await user.click(screen.getByRole("button", { name: "清空" }));
+    expect(screen.getByText("已选 0 项")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "保存设置" }));
+    expect(onSave).toHaveBeenLastCalledWith(expect.objectContaining({
+      scheduled_refresh: expect.objectContaining({ targets: [] }),
+    }));
+  });
+
+  it("selects subscriptions and files with the same name independently", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    renderRuntimePage(
+      <SettingsServicePage
+        overrides={{}}
+        restartRequired={[]}
+        scheduledRefreshResources={[
+          { kind: "subscription", name: "shared", label: "Shared target" },
+          { kind: "file", name: "shared", label: "Shared target" },
+        ]}
+        settings={{
+          ...defaultProjectSettings,
+          scheduled_refresh: { ...defaultProjectSettings.scheduled_refresh, enabled: true },
+        }}
+        onBack={vi.fn()}
+        onRunScheduledRefresh={vi.fn()}
+        onSave={onSave}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "更新目标" }));
+    const subscription = within(screen.getByRole("group", { name: "订阅" })).getByRole("checkbox", { name: /Shared target/ });
+    const file = within(screen.getByRole("group", { name: "文件" })).getByRole("checkbox", { name: /Shared target/ });
+    await user.click(subscription);
+    expect(subscription).toBeChecked();
+    expect(file).not.toBeChecked();
+    await user.click(file);
+    await user.click(subscription);
+    expect(subscription).not.toBeChecked();
+    expect(file).toBeChecked();
+    await user.click(screen.getByRole("button", { name: "保存设置" }));
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      scheduled_refresh: expect.objectContaining({
+        targets: [{ kind: "file", name: "shared" }],
       }),
     }));
   });

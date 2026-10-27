@@ -253,6 +253,77 @@ const routes = [
   { project: "desktop", path: "/subscriptions/new?type=local", heading: "新建订阅", content: "内容", focus: true },
 ];
 
+test("scheduled refresh targets stay compact and preserve selections through search and save", async ({ page }, testInfo) => {
+  const issues: string[] = [];
+  page.on("pageerror", (error) => issues.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error" || message.type() === "warning") issues.push(message.text());
+  });
+  const subscriptions = Array.from({ length: 10 }, (_, index) => ({
+    name: `provider-${index + 1}`, type: "remote", format: "uri-list",
+    display_name: index === 0 ? "A very long subscription title that must wrap within the target picker on mobile" : `Provider ${index + 1}`,
+  }));
+  const originalTargets = subscriptions.slice(0, 9).map(({ name }) => ({ kind: "subscription", name }));
+  const settings = {
+    ...settingsEnvelope().settings,
+    scheduled_refresh: { enabled: true, schedule: "@daily", targets: [...originalTargets, { kind: "subscription", name: "missing-provider" }] },
+  };
+  let savedTargets: Array<{ kind: string; name: string }> | undefined;
+  await page.route("**/v1/subscriptions", (route) => route.fulfill({ json: { items: subscriptions } }));
+  await page.route("**/v1/settings", async (route) => {
+    if (route.request().method() === "PUT") {
+      savedTargets = route.request().postDataJSON().scheduled_refresh.targets;
+      settings.scheduled_refresh.targets = savedTargets!;
+    }
+    await route.fulfill({ json: { ...settingsEnvelope(), settings, effective: settings } });
+  });
+  await page.goto("/settings/service");
+  const picker = page.getByRole("button", { name: "更新目标", exact: true });
+  await expect(picker).toHaveAttribute("aria-expanded", "false");
+  await expect(picker).toContainText("已选 10 项");
+  await expect(page.getByText("含 1 项缺失资源")).toBeVisible();
+  await expect(page.getByRole("searchbox", { name: "搜索" })).toHaveCount(0);
+  const widths = testInfo.project.name === "mobile" ? [320, 390] : [1280];
+  for (const width of widths) {
+    await page.setViewportSize({ width, height: 844 });
+    await picker.scrollIntoViewIfNeeded();
+    expect((await picker.boundingBox())!.height).toBeLessThanOrEqual(56);
+    await picker.click();
+    const subscriptionsGroup = page.getByRole("group", { name: "订阅", exact: true });
+    const longOption = subscriptionsGroup.getByRole("checkbox", { name: /A very long subscription title/ });
+    await expect(longOption).toBeChecked();
+    const labelBounds = (await longOption.locator("xpath=ancestor::label").boundingBox())!;
+    expect(labelBounds.x + labelBounds.width).toBeLessThanOrEqual(width);
+    const listMetrics = await subscriptionsGroup.locator("..").evaluate((list) => ({
+      clientHeight: list.clientHeight, scrollHeight: list.scrollHeight, overflowY: getComputedStyle(list).overflowY,
+    }));
+    expect(listMetrics.overflowY).toBe("auto");
+    expect(listMetrics.clientHeight).toBeLessThanOrEqual(320);
+    expect(listMetrics.scrollHeight).toBeGreaterThan(listMetrics.clientHeight);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1);
+    await picker.click();
+    await expect(picker).toHaveAttribute("aria-expanded", "false");
+    await expect(page.getByRole("searchbox", { name: "搜索" })).toHaveCount(0);
+  }
+  await picker.focus();
+  await page.keyboard.press("Enter");
+  await expect(picker).toHaveAttribute("aria-expanded", "true");
+  const search = page.getByRole("searchbox", { name: "搜索" });
+  await search.fill("default.yaml");
+  await page.getByRole("button", { name: "全选" }).click();
+  await expect(page.getByRole("group", { name: "文件", exact: true }).getByRole("checkbox")).toBeChecked();
+  await expect(picker).toContainText("已选 11 项");
+  await search.fill("missing-provider");
+  await page.getByRole("checkbox", { name: /missing-provider/ }).click();
+  await expect(page.getByText("含 1 项缺失资源")).toHaveCount(0);
+  await search.fill("");
+  await picker.click();
+  await page.getByRole("button", { name: "保存设置", exact: true }).click();
+  await expect.poll(() => savedTargets).toEqual([...originalTargets, { kind: "file", name: "default.yaml" }]);
+  await expect(picker).toContainText("已选 10 项");
+  expect(issues).toEqual([]);
+});
+
 test("sing-box regex groups expose the outbound adapter requirement", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile", "covered by the mobile editor smoke flow");
   const errors: string[] = [];
