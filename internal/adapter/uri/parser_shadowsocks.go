@@ -81,7 +81,7 @@ func parseSS(raw string) (domain.NodeIR, *domain.SourceInfo, error) {
 				if uotKnown[key] || tfoKnown[key] {
 					continue
 				}
-				node.Raw["uri.query."+key] = jsontext.Value(strconv.Quote(values.Get(key)))
+				shared.AddRaw(node.Raw, "uri.query."+key, values.Get(key))
 			}
 		}
 	}

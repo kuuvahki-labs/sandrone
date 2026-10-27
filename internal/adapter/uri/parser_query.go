@@ -247,7 +247,7 @@ func preserveURIQuery(node *domain.NodeIR, values url.Values, known map[string]b
 		if node.Raw == nil {
 			node.Raw = map[string]jsontext.Value{}
 		}
-		node.Raw["uri.query."+key] = jsontext.Value(strconv.Quote(values.Get(key)))
+		shared.AddRaw(node.Raw, "uri.query."+key, values.Get(key))
 	}
 }
 
