@@ -15,6 +15,7 @@ type DiagnoseCacheMode string
 const (
 	DiagnoseInputAuto         DiagnoseInputKind = "auto"
 	DiagnoseInputNodes        DiagnoseInputKind = "nodes"
+	DiagnoseInputURLList      DiagnoseInputKind = "url-list"
 	DiagnoseInputSubscription DiagnoseInputKind = "subscription"
 	DiagnoseInputFile         DiagnoseInputKind = "file"
 )
@@ -25,13 +26,14 @@ const (
 )
 
 // DiagnoseRequest describes one diagnostic execution. Exactly one of Content,
-// Remote, SubscriptionName, or File should identify the input.
+// Remote, RemoteBatch, SubscriptionName, or File should identify the input.
 type DiagnoseRequest struct {
 	Kind             DiagnoseInputKind `json:"kind,omitempty" yaml:"kind,omitempty"`
 	Name             string            `json:"name,omitempty" yaml:"name,omitempty"`
 	Format           string            `json:"format,omitempty" yaml:"format,omitempty"`
 	Content          []byte            `json:"content,omitempty" yaml:"content,omitempty"`
 	Remote           *RemoteInput      `json:"remote,omitzero" yaml:"remote,omitempty"`
+	RemoteBatch      *RemoteBatchInput `json:"remote_batch,omitzero" yaml:"remote_batch,omitempty"`
 	SubscriptionName string            `json:"subscription_name,omitempty" yaml:"subscription_name,omitempty"`
 	File             *FileRequest      `json:"file,omitzero" yaml:"file,omitempty"`
 	Processors       []ProcessorSpec   `json:"processors,omitempty" yaml:"processors,omitempty"`

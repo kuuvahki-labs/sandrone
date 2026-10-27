@@ -4,6 +4,7 @@ package cli
 import (
 	"encoding/json/jsontext"
 	"encoding/json/v2"
+	"errors"
 	"fmt"
 	"time"
 
@@ -42,6 +43,10 @@ func (f remoteInputFlags) remoteInput() *sandrone.RemoteInput {
 
 func addRemoteInputFlags(flags *pflag.FlagSet, remote *remoteInputFlags) {
 	flags.StringVar(&remote.inputURL, "input-url", "", "remote input URL to fetch instead of local input")
+	addRemoteFetchFlags(flags, remote)
+}
+
+func addRemoteFetchFlags(flags *pflag.FlagSet, remote *remoteInputFlags) {
 	flags.StringVar(&remote.userAgent, "user-agent", "", "HTTP User-Agent for remote input fetch")
 	flags.StringVar(&remote.proxy, "proxy", "", "HTTP, HTTPS, or SOCKS proxy URL for remote input fetch")
 	flags.DurationVar(&remote.remoteTimeout, "remote-timeout", 0, "remote input fetch timeout as Go duration, for example 3s or 500ms")
@@ -63,11 +68,13 @@ func newConvertCommand(cfg *config) *cobra.Command {
 	var input string
 	var output string
 	var reportOutput string
+	var inputURLs string
+	var processorsPath string
 	var remote remoteInputFlags
 
 	cmd := &cobra.Command{
-		Use:   "convert --to <fmt> (--input <path|-> | --input-url <url>)",
-		Short: "Convert input nodes directly to a target format",
+		Use:   "convert --to <fmt> (--input <path|-> | --input-url <url> | --input-urls <path|->)",
+		Short: "Process input nodes and convert them to a target format",
 		Long: `Convert reads nodes in one format and renders them directly to another format.
 
 Use --input - to read from stdin, or use --input-url to fetch a remote
@@ -75,6 +82,11 @@ config input. When --input-url is used, --from can be omitted so that the
 service auto-detects the source format. Omit --output to write the rendered
 body to stdout. Use --report-output with a file path to write the complete
 conversion report as pretty JSON.
+
+Use --input-urls to read a newline-delimited HTTP(S) URL list from a file or
+stdin. Each remote document is parsed separately, then successful sources are
+merged in input order. Use --processors to run a JSON nodes-stage processor
+chain once on the merged nodes. A URL list is not the node format uri-list.
 
 json-nodes is the normalized node IR, useful for debugging or exporting parsed
 nodes. mihomo-proxies and shadowrocket-proxies are Clash YAML node documents;
@@ -91,8 +103,15 @@ FileSpec should produce its final output.
   sandrone convert --from base64 --to sing-box-outbounds --input - --output out.json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			remoteInput := remote.remoteInput()
-			if remoteInput == nil && fromFormat == "" {
-				return fmt.Errorf("--from is required unless --input-url is set")
+			batchInput := cmd.Flags().Changed("input-urls")
+			if batchInput && inputURLs == "" {
+				return fmt.Errorf("--input-urls requires a file path or -")
+			}
+			if batchInput && (cmd.Flags().Changed("input") || cmd.Flags().Changed("input-url")) {
+				return fmt.Errorf("--input, --input-url and --input-urls are mutually exclusive")
+			}
+			if remoteInput == nil && !batchInput && fromFormat == "" {
+				return fmt.Errorf("--from is required unless --input-url or --input-urls is set")
 			}
 			if toFormat == "" {
 				return fmt.Errorf("--to is required")
@@ -103,9 +122,25 @@ FileSpec should produce its final output.
 			if err := validateOutputPaths(output, reportOutput); err != nil {
 				return err
 			}
+			if processorsPath == "-" && ((batchInput && inputURLs == "-") || (!batchInput && remoteInput == nil && (input == "" || input == "-"))) {
+				return fmt.Errorf("input and --processors cannot both read from stdin")
+			}
+			processors, err := readProcessorSpecs(processorsPath, cfg.stdin)
+			if err != nil {
+				return err
+			}
 			var body []byte
-			if remoteInput == nil {
-				var err error
+			var remoteBatch *sandrone.RemoteBatchInput
+			if batchInput {
+				list, readErr := readInput(inputURLs, cfg.stdin)
+				if readErr != nil {
+					return readErr
+				}
+				remoteBatch, err = parseURLList(list, remote)
+				if err != nil {
+					return err
+				}
+			} else if remoteInput == nil {
 				body, err = readInput(input, cfg.stdin)
 				if err != nil {
 					return err
@@ -116,27 +151,46 @@ FileSpec should produce its final output.
 				return err
 			}
 			rendered, err := engine.Convert(cmd.Context(), sandrone.ConvertRequest{
-				FromFormat: fromFormat,
-				ToFormat:   toFormat,
-				Content:    body,
-				Remote:     remoteInput,
+				FromFormat:      fromFormat,
+				ToFormat:        toFormat,
+				Content:         body,
+				Remote:          remoteInput,
+				RemoteBatch:     remoteBatch,
+				ParseProcessors: processors,
 			})
 			if err != nil {
+				if reportOutput != "" {
+					report := sandrone.Report{Kind: "convert", Status: "failed"}
+					if rendered != nil {
+						report = rendered.Report
+						report.Status = "failed"
+					}
+					if reportErr := writeReportOutput(reportOutput, report); reportErr != nil {
+						return errors.Join(err, fmt.Errorf("write failure report (main output unchanged): %w", reportErr))
+					}
+				}
 				return err
+			}
+			if rendered == nil {
+				return fmt.Errorf("conversion returned no result")
 			}
 			if err := writeOutput(output, cfg.stdout, rendered.Body); err != nil {
 				return err
 			}
 			if reportOutput != "" {
-				return writeReportOutput(reportOutput, rendered.Report)
+				if err := writeReportOutput(reportOutput, rendered.Report); err != nil {
+					return fmt.Errorf("main output was written, but writing report failed: %w", err)
+				}
 			}
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&fromFormat, "from", "", inputFormatsHelp+"; required unless --input-url is set")
+	cmd.Flags().StringVar(&fromFormat, "from", "", inputFormatsHelp+"; required unless --input-url or --input-urls is set")
 	cmd.Flags().StringVar(&toFormat, "to", "", targetFormatsHelp)
 	cmd.Flags().StringVar(&input, "input", "-", "input file path, or - to read from stdin")
 	addRemoteInputFlags(cmd.Flags(), &remote)
+	cmd.Flags().StringVar(&inputURLs, "input-urls", "", "newline-delimited HTTP(S) URL list path, or - for stdin")
+	cmd.Flags().StringVar(&processorsPath, "processors", "", "JSON nodes-stage ProcessorSpec array path, or - for stdin")
 	cmd.Flags().StringVar(&output, "output", "", "output file path, or stdout when empty or -")
 	cmd.Flags().StringVar(&reportOutput, "report-output", "", "write the complete conversion report as pretty JSON to a file")
 	return cmd

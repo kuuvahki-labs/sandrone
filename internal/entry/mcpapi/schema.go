@@ -4,6 +4,8 @@ import (
 	"encoding/json/v2"
 
 	"github.com/google/jsonschema-go/jsonschema"
+
+	"github.com/kuuvahki-labs/sandrone/internal/domain"
 )
 
 func convertInputSchema() *jsonschema.Schema {
@@ -12,6 +14,7 @@ func convertInputSchema() *jsonschema.Schema {
 		"to_format":         renderFormatSchema(),
 		"content":           stringSchema(),
 		"remote":            remoteInputSchema(),
+		"remote_batch":      remoteBatchInputSchema(),
 		"parse_processors":  arraySchema(processorSpecSchema()),
 		"render_processors": arraySchema(processorSpecSchema()),
 		"options": closedObject(map[string]*jsonschema.Schema{
@@ -21,13 +24,23 @@ func convertInputSchema() *jsonschema.Schema {
 	}, []string{"to_format"},
 		&jsonschema.Schema{
 			Required: []string{"content", "from_format"},
-			Not:      &jsonschema.Schema{Required: []string{"remote"}},
+			Not:      &jsonschema.Schema{AnyOf: []*jsonschema.Schema{{Required: []string{"remote"}}, {Required: []string{"remote_batch"}}}},
 		},
 		&jsonschema.Schema{
 			Required: []string{"remote"},
-			Not:      &jsonschema.Schema{Required: []string{"content"}},
+			Not:      &jsonschema.Schema{AnyOf: []*jsonschema.Schema{{Required: []string{"content"}}, {Required: []string{"remote_batch"}}}},
 		},
+		&jsonschema.Schema{Required: []string{"remote_batch"}, Not: &jsonschema.Schema{AnyOf: []*jsonschema.Schema{{Required: []string{"content"}}, {Required: []string{"remote"}}}}},
 	)
+}
+
+func remoteBatchInputSchema() *jsonschema.Schema {
+	sources := arraySchema(remoteInputSchema())
+	sources.MinItems = new(1)
+	return closedObject(map[string]*jsonschema.Schema{
+		"sources":     sources,
+		"concurrency": boundedIntegerSchema(0, new(float64(domain.MaxRemoteBatchConcurrency))),
+	}, []string{"sources"})
 }
 
 func getFileInputSchema() *jsonschema.Schema {

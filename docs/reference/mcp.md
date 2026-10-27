@@ -110,11 +110,15 @@ schema 为准；未知字段会被拒绝。`ProcessorSpec.params` 和
 | --- | --- | --- |
 | `sandrone_list_resources` | 可选 `kind`（`subscription` 或 `file`）、`cursor`、`limit`。 | 当前定义摘要 `items` 与可选 `next_cursor`。 |
 | `sandrone_inspect` | 无参数。 | 轻量运行时摘要与 capability/schema catalog URI；不内嵌字段详情。 |
-| `sandrone_convert` | `to_format`，以及 inline `content` + `from_format` 或受控 `remote`；可带 parse/render processors、render options 和 metadata。 | `content_type`、可选 `body` 与 `report`。 |
+| `sandrone_convert` | `to_format`，以及 inline `content` + `from_format` 或受控 `remote` / `remote_batch`；可带 parse/render processors、render options 和 metadata。 | `content_type`、可选 `body` 与 `report`。 |
 | `sandrone_preview_subscription` | 已保存的 subscription `name` 与可选字符串 `args`。 | processor 前后的节点、数量与 `report`。 |
 | `sandrone_render_subscription` | 已保存的 subscription `name`、目标 `format`、可选字符串 `args` 与 `refresh`。 | `content_type`、可选 `body` 与 `report`。 |
 | `sandrone_get_subscription_traffic` | 已保存的 remote subscription `name`；可用 `refresh` 强制刷新。 | 流量 metadata。 |
 | `sandrone_get_file` | 已保存的 `file` 名称、可选 `target`/字符串 `args`/`refresh`；`mode` 为 `render`、`source` 或 `spec`，省略时默认 `render`。 | render 返回正文与 report；source 返回 `FileDocument`；spec 返回完整定义与 `resource_uri`。 |
+
+`remote_batch` 的来源顺序、并发、部分失败和 `report.source_results` 与
+[受保护 HTTP 转换](http-api/conversion.md#批量远程输入)相同。批量全失败时 MCP
+返回 `isError: true`，结构化错误保留 `report`，不输出部分客户端正文。
 
 `sandrone_convert` 的格式与有损边界见[格式与能力参考](capabilities.md)；
 processor 声明见 [Processors](processors.md)。文件 source、typed config 与完整

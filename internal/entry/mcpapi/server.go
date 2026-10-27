@@ -108,17 +108,25 @@ func registerTools(server *mcp.Server, rt *app.Runtime) {
 		if err != nil {
 			return nil, renderOutput{}, err
 		}
+		var content []byte
+		if in.Remote == nil && in.RemoteBatch == nil {
+			content = []byte(in.Content)
+		}
 		result, err := rt.Service.Convert(ctx, domain.ConvertRequest{
 			FromFormat:       in.FromFormat,
 			ToFormat:         in.ToFormat,
-			Content:          []byte(in.Content),
+			Content:          content,
 			Remote:           in.Remote,
+			RemoteBatch:      in.RemoteBatch,
 			ParseProcessors:  parseProcessors,
 			RenderProcessors: renderProcessors,
 			Options:          in.Options,
 			Meta:             in.Meta,
 		})
 		if err != nil {
+			if result != nil && len(result.Report.SourceResults) > 0 {
+				err = &conversionReportError{cause: err, report: result.Report}
+			}
 			return nil, renderOutput{}, err
 		}
 		out := renderOutput{

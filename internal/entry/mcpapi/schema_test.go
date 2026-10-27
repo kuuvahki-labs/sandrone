@@ -31,8 +31,9 @@ func TestToolSchemasExposeObjectValuesAndBoundaryValidation(t *testing.T) {
 		t, result.Tools, "sandrone_put_file", "properties.config.properties.settings",
 	))
 	require.JSONEq(t, `[
-		{"required":["content","from_format"],"not":{"required":["remote"]}},
-		{"required":["remote"],"not":{"required":["content"]}}
+		{"required":["content","from_format"],"not":{"anyOf":[{"required":["remote"]},{"required":["remote_batch"]}]}},
+		{"required":["remote"],"not":{"anyOf":[{"required":["content"]},{"required":["remote_batch"]}]}},
+  {"required":["remote_batch"],"not":{"anyOf":[{"required":["content"]},{"required":["remote"]}]}}
 	]`, extractSchema(t, result.Tools, "sandrone_convert", "oneOf"))
 	require.JSONEq(t, `["spec","source","render"]`, extractSchema(
 		t, result.Tools, "sandrone_get_file", "properties.mode.enum",

@@ -52,10 +52,14 @@ func (s *Server) publicConvert(w http.ResponseWriter, r *http.Request) {
 	} else if fromFormat == "" {
 		fromFormat = "uri-list"
 	}
+	var inputContent []byte
+	if remote == nil {
+		inputContent = []byte(content)
+	}
 	result, err := s.rt.Service.ConvertPublic(r.Context(), domain.ConvertRequest{
 		FromFormat: fromFormat,
 		ToFormat:   toFormat,
-		Content:    []byte(content),
+		Content:    inputContent,
 		Remote:     remote,
 	})
 	if err != nil {

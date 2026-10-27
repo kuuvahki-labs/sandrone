@@ -109,7 +109,7 @@ curl -sS -G "$SANDRONE_URL/convert" \
 这个受保护接口执行完整 `parse -> parse processors -> render -> render
 processors` 流程。与 `GET /convert` 相比，它：
 
-- 用 JSON body 传递字符串 `content` 或受控 `remote`，不会把节点正文放入 URL；
+- 用 JSON body 传递字符串 `content`、受控 `remote` 或 `remote_batch`，不会把节点正文放入 URL；
 - 接受 parse/render processor、render options 和 metadata；
 - 总是返回字符串 `body` 与完整结构化 `report`；
 - 继承 `/v1/*` bearer 鉴权，不是公开转换入口。
@@ -124,18 +124,57 @@ processor 的 stage、声明顺序和 config 语义只见
 | --- | --- | --- |
 | `to_format` | string | 必填 renderer 格式。 |
 | `from_format` | string | inline `content` 时必填；remote 输入省略时允许自动检测。 |
-| `content` | string | inline 节点正文；与 `remote` 互斥。HTTP wire 上始终是字符串，不是 Base64 bytes。 |
-| `remote` | object | 与 `content` 互斥；`url` 必填，可选 `user_agent`、`proxy`、非负 `timeout_ms`、`cache_ttl_seconds`。 |
+| `content` | string | inline 节点正文；与 `remote`、`remote_batch` 互斥。HTTP wire 上始终是字符串，不是 Base64 bytes。 |
+| `remote` | object | 与 `content`、`remote_batch` 互斥；`url` 必填，可选 `user_agent`、`proxy`、非负 `timeout_ms`、`cache_ttl_seconds`。 |
+| `remote_batch` | object | 批量远程输入；`sources` 是非空 `remote` 对象数组，`concurrency` 省略或 `0` 使用 `4`，显式值为 `1..32`。 |
 | `parse_processors` | array | 可选 parse 后的 processor 声明列表，按声明顺序执行。 |
 | `render_processors` | array | 可选 render flow 的 processor 声明列表，按声明顺序执行。 |
 | `options` | object | 可选 render options；当前公开字段是 `format`。未给出时使用 `to_format`。 |
 | `meta` | object | 可选 string-to-string metadata，传入本次 parse/report 上下文。 |
 
-`content` 与 `remote` 必须且只能提供一个。格式名应先用
+`content`、`remote` 与 `remote_batch` 必须且只能提供一个。格式名应先用
 [`GET /v1/inspect`](#get-v1inspect) 或
 [schema catalog](schemas.md)发现；字段兼容性见[格式与能力](../capabilities.md)。
 convert 属于临时输入；`remote.cache_ttl_seconds` 会被校验但不会创建或读取持久
 remote-fetch cache。持久缓存只用于已保存 Subscription/File 的执行作用域。
+
+### 批量远程输入
+
+```json
+{
+  "to_format": "json-nodes",
+  "remote_batch": {
+    "sources": [
+      {"url": "https://first.example/subscription"},
+      {"url": "https://second.example/subscription"}
+    ],
+    "concurrency": 4
+  },
+  "parse_processors": [
+    {"type": "dedup", "stage": "nodes", "params": {"strategy": "connection"}}
+  ]
+}
+```
+
+每个来源独立抓取与解析；`from_format` 省略时逐来源自动检测，显式指定时对所有来源
+生效。批量自动检测拒绝明显的 HTTP(S) 订阅 URL 清单（包括解包后清单），不会递归
+抓取；明确的 `http://host:port` 代理端点及显式 `from_format` 仍使用既有 URI 语义。
+结果按输入顺序合并，再执行一次 parse/render processors。重复 URL 保留各自
+输入序号；不会隐式去重来源或节点。单个来源失败时继续其他来源，返回 `200` 且
+`report.status` 为 `partial`。全部失败或处理器执行前没有有效节点时返回错误；处理器
+主动过滤为空是正常结果。取消请求会停止排队，尚未开始的来源标为跳过。
+
+`report.source_results` 与输入逐项对应，包含零起始 `index`、去除 userinfo、query 和
+fragment 的 `url`、`fetch_status`（`ok`/`failed`/`skipped`）、`parse_status`
+（`ok`/`failed`/`skipped`）、识别的 `format`、合并及处理器执行前的 `node_count`，
+以及失败时的结构化 `error`。超时与取消分别使用 `remote_fetch_timeout` 和
+`remote_fetch_canceled`；其他错误保留可用的原错误码。结果不包含逐节点 probe 的
+来源归属，也不表示每个来源经过合并处理器后的通过判定。
+
+批量执行失败时，HTTP 错误 envelope 除 `error` 外保留 `report` 及逐来源结果；错误
+不会输出部分客户端正文。此能力只用于受保护转换，匿名 `GET /convert` 不接受批量
+远程输入。SDK `Parse`/`Convert` 同样接收 `RemoteBatch`，执行失败时可能同时返回
+非空结果与 error，调用者可读取结果中的 report。
 
 ### 响应
 

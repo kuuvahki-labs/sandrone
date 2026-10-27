@@ -3,14 +3,15 @@ package httpapi
 import "github.com/kuuvahki-labs/sandrone/internal/domain"
 
 type convertRequest struct {
-	FromFormat       string                 `json:"from_format"`
-	ToFormat         string                 `json:"to_format"`
-	Content          *string                `json:"content,omitzero"`
-	Remote           *domain.RemoteInput    `json:"remote,omitzero"`
-	ParseProcessors  []domain.ProcessorSpec `json:"parse_processors,omitempty"`
-	RenderProcessors []domain.ProcessorSpec `json:"render_processors,omitempty"`
-	Options          domain.RenderOptions   `json:"options,omitempty"`
-	Meta             map[string]string      `json:"meta,omitempty"`
+	RemoteBatch      *domain.RemoteBatchInput `json:"remote_batch,omitzero"`
+	FromFormat       string                   `json:"from_format"`
+	ToFormat         string                   `json:"to_format"`
+	Content          *string                  `json:"content,omitzero"`
+	Remote           *domain.RemoteInput      `json:"remote,omitzero"`
+	ParseProcessors  []domain.ProcessorSpec   `json:"parse_processors,omitempty"`
+	RenderProcessors []domain.ProcessorSpec   `json:"render_processors,omitempty"`
+	Options          domain.RenderOptions     `json:"options,omitempty"`
+	Meta             map[string]string        `json:"meta,omitempty"`
 }
 
 type subscriptionRenderRequest struct {
@@ -80,7 +81,8 @@ type subscriptionPreviewResponse struct {
 }
 
 type errorResponse struct {
-	Error errorBody `json:"error"`
+	Report *domain.Report `json:"report,omitzero"`
+	Error  errorBody      `json:"error"`
 }
 
 type errorBody struct {

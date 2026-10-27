@@ -23,8 +23,10 @@ var autoSubscriptionFormats = []string{"uri-list", "mihomo", "sing-box"}
 type publicRemoteFetchContextKey struct{}
 
 type parseInputResult struct {
-	Nodes  []domain.NodeIR
-	Source *domain.SourceInfo
+	SourceResults []domain.RemoteSourceResult
+	Status        string
+	Nodes         []domain.NodeIR
+	Source        *domain.SourceInfo
 }
 
 type remoteInputResult struct {
@@ -37,10 +39,23 @@ type remoteInputResult struct {
 }
 
 func (s *Service) parseRequestInput(ctx context.Context, req domain.ParseRequest) (*parseInputResult, error) {
+	sources := 0
+	if req.Content != nil {
+		sources++
+	}
 	if req.Remote != nil {
-		if len(req.Content) > 0 {
-			return nil, domain.NewError(domain.CodeInvalidArgument, "content and remote input are mutually exclusive")
-		}
+		sources++
+	}
+	if req.RemoteBatch != nil {
+		sources++
+	}
+	if sources != 1 {
+		return nil, domain.NewError(domain.CodeInvalidArgument, "exactly one of content, remote or remote_batch is required")
+	}
+	if req.RemoteBatch != nil {
+		return s.parseRemoteBatch(ctx, req.Format, *req.RemoteBatch)
+	}
+	if req.Remote != nil {
 		remoteInput, err := s.fetchRemoteInput(ctx, *req.Remote)
 		if err != nil {
 			return nil, err

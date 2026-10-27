@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -12,13 +13,17 @@ import (
 // points should call this instead of piping json-nodes themselves.
 func (s *Service) Convert(ctx context.Context, req domain.ConvertRequest) (*domain.RenderResult, error) {
 	start := time.Now()
+	if _, ok := s.renderers[normalizeFormat(req.ToFormat)]; !ok {
+		return nil, domain.NewError(domain.CodeInvalidArgument, fmt.Sprintf("unsupported render format %q", req.ToFormat))
+	}
 	parsed, err := s.parse(ctx, domain.ParseRequest{
-		Format:     req.FromFormat,
-		Content:    req.Content,
-		Remote:     req.Remote,
-		Target:     req.ToFormat,
-		Processors: req.ParseProcessors,
-		Meta:       req.Meta,
+		Format:      req.FromFormat,
+		Content:     req.Content,
+		Remote:      req.Remote,
+		RemoteBatch: req.RemoteBatch,
+		Target:      req.ToFormat,
+		Processors:  req.ParseProcessors,
+		Meta:        req.Meta,
 	})
 	if err != nil {
 		s.log(ctx, slog.LevelError, "service convert failed",
@@ -31,6 +36,11 @@ func (s *Service) Convert(ctx context.Context, req domain.ConvertRequest) (*doma
 			"duration_ms", elapsedMillis(start),
 			"error", err.Error(),
 		)
+		if parsed != nil && len(parsed.Report.SourceResults) > 0 {
+			report := parsed.Report
+			report.Kind, report.Status = "convert", "failed"
+			return &domain.RenderResult{Report: s.prepareReport("convert", report)}, err
+		}
 		return nil, err
 	}
 	options := req.Options
@@ -56,10 +66,19 @@ func (s *Service) Convert(ctx context.Context, req domain.ConvertRequest) (*doma
 			"duration_ms", elapsedMillis(start),
 			"error", err.Error(),
 		)
+		if parsed != nil && len(parsed.Report.SourceResults) > 0 {
+			report := parsed.Report
+			report.Kind, report.Status = "convert", "failed"
+			return &domain.RenderResult{Report: s.prepareReport("convert", report)}, err
+		}
 		return nil, err
 	}
 	report := rendered.Report
 	report.Kind = "convert"
+	report.SourceResults = parsed.Report.SourceResults
+	if parsed.Report.Status != "" {
+		report.Status = parsed.Report.Status
+	}
 	report.SourceRefs = append(append([]domain.SourceRef{}, parsed.Report.SourceRefs...), report.SourceRefs...)
 	report.Warnings = append(append([]domain.Warning{}, parsed.Report.Warnings...), report.Warnings...)
 	report = s.prepareReport("convert", report)
@@ -81,6 +100,9 @@ func (s *Service) Convert(ctx context.Context, req domain.ConvertRequest) (*doma
 // ConvertPublic runs the processor-free conversion flow and applies the public
 // network policy to request-level remote inputs.
 func (s *Service) ConvertPublic(ctx context.Context, req domain.ConvertRequest) (*domain.RenderResult, error) {
+	if req.RemoteBatch != nil {
+		return nil, domain.NewError(domain.CodeInvalidArgument, "public convert does not support remote_batch")
+	}
 	if len(req.ParseProcessors) > 0 || len(req.RenderProcessors) > 0 || len(req.Meta) > 0 || req.Options.Format != "" {
 		return nil, domain.NewError(domain.CodeInvalidArgument, "public convert does not support processors, meta, or render options")
 	}

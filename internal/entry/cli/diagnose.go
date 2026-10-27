@@ -45,6 +45,7 @@ reports and must be treated as sensitive data.`,
 func newDiagnoseInputCommand(cfg *config) *cobra.Command {
 	var kind string
 	var flags diagnoseNodeFlags
+	var remote remoteInputFlags
 	cmd := &cobra.Command{
 		Use:   "input <path|->",
 		Short: "Diagnose a local input or stdin",
@@ -52,15 +53,19 @@ func newDiagnoseInputCommand(cfg *config) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			kind = strings.ToLower(strings.TrimSpace(kind))
 			switch sandrone.DiagnoseInputKind(kind) {
-			case sandrone.DiagnoseInputAuto, sandrone.DiagnoseInputNodes, sandrone.DiagnoseInputSubscription, sandrone.DiagnoseInputFile:
+			case sandrone.DiagnoseInputAuto, sandrone.DiagnoseInputNodes, sandrone.DiagnoseInputSubscription, sandrone.DiagnoseInputFile, sandrone.DiagnoseInputURLList:
 			default:
-				return fmt.Errorf("--kind must be auto, nodes, subscription, or file")
+				return fmt.Errorf("--kind must be auto, nodes, subscription, file, or url-list")
 			}
-			if flags.format != "" && kind != string(sandrone.DiagnoseInputAuto) && kind != string(sandrone.DiagnoseInputNodes) {
-				return fmt.Errorf("--format is only supported for nodes input")
+			isNodes := kind == string(sandrone.DiagnoseInputAuto) || kind == string(sandrone.DiagnoseInputNodes) || kind == string(sandrone.DiagnoseInputURLList)
+			if flags.format != "" && !isNodes {
+				return fmt.Errorf("--format is only supported for nodes or url-list input")
 			}
-			if flags.processorsPath != "" && kind != string(sandrone.DiagnoseInputAuto) && kind != string(sandrone.DiagnoseInputNodes) {
-				return fmt.Errorf("--processors is only supported for nodes input")
+			if flags.processorsPath != "" && !isNodes {
+				return fmt.Errorf("--processors is only supported for nodes or url-list input")
+			}
+			if kind != string(sandrone.DiagnoseInputURLList) && (cmd.Flags().Changed("user-agent") || cmd.Flags().Changed("proxy") || cmd.Flags().Changed("remote-timeout")) {
+				return fmt.Errorf("remote fetch flags require --kind url-list")
 			}
 			if args[0] == "-" && flags.processorsPath == "-" {
 				return fmt.Errorf("input and --processors cannot both read from stdin")
@@ -73,14 +78,23 @@ func newDiagnoseInputCommand(cfg *config) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runDiagnose(cmd, cfg, sandrone.DiagnoseRequest{
+			req := sandrone.DiagnoseRequest{
 				Kind: sandrone.DiagnoseInputKind(kind), Name: args[0], Format: flags.format,
 				Content: body, Processors: processors,
-			}, flags.output)
+			}
+			if kind == string(sandrone.DiagnoseInputURLList) {
+				req.RemoteBatch, err = parseURLList(body, remote)
+				if err != nil {
+					return err
+				}
+				req.Content = nil
+			}
+			return runDiagnose(cmd, cfg, req, flags.output)
 		},
 	}
-	cmd.Flags().StringVar(&kind, "kind", "auto", "input kind: auto, nodes, subscription, or file")
+	cmd.Flags().StringVar(&kind, "kind", "auto", "input kind: auto, nodes, subscription, file, or url-list")
 	addDiagnoseNodeFlags(cmd, &flags)
+	addRemoteFetchFlags(cmd.Flags(), &remote)
 	return cmd
 }
 

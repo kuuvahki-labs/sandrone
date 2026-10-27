@@ -91,18 +91,38 @@ API 保存了其它被覆盖字段时，当前进程继续使用覆盖值。`war
 
 ```text
 sandrone convert --to <format> \
-  (--from <format> --input <path|-> | --input-url <url>)
+  (--from <format> --input <path|-> | --input-url <url> | --input-urls <path|->) \
+  [--processors <json-path|->]
 ```
 
-`convert` 解析节点、规范化后直接渲染为目标节点格式。
+`convert` 解析、规范化节点，执行显式指定的 nodes-stage processors 后渲染目标格式。
 
 - 本地输入必须提供 `--from`；`--input` 缺省为 `-`，即标准输入。
 - `--input-url` 使用受控远程抓取，并允许省略 `--from` 以自动检测格式。
-- 显式给出 `--input`（包括 `--input -`）后不得同时给出 `--input-url`。
+- `--input-urls` 读取逐行 HTTP(S) URL 清单，支持文件或 stdin、空行与 CRLF。
+  每个来源分别获取并检测格式，成功来源按输入顺序合并；显式 `--from` 覆盖所有来源的格式。
+  这不是节点 `uri-list`，获取到的正文也不会递归展开为 URL 清单。
+- `--input`、`--input-url`、`--input-urls` 互斥；未指定远程输入时仍默认读取节点 stdin。
+- `--processors` 使用 JSON `ProcessorSpec[]`，在合并后的节点上执行一次。
+  不自动插入去重或测活；节点或 URL 清单输入与 processors 不能同时读取 stdin。
 - `--to` 必填。
 - `--output <path|->` 控制主输出；省略或使用 `-` 时写标准输出。
 - `--report-output <path>` 将完整 report 写为缩进 JSON；它必须是文件路径，
   不能为 `-`，也不能与 `--output` 指向同一文件。
+
+批量获取默认并发为 4；`--user-agent`、`--proxy`、`--remote-timeout` 应用于所有 URL。
+部分来源失败时继续处理并报告 `partial`，完成后退出 `0`；所有来源失败或没有可解析节点时
+退出非零并保留已有主输出。处理器有意筛选为空仍是有效结果。
+报告的 `source_results` 按输入顺序记录获取／解析状态、合并前节点数和错误，`index` 从 0
+开始，可用于关联原清单；报告 URL 会脱敏，解析成功不代表节点可用。
+
+```sh
+sandrone convert --input-urls urls.txt --processors pipeline.json \
+  --to json-nodes --output nodes.json --report-output report.json
+```
+
+文件输出先写同目录临时文件再原子替换。主输出与报告分别更新；转换失败时仍尽可能写出
+失败报告，主输出成功而报告写入失败时命令返回非零并明确说明已更新主输出。
 
 远程输入 flags 为：
 
@@ -119,7 +139,7 @@ sandrone convert --to <format> \
 ## `diagnose`
 
 ```text
-sandrone diagnose input <path|-> [--kind auto|nodes|subscription|file]
+sandrone diagnose input <path|-> [--kind auto|nodes|subscription|file|url-list]
 sandrone diagnose url <url>
 sandrone diagnose subscription <name> [--cache-mode refresh|reuse]
 sandrone diagnose file <name-or-spec-path>
@@ -135,8 +155,10 @@ Subscription、FileSpec 和一次性 ProcessorSpec 文件使用 JSON 定义。�
 
 - `input` 的 `--kind` 缺省为 `auto`；强结构同时命中多个类型时以
   `input_kind_ambiguous` 失败，无法识别时以 `input_kind_unrecognized` 失败。
-- `--format` 只覆盖节点格式识别，不会让 Subscription 或 FileSpec 静默退化为节点。
-- `--processors <json-path|->` 只用于 nodes 输入；输入和 processors 不能
+- 显式 `--kind url-list` 读取批量订阅 URL，使用与 `convert --input-urls` 相同的执行路径，
+  可使用 `--user-agent`、`--proxy`、`--remote-timeout` 配置获取；不会自动把文本识别为 URL 清单。
+- `--format` 只覆盖节点或 URL 清单中正文的格式识别，不会让 Subscription 或 FileSpec 静默退化为节点。
+- `--processors <json-path|->` 用于 nodes 或 url-list 输入；输入和 processors 不能
   同时从标准输入读取。文件内容必须是顶层 `ProcessorSpec[]`。
 - `url` 只把远程正文解释为节点文档，并支持 `--user-agent`、`--proxy`、
   `--remote-timeout`、`--format` 和 `--processors`。
@@ -162,7 +184,7 @@ sandrone render file <name-or-spec.json>
 
 `render` 执行已声明资源的完整物化流程并直接输出最终正文。三个相关入口的职责是：
 
-- `convert`：将一次性节点输入转换为另一种节点格式；
+- `convert`：对一次性节点或批量远程输入执行可选处理链并输出目标节点格式；
 - `diagnose`：执行输入流水线并输出 stages、warnings、report 和 probe trace 等
   诊断 JSON；
 - `render`：执行 Store 中的 Subscription 或 Store/本地的 FileSpec，并输出供

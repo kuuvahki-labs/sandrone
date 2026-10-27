@@ -142,14 +142,15 @@ func (sub subscription) domain() (domain.Subscription, error) {
 }
 
 type convertInput struct {
-	FromFormat       string               `json:"from_format"`
-	ToFormat         string               `json:"to_format"`
-	Content          string               `json:"content,omitempty"`
-	Remote           *domain.RemoteInput  `json:"remote,omitzero"`
-	ParseProcessors  []processorSpec      `json:"parse_processors,omitempty"`
-	RenderProcessors []processorSpec      `json:"render_processors,omitempty"`
-	Options          domain.RenderOptions `json:"options,omitempty"`
-	Meta             map[string]string    `json:"meta,omitempty"`
+	RemoteBatch      *domain.RemoteBatchInput `json:"remote_batch,omitzero"`
+	FromFormat       string                   `json:"from_format"`
+	ToFormat         string                   `json:"to_format"`
+	Content          string                   `json:"content,omitempty"`
+	Remote           *domain.RemoteInput      `json:"remote,omitzero"`
+	ParseProcessors  []processorSpec          `json:"parse_processors,omitempty"`
+	RenderProcessors []processorSpec          `json:"render_processors,omitempty"`
+	Options          domain.RenderOptions     `json:"options,omitempty"`
+	Meta             map[string]string        `json:"meta,omitempty"`
 }
 
 type getFileInput struct {

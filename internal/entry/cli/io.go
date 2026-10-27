@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"fmt"
@@ -26,10 +27,43 @@ func writeOutput(outputPath string, stdout io.Writer, body []byte) error {
 		_, err := stdout.Write(body)
 		return err
 	}
+	return writeAtomicOutput(outputPath, body, 0o644)
+}
+
+// Stage the complete file in the destination directory. A failed write or rename
+// leaves an existing output intact; each output is replaced independently.
+func writeAtomicOutput(outputPath string, body []byte, mode os.FileMode) error {
+	if info, err := os.Stat(outputPath); err == nil {
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("output path is not a regular file: %s", outputPath)
+		}
+		// Do not make an existing private result more permissive.
+		mode &= info.Mode().Perm()
+	} else if !os.IsNotExist(err) {
+		return err
+	}
 	if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(outputPath, body, 0o644)
+	// Open with the final mode so the kernel applies the caller's umask. Chmod
+	// after CreateTemp would bypass it and could expose newly written credentials.
+	file, err := os.OpenFile(filepath.Join(filepath.Dir(outputPath), ".sandrone-output-"+rand.Text()), os.O_RDWR|os.O_CREATE|os.O_EXCL, mode)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = os.Remove(file.Name()) }()
+	if _, err := file.Write(body); err != nil {
+		_ = file.Close()
+		return err
+	}
+	if err := file.Sync(); err != nil {
+		_ = file.Close()
+		return err
+	}
+	if err := file.Close(); err != nil {
+		return err
+	}
+	return os.Rename(file.Name(), outputPath)
 }
 
 func writeJSONOutput(outputPath string, stdout io.Writer, value any) error {
@@ -51,22 +85,7 @@ func writeSensitiveJSONOutput(outputPath string, stdout io.Writer, value any) er
 		_, err = stdout.Write(body)
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
-		return err
-	}
-	file, err := os.OpenFile(outputPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
-	if err != nil {
-		return err
-	}
-	if err := file.Chmod(0o600); err != nil {
-		_ = file.Close()
-		return err
-	}
-	if _, err := file.Write(body); err != nil {
-		_ = file.Close()
-		return err
-	}
-	return file.Close()
+	return writeAtomicOutput(outputPath, body, 0o600)
 }
 
 func writeReportOutput(outputPath string, report sandrone.Report) error {

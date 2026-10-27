@@ -9,14 +9,21 @@ type RemoteInput struct {
 	CacheTTLSeconds int    `json:"cache_ttl_seconds,omitzero" yaml:"cache_ttl_seconds,omitempty"`
 }
 
+// RemoteBatchInput describes ordered remote subscriptions fetched with bounded concurrency.
+type RemoteBatchInput struct {
+	Sources     []RemoteInput `json:"sources" yaml:"sources"`
+	Concurrency int           `json:"concurrency,omitempty" yaml:"concurrency,omitempty"`
+}
+
 // ParseRequest describes a single parse invocation.
 type ParseRequest struct {
-	Format     string            `json:"format" yaml:"format"`
-	Content    []byte            `json:"content,omitempty" yaml:"content,omitempty"`
-	Remote     *RemoteInput      `json:"remote,omitzero" yaml:"remote,omitempty"`
-	Target     string            `json:"target,omitempty" yaml:"target,omitempty"`
-	Processors []ProcessorSpec   `json:"processors,omitempty" yaml:"processors,omitempty"`
-	Meta       map[string]string `json:"meta,omitempty" yaml:"meta,omitempty"`
+	Format      string            `json:"format" yaml:"format"`
+	Content     []byte            `json:"content,omitempty" yaml:"content,omitempty"`
+	Remote      *RemoteInput      `json:"remote,omitzero" yaml:"remote,omitempty"`
+	RemoteBatch *RemoteBatchInput `json:"remote_batch,omitzero" yaml:"remote_batch,omitempty"`
+	Target      string            `json:"target,omitempty" yaml:"target,omitempty"`
+	Processors  []ProcessorSpec   `json:"processors,omitempty" yaml:"processors,omitempty"`
+	Meta        map[string]string `json:"meta,omitempty" yaml:"meta,omitempty"`
 }
 
 type ParseResult struct {
@@ -91,6 +98,7 @@ type ConvertRequest struct {
 	ToFormat         string            `json:"to_format" yaml:"to_format"`
 	Content          []byte            `json:"content,omitempty" yaml:"content,omitempty"`
 	Remote           *RemoteInput      `json:"remote,omitzero" yaml:"remote,omitempty"`
+	RemoteBatch      *RemoteBatchInput `json:"remote_batch,omitzero" yaml:"remote_batch,omitempty"`
 	ParseProcessors  []ProcessorSpec   `json:"parse_processors,omitempty" yaml:"parse_processors,omitempty"`
 	RenderProcessors []ProcessorSpec   `json:"render_processors,omitempty" yaml:"render_processors,omitempty"`
 	Options          RenderOptions     `json:"options,omitempty" yaml:"options,omitempty"`

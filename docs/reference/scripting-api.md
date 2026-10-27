@@ -263,6 +263,55 @@ header；未知字段同样会使 `api.ini.stringify` 失败。输出统一使�
 脚本处于已保存 Subscription 的执行作用域时，`cache_ttl_seconds` 使用该资源的
 持久 probe cache；临时脚本管线不会读写持久缓存。
 
+### `api.http.request(nodes, options)`
+
+仅在 `nodes` 阶段提供，节点约束与 `api.probe` 相同：传入原始输入的逐项精确子集，
+包括重复次数限制；应先请求，再改名或写 metadata。它没有直连网络入口。
+
+```js
+const results = api.http.request(input.nodes, {
+  url: "https://www.cloudflare.com/cdn-cgi/trace",
+  method: "GET",                 // GET 或 HEAD，默认 GET
+  core: "sing-box",              // sing-box 或 mihomo，默认 sing-box
+  headers: { Accept: "text/plain" },
+  timeout_ms: 5000,               // 单节点超时，不含排队
+  concurrency: 4,
+  max_response_bytes: 65536       // 正文上限
+});
+```
+
+必须提供 HTTP(S) `url`，不接受 userinfo、fragment 或覆盖 Host 的请求头。数值省略或为
+0 时使用上述默认值，负值、非法请求头和未知 options 字段报错。返回数组与本次传入的
+子集等长且顺序相同；`index` 是该子集内从 0 开始的位置，与原始输入数组索引不一定相同。
+每项含 `index`、`status_code`（收到响应时）、`headers`（值为字符串数组）、`body`、
+`duration_ms` 和失败时的 `error`。正文和响应头作为 UTF-8 文本返回，无效字节用替换字符表示。
+非 2xx 状态仍返回响应，由脚本决定是否可接受。
+
+请求经对应节点，不使用环境代理、不在失败时直连回退、不跟随重定向，不持久缓存。
+所选核心必须编译进当前二进制：sing-box 使用 `probe_singbox`，Mihomo 使用 `probe_mihomo`，
+也可同时启用。核心未编译时返回 `probe_backend_unavailable`，不会切换到另一核心；
+省略 `core` 始终选择 sing-box。
+正文超限时返回错误及空正文，响应头最多 64 KiB；单节点请求失败不取消其他节点。
+非法参数、核心缺失或启动失败使整个调用失败。调用服从 script 总超时及调用方取消；
+总超时或取消使整个调用失败，不返回尚未完成的部分数组。同名节点使用独立临时标识，
+不会改变输入节点名称。
+
+出口解析、过滤和命名示例在 [exit-info.js](../../examples/scripts/exit-info.js)。它对每个
+节点只做一次 GET，拒绝重复 trace 字段，校验 IP 格式、常见非公网网段及 ISO 国家代码，
+剔除无效信息并发出 warning，
+写入 `meta["exit.ip"]`、`meta["exit.country"]`，生成 `JP-a1b2c3` 一类名称并处理哈希碰撞。
+该结果只是本次请求观测，不表示未来可用性。使用时，将脚本内容填入 script 处理器的
+`source: { type: "inline", content: "…" }`，与连接去重处理器组成 `pipeline.json`。
+受控 `source.type=file` 不表示任意本地路径。
+
+```sh
+sandrone convert --input-urls urls.txt --processors pipeline.json --to json-nodes --output nodes.json
+```
+
+处理链先连接去重，再运行脚本；建议显式设置 script 总时限，如 `timeout_ms: 300000`。
+很大的清单需要按节点数及并发调整该时限。脚本 `args.url` 可替换为返回同样 trace 格式的
+服务，`args.core` 可选择核心，`args.timeout_ms` 与 `args.concurrency` 可调整单节点时限与并发。
+
 ### `api.subscription.produce(name, options?)`
 
 解析已登记订阅。`options` 可含 `target` 与字符串 `args`；`args` 是该子调用的
@@ -293,7 +342,7 @@ header；未知字段同样会使 `api.ini.stringify` 失败。输出统一使�
 ## 超时、隔离与敏感信息
 
 每次执行有一个总超时。未配置 processor 级正数 `timeout_ms` 时继承项目
-`script_defaults.timeout_ms`，该项目默认值为 2000 ms。它覆盖顶层求值、`main`、`api.probe`
+`script_defaults.timeout_ms`，该项目默认值为 2000 ms。它覆盖顶层求值、`main`、`api.probe`、`api.http.request`
 及执行期间的受控资源调用；超时返回 `script_timeout`。脚本 source 的加载和
 编译发生在该执行时限之前，remote source 使用自己的抓取超时。调用方 context
 取消也会中断执行，但不伪装成脚本自身超时。
@@ -301,7 +350,7 @@ header；未知字段同样会使 `api.ini.stringify` 失败。输出统一使�
 运行时是 Go 内嵌 ECMAScript 引擎，不是 Node.js，也不是通用代码执行环境。
 脚本没有 `require`、Node.js 模块、任意文件系统、子进程、环境变量或通用网络
 API。即使填写保留的 `permissions` object，也不会出现这些能力。远程脚本抓取、
-订阅生成、文件读取和节点探测只能通过 Sandrone 的受控边界进行。
+订阅生成、文件读取、节点探测及经输入节点的 HTTP 请求只能通过 Sandrone 的受控边界进行。
 
 envelope 含节点凭据与请求信息；脚本日志和 warning 不会自动脱敏。
 错误码、warning/report 和对外分享前的检查见[错误与诊断](errors.md#敏感诊断边界)。

@@ -266,6 +266,7 @@ func New(opts ...Option) *Service {
 	scriptproc.Register(
 		registry,
 		scriptproc.WithProbeRunner(s),
+		scriptproc.WithHTTPRequester(s),
 		scriptproc.WithResourceResolver(s),
 		scriptproc.WithLoader(s.loadScriptSource),
 		scriptproc.WithDefaultTimeout(func() time.Duration {

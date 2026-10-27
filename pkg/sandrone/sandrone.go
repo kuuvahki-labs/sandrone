@@ -100,16 +100,18 @@ type (
 	ShadowTLSOptions            = domain.ShadowTLSOptions
 	AnyTLSOptions               = domain.AnyTLSOptions
 
-	RemoteInput     = domain.RemoteInput
-	ParseRequest    = domain.ParseRequest
-	ParseResult     = domain.ParseResult
-	RenderRequest   = domain.RenderRequest
-	RenderResult    = domain.RenderResult
-	ConvertRequest  = domain.ConvertRequest
-	ProbeResult     = domain.ProbeResult
-	NodeProbeResult = domain.NodeProbeResult
-	FileRequest     = domain.FileRequest
-	FileResult      = domain.FileResult
+	RemoteInput        = domain.RemoteInput
+	RemoteBatchInput   = domain.RemoteBatchInput
+	RemoteSourceResult = domain.RemoteSourceResult
+	ParseRequest       = domain.ParseRequest
+	ParseResult        = domain.ParseResult
+	RenderRequest      = domain.RenderRequest
+	RenderResult       = domain.RenderResult
+	ConvertRequest     = domain.ConvertRequest
+	ProbeResult        = domain.ProbeResult
+	NodeProbeResult    = domain.NodeProbeResult
+	FileRequest        = domain.FileRequest
+	FileResult         = domain.FileResult
 )
 
 // Store is the storage boundary accepted by NewWithStore. Keys are safe
@@ -138,10 +140,13 @@ const (
 	DiagnoseStatusPartial = domain.DiagnoseStatusPartial
 	DiagnoseStatusFailed  = domain.DiagnoseStatusFailed
 
-	DiagnoseInputAuto         = domain.DiagnoseInputAuto
-	DiagnoseInputNodes        = domain.DiagnoseInputNodes
-	DiagnoseInputSubscription = domain.DiagnoseInputSubscription
-	DiagnoseInputFile         = domain.DiagnoseInputFile
+	DiagnoseInputAuto             = domain.DiagnoseInputAuto
+	DiagnoseInputNodes            = domain.DiagnoseInputNodes
+	DiagnoseInputURLList          = domain.DiagnoseInputURLList
+	DefaultRemoteBatchConcurrency = domain.DefaultRemoteBatchConcurrency
+	MaxRemoteBatchConcurrency     = domain.MaxRemoteBatchConcurrency
+	DiagnoseInputSubscription     = domain.DiagnoseInputSubscription
+	DiagnoseInputFile             = domain.DiagnoseInputFile
 
 	DiagnoseCacheModeRefresh = domain.DiagnoseCacheModeRefresh
 	DiagnoseCacheModeReuse   = domain.DiagnoseCacheModeReuse

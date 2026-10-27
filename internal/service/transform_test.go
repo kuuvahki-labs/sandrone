@@ -1074,7 +1074,7 @@ func TestServiceParseRejectsContentAndRemoteTogether(t *testing.T) {
 
 	require.Error(t, err)
 	require.True(t, domain.IsCode(err, domain.CodeInvalidArgument))
-	require.Contains(t, err.Error(), "content and remote input are mutually exclusive")
+	require.Contains(t, err.Error(), "exactly one of content, remote or remote_batch is required")
 }
 func TestServiceConvertRejectsUnsupportedFormats(t *testing.T) {
 	svc := service.New()

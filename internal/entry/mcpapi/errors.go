@@ -17,8 +17,17 @@ import (
 
 const internalErrorCode = "internal_error"
 
+type conversionReportError struct {
+	cause  error
+	report domain.Report
+}
+
+func (e *conversionReportError) Error() string { return e.cause.Error() }
+func (e *conversionReportError) Unwrap() error { return e.cause }
+
 type toolErrorEnvelope struct {
-	Error toolErrorDetail `json:"error"`
+	Report *domain.Report  `json:"report,omitzero"`
+	Error  toolErrorDetail `json:"error"`
 }
 
 type toolErrorDetail struct {
@@ -69,6 +78,9 @@ func newToolErrorResult(err error, context toolErrorContext) *mcp.CallToolResult
 		detail.Message = "requested resource was not found"
 	}
 	envelope := toolErrorEnvelope{Error: detail}
+	if failure, ok := errors.AsType[*conversionReportError](err); ok {
+		envelope.Report = &failure.report
+	}
 	text := fmt.Sprintf("%s: %s", detail.Code, detail.Message)
 	return &mcp.CallToolResult{
 		IsError:           true,

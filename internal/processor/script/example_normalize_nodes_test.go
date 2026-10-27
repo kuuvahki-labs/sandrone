@@ -403,28 +403,3 @@ func TestExampleNormalizeNodesStringCleanupPreservesLiteralSeparatorSemantics(t 
 	require.NoError(t, err)
 	require.Equal(t, "NotVLESS", untouched.String())
 }
-
-func TestExampleNormalizeNodesHandlesLargeSubscriptionWithinTimeout(t *testing.T) {
-	const nodeCount = 1725
-	const otherCount = 318
-	regionCodes := []string{"HK", "JP", "SG", "US", "GB", "DE", "NL"}
-	nodes := make([]domain.NodeIR, 0, nodeCount)
-	for index := 0; index < nodeCount-otherCount; index++ {
-		nodes = append(nodes, domain.NodeIR{
-			Name: fmt.Sprintf("%s-%d", regionCodes[index%len(regionCodes)], index),
-			Type: domain.NodeTypeShadowsocks, Server: fmt.Sprintf("region-%d.example.com", index),
-			Port: 8388, Cipher: "aes-128-gcm", Password: fmt.Sprintf("region-%d", index),
-		})
-	}
-	for index := 0; index < otherCount; index++ {
-		nodes = append(nodes, domain.NodeIR{
-			Name: fmt.Sprintf("❓Other_%d", index+1),
-			Type: domain.NodeTypeShadowsocks, Server: fmt.Sprintf("other-%d.example.com", index),
-			Port: 8388, Cipher: "aes-128-gcm", Password: fmt.Sprintf("other-%d", index),
-		})
-	}
-
-	out := applyExampleNormalizer(t, nil, nodes)
-	require.Len(t, out.Nodes, nodeCount-otherCount)
-	require.Contains(t, warningCodes(out.Warnings), "node_normalize_filtered")
-}

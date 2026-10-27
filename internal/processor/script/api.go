@@ -16,6 +16,7 @@ import (
 )
 
 type scriptAPI struct {
+	httpRequester    HTTPRequester
 	cfg              Config
 	warningSink      *[]domain.Warning
 	logSink          *[]string
@@ -62,6 +63,9 @@ func (a *scriptAPI) attach(vm *goja.Runtime) {
 	}
 	if a.probeRunner != nil && a.stage == string(domain.StageNodes) {
 		must(obj.Set("probe", a.jsProbe(vm)))
+	}
+	if a.httpRequester != nil && a.stage == string(domain.StageNodes) {
+		must(obj.Set("http", a.jsHTTP(vm)))
 	}
 	must(vm.Set("api", obj))
 }

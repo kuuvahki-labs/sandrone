@@ -94,12 +94,17 @@ type ProbeRunner interface {
 	Probe(ctx context.Context, req domain.ProbeRequest) (*domain.ProbeResult, error)
 }
 
+type HTTPRequester interface {
+	RequestNodeHTTP(context.Context, []domain.NodeIR, domain.NodeHTTPOptions) ([]domain.NodeHTTPResult, error)
+}
+
 type ResourceResolver interface {
 	ProduceSubscription(ctx context.Context, name string, opts domain.ScriptProduceOptions) (*domain.ScriptSubscriptionProduceResult, error)
 	FileContent(ctx context.Context, name string, opts domain.ScriptProduceOptions) (string, error)
 }
 
 type registerConfig struct {
+	httpRequester    HTTPRequester
 	probeRunner      ProbeRunner
 	resourceResolver ResourceResolver
 	loader           Loader
@@ -107,6 +112,10 @@ type registerConfig struct {
 }
 
 type RegisterOption func(*registerConfig)
+
+func WithHTTPRequester(requester HTTPRequester) RegisterOption {
+	return func(cfg *registerConfig) { cfg.httpRequester = requester }
+}
 
 func WithProbeRunner(runner ProbeRunner) RegisterOption {
 	return func(cfg *registerConfig) {
@@ -140,7 +149,7 @@ type NodeProcessor struct {
 	runner *runner
 }
 
-func buildNodeProcessorWithProbe(runner ProbeRunner, resolver ResourceResolver, loader Loader, resolveDefaultTimeout func() time.Duration) processor.NodeBuilder {
+func buildNodeProcessorWithAPIs(runner ProbeRunner, resolver ResourceResolver, loader Loader, resolveDefaultTimeout func() time.Duration, requester HTTPRequester) processor.NodeBuilder {
 	return func(spec domain.ProcessorSpec) (domain.NodeProcessor, error) {
 		cfg, err := parseConfig(spec)
 		if err != nil {
@@ -149,7 +158,9 @@ func buildNodeProcessorWithProbe(runner ProbeRunner, resolver ResourceResolver, 
 		applyDefaultTimeout(&cfg, resolveDefaultTimeout)
 		warnings := []domain.Warning{}
 		logs := []string{}
-		r, err := newRunner(cfg, newScriptAPI(cfg, &warnings, &logs, runner, resolver), loader)
+		api := newScriptAPI(cfg, &warnings, &logs, runner, resolver)
+		api.httpRequester = requester
+		r, err := newRunner(cfg, api, loader)
 		if err != nil {
 			return nil, err
 		}
@@ -286,7 +297,7 @@ func Register(r *processor.Registry, opts ...RegisterOption) {
 	}
 	nodeDescriptor := descriptor
 	nodeDescriptor.Effects.Probes = true
-	r.RegisterNodeWithDescriptor("script", buildNodeProcessorWithProbe(cfg.probeRunner, cfg.resourceResolver, cfg.loader, cfg.defaultTimeout), nodeDescriptor)
+	r.RegisterNodeWithDescriptor("script", buildNodeProcessorWithAPIs(cfg.probeRunner, cfg.resourceResolver, cfg.loader, cfg.defaultTimeout, cfg.httpRequester), nodeDescriptor)
 	r.RegisterFileWithDescriptor("script", buildFileProcessorWithResources(cfg.resourceResolver, cfg.loader, cfg.defaultTimeout), descriptor)
 }
 

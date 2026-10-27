@@ -174,7 +174,7 @@ func ScriptAPI() (ScriptAPIDocument, error) {
 		Sandbox: ScriptSandboxDocument{
 			Filesystem: false,
 			Process:    false,
-			Network:    "Only injected controlled remote reads are available when explicitly permitted.",
+			Network:    "Only injected controlled resource reads, node probes, and HTTP requests through input nodes are available.",
 			Timeout:    "Execution is bounded by timeout_ms and the service default.",
 			Logging:    "api.log output stays in the processor diagnostic sink.",
 			Sensitive:  "Scripts receive only the selected processor envelope and explicitly allowed resources.",
@@ -317,6 +317,18 @@ func scriptMethodCatalog() ([]ScriptMethodDocument, error) {
 			recommendedArity: "1-2", extraArgumentsIgnored: true, zeroArguments: "returns invalid_argument error",
 			returnKind: "value", result: "",
 			codes: []domain.ErrorCode{domain.CodeInvalidArgument, domain.CodeFileDependencyCycle, domain.CodeScriptRuntime},
+		},
+		{
+			name: "api.http.request", description: "Issue an uncached GET or HEAD through each exact input node; ordered results use zero-based subset indices.",
+			stages:             []domain.Stage{domain.StageNodes},
+			runtimeRequirement: "Requires the selected sing-box or Mihomo backend to be compiled in; defaults to sing-box, without core or direct-connection fallback.",
+			arguments: []argumentSpec{
+				{name: "nodes", prototype: []scriptproc.ScriptNode{}, required: true},
+				{name: "options", prototype: domain.NodeHTTPOptions{}, required: true},
+			},
+			recommendedArity: "2", extraArgumentsIgnored: true, zeroArguments: "returns script_runtime error",
+			returnKind: "value", result: []domain.NodeHTTPResult{},
+			codes: []domain.ErrorCode{domain.CodeInvalidArgument, domain.CodeProbeBackendUnavailable, domain.CodeProbeCoreStartFailed, domain.CodeProbeInvalidTarget, domain.CodeScriptRuntime, domain.CodeScriptTimeout},
 		},
 		{
 			name: "api.probe", description: "Probe a subset of the node-stage input through the service.",

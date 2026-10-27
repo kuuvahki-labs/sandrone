@@ -52,6 +52,13 @@ func cloneFileParts(parts []FilePart) []FilePart {
 // Clone copies the mutable containers owned directly by a report.
 func (report Report) Clone() Report {
 	out := report
+	out.SourceResults = append([]RemoteSourceResult{}, report.SourceResults...)
+	for i := range out.SourceResults {
+		if out.SourceResults[i].Error != nil {
+			cloned := *out.SourceResults[i].Error
+			out.SourceResults[i].Error = &cloned
+		}
+	}
 	out.Dependencies = append([]ResourceRef{}, report.Dependencies...)
 	out.SourceRefs = append([]SourceRef{}, report.SourceRefs...)
 	out.Warnings = append([]Warning{}, report.Warnings...)

@@ -117,6 +117,10 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 }
 
 func writeServiceError(w http.ResponseWriter, err error) {
+	writeError(w, err, serviceErrorStatus(err))
+}
+
+func serviceErrorStatus(err error) int {
 	status := http.StatusInternalServerError
 	switch {
 	case domain.IsCode(err, domain.CodeBackupInvalid):
@@ -140,14 +144,18 @@ func writeServiceError(w http.ResponseWriter, err error) {
 			status = http.StatusNotFound
 		}
 	}
-	writeError(w, err, status)
+	return status
 }
 
 func writeError(w http.ResponseWriter, err error, status int) {
+	writeJSON(w, status, errorResponse{Error: serviceErrorBody(err)})
+}
+
+func serviceErrorBody(err error) errorBody {
 	body := errorBody{Code: "internal_error", Message: err.Error()}
 	if appErr, ok := errors.AsType[*domain.AppError](err); ok {
 		body.Code = string(appErr.Code)
 		body.Message = appErr.Message
 	}
-	writeJSON(w, status, errorResponse{Error: body})
+	return body
 }

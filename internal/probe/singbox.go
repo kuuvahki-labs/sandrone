@@ -78,17 +78,11 @@ func (b *SingBoxBackend) Probe(ctx context.Context, backendReq BackendRequest, n
 		return nil, err
 	}
 	skipped := rendererSkippedNodeMessages(backendReq.Payload, "sing-box-outbounds", len(nodes))
-	instance, err := box.New(box.Options{
-		Context: boxCtx,
-		Options: options,
-	})
+	instance, err := startSingBox(boxCtx, options)
 	if err != nil {
-		return nil, domain.WrapError(domain.CodeProbeCoreStartFailed, "create sing-box instance", err)
+		return nil, err
 	}
 	defer func() { _ = instance.Close() }()
-	if err := instance.Start(); err != nil {
-		return nil, domain.WrapError(domain.CodeProbeCoreStartFailed, "start sing-box instance", err)
-	}
 
 	timeout := timeoutFromRequest(req)
 	attempts := attemptsFromRequest(req)
@@ -198,17 +192,11 @@ func (b *SingBoxNTPBackend) Probe(ctx context.Context, backendReq BackendRequest
 		return nil, err
 	}
 	skipped := rendererSkippedNodeMessages(backendReq.Payload, "sing-box-outbounds", len(nodes))
-	instance, err := box.New(box.Options{
-		Context: boxCtx,
-		Options: options,
-	})
+	instance, err := startSingBox(boxCtx, options)
 	if err != nil {
-		return nil, domain.WrapError(domain.CodeProbeCoreStartFailed, "create sing-box instance", err)
+		return nil, err
 	}
 	defer func() { _ = instance.Close() }()
-	if err := instance.Start(); err != nil {
-		return nil, domain.WrapError(domain.CodeProbeCoreStartFailed, "start sing-box instance", err)
-	}
 
 	timeout := timeoutFromRequest(req)
 	attempts := attemptsFromRequest(req)
@@ -330,4 +318,17 @@ func errorCodeForUDPNTP(err error) string {
 		return string(domain.CodeProbeTimeout)
 	}
 	return string(domain.CodeProbeUDPNTPFailed)
+}
+
+// startSingBox is shared by probe and script HTTP execution.
+func startSingBox(ctx context.Context, options option.Options) (*box.Box, error) {
+	instance, err := box.New(box.Options{Context: ctx, Options: options})
+	if err != nil {
+		return nil, domain.WrapError(domain.CodeProbeCoreStartFailed, "create sing-box instance", err)
+	}
+	if err := instance.Start(); err != nil {
+		_ = instance.Close()
+		return nil, domain.WrapError(domain.CodeProbeCoreStartFailed, "start sing-box instance", err)
+	}
+	return instance, nil
 }

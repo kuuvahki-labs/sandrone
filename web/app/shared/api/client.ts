@@ -1,4 +1,4 @@
-import type { IgnoredWarning } from "~/shared/resources/types";
+import type { IgnoredWarning, ProcessorDetail } from "~/shared/resources/types";
 import { apiSession, onApiSessionReset, resetApiSession } from "~/shared/storage/api-session";
 import { getAdminToken } from "~/shared/storage/preferences";
 
@@ -82,11 +82,32 @@ export interface SubscriptionPreviewRequest {
   refresh?: boolean;
 }
 
-export interface ConvertRequest {
-  from_format: string;
-  to_format: string;
-  content: string;
+export interface RemoteInput {
+  url: string;
+  user_agent?: string;
+  proxy?: string;
+  timeout_ms?: number;
+  cache_ttl_seconds?: number;
 }
+
+export interface RemoteBatchInput {
+  sources: RemoteInput[];
+  concurrency?: number;
+}
+
+export interface ConvertOptions {
+  to_format: string;
+  parse_processors?: ProcessorDetail[];
+  render_processors?: ProcessorDetail[];
+  options?: { format?: string };
+  meta?: Record<string, string>;
+}
+
+export type ConvertRequest = ConvertOptions & (
+  | { content: string; from_format: string; remote?: never; remote_batch?: never }
+  | { remote: RemoteInput; from_format?: string; content?: never; remote_batch?: never }
+  | { remote_batch: RemoteBatchInput; from_format?: string; content?: never; remote?: never }
+);
 
 export interface NodeInspectRequest {
   node: Record<string, unknown>;

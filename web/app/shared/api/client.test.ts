@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 
 import { saveAdminToken } from "~/shared/storage/preferences";
 
-import { ApiClient, type Fetcher } from "./client";
+import { ApiClient, type ConvertRequest, type Fetcher } from "./client";
 
 type FetchInput = Parameters<Fetcher>[0];
 type FetchOptions = NonNullable<Parameters<Fetcher>[1]>;
@@ -75,6 +75,67 @@ describe("ApiClient", () => {
 
     expect(calls[0]?.headers).toEqual({ Authorization: "Bearer secret" });
   });
+
+  it.each([
+    {
+      name: "body with an explicit source format",
+      input: { content: "[]", from_format: "json-nodes" },
+    },
+    {
+      name: "single remote source with format detection",
+      input: {
+        remote: {
+          url: "https://example.com/nodes",
+          user_agent: "fixture-agent",
+          proxy: "http://127.0.0.1:8080",
+          timeout_ms: 2000,
+          cache_ttl_seconds: 60,
+        },
+      },
+    },
+    {
+      name: "ordered remote sources with an explicit format override",
+      input: {
+        from_format: "json-nodes",
+        remote_batch: {
+          sources: [
+            { url: "https://example.com/first", timeout_ms: 1000 },
+            { url: "https://example.com/second", user_agent: "fixture-agent", cache_ttl_seconds: 0 },
+          ],
+          concurrency: 2,
+        },
+      },
+    },
+  ] satisfies Array<{ name: string; input: Omit<ConvertRequest, "to_format"> }>)(
+    "serializes $name and processing options to the protected convert endpoint",
+    async ({ input }) => {
+      saveAdminToken("secret");
+      const calls: Array<{ input: FetchInput; init?: FetchOptions }> = [];
+      const result = { body: "[]", report: { status: "ok" } };
+      const client = new ApiClient({
+        fetcher: async (url, init) => {
+          calls.push({ input: url, init });
+          return new Response(JSON.stringify(result), { headers: { "content-type": "application/json" } });
+        },
+      });
+      const request: ConvertRequest = {
+        ...input,
+        to_format: "json-nodes",
+        parse_processors: [{ type: "dedupe", stage: "nodes", params: { mode: "connection" } }],
+        render_processors: [{ type: "script", stage: "nodes", enabled: false, params: { source: "fixture" } }],
+        options: { format: "json" },
+        meta: { source: "contract-test" },
+      };
+
+      await expect(client.convert(request)).resolves.toEqual(result);
+
+      expect(calls).toHaveLength(1);
+      expect(String(calls[0]?.input)).toBe("/v1/convert");
+      expect(calls[0]?.init?.method).toBe("POST");
+      expect(calls[0]?.init?.headers).toEqual({ Authorization: "Bearer secret", "Content-Type": "application/json" });
+      expect(calls[0]?.init?.body).toBe(JSON.stringify(request));
+    },
+  );
 
   it("posts a node and requested information to the protected inspection endpoint", async () => {
     saveAdminToken("secret");

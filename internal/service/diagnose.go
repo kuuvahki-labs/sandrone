@@ -46,6 +46,9 @@ func (s *Service) Diagnose(ctx context.Context, req domain.DiagnoseRequest) (*do
 
 	var err error
 	switch {
+	case req.RemoteBatch != nil:
+		result.Input = domain.DiagnoseInput{Kind: domain.DiagnoseInputURLList, Name: req.Name, Remote: true}
+		err = s.diagnoseNodes(ctx, req, result)
 	case req.Remote != nil:
 		result.Input = domain.DiagnoseInput{Kind: domain.DiagnoseInputNodes, Name: req.Name, Format: normalizeFormat(req.Format), Remote: true}
 		err = s.diagnoseNodes(ctx, req, result)
@@ -112,6 +115,9 @@ func (s *Service) Diagnose(ctx context.Context, req domain.DiagnoseRequest) (*do
 
 func validateDiagnoseRequest(req domain.DiagnoseRequest) error {
 	sources := 0
+	if req.RemoteBatch != nil {
+		sources++
+	}
 	if req.Remote != nil {
 		sources++
 	}
@@ -121,21 +127,27 @@ func validateDiagnoseRequest(req domain.DiagnoseRequest) error {
 	if req.File != nil {
 		sources++
 	}
-	if len(req.Content) > 0 || sources == 0 {
+	if req.Content != nil || sources == 0 {
 		sources++
 	}
 	if sources != 1 {
 		return domain.NewError(domain.CodeInvalidArgument, "diagnose request must identify exactly one input")
 	}
 	switch req.Kind {
-	case domain.DiagnoseInputAuto, domain.DiagnoseInputNodes, domain.DiagnoseInputSubscription, domain.DiagnoseInputFile:
+	case domain.DiagnoseInputAuto, domain.DiagnoseInputNodes, domain.DiagnoseInputURLList, domain.DiagnoseInputSubscription, domain.DiagnoseInputFile:
 	default:
-		return domain.NewError(domain.CodeInvalidArgument, "diagnose kind must be auto, nodes, subscription, or file")
+		return domain.NewError(domain.CodeInvalidArgument, "diagnose kind must be auto, nodes, url-list, subscription, or file")
 	}
 	switch req.CacheMode {
 	case domain.DiagnoseCacheModeRefresh, domain.DiagnoseCacheModeReuse:
 	default:
 		return domain.NewError(domain.CodeInvalidArgument, "diagnose cache_mode must be refresh or reuse")
+	}
+	if req.RemoteBatch != nil && req.Kind != domain.DiagnoseInputAuto && req.Kind != domain.DiagnoseInputNodes && req.Kind != domain.DiagnoseInputURLList {
+		return domain.NewError(domain.CodeInvalidArgument, "remote_batch diagnose input requires nodes or url-list kind")
+	}
+	if req.Kind == domain.DiagnoseInputURLList && req.RemoteBatch == nil {
+		return domain.NewError(domain.CodeInvalidArgument, "url-list diagnose input requires remote_batch")
 	}
 	if req.Remote != nil && req.Kind != domain.DiagnoseInputAuto && req.Kind != domain.DiagnoseInputNodes {
 		return domain.NewError(domain.CodeInvalidArgument, "remote diagnose input only supports nodes")
@@ -149,7 +161,7 @@ func validateDiagnoseRequest(req domain.DiagnoseRequest) error {
 	if (req.SubscriptionName != "" || req.File != nil) && (len(req.Processors) > 0 || strings.TrimSpace(req.Format) != "") {
 		return domain.NewError(domain.CodeInvalidArgument, "format and one-time processors are only supported for nodes input")
 	}
-	if len(req.Processors) > 0 && req.Kind != domain.DiagnoseInputAuto && req.Kind != domain.DiagnoseInputNodes {
+	if len(req.Processors) > 0 && req.Kind != domain.DiagnoseInputAuto && req.Kind != domain.DiagnoseInputNodes && req.Kind != domain.DiagnoseInputURLList {
 		return domain.NewError(domain.CodeInvalidArgument, "one-time processors are only supported for nodes input")
 	}
 	return nil
@@ -353,7 +365,13 @@ func (s *Service) diagnoseNodes(ctx context.Context, req domain.DiagnoseRequest,
 		parsed *parseInputResult
 		err    error
 	)
-	if req.Remote != nil {
+	switch {
+	case req.RemoteBatch != nil:
+		parsed, err = s.parseRequestInput(ctx, domain.ParseRequest{Format: req.Format, RemoteBatch: req.RemoteBatch})
+		if parsed != nil {
+			result.Report = s.prepareReport("diagnose", domain.Report{SourceResults: parsed.SourceResults, Status: parsed.Status})
+		}
+	case req.Remote != nil:
 		remoteInput, fetchErr := s.fetchRemoteInput(ctx, *req.Remote)
 		if fetchErr != nil {
 			return fetchErr
@@ -367,7 +385,7 @@ func (s *Service) diagnoseNodes(ctx context.Context, req domain.DiagnoseRequest,
 		}
 		result.Input.Format = normalizeFormat(format)
 		parsed, err = s.parseNodeContent(ctx, format, remoteInput.Body, false, &remoteInput.SourceRef)
-	} else {
+	default:
 		parsed, err = s.parseRequestInput(ctx, domain.ParseRequest{Format: req.Format, Content: req.Content})
 	}
 	if err != nil {
@@ -416,11 +434,11 @@ func (s *Service) diagnoseNodes(ctx context.Context, req domain.DiagnoseRequest,
 		}
 		nodes = post.Nodes
 	}
-	if len(nodes) == 0 {
+	if len(nodes) == 0 && req.RemoteBatch == nil {
 		return domain.NewError(domain.CodeNodeValidationFailed, "node input produced no final nodes")
 	}
 	result.Nodes = append([]domain.NodeIR{}, nodes...)
-	result.Report = s.prepareReport("diagnose", domain.Report{Warnings: append([]domain.Warning{}, result.Warnings...), SourceRefs: append([]domain.SourceRef{}, result.SourceRefs...)})
+	result.Report = s.prepareReport("diagnose", domain.Report{SourceResults: parsed.SourceResults, Warnings: append([]domain.Warning{}, result.Warnings...), SourceRefs: append([]domain.SourceRef{}, result.SourceRefs...)})
 	return nil
 }
 
