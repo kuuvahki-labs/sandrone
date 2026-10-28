@@ -74,14 +74,14 @@ func TestExampleExitInfoOnlyAnnotatesOneRequestPerNode(t *testing.T) {
 		require.Equal(t, 1, count)
 	}
 	require.Len(t, out.Nodes, len(input), "exit-info must not filter or limit nodes")
-	require.Len(t, out.Warnings, 4)
+	require.Len(t, out.Warnings, 2)
 	for i, node := range out.Nodes {
 		original, observed := input[i], node
 		original.Meta, observed.Meta = nil, nil
 		require.Equal(t, original, observed, "node order, names and connection fields must not change")
 		require.Equal(t, "keep", node.Meta["owner"])
 		require.Equal(t, "keep", node.Meta["exit.note"])
-		if i == 0 || i == 5 {
+		if i == 0 || i == 3 || i == 4 || i == 5 {
 			require.Equal(t, "true", node.Meta["exit.valid"])
 		} else {
 			require.Equal(t, "false", node.Meta["exit.valid"])
@@ -103,40 +103,21 @@ func TestExampleExitInfoOnlyAnnotatesOneRequestPerNode(t *testing.T) {
 	}
 }
 
-func TestExampleExitInfoValidatesIPv4IPv6AndCountry(t *testing.T) {
+func TestExampleExitInfoAcceptsResponseIPAndCountryWithoutValidation(t *testing.T) {
 	vm := goja.New()
-	_, err := vm.RunString(exitInfoSource(t))
+	value, err := vm.RunString(exitInfoSource(t) + `
+  var warnings=[];
+  var result=main({nodes:[{name:"n",type:"http",server:"example.com",port:80}]},{http:{request:function(){return [{index:0,status_code:200,duration_ms:10,body:"ip=not-an-ip\nloc=XX\n"}];}},warn:function(w){warnings.push(w);}});
+  result.nodes.length===1 && result.nodes[0].meta["exit.valid"]==="true" &&
+    result.nodes[0].meta["exit.ip"]==="not-an-ip" && result.nodes[0].meta["exit.country"]==="XX" && warnings.length===0;`)
 	require.NoError(t, err)
-	validIP, ok := goja.AssertFunction(vm.Get("validIP"))
-	require.True(t, ok)
-	for _, ip := range []string{"8.8.8.8", "2001:db8::1", "::", "::ffff:8.8.8.8"} {
-		v, e := validIP(goja.Undefined(), vm.ToValue(ip))
-		require.NoError(t, e)
-		require.True(t, v.ToBoolean(), ip)
-	}
-	for _, ip := range []string{"999.0.0.1", "01.2.3.4", "2001:db8:::1", "1:2:3:4:5:6:7:8:9", "not-ip", "::ffff:999.0.0.1"} {
-		v, e := validIP(goja.Undefined(), vm.ToValue(ip))
-		require.NoError(t, e)
-		require.False(t, v.ToBoolean(), ip)
-	}
+	require.True(t, value.ToBoolean())
 }
 
-func TestExampleExitInfoRejectsNonPublicAndAmbiguousResponses(t *testing.T) {
+func TestExampleExitInfoRejectsAmbiguousResponses(t *testing.T) {
 	vm := goja.New()
 	_, err := vm.RunString(exitInfoSource(t))
 	require.NoError(t, err)
-	check, ok := goja.AssertFunction(vm.Get("publicIP"))
-	require.True(t, ok)
-	for _, ip := range []string{"8.8.8.8", "2001:4860:4860::8888", "::ffff:8.8.8.8", "::ffff:0808:0808"} {
-		v, e := check(goja.Undefined(), vm.ToValue(ip))
-		require.NoError(t, e)
-		require.True(t, v.ToBoolean(), ip)
-	}
-	for _, ip := range []string{"0.0.0.0", "10.0.0.1", "127.0.0.1", "169.254.1.1", "172.16.0.1", "192.168.0.1", "100.64.0.1", "224.0.0.1", "255.255.255.255", "192.0.2.1", "198.51.100.1", "203.0.113.1", "::", "::1", "fe80::1", "fc00::1", "ff02::1", "2001:db8::1", "3fff::1", "::ffff:127.0.0.1", "::ffff:7f00:1"} {
-		v, e := check(goja.Undefined(), vm.ToValue(ip))
-		require.NoError(t, e)
-		require.False(t, v.ToBoolean(), ip)
-	}
 	value, err := vm.RunString(`var warnings=[];var result=main({nodes:[{name:"n",type:"http",server:"example.com",port:80}]},{http:{request:function(){return [{index:0,status_code:200,duration_ms:10,body:"ip=8.8.8.8\nloc=XX\nloc=US\n"}];}},warn:function(w){warnings.push(w);}});result.nodes.length===1 && result.nodes[0].name==="n" && result.nodes[0].meta["exit.valid"]==="false" && warnings.length===1;`)
 	require.NoError(t, err)
 	require.True(t, value.ToBoolean())
